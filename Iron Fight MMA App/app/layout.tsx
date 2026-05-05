@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const bebasNeue = Bebas_Neue({
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="de" className={`${inter.variable} ${bebasNeue.variable}`}>
       <body className="bg-[#050505] text-white font-sans antialiased">
         <AuthProvider>
+          <ServiceWorkerRegistration />
           <Navbar />
           <main>{children}</main>
           <Footer />
