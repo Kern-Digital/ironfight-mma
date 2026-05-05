@@ -3,28 +3,27 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useFighterName } from "@/lib/auth-context";
 
 const links = [
   { href: "/", label: "Home" },
   { href: "/training", label: "Training" },
+  { href: "/techniques", label: "Techniken" },
+  { href: "/workout/generator", label: "Generator" },
   { href: "/timer", label: "Timer" },
   { href: "/dashboard", label: "Dashboard" },
 ];
 
-function initialsOf(name?: string | null, email?: string | null) {
-  if (name) {
-    const parts = name.trim().split(/\s+/);
-    return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
-  }
-  if (email) return email[0].toUpperCase();
-  return "?";
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "F") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, logOut } = useAuth();
+  const fighterName = useFighterName();
   const [open, setOpen] = useState(false);
 
   async function handleLogout() {
@@ -58,7 +57,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${
+                className={`relative px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors lg:text-sm lg:px-4 ${
                   active ? "text-blood" : "text-foreground/70 hover:text-foreground"
                 }`}
               >
@@ -77,15 +76,13 @@ export default function Navbar() {
           ) : user ? (
             <>
               <Link
-                href="/dashboard"
+                href="/profile"
                 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-foreground/80 hover:text-blood"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-sm border border-blood bg-blood/15 text-xs font-black text-blood">
-                  {initialsOf(user.displayName, user.email)}
+                  {initialsOf(fighterName)}
                 </span>
-                <span className="hidden lg:inline">
-                  {user.displayName || user.email?.split("@")[0]}
-                </span>
+                <span className="hidden lg:inline">{fighterName}</span>
               </Link>
               <button
                 onClick={handleLogout}
@@ -133,6 +130,15 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {user && (
+              <Link
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className="px-2 py-3 text-sm font-bold uppercase tracking-wider text-foreground/80 hover:text-blood"
+              >
+                Profil ({fighterName})
+              </Link>
+            )}
             <div className="mt-2 flex gap-2 border-t border-carbon-500 pt-3">
               {user ? (
                 <button

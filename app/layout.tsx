@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
 import PwaRegister from "@/components/PwaRegister";
+import FighterNameModal from "@/components/auth/FighterNameModal";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -31,6 +32,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#dc2626",
+  width: "device-width",
+  initialScale: 1,
+  // Erlaubt Zoom — Usability ist wichtiger als perfekte App-Optik
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -48,6 +53,7 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />
+          <FighterNameModal />
         </AuthProvider>
       </body>
     </html>

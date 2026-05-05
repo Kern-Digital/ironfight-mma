@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  playStartSignal,
-  playEndSignal,
+  playRoundStart,
+  playRoundEnd,
+  playSessionEnd,
   playRestStart,
   playCountdownTick,
   playLastTick,
   playPrepBeep,
-} from "./beep";
+  tickVolumeForRemaining,
+  vibrateTick,
+  vibrateRoundEnd,
+  vibrateSessionEnd,
+} from "./audio";
 
 export type Phase = "idle" | "prep" | "work" | "rest" | "done";
 
@@ -80,13 +85,21 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
       endAtRef.current = seconds > 0 ? Date.now() + seconds * 1000 : null;
       lastTickSecRef.current = -1; // Reset Countdown-Tracker
 
-      if (next === "work") playStartSignal();
-      else if (next === "rest") playRestStart();
-      else if (next === "prep") playPrepBeep();
-      else if (next === "done") {
+      if (next === "work") {
+        playRoundStart();
+      } else if (next === "rest") {
+        // Zwischen Runden: Boxglocke + Gong-Pause-Start
+        playRoundEnd();
+        // Gong-Pause-Sound mit kleinem Versatz, damit beide hörbar bleiben
+        setTimeout(() => playRestStart(), 700);
+        vibrateRoundEnd();
+      } else if (next === "prep") {
+        playPrepBeep();
+      } else if (next === "done") {
         setRunning(false);
         endAtRef.current = null;
-        playEndSignal();
+        playSessionEnd();
+        vibrateSessionEnd();
       }
     },
     [config.prepSeconds, config.workSeconds, config.restSeconds],
@@ -103,13 +116,17 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
       const cur = phaseRef.current;
 
       // ─── Countdown-Ticks: letzte 10 Sek. in der Rest-Phase ───
+      // Lautstärke steigt linear von 0.30 (Sek. 10) auf 1.00 (Sek. 2-1)
+      // Vibration in den letzten 3 Sekunden
       if (cur === "rest" && left > 0 && left <= 10) {
         if (lastTickSecRef.current !== left) {
           lastTickSecRef.current = left;
           if (left === 1) {
             playLastTick();
+            vibrateTick();
           } else {
-            playCountdownTick();
+            playCountdownTick(tickVolumeForRemaining(left));
+            if (left <= 3) vibrateTick();
           }
         }
       }
@@ -133,6 +150,7 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
     if (phase === "done" || phase === "idle") {
       enterPhase("prep", 1);
     } else {
+      // Resume: endAt aus aktuellem remaining berechnen
       endAtRef.current = Date.now() + remaining * 1000;
     }
     setRunning(true);

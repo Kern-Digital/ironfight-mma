@@ -9,6 +9,9 @@ import {
 } from "@/lib/use-workout-timer";
 import { useAuth } from "@/lib/auth-context";
 import { logWorkout } from "@/lib/workouts";
+import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
+import { useTimerSettings } from "@/lib/use-timer-settings";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
@@ -62,6 +65,7 @@ function parsePositive(v: string | null, fallback: number) {
 function TimerView() {
   const params = useSearchParams();
   const { user } = useAuth();
+  const { settings, setSoundOn, setVibrate, setWakeLock } = useTimerSettings();
 
   const initial = useMemo<TimerConfig>(
     () => ({
@@ -79,6 +83,15 @@ function TimerView() {
     t.phase === "idle" || t.totalForPhase === 0
       ? 0
       : 1 - t.remaining / t.totalForPhase;
+
+  // Display wach halten, wenn Timer läuft und Setting aktiv
+  useWakeLock(settings.wakeLock && t.running);
+
+  // Audio-Unlock-Status (nur initial gesetzt — wird beim Start aktualisiert)
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  useEffect(() => {
+    setAudioUnlocked(isAudioUnlocked());
+  }, []);
 
   const [logState, setLogState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
@@ -124,6 +137,15 @@ function TimerView() {
     t.setConfig({ ...t.config, [key]: Math.max(1, Math.floor(value || 0)) });
   }
 
+  /** Audio-Unlock + Timer-Start in einem Click — kritisch für iOS! */
+  async function handleStart() {
+    if (!audioUnlocked) {
+      const ok = await unlockAudio();
+      setAudioUnlocked(ok);
+    }
+    t.start();
+  }
+
   const isLocked = t.phase !== "idle";
 
   return (
@@ -134,7 +156,28 @@ function TimerView() {
         description="Konfiguriere Runden, Pausen und Vorbereitung — dann auf die Glocke."
       />
 
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 sm:px-6">
+        {/* Sound-Unlock-Hinweis für Mobile, vor erstem Start */}
+        {!audioUnlocked && t.phase === "idle" && (
+          <div className="mb-4 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            <div className="font-bold">📱 Sound-Hinweis</div>
+            <p className="mt-1 text-xs text-yellow-100/80">
+              Auf Handys muss der Sound einmal pro Sitzung freigegeben werden.
+              Tippe auf <strong>Start</strong> oder den Button unten —
+              danach hörst du Glocke, Ticks und Sounds.
+            </p>
+            <button
+              onClick={async () => {
+                const ok = await unlockAudio();
+                setAudioUnlocked(ok);
+              }}
+              className="mt-3 rounded-sm border border-yellow-500 bg-yellow-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-yellow-100 hover:bg-yellow-500/30"
+            >
+              🔔 Sound jetzt aktivieren
+            </button>
+          </div>
+        )}
+
         <div className="card">
           <div className="flex items-center justify-between">
             <div className={`text-xs font-bold uppercase tracking-widest ${PHASE_COLOR[t.phase]}`}>
@@ -145,10 +188,13 @@ function TimerView() {
             </div>
           </div>
 
-          <div className="my-8 text-center">
+          <div className="my-6 sm:my-8 text-center">
             <div
-              className={`font-display text-8xl font-black leading-none sm:text-9xl ${PHASE_COLOR[t.phase]}`}
-              style={{ fontVariantNumeric: "tabular-nums" }}
+              className={`font-display font-black leading-none ${PHASE_COLOR[t.phase]}`}
+              style={{
+                fontVariantNumeric: "tabular-nums",
+                fontSize: "clamp(5rem, 22vw, 10rem)",
+              }}
             >
               {formatTime(t.remaining)}
             </div>
@@ -171,20 +217,31 @@ function TimerView() {
             />
           </div>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          {/* Große Touch-Buttons — auch mit verschwitzten Händen treffbar */}
+          <div className="mt-6 sm:mt-8 grid grid-cols-3 gap-2 sm:gap-3">
             {!t.running ? (
-              <button onClick={t.start} className="btn-primary px-8">
+              <button
+                onClick={handleStart}
+                className="btn-primary col-span-3 sm:col-span-1 py-4 text-base"
+              >
                 {t.phase === "idle" || t.phase === "done" ? "Start" : "Weiter"}
               </button>
             ) : (
-              <button onClick={t.pause} className="btn-primary px-8">
+              <button
+                onClick={t.pause}
+                className="btn-primary col-span-3 sm:col-span-1 py-4 text-base"
+              >
                 Pause
               </button>
             )}
-            <button onClick={t.skip} className="btn-secondary" disabled={t.phase === "idle" || t.phase === "done"}>
+            <button
+              onClick={t.skip}
+              className="btn-secondary py-4 text-base"
+              disabled={t.phase === "idle" || t.phase === "done"}
+            >
               Skip
             </button>
-            <button onClick={t.reset} className="btn-secondary">
+            <button onClick={t.reset} className="btn-secondary py-4 text-base">
               Reset
             </button>
           </div>
@@ -209,6 +266,28 @@ function TimerView() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Settings: Sound, Vibration, Wake-Lock — Toggle-Reihe */}
+        <div className="mt-6 grid grid-cols-3 gap-2 text-center text-xs uppercase tracking-widest">
+          <SettingToggle
+            label="Sound"
+            value={settings.soundOn}
+            onChange={setSoundOn}
+            icon="🔔"
+          />
+          <SettingToggle
+            label="Vibration"
+            value={settings.vibrate}
+            onChange={setVibrate}
+            icon="📳"
+          />
+          <SettingToggle
+            label="Display an"
+            value={settings.wakeLock}
+            onChange={setWakeLock}
+            icon="🌓"
+          />
         </div>
 
         <div className="mt-8">
@@ -277,6 +356,34 @@ function TimerView() {
   );
 }
 
+function SettingToggle({
+  label,
+  value,
+  onChange,
+  icon,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  icon: string;
+}) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      className={`flex flex-col items-center gap-1 rounded-sm border px-3 py-3 transition-all ${
+        value
+          ? "border-blood/60 bg-blood/10 text-blood"
+          : "border-carbon-500 bg-carbon-700/40 text-foreground/40"
+      }`}
+    >
+      <span className="text-base">{icon}</span>
+      <span className="text-[10px] font-bold tracking-widest">
+        {label} {value ? "an" : "aus"}
+      </span>
+    </button>
+  );
+}
+
 function ConfigField({
   label,
   value,
@@ -299,6 +406,7 @@ function ConfigField({
         <input
           type="number"
           min={1}
+          inputMode="numeric"
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           disabled={disabled}
