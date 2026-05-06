@@ -90,7 +90,7 @@ export async function unlockAudio(): Promise<boolean> {
   const all = [..._bellPool, ..._countdownPool];
   const proms = all.map(async (el) => {
     try {
-      el.volume = 0.001;
+      el.volume = 0;
       await el.play();
       el.pause();
       el.currentTime = 0;
@@ -171,12 +171,10 @@ export function playRoundEnd(): void {
   if (el) playEl(el, 0.85);
 }
 
-/** Session-Ende — Bell zweimal hintereinander */
+/** Session-Ende — Bell (Datei enthält bereits Doppelglocke) */
 export function playSessionEnd(): void {
-  const e1 = nextBell();
-  const e2 = nextBell();
-  if (e1) playEl(e1, 0.85);
-  if (e2) setTimeout(() => playEl(e2, 0.85), 900);
+  const el = nextBell();
+  if (el) playEl(el, 0.85);
 }
 
 /** Pause-Start — leiser Glocken-Hinweis */

@@ -5,7 +5,6 @@ import {
   playRoundStart,
   playRoundEnd,
   playSessionEnd,
-  playRestStart,
   playCountdownTick,
   playLastTick,
   playPrepBeep,
@@ -57,6 +56,7 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
   const roundRef = useRef(1);
   // Verhindert doppelte Countdown-Ticks: speichert die zuletzt abgespielte Sekunde
   const lastTickSecRef = useRef<number>(-1);
+  const restSoundTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { roundRef.current = round; }, [round]);
@@ -70,6 +70,11 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
 
   const enterPhase = useCallback(
     (next: Phase, nextRound = roundRef.current) => {
+      if (restSoundTimeoutRef.current !== null) {
+        clearTimeout(restSoundTimeoutRef.current);
+        restSoundTimeoutRef.current = null;
+      }
+
       const seconds =
         next === "prep"
           ? config.prepSeconds
@@ -88,10 +93,7 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
       if (next === "work") {
         playRoundStart();
       } else if (next === "rest") {
-        // Zwischen Runden: Boxglocke + Gong-Pause-Start
         playRoundEnd();
-        // Gong-Pause-Sound mit kleinem Versatz, damit beide hörbar bleiben
-        setTimeout(() => playRestStart(), 700);
         vibrateRoundEnd();
       } else if (next === "prep") {
         playPrepBeep();
@@ -162,6 +164,10 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
   }, []);
 
   const reset = useCallback(() => {
+    if (restSoundTimeoutRef.current !== null) {
+      clearTimeout(restSoundTimeoutRef.current);
+      restSoundTimeoutRef.current = null;
+    }
     setRunning(false);
     setPhase("idle");
     setRound(1);
