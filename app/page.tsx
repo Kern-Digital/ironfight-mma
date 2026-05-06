@@ -118,23 +118,6 @@ export default function Home() {
             "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.18), transparent 60%), radial-gradient(420px 260px at 0% 110%, rgba(255,45,120,.14), transparent 60%), linear-gradient(160deg, #0A1218, #050709 70%)",
         }}
       >
-        {/* Background photo */}
-        <Image
-          src="/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"
-          alt=""
-          fill
-          className="pointer-events-none object-cover object-center"
-          style={{ opacity: 0.12, mixBlendMode: "luminosity" }}
-          priority
-        />
-        {/* Dark scrim over photo */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(160deg, rgba(10,18,24,.85) 0%, rgba(5,7,9,.92) 100%)",
-          }}
-        />
         {/* Grid overlay */}
         <div
           className="pointer-events-none absolute inset-0"
@@ -445,10 +428,24 @@ export default function Home() {
 
       {/* ── ABSCHLUSS-CTA ── */}
       <section
-        className="py-16 sm:py-24 text-center"
+        className="relative overflow-hidden py-16 sm:py-24 text-center"
         style={{ borderTop: "1px solid var(--ink-4)" }}
       >
-        <div className="mx-auto max-w-2xl px-4 sm:px-6">
+        <Image
+          src="/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"
+          alt=""
+          fill
+          className="pointer-events-none object-cover object-center"
+          style={{ opacity: 0.18, mixBlendMode: "luminosity" }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(5,7,9,.7) 0%, rgba(5,7,9,.85) 100%)",
+          }}
+        />
+        <div className="relative z-10 mx-auto max-w-2xl px-4 sm:px-6">
           <h2
             className="font-display-ta font-black uppercase text-3xl sm:text-5xl"
             style={{ letterSpacing: "0.02em", lineHeight: 0.9 }}
