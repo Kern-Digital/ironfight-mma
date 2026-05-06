@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 const disciplines = [
   {
@@ -132,21 +133,40 @@ export default function Home() {
         />
 
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:py-32">
-          {/* Eye */}
-          <div className="mb-5 inline-flex items-center gap-2">
-            <span
-              className="h-2 w-2 animate-dot-pulse rounded-full"
+          {/* Logo + Eye */}
+          <div className="mb-6 flex items-center gap-4">
+            <Image
+              src="/icons/icon-192.png"
+              alt="Tidal Athletics"
+              width={56}
+              height={56}
+              className="rounded-2xl"
               style={{
-                background: "var(--ta-cyan)",
-                boxShadow: "0 0 12px var(--ta-cyan)",
+                boxShadow: "0 0 28px rgba(0,212,230,.35), 0 0 60px rgba(255,45,120,.12)",
               }}
+              priority
             />
-            <span
-              className="font-mono-ta text-[10px] uppercase"
-              style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}
-            >
-              Tidal Athletics
-            </span>
+            <div>
+              <div
+                className="font-display-ta font-black uppercase leading-none"
+                style={{ fontSize: "20px", letterSpacing: "0.1em" }}
+              >
+                <span style={{ color: "var(--ta-pink)" }}>Tidal</span>
+                <span style={{ color: "var(--ta-cyan)" }}>Athletics</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className="h-1.5 w-1.5 animate-dot-pulse rounded-full"
+                  style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                />
+                <span
+                  className="font-mono-ta text-[9px] uppercase"
+                  style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}
+                >
+                  MMA Training
+                </span>
+              </div>
+            </div>
           </div>
 
           <h1

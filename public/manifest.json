@@ -4,8 +4,8 @@
   "description": "Deine MMA Trainings-App. Boxing, Wrestling, BJJ, Muay Thai — Timer, Pläne und Fortschritts-Tracking.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#dc2626",
+  "background_color": "#030406",
+  "theme_color": "#00D4E6",
   "orientation": "portrait-primary",
   "icons": [
     {
