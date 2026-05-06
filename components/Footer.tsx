@@ -48,6 +48,11 @@ export default function Footer() {
                 Dashboard
               </Link>
             </li>
+            <li>
+              <Link href="/workout" className="hover:text-blood">
+                Workout Generator
+              </Link>
+            </li>
           </ul>
         </div>
 

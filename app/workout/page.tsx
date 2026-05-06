@@ -428,7 +428,7 @@ function WorkoutRunner() {
             icon="📳"
           />
           <SettingToggle
-            label="Display an"
+            label="Display"
             value={settings.wakeLock}
             onChange={setWakeLock}
             icon="🌓"
