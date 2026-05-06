@@ -54,14 +54,25 @@ function DashboardContent() {
     setSessions(null);
     setStats(null);
 
-    getRecentWorkouts(user.uid, 20)
+    // Timeout verhindert endlosen Ladezustand auf Mobile (z. B. bei Firestore-Problemen)
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Verbindung zu Firestore dauert zu lange. Bitte Internetverbindung prüfen.")),
+        15000,
+      ),
+    );
+
+    Promise.race([getRecentWorkouts(user.uid, 20), timeout])
       .then((data) => {
-        setSessions(data);
-        setStats(computeStats(data));
+        setSessions(data as WorkoutSession[]);
+        setStats(computeStats(data as WorkoutSession[]));
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
         setError(msg);
+        // Leere Sessions setzen damit kein endloser Skeleton-Zustand entsteht
+        setSessions([]);
+        setStats(computeStats([]));
       });
   }, [user]);
 
@@ -97,7 +108,11 @@ function DashboardContent() {
             <ErrorState
               title="Daten konnten nicht geladen werden"
               message={error}
-              hint="Prüfe ob Firestore in der Firebase Console aktiviert ist."
+              hint={
+                error.includes("permission")
+                  ? "Firestore-Berechtigungen prüfen — oder erneut einloggen."
+                  : "Prüfe deine Internetverbindung und lade die Seite neu."
+              }
               onRetry={fetchData}
             />
           </div>
@@ -160,7 +175,7 @@ function DashboardContent() {
                 Nur Timer
               </Link>
               <Link href="/techniques" className="btn-secondary text-sm">
-                Technikbibliothek
+                Techniken
               </Link>
             </div>
           </div>
@@ -188,9 +203,10 @@ function DashboardContent() {
             </div>
           )}
 
-          {sessions && sessions.length === 0 && (
-            <div className="mt-6 rounded-sm border border-dashed border-carbon-400 bg-carbon-800/40 p-6 text-center text-sm text-foreground/70">
-              <p>Noch keine Sessions.</p>
+          {sessions && sessions.length === 0 && !error && (
+            <div className="mt-6 rounded-xl border border-dashed border-carbon-400 bg-carbon-800/40 p-8 text-center">
+              <div className="text-3xl">🥊</div>
+              <p className="mt-3 text-sm font-bold text-foreground/70">Noch keine Sessions.</p>
               <p className="mt-1 text-xs text-foreground/50">
                 Starte dein erstes Training über{" "}
                 <Link href="/workout/generator" className="text-blood hover:underline">
@@ -216,7 +232,7 @@ function DashboardContent() {
                     <div className="font-bold">
                       {s.label ?? "Freies Workout"}
                       {s.status === "aborted" && (
-                        <span className="ml-2 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-yellow-300">
+                        <span className="ml-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-yellow-300">
                           abgebrochen
                         </span>
                       )}

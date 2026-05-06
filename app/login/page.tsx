@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 
 function authErrorMessage(code: string) {
@@ -18,7 +18,12 @@ function authErrorMessage(code: string) {
     case "auth/too-many-requests":
       return "Zu viele Versuche. Bitte später erneut probieren.";
     case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
       return "Google-Anmeldung wurde abgebrochen.";
+    case "auth/popup-blocked":
+      return "Popup blockiert. Bitte nutze E-Mail und Passwort.";
+    case "auth/network-request-failed":
+      return "Netzwerkfehler. Bitte Internetverbindung prüfen.";
     default:
       return "Login fehlgeschlagen. Bitte erneut versuchen.";
   }
@@ -36,16 +41,28 @@ function GoogleIcon() {
 }
 
 export default function LoginPage() {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, user, redirectError } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
+
+  // Redirect wenn bereits eingeloggt (z. B. nach Google-Redirect)
+  useEffect(() => {
+    if (user) router.replace("/dashboard");
+  }, [user, router]);
+
+  // Redirect-Fehler aus Google-Auth anzeigen
+  useEffect(() => {
+    if (redirectError) setError(redirectError);
+  }, [redirectError]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting || googleLoading) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -60,10 +77,16 @@ export default function LoginPage() {
   }
 
   async function handleGoogle() {
+    if (submitting || googleLoading) return;
     setError(null);
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
+      const result = await signInWithGoogle();
+      if (result === null) {
+        // Mobile-Redirect eingeleitet
+        setGoogleRedirectPending(true);
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       const code = err instanceof FirebaseError ? err.code : "";
@@ -73,10 +96,21 @@ export default function LoginPage() {
     }
   }
 
+  if (googleRedirectPending) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-32 text-center sm:px-6">
+        <div className="mb-4 text-2xl">🔄</div>
+        <p className="text-sm uppercase tracking-widest text-foreground/60">
+          Weiterleitung zu Google…
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader eyebrow="Account" title="Login" />
-      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
         <div className="card space-y-5">
 
           {/* Google Sign-In */}
@@ -84,10 +118,19 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogle}
             disabled={googleLoading || submitting}
-            className="flex w-full items-center justify-center gap-3 rounded-sm border border-carbon-400 bg-carbon-800 px-4 py-2.5 text-sm font-bold transition-all hover:border-foreground/50 hover:bg-carbon-700 active:scale-95 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-carbon-400 bg-carbon-800 px-4 py-3 text-sm font-bold transition-all hover:border-foreground/50 hover:bg-carbon-700 active:scale-95 disabled:opacity-50"
           >
-            <GoogleIcon />
-            {googleLoading ? "Verbinde mit Google…" : "Mit Google anmelden"}
+            {googleLoading ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+                Verbinde…
+              </>
+            ) : (
+              <>
+                <GoogleIcon />
+                Mit Google anmelden
+              </>
+            )}
           </button>
 
           {/* Divider */}
@@ -109,8 +152,9 @@ export default function LoginPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
-                placeholder="fighter@ironfight.app"
+                disabled={submitting}
+                className="w-full rounded-xl border border-carbon-400 bg-carbon-800 px-3 py-2.5 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
+                placeholder="name@beispiel.de"
               />
             </div>
             <div>
@@ -123,13 +167,14 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
+                disabled={submitting}
+                className="w-full rounded-xl border border-carbon-400 bg-carbon-800 px-3 py-2.5 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <div className="rounded-sm border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">
+              <div className="rounded-xl border border-blood/40 bg-blood/10 px-4 py-3 text-sm text-blood">
                 {error}
               </div>
             )}
@@ -137,9 +182,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting || googleLoading}
-              className="btn-primary w-full disabled:opacity-50"
+              className="btn-primary w-full py-3 disabled:opacity-50"
             >
-              {submitting ? "Logge ein…" : "Login"}
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Einloggen…
+                </span>
+              ) : (
+                "Login"
+              )}
             </button>
           </form>
 

@@ -4,19 +4,26 @@ import PageHeader from "@/components/PageHeader";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 
-function authErrorMessage(code: string) {
+function authErrorMessage(code: string): string {
   switch (code) {
     case "auth/email-already-in-use":
-      return "Diese E-Mail ist bereits registriert.";
+      return "Diese E-Mail ist bereits registriert. Bitte melde dich an.";
     case "auth/invalid-email":
       return "Ungültige E-Mail-Adresse.";
     case "auth/weak-password":
-      return "Passwort zu schwach (mindestens 6 Zeichen).";
+      return "Passwort zu schwach — mindestens 6 Zeichen.";
     case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
       return "Google-Anmeldung wurde abgebrochen.";
+    case "auth/popup-blocked":
+      return "Popup wurde blockiert. Bitte nutze E-Mail und Passwort oder erlaube Popups.";
+    case "auth/network-request-failed":
+      return "Netzwerkfehler. Bitte Internetverbindung prüfen.";
+    case "auth/too-many-requests":
+      return "Zu viele Versuche. Bitte kurz warten.";
     default:
       return "Registrierung fehlgeschlagen. Bitte erneut versuchen.";
   }
@@ -34,7 +41,7 @@ function GoogleIcon() {
 }
 
 export default function RegisterPage() {
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, user, redirectError } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,9 +49,21 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
+
+  // Redirect wenn bereits eingeloggt (z. B. nach Google-Redirect)
+  useEffect(() => {
+    if (user) router.replace("/dashboard");
+  }, [user, router]);
+
+  // Redirect-Fehler aus Google-Auth anzeigen
+  useEffect(() => {
+    if (redirectError) setError(redirectError);
+  }, [redirectError]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting || googleLoading) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -59,10 +78,16 @@ export default function RegisterPage() {
   }
 
   async function handleGoogle() {
+    if (submitting || googleLoading) return;
     setError(null);
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
+      const result = await signInWithGoogle();
+      if (result === null) {
+        // Mobile-Redirect eingeleitet — Seite wird weitergeleitet
+        setGoogleRedirectPending(true);
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       const code = err instanceof FirebaseError ? err.code : "";
@@ -72,10 +97,24 @@ export default function RegisterPage() {
     }
   }
 
+  if (googleRedirectPending) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-32 text-center sm:px-6">
+        <div className="mb-4 text-2xl">🔄</div>
+        <p className="text-sm uppercase tracking-widest text-foreground/60">
+          Weiterleitung zu Google…
+        </p>
+        <p className="mt-2 text-xs text-foreground/40">
+          Bitte warte einen Moment.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader eyebrow="Account" title="Registrieren" />
-      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-md px-4 py-12 sm:px-6">
         <div className="card space-y-5">
 
           {/* Google Sign-In */}
@@ -83,10 +122,19 @@ export default function RegisterPage() {
             type="button"
             onClick={handleGoogle}
             disabled={googleLoading || submitting}
-            className="flex w-full items-center justify-center gap-3 rounded-sm border border-carbon-400 bg-carbon-800 px-4 py-2.5 text-sm font-bold transition-all hover:border-foreground/50 hover:bg-carbon-700 active:scale-95 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-carbon-400 bg-carbon-800 px-4 py-3 text-sm font-bold transition-all hover:border-foreground/50 hover:bg-carbon-700 active:scale-95 disabled:opacity-50"
           >
-            <GoogleIcon />
-            {googleLoading ? "Verbinde mit Google…" : "Mit Google registrieren"}
+            {googleLoading ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+                Verbinde…
+              </>
+            ) : (
+              <>
+                <GoogleIcon />
+                Mit Google registrieren
+              </>
+            )}
           </button>
 
           {/* Divider */}
@@ -100,14 +148,15 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-foreground/70">
-                Fighter-Name
+                Name (optional)
               </label>
               <input
                 type="text"
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
+                disabled={submitting}
+                className="w-full rounded-xl border border-carbon-400 bg-carbon-800 px-3 py-2.5 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
                 placeholder="z. B. Iron Mike"
               />
             </div>
@@ -121,8 +170,9 @@ export default function RegisterPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
-                placeholder="fighter@ironfight.app"
+                disabled={submitting}
+                className="w-full rounded-xl border border-carbon-400 bg-carbon-800 px-3 py-2.5 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
+                placeholder="name@beispiel.de"
               />
             </div>
             <div>
@@ -136,13 +186,14 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
+                disabled={submitting}
+                className="w-full rounded-xl border border-carbon-400 bg-carbon-800 px-3 py-2.5 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
                 placeholder="mind. 6 Zeichen"
               />
             </div>
 
             {error && (
-              <div className="rounded-sm border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">
+              <div className="rounded-xl border border-blood/40 bg-blood/10 px-4 py-3 text-sm text-blood">
                 {error}
               </div>
             )}
@@ -150,16 +201,23 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={submitting || googleLoading}
-              className="btn-primary w-full disabled:opacity-50"
+              className="btn-primary w-full py-3 disabled:opacity-50"
             >
-              {submitting ? "Erstelle Account…" : "Account erstellen"}
+              {submitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Erstelle Account…
+                </span>
+              ) : (
+                "Account erstellen"
+              )}
             </button>
           </form>
 
           <p className="text-center text-sm text-foreground/60">
-            Schon Mitglied?{" "}
+            Schon registriert?{" "}
             <Link href="/login" className="font-bold text-blood hover:underline">
-              Login
+              Zum Login
             </Link>
           </p>
         </div>

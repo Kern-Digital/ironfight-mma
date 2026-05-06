@@ -6,10 +6,10 @@ export default function Footer() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-display text-xl font-black uppercase">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blood text-xs font-black text-white">
-              MMA
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blood text-[10px] font-black text-white">
+              TA
             </span>
-            Iron<span className="text-blood">Fight</span>
+            Tidal<span className="text-blood">Athletics</span>
           </div>
           <p className="mt-3 text-sm text-foreground/60">
             Train hard. Fight smart. Become unbreakable.
@@ -66,7 +66,7 @@ export default function Footer() {
             </li>
             <li>
               <Link href="/timer" className="hover:text-blood">
-                Workout Timer
+                Workout-Timer
               </Link>
             </li>
             <li>
@@ -97,7 +97,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-carbon-500/60 px-4 py-4 text-center text-xs text-foreground/50 sm:px-6">
-        © {new Date().getFullYear()} IronFight MMA. All rights reserved.
+        © {new Date().getFullYear()} Tidal Athletics. All rights reserved.
       </div>
     </footer>
   );

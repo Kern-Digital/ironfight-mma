@@ -1,22 +1,26 @@
 /**
- * IronFight MMA — Audio-Engine
+ * Tidal Athletics — Audio-Engine
  *
  * Wichtige Designentscheidungen:
- *  • iOS Safari erlaubt AudioContext-Wiedergabe NUR nach einer User-Geste
- *    (touchstart/click). Wir bieten dafür `unlockAudio()` an, das einen
- *    stillen Buffer abspielt und damit die Audio-Pipeline freigibt.
- *  • Der AudioContext wird lazy erzeugt, um SSR-Fehler zu vermeiden.
- *  • Alle Sounds basieren auf der WebAudio-API — kein externes Asset nötig.
- *  • Lautstärke kann pro Klang dynamisch gesetzt werden (für ansteigenden
- *    Countdown in den letzten 10 Sekunden der Pause).
- *  • `playRoundEnd()` ist der prägnante Boxglocken-Sound für das Rundenende.
+ *  • iOS Safari erlaubt AudioContext-Wiedergabe NUR nach einer User-Geste.
+ *    `unlockAudio()` spielt einen stillen Buffer und gibt damit die Pipeline frei.
+ *  • MP3-Dateien aus /public/audio/ werden nach dem Unlock geladen (fetch + decodeAudioData).
+ *  • Falls MP3s nicht ladbar sind, werden synthetisierte Fallback-Sounds verwendet.
+ *  • `initAudio()` kann ohne User-Geste aufgerufen werden und lädt Buffers vorab.
  */
 
 let _ctx: AudioContext | null = null;
 let _unlocked = false;
-
-/** Globale Stummschaltung — wird vom Settings-Hook gesteuert */
 let _muted = false;
+
+// ─── MP3 Buffer Cache ──────────────────────────────────────────────────────
+
+const BELL_URL = "/audio/cartoon-music-soundtrack-boxing-bell-hit-double-489811.mp3";
+const COUNTDOWN_URL = "/audio/lesiakower-countdown-sound-effect-8-bit-151797.mp3";
+
+let _bellBuffer: AudioBuffer | null = null;
+let _countdownBuffer: AudioBuffer | null = null;
+let _bufferLoadState: "idle" | "loading" | "done" | "error" = "idle";
 
 export function setAudioMuted(value: boolean) {
   _muted = value;
@@ -29,21 +33,64 @@ export function isAudioUnlocked() {
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!_ctx) {
-    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    const Ctor = window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     _ctx = new Ctor();
   }
   if (_ctx.state === "suspended") {
-    // Versucht den Context zu reaktivieren (nach Tab-Wechsel etc.)
     _ctx.resume().catch(() => {});
   }
   return _ctx;
 }
 
 /**
+ * Lädt MP3-Buffer via fetch + decodeAudioData.
+ * Kann ohne User-Geste aufgerufen werden (nur Wiedergabe braucht Geste).
+ */
+async function loadBuffers(): Promise<void> {
+  if (_bufferLoadState !== "idle") return;
+  _bufferLoadState = "loading";
+
+  const ctx = getCtx();
+  if (!ctx) {
+    _bufferLoadState = "error";
+    return;
+  }
+
+  try {
+    const [bellRes, countdownRes] = await Promise.all([
+      fetch(BELL_URL),
+      fetch(COUNTDOWN_URL),
+    ]);
+
+    const [bellArr, countdownArr] = await Promise.all([
+      bellRes.arrayBuffer(),
+      countdownRes.arrayBuffer(),
+    ]);
+
+    [_bellBuffer, _countdownBuffer] = await Promise.all([
+      ctx.decodeAudioData(bellArr),
+      ctx.decodeAudioData(countdownArr),
+    ]);
+
+    _bufferLoadState = "done";
+  } catch {
+    _bufferLoadState = "error";
+  }
+}
+
+/**
+ * Eager-Initialisierung — vom Timer beim Seitenaufruf starten,
+ * damit die Buffer bereit sind wenn der Nutzer auf Start drückt.
+ */
+export function initAudio(): void {
+  if (typeof window === "undefined") return;
+  loadBuffers().catch(() => {});
+}
+
+/**
  * Muss innerhalb einer User-Geste aufgerufen werden (Click/Touch).
- * Spielt einen stillen Buffer und resumiert den Context, damit auf iOS
- * danach alle weiteren Sounds funktionieren.
+ * Entsperrt iOS-Audiopipeline und startet Buffer-Download falls noch nicht geschehen.
  */
 export async function unlockAudio(): Promise<boolean> {
   const ctx = getCtx();
@@ -53,26 +100,43 @@ export async function unlockAudio(): Promise<boolean> {
     if (ctx.state === "suspended") {
       await ctx.resume();
     }
-    // Stiller Buffer trickst iOS-Pipeline frei
     const buffer = ctx.createBuffer(1, 1, 22050);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.connect(ctx.destination);
     src.start(0);
     _unlocked = true;
+
+    loadBuffers().catch(() => {});
     return true;
   } catch {
     return false;
   }
 }
 
-// ─── Helper: Master-Gain mit globalem Mute ────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 function createMaster(ctx: AudioContext, value: number): GainNode {
   const g = ctx.createGain();
   g.gain.value = _muted ? 0 : value;
   g.connect(ctx.destination);
   return g;
+}
+
+function playBuffer(
+  buffer: AudioBuffer,
+  volume = 0.8,
+  playbackRate = 1.0,
+  delaySeconds = 0,
+): void {
+  const ctx = getCtx();
+  if (!ctx) return;
+  const master = createMaster(ctx, _muted ? 0 : volume);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = playbackRate;
+  src.connect(master);
+  src.start(ctx.currentTime + delaySeconds);
 }
 
 function tone(
@@ -106,104 +170,90 @@ function noiseBurst(
   duration = 0.04,
 ) {
   const bufferSize = Math.floor(ctx.sampleRate * duration);
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
+  const buf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
-
   const src = ctx.createBufferSource();
-  src.buffer = buffer;
-
+  src.buffer = buf;
   const env = ctx.createGain();
   env.gain.setValueAtTime(1, startTime);
   env.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
   src.connect(env);
   env.connect(output);
   src.start(startTime);
 }
 
-// ─── PUBLIC API ────────────────────────────────────────────────────────────
-
-/**
- * START-SIGNAL: 3-Ton-Signal für Rundenstart (FIGHT!)
- */
-export function playRoundStart() {
-  const ctx = getCtx();
-  if (!ctx) return;
-  const master = createMaster(ctx, 0.7);
-  const now = ctx.currentTime;
-
-  tone(ctx, master, 440, now, 0.15, "square", 0.005, 0.06);
-  tone(ctx, master, 554, now + 0.18, 0.15, "square", 0.005, 0.06);
-  tone(ctx, master, 660, now + 0.36, 0.32, "square", 0.005, 0.18);
-
-  tone(ctx, master, 80, now, 0.1, "sine", 0.002, 0.08);
-  tone(ctx, master, 80, now + 0.18, 0.1, "sine", 0.002, 0.08);
-  tone(ctx, master, 80, now + 0.36, 0.1, "sine", 0.002, 0.08);
-
-  noiseBurst(ctx, master, now);
-  noiseBurst(ctx, master, now + 0.18);
-  noiseBurst(ctx, master, now + 0.36);
-}
-
-/**
- * BOX-GLOCKE: Prägnanter Rundenend-Sound — klassische Boxglocke
- *
- * Realisiert über mehrere harmonisch verschobene Sinus-Oszillatoren,
- * die gemeinsam abklingen — das erzeugt den typischen metallischen
- * Glockenklang. Anders als der Countdown-Tick. Klar und unverwechselbar.
- */
-export function playRoundEnd() {
-  const ctx = getCtx();
-  if (!ctx) return;
-  const master = createMaster(ctx, 0.85);
-  const now = ctx.currentTime;
-
-  // "DING-DING" — zweimal mit kurzer Pause
-  for (const offset of [0, 0.28]) {
-    bell(ctx, master, now + offset);
-  }
-}
-
-/**
- * Boxglocken-Stoß — eine Glocke (DING)
- * Mehrere harmonisch leicht inharmonische Partials für metallischen Klang.
- */
 function bell(ctx: AudioContext, output: GainNode, startTime: number) {
-  // Glocken-Frequenzen leicht inharmonisch — typisches Glocken-Spektrum
   const partials = [
-    { freq: 880, gain: 0.55, decay: 1.2 }, // Grundton
-    { freq: 1318, gain: 0.4, decay: 0.95 }, // 1.5x — perfekte Quinte
-    { freq: 1760, gain: 0.3, decay: 0.7 }, // 2x — Oktave
-    { freq: 2640, gain: 0.18, decay: 0.5 }, // 3x — Sub-Oberton
-    { freq: 3520, gain: 0.1, decay: 0.35 }, // 4x — Brillanz
+    { freq: 880, gain: 0.55, decay: 1.2 },
+    { freq: 1318, gain: 0.4, decay: 0.95 },
+    { freq: 1760, gain: 0.3, decay: 0.7 },
+    { freq: 2640, gain: 0.18, decay: 0.5 },
+    { freq: 3520, gain: 0.1, decay: 0.35 },
   ];
-
   for (const p of partials) {
     const osc = ctx.createOscillator();
     const env = ctx.createGain();
     osc.type = "sine";
     osc.frequency.setValueAtTime(p.freq, startTime);
-
     env.gain.setValueAtTime(0, startTime);
     env.gain.linearRampToValueAtTime(p.gain, startTime + 0.005);
     env.gain.exponentialRampToValueAtTime(0.0001, startTime + p.decay);
-
     osc.connect(env);
     env.connect(output);
     osc.start(startTime);
     osc.stop(startTime + p.decay + 0.05);
   }
-
-  // Anschlagsgeräusch (Klöppel) — kurzer Noise-Burst
   noiseBurst(ctx, output, startTime, 0.025);
 }
 
-/**
- * SESSION-ENDE: Abschluss-Glocken-Sequenz nach letzter Runde
- *  Drei Glockenschläge — klar erkennbar als "fertig"
- */
+// ─── PUBLIC API ────────────────────────────────────────────────────────────
+
+/** START-SIGNAL: 3-Ton-Signal für Rundenstart (FIGHT!) */
+export function playRoundStart() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  // Boxglocke via MP3 beim Rundenstart
+  if (_bellBuffer) {
+    playBuffer(_bellBuffer, 0.9, 1.0);
+    return;
+  }
+  // Fallback: synthetisiertes Signal
+  const master = createMaster(ctx, 0.7);
+  const now = ctx.currentTime;
+  tone(ctx, master, 440, now, 0.15, "square", 0.005, 0.06);
+  tone(ctx, master, 554, now + 0.18, 0.15, "square", 0.005, 0.06);
+  tone(ctx, master, 660, now + 0.36, 0.32, "square", 0.005, 0.18);
+  tone(ctx, master, 80, now, 0.1, "sine", 0.002, 0.08);
+  tone(ctx, master, 80, now + 0.18, 0.1, "sine", 0.002, 0.08);
+  tone(ctx, master, 80, now + 0.36, 0.1, "sine", 0.002, 0.08);
+  noiseBurst(ctx, master, now);
+  noiseBurst(ctx, master, now + 0.18);
+  noiseBurst(ctx, master, now + 0.36);
+}
+
+/** BOX-GLOCKE: Rundenende — klassische Doppelglocke */
+export function playRoundEnd() {
+  if (_bellBuffer) {
+    playBuffer(_bellBuffer, 0.85, 1.0);
+    return;
+  }
+  const ctx = getCtx();
+  if (!ctx) return;
+  const master = createMaster(ctx, 0.85);
+  const now = ctx.currentTime;
+  for (const offset of [0, 0.28]) {
+    bell(ctx, master, now + offset);
+  }
+}
+
+/** SESSION-ENDE: Abschluss nach letzter Runde — drei Glockenschläge */
 export function playSessionEnd() {
+  if (_bellBuffer) {
+    playBuffer(_bellBuffer, 0.85, 1.0, 0);
+    playBuffer(_bellBuffer, 0.85, 1.0, 0.8);
+    return;
+  }
   const ctx = getCtx();
   if (!ctx) return;
   const master = createMaster(ctx, 0.85);
@@ -213,9 +263,7 @@ export function playSessionEnd() {
   bell(ctx, master, now + 0.62);
 }
 
-/**
- * REST-START: Weicher Gong — Pause hat begonnen
- */
+/** REST-START: Weicher Gong — Pause hat begonnen */
 export function playRestStart() {
   const ctx = getCtx();
   if (!ctx) return;
@@ -227,25 +275,28 @@ export function playRestStart() {
 
 /**
  * COUNTDOWN-TICK mit dynamischer Lautstärke
- *
- * @param volume 0..1 — wird vom Timer dynamisch gesetzt:
- *   Sek. 10..3: linear ansteigend von 0.3 auf 0.85
- *   Sek. 2..1:  100 % (1.0)
+ * @param volume 0..1
  */
 export function playCountdownTick(volume = 0.5) {
+  const v = Math.max(0, Math.min(1, volume));
+  if (_countdownBuffer) {
+    playBuffer(_countdownBuffer, _muted ? 0 : v);
+    return;
+  }
   const ctx = getCtx();
   if (!ctx) return;
-  const v = Math.max(0, Math.min(1, volume));
   const master = createMaster(ctx, v);
   const now = ctx.currentTime;
   tone(ctx, master, 1200, now, 0.05, "sine", 0.001, 0.025);
   noiseBurst(ctx, master, now, 0.018);
 }
 
-/**
- * LAST-TICK: Lauterer/härterer Tick bei der allerletzten Sekunde (1)
- */
+/** LAST-TICK: Letzter Countdown-Tick — lauter und schärfer */
 export function playLastTick() {
+  if (_countdownBuffer) {
+    playBuffer(_countdownBuffer, _muted ? 0 : 1.0, 1.3);
+    return;
+  }
   const ctx = getCtx();
   if (!ctx) return;
   const master = createMaster(ctx, 1.0);
@@ -254,10 +305,12 @@ export function playLastTick() {
   noiseBurst(ctx, master, now, 0.03);
 }
 
-/**
- * PREP-BEEP: Neutrales Beep für die Vorbereitungsphase
- */
+/** PREP-BEEP: Neutrales Beep für Vorbereitungsphase */
 export function playPrepBeep() {
+  if (_countdownBuffer) {
+    playBuffer(_countdownBuffer, _muted ? 0 : 0.4, 0.85);
+    return;
+  }
   const ctx = getCtx();
   if (!ctx) return;
   const master = createMaster(ctx, 0.4);
@@ -265,30 +318,14 @@ export function playPrepBeep() {
   tone(ctx, master, 600, now, 0.1, "sine", 0.005, 0.05);
 }
 
-// ─── Berechnung der ansteigenden Tick-Lautstärke ──────────────────────────
+// ─── Tick-Lautstärke ──────────────────────────────────────────────────────
 
-/**
- * Berechnet die Tick-Lautstärke für den Countdown in den letzten 10 Sek.
- *
- * Verlauf:
- *   Sek. 10 → 0.30
- *   Sek.  9 → 0.39
- *   Sek.  8 → 0.49
- *   Sek.  7 → 0.58
- *   Sek.  6 → 0.67
- *   Sek.  5 → 0.77
- *   Sek.  4 → 0.86
- *   Sek.  3 → 0.95
- *   Sek.  2 → 1.00 (100%)
- *   Sek.  1 → 1.00 (100%)
- */
 export function tickVolumeForRemaining(remaining: number): number {
   if (remaining > 10 || remaining < 1) return 0.5;
   if (remaining <= 2) return 1.0;
-  // Linear von 0.30 (Sek. 10) bis 0.95 (Sek. 3)
   const start = 0.3;
   const end = 0.95;
-  const t = (10 - remaining) / 7; // 0..1 zwischen Sek. 10 und Sek. 3
+  const t = (10 - remaining) / 7;
   return start + (end - start) * t;
 }
 
@@ -311,17 +348,14 @@ export function vibrate(pattern: number | number[]) {
   }
 }
 
-/** Kurze Vibration für einzelnen Countdown-Tick */
 export function vibrateTick() {
   vibrate(35);
 }
 
-/** Lange Vibration für Rundenende */
 export function vibrateRoundEnd() {
   vibrate([180, 80, 180]);
 }
 
-/** Endgültige Session-Ende-Vibration */
 export function vibrateSessionEnd() {
   vibrate([300, 120, 300, 120, 500]);
 }

@@ -9,9 +9,9 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { slug: string } }) {
   const plan = getPlanBySlug(params.slug);
-  if (!plan) return { title: "Plan nicht gefunden — IronFight" };
+  if (!plan) return { title: "Plan nicht gefunden — Tidal Athletics" };
   return {
-    title: `${plan.name} Plan — IronFight`,
+    title: `${plan.name} Plan — Tidal Athletics`,
     description: plan.description,
   };
 }

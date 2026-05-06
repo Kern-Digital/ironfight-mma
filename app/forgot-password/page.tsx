@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
-                  placeholder="fighter@ironfight.app"
+                  placeholder="name@beispiel.de"
                 />
               </div>
 

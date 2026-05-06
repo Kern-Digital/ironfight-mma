@@ -53,13 +53,13 @@ export default function Navbar() {
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 font-display text-2xl font-black uppercase tracking-tight"
+          className="flex items-center gap-2 font-display text-xl font-black uppercase tracking-tight"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blood text-sm font-black text-white">
-            MMA
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blood text-[10px] font-black text-white">
+            TA
           </span>
           <span>
-            Iron<span className="text-blood">Fight</span>
+            Tidal<span className="text-blood">Athletics</span>
           </span>
         </Link>
 
@@ -113,7 +113,7 @@ export default function Navbar() {
                 Login
               </Link>
               <Link href="/register" className="btn-primary px-4 py-2 text-xs">
-                Join Now
+                Registrieren
               </Link>
             </>
           )}
@@ -174,7 +174,7 @@ export default function Navbar() {
                     onClick={() => setOpen(false)}
                     className="btn-primary flex-1 px-4 py-2 text-xs"
                   >
-                    Join Now
+                    Registrieren
                   </Link>
                 </>
               )}

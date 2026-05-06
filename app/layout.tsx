@@ -19,14 +19,14 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "IronFight MMA — Train Hard. Fight Smart.",
+  title: "Tidal Athletics — Train Hard. Fight Smart.",
   description:
-    "Die ultimative MMA Trainings-App. Boxing, Wrestling, BJJ, Muay Thai. Trainingspläne, Workout-Timer und Fortschritts-Tracking.",
+    "Deine MMA Trainings-App. Boxing, Wrestling, BJJ, Muay Thai. Strukturierte Pläne, Workout-Timer und Fortschritts-Tracking.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "IronFight MMA",
+    title: "Tidal Athletics",
   },
 };
 
@@ -34,7 +34,6 @@ export const viewport: Viewport = {
   themeColor: "#dc2626",
   width: "device-width",
   initialScale: 1,
-  // Erlaubt Zoom — Usability ist wichtiger als perfekte App-Optik
   maximumScale: 5,
 };
 

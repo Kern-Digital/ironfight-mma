@@ -1,7 +1,7 @@
 {
-  "name": "IronFight MMA",
-  "short_name": "IronFight",
-  "description": "Die ultimative MMA Trainings-App. Boxing, Wrestling, BJJ, Muay Thai.",
+  "name": "Tidal Athletics",
+  "short_name": "Tidal",
+  "description": "Deine MMA Trainings-App. Boxing, Wrestling, BJJ, Muay Thai — Timer, Pläne und Fortschritts-Tracking.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",

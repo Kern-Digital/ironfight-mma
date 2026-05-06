@@ -1,9 +1,9 @@
 /**
- * IronFight MMA — Service Worker
+ * Tidal Athletics — Service Worker
  * Cache-First für App-Shell, Network-First für API/Firebase
  */
 
-const CACHE_NAME = "ironfight-v1";
+const CACHE_NAME = "tidal-v1";
 const STATIC_ASSETS = [
   "/",
   "/training",

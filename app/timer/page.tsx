@@ -9,7 +9,7 @@ import {
 } from "@/lib/use-workout-timer";
 import { useAuth } from "@/lib/auth-context";
 import { logWorkout } from "@/lib/workouts";
-import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
+import { unlockAudio, isAudioUnlocked, initAudio } from "@/lib/audio";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { useSearchParams } from "next/navigation";
@@ -136,6 +136,11 @@ function TimerView() {
     };
   }, []);
 
+  // Audio vorab initialisieren (Buffer laden ohne User-Geste nötig)
+  useEffect(() => {
+    initAudio();
+  }, []);
+
   // Audio-Unlock-Status (nur initial gesetzt — wird beim Start aktualisiert)
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   useEffect(() => {
@@ -175,7 +180,7 @@ function TimerView() {
     if (typeof document === "undefined") return;
     const original = document.title;
     if (t.running || t.phase === "done") {
-      document.title = `${formatTime(t.remaining)} · ${PHASE_LABEL[t.phase]} — IronFight`;
+      document.title = `${formatTime(t.remaining)} · ${PHASE_LABEL[t.phase]} — Tidal Athletics`;
     }
     return () => {
       document.title = original;
