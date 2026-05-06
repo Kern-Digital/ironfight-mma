@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -63,16 +64,13 @@ export default function Navbar() {
           className="flex items-center gap-3"
           style={{ textDecoration: "none" }}
         >
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[11px] font-black"
-            style={{
-              background: "linear-gradient(135deg, var(--ta-cyan), var(--ta-cyan-deep))",
-              color: "#001417",
-              boxShadow: "0 0 18px rgba(0,212,230,.35)",
-            }}
-          >
-            TA
-          </div>
+          <Image
+            src="/icons/icon-192.png"
+            alt="Tidal Athletics"
+            width={36}
+            height={36}
+            className="rounded-xl"
+          />
           <div>
             <div
               className="font-display-ta text-lg font-black uppercase leading-none"
