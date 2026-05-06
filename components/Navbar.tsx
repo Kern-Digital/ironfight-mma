@@ -5,13 +5,23 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth, useFighterName } from "@/lib/auth-context";
 
-const links = [
+interface NavLink {
+  href: string;
+  label: string;
+  activePattern?: RegExp;
+}
+
+const links: NavLink[] = [
   { href: "/", label: "Home" },
-  { href: "/training", label: "Training" },
+  {
+    href: "/workout/generator",
+    label: "Workout",
+    activePattern: /^\/(workout|training)/,
+  },
   { href: "/techniques", label: "Techniken" },
-  { href: "/workout/generator", label: "Generator" },
+  { href: "/regeln", label: "Regeln" },
   { href: "/timer", label: "Timer" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Mein Training" },
 ];
 
 function initialsOf(name: string): string {
@@ -32,6 +42,12 @@ export default function Navbar() {
     router.push("/");
   }
 
+  function isActive(link: NavLink): boolean {
+    if (link.activePattern) return link.activePattern.test(pathname);
+    if (link.href === "/") return pathname === "/";
+    return pathname.startsWith(link.href);
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-carbon-500/60 bg-carbon-900/80 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -39,7 +55,7 @@ export default function Navbar() {
           href="/"
           className="flex items-center gap-2 font-display text-2xl font-black uppercase tracking-tight"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-blood text-sm font-black text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blood text-sm font-black text-white">
             MMA
           </span>
           <span>
@@ -49,10 +65,7 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-1 md:flex">
           {links.map((link) => {
-            const active =
-              link.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(link.href);
+            const active = isActive(link);
             return (
               <Link
                 key={link.href}
@@ -72,14 +85,14 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           {loading ? (
-            <div className="h-8 w-24 animate-pulse rounded-sm bg-carbon-600" />
+            <div className="h-8 w-24 animate-pulse rounded-lg bg-carbon-600" />
           ) : user ? (
             <>
               <Link
                 href="/profile"
                 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-foreground/80 hover:text-blood"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-sm border border-blood bg-blood/15 text-xs font-black text-blood">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-blood bg-blood/15 text-xs font-black text-blood">
                   {initialsOf(fighterName)}
                 </span>
                 <span className="hidden lg:inline">{fighterName}</span>
@@ -108,7 +121,7 @@ export default function Navbar() {
 
         <button
           onClick={() => setOpen((v) => !v)}
-          className="rounded-sm border border-carbon-400 p-2 md:hidden"
+          className="rounded-lg border border-carbon-400 p-2 md:hidden"
           aria-label="Toggle menu"
         >
           <span className="block h-0.5 w-5 bg-foreground" />

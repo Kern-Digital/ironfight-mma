@@ -26,6 +26,12 @@ export const BJJ_TECHNIQUES: Technique[] = [
     usage:
       "Aus Mount, Side Control, Knee-on-Belly entkommen. Setup für Guard-Recovery.",
     equipment: ["mat", "bodyweight"],
+    video: {
+      url: "https://www.youtube.com/embed/yiA-UfMxq8s",
+      source: "YouTube",
+      license: "YouTube-Embed",
+      attribution: "BJJ Tutorial",
+    },
     relatedTechniqueIds: ["bjj_bridge_roll", "bjj_mount_escape"],
     nextTechniqueId: "bjj_bridge_roll",
   },
@@ -133,6 +139,12 @@ export const BJJ_TECHNIQUES: Technique[] = [
     usage:
       "Standard-Escape aus der Mount, wenn Bridge & Roll nicht funktioniert.",
     equipment: ["mat"],
+    video: {
+      url: "https://www.youtube.com/embed/5Y1CahWUA_s",
+      source: "YouTube",
+      license: "YouTube-Embed",
+      attribution: "BJJ Tutorial",
+    },
     relatedTechniqueIds: ["bjj_bridge_roll", "bjj_hip_escape"],
   },
   {
@@ -187,6 +199,12 @@ export const BJJ_TECHNIQUES: Technique[] = [
     usage:
       "Eine der ältesten und sichersten Submissions im BJJ. Pflicht-Technik für jeden Blue Belt.",
     equipment: ["mat"],
+    video: {
+      url: "https://www.youtube.com/embed/ybdyDkzfQG8",
+      source: "YouTube",
+      license: "YouTube-Embed",
+      attribution: "BJJ Tutorial",
+    },
     relatedTechniqueIds: ["bjj_closed_guard", "bjj_triangle_from_guard"],
     nextTechniqueId: "bjj_triangle_from_guard",
   },

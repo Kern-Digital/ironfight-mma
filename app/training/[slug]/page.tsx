@@ -59,7 +59,7 @@ export default function TrainingPlanPage({
             <Link href={timerHref} className="btn-primary">
               Workout starten
             </Link>
-            <Link href="/training" className="btn-secondary">
+            <Link href="/workout/generator" className="btn-secondary">
               Andere Disziplin
             </Link>
           </div>

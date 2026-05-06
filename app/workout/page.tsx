@@ -169,7 +169,7 @@ function WorkoutRunner() {
         />
         <div className="mx-auto max-w-xl px-4 py-16 text-center">
           <Link href="/workout/generator" className="btn-primary">
-            Zum Generator
+            Zum Workout
           </Link>
         </div>
       </>
@@ -403,7 +403,7 @@ function WorkoutRunner() {
               )}
               <div className="mt-3 flex flex-wrap justify-center gap-2">
                 <Link href="/dashboard" className="btn-secondary text-xs">
-                  Zum Dashboard
+                  Mein Training
                 </Link>
                 <Link href="/workout/generator" className="btn-primary text-xs">
                   Neues Workout

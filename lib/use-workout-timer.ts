@@ -115,10 +115,10 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
 
       const cur = phaseRef.current;
 
-      // ─── Countdown-Ticks: letzte 10 Sek. in der Rest-Phase ───
-      // Lautstärke steigt linear von 0.30 (Sek. 10) auf 1.00 (Sek. 2-1)
+      // ─── Countdown-Ticks: letzte 4 Sek. in Rest- und Prep-Phase ───
+      // Lautstärke steigt linear in den letzten Sekunden
       // Vibration in den letzten 3 Sekunden
-      if (cur === "rest" && left > 0 && left <= 10) {
+      if ((cur === "rest" || cur === "prep") && left > 0 && left <= 4) {
         if (lastTickSecRef.current !== left) {
           lastTickSecRef.current = left;
           if (left === 1) {

@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-display text-xl font-black uppercase">
-            <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-blood text-xs font-black text-white">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blood text-xs font-black text-white">
               MMA
             </span>
             Iron<span className="text-blood">Fight</span>
@@ -21,10 +21,26 @@ export default function Footer() {
             Disziplinen
           </h4>
           <ul className="space-y-2 text-sm text-foreground/70">
-            <li>Boxing</li>
-            <li>Wrestling</li>
-            <li>Brazilian Jiu-Jitsu</li>
-            <li>Muay Thai</li>
+            <li>
+              <Link href="/training/boxing" className="hover:text-blood">
+                Boxing
+              </Link>
+            </li>
+            <li>
+              <Link href="/training/wrestling" className="hover:text-blood">
+                Wrestling
+              </Link>
+            </li>
+            <li>
+              <Link href="/training/bjj" className="hover:text-blood">
+                Brazilian Jiu-Jitsu
+              </Link>
+            </li>
+            <li>
+              <Link href="/training/muay-thai" className="hover:text-blood">
+                Muay Thai
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -34,8 +50,18 @@ export default function Footer() {
           </h4>
           <ul className="space-y-2 text-sm text-foreground/70">
             <li>
-              <Link href="/training" className="hover:text-blood">
-                Trainingspläne
+              <Link href="/workout/generator" className="hover:text-blood">
+                Workout
+              </Link>
+            </li>
+            <li>
+              <Link href="/techniques" className="hover:text-blood">
+                Techniken
+              </Link>
+            </li>
+            <li>
+              <Link href="/regeln" className="hover:text-blood">
+                Regeln
               </Link>
             </li>
             <li>
@@ -45,12 +71,7 @@ export default function Footer() {
             </li>
             <li>
               <Link href="/dashboard" className="hover:text-blood">
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link href="/workout" className="hover:text-blood">
-                Workout Generator
+                Mein Training
               </Link>
             </li>
           </ul>

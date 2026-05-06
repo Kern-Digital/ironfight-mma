@@ -87,7 +87,7 @@ function DashboardContent() {
   return (
     <>
       <PageHeader
-        eyebrow="Dein Cage"
+        eyebrow="Mein Training"
         title={greeting}
         description="Deine Trainings, Streaks und Fortschritte auf einen Blick."
       />

@@ -13,7 +13,7 @@ import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PRESETS: { label: string; config: TimerConfig }[] = [
   {
@@ -50,6 +50,14 @@ const PHASE_COLOR: Record<Phase, string> = {
   done: "text-green-400",
 };
 
+const PHASE_BG: Record<Phase, string> = {
+  idle: "bg-carbon-600",
+  prep: "bg-yellow-500",
+  work: "bg-blood",
+  rest: "bg-blue-500",
+  done: "bg-green-500",
+};
+
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
@@ -65,7 +73,7 @@ function parsePositive(v: string | null, fallback: number) {
 function TimerView() {
   const params = useSearchParams();
   const { user } = useAuth();
-  const { settings, setSoundOn, setVibrate, setWakeLock } = useTimerSettings();
+  const { settings, setSoundOn, setVibrate } = useTimerSettings();
 
   const initial = useMemo<TimerConfig>(
     () => ({
@@ -84,8 +92,49 @@ function TimerView() {
       ? 0
       : 1 - t.remaining / t.totalForPhase;
 
-  // Display wach halten, wenn Timer läuft und Setting aktiv
-  useWakeLock(settings.wakeLock && t.running);
+  // Wake-Lock immer aktiv wenn Timer läuft
+  useWakeLock(t.running);
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+
+  const openFullscreen = useCallback(async () => {
+    setIsFullscreen(true);
+    // Versuche native Fullscreen API (funktioniert auf Android/Desktop, nicht auf iOS)
+    try {
+      await document.documentElement.requestFullscreen?.();
+    } catch { /* nicht unterstützt */ }
+    // Versuche Querformat zu sperren
+    try {
+      await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.("landscape");
+    } catch { /* Orientation Lock nicht unterstützt */ }
+  }, []);
+
+  const closeFullscreen = useCallback(async () => {
+    setIsFullscreen(false);
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch { /* ignorieren */ }
+    try {
+      screen.orientation?.unlock?.();
+    } catch { /* ignorieren */ }
+  }, []);
+
+  // Synchronisiert mit nativem Fullscreen (z. B. Escape-Taste)
+  useEffect(() => {
+    function onFsChange() {
+      if (!document.fullscreenElement) setIsFullscreen(false);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
 
   // Audio-Unlock-Status (nur initial gesetzt — wird beim Start aktualisiert)
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -150,6 +199,83 @@ function TimerView() {
 
   return (
     <>
+      {/* ── Vollbild-Overlay ── */}
+      {isFullscreen && (
+        <div
+          ref={fullscreenRef}
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050505]"
+          style={{ touchAction: "none" }}
+        >
+          {/* Oben: Phase + Runde */}
+          <div className="absolute top-6 left-0 right-0 flex items-center justify-between px-8">
+            <div className={`text-sm font-bold uppercase tracking-widest ${PHASE_COLOR[t.phase]}`}>
+              {PHASE_LABEL[t.phase]}
+            </div>
+            <div className="text-sm uppercase tracking-widest text-foreground/50">
+              Runde {Math.min(t.round, t.config.rounds)} / {t.config.rounds}
+            </div>
+          </div>
+
+          {/* Große Timer-Anzeige — für Querformat optimiert */}
+          <div
+            className={`font-display font-black leading-none ${PHASE_COLOR[t.phase]} select-none`}
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              fontSize: "clamp(6rem, 28vw, 22rem)",
+            }}
+          >
+            {formatTime(t.remaining)}
+          </div>
+
+          {/* Fortschrittsbalken */}
+          <div className="mt-6 w-full max-w-lg px-8">
+            <div className="h-2 overflow-hidden rounded-full bg-carbon-700">
+              <div
+                className={`h-full transition-all duration-200 ${PHASE_BG[t.phase]}`}
+                style={{ width: `${Math.min(100, progress * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Steuerung */}
+          <div className="mt-8 flex gap-4">
+            {!t.running ? (
+              <button
+                onClick={handleStart}
+                className="btn-primary px-10 py-5 text-xl"
+              >
+                {t.phase === "idle" || t.phase === "done" ? "Start" : "Weiter"}
+              </button>
+            ) : (
+              <button
+                onClick={t.pause}
+                className="btn-primary px-10 py-5 text-xl"
+              >
+                Pause
+              </button>
+            )}
+            <button
+              onClick={t.skip}
+              className="btn-secondary px-8 py-5 text-xl"
+              disabled={t.phase === "idle" || t.phase === "done"}
+            >
+              Skip
+            </button>
+            <button onClick={t.reset} className="btn-secondary px-8 py-5 text-xl">
+              Reset
+            </button>
+          </div>
+
+          {/* Vollbild beenden */}
+          <button
+            onClick={closeFullscreen}
+            className="absolute bottom-6 right-8 rounded-lg border border-carbon-400 bg-carbon-800/80 px-4 py-2 text-xs font-bold uppercase tracking-widest text-foreground/60 hover:text-foreground"
+          >
+            ✕ Vollbild beenden
+          </button>
+        </div>
+      )}
+
       <PageHeader
         eyebrow={label ? `Workout · ${label}` : "Workout"}
         title="Runden-Timer"
@@ -159,7 +285,7 @@ function TimerView() {
       <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 sm:px-6">
         {/* Sound-Unlock-Hinweis für Mobile, vor erstem Start */}
         {!audioUnlocked && t.phase === "idle" && (
-          <div className="mb-4 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+          <div className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
             <div className="font-bold">📱 Sound-Hinweis</div>
             <p className="mt-1 text-xs text-yellow-100/80">
               Auf Handys muss der Sound einmal pro Sitzung freigegeben werden.
@@ -171,7 +297,7 @@ function TimerView() {
                 const ok = await unlockAudio();
                 setAudioUnlocked(ok);
               }}
-              className="mt-3 rounded-sm border border-yellow-500 bg-yellow-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-yellow-100 hover:bg-yellow-500/30"
+              className="mt-3 rounded-lg border border-yellow-500 bg-yellow-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-yellow-100 hover:bg-yellow-500/30"
             >
               🔔 Sound jetzt aktivieren
             </button>
@@ -200,19 +326,9 @@ function TimerView() {
             </div>
           </div>
 
-          <div className="h-2 overflow-hidden rounded-sm bg-carbon-600">
+          <div className="h-2 overflow-hidden rounded-full bg-carbon-600">
             <div
-              className={`h-full transition-all duration-200 ${
-                t.phase === "work"
-                  ? "bg-blood"
-                  : t.phase === "rest"
-                    ? "bg-blue-500"
-                    : t.phase === "prep"
-                      ? "bg-yellow-500"
-                      : t.phase === "done"
-                        ? "bg-green-500"
-                        : "bg-carbon-400"
-              }`}
+              className={`h-full transition-all duration-200 ${PHASE_BG[t.phase]}`}
               style={{ width: `${Math.min(100, progress * 100)}%` }}
             />
           </div>
@@ -268,7 +384,7 @@ function TimerView() {
           )}
         </div>
 
-        {/* Settings: Sound, Vibration, Wake-Lock — Toggle-Reihe */}
+        {/* Settings: Sound, Vibration, Vollbild */}
         <div className="mt-6 grid grid-cols-3 gap-2 text-center text-xs uppercase tracking-widest">
           <SettingToggle
             label="Sound"
@@ -282,12 +398,13 @@ function TimerView() {
             onChange={setVibrate}
             icon="📳"
           />
-          <SettingToggle
-            label="Display"
-            value={settings.wakeLock}
-            onChange={setWakeLock}
-            icon="🌓"
-          />
+          <button
+            onClick={openFullscreen}
+            className="flex flex-col items-center gap-1 rounded-lg border border-carbon-500 bg-carbon-700/40 px-3 py-3 transition-all hover:border-blood/60 hover:text-blood"
+          >
+            <span className="text-base">⛶</span>
+            <span className="text-[10px] font-bold tracking-widest">Vollbild</span>
+          </button>
         </div>
 
         <div className="mt-8">
@@ -303,7 +420,7 @@ function TimerView() {
                   t.reset();
                 }}
                 disabled={isLocked}
-                className="rounded-sm border border-carbon-400 bg-carbon-700/60 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors hover:border-blood hover:text-blood disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg border border-carbon-400 bg-carbon-700/60 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors hover:border-blood hover:text-blood disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {p.label}
               </button>
@@ -370,7 +487,7 @@ function SettingToggle({
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`flex flex-col items-center gap-1 rounded-sm border px-3 py-3 transition-all ${
+      className={`flex flex-col items-center gap-1 rounded-lg border px-3 py-3 transition-all ${
         value
           ? "border-blood/60 bg-blood/10 text-blood"
           : "border-carbon-500 bg-carbon-700/40 text-foreground/40"
@@ -410,7 +527,7 @@ function ConfigField({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           disabled={disabled}
-          className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
+          className="w-full rounded-lg border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none disabled:opacity-50"
         />
         {suffix && (
           <span className="ml-2 self-center text-xs text-foreground/60">

@@ -45,14 +45,14 @@ body {
 
   /* Primary CTA — roter Glow-Button */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-sm bg-blood px-6 py-3 font-bold uppercase tracking-wider text-white transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-blood px-6 py-3 font-bold uppercase tracking-wider text-white transition-all duration-200;
     @apply hover:bg-blood-dark hover:shadow-[0_0_24px_rgba(220,38,38,0.55)] active:scale-95;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blood focus-visible:ring-offset-2 focus-visible:ring-offset-carbon-900;
   }
 
   /* Secondary — transparenter Border-Button */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-sm border border-carbon-400 bg-carbon-700/50 px-6 py-3 font-bold uppercase tracking-wider text-foreground backdrop-blur transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-carbon-400 bg-carbon-700/50 px-6 py-3 font-bold uppercase tracking-wider text-foreground backdrop-blur transition-all duration-200;
     @apply hover:border-blood hover:text-blood hover:bg-blood/5 active:scale-95;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blood focus-visible:ring-offset-2 focus-visible:ring-offset-carbon-900;
   }
@@ -65,13 +65,13 @@ body {
   /* Card — Glassmorphism */
   .card {
     background: rgba(23, 23, 23, 0.7);
-    @apply rounded-sm border border-carbon-500/80 p-6 backdrop-blur-md transition-all duration-300;
+    @apply rounded-xl border border-carbon-500/80 p-6 backdrop-blur-md transition-all duration-300;
     @apply hover:border-blood/40 hover:shadow-[0_0_32px_rgba(220,38,38,0.08)];
   }
 
   /* Input-Feld */
   .input-field {
-    @apply w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm transition-colors;
+    @apply w-full rounded-lg border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm transition-colors;
     @apply focus:border-blood focus:outline-none focus:ring-1 focus:ring-blood/30;
     @apply placeholder:text-foreground/30;
   }
