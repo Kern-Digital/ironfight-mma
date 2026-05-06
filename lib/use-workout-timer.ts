@@ -6,9 +6,6 @@ import {
   playRoundEnd,
   playSessionEnd,
   playCountdownTick,
-  playLastTick,
-  playPrepBeep,
-  tickVolumeForRemaining,
   vibrateTick,
   vibrateRoundEnd,
   vibrateSessionEnd,
@@ -95,8 +92,6 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
       } else if (next === "rest") {
         playRoundEnd();
         vibrateRoundEnd();
-      } else if (next === "prep") {
-        playPrepBeep();
       } else if (next === "done") {
         setRunning(false);
         endAtRef.current = null;
@@ -117,19 +112,12 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
 
       const cur = phaseRef.current;
 
-      // ─── Countdown-Ticks: letzte 4 Sek. in Rest- und Prep-Phase ───
-      // Lautstärke steigt linear in den letzten Sekunden
-      // Vibration in den letzten 3 Sekunden
-      if ((cur === "rest" || cur === "prep") && left > 0 && left <= 4) {
-        if (lastTickSecRef.current !== left) {
-          lastTickSecRef.current = left;
-          if (left === 1) {
-            playLastTick();
-            vibrateTick();
-          } else {
-            playCountdownTick(tickVolumeForRemaining(left));
-            if (left <= 3) vibrateTick();
-          }
+      // ─── Countdown: genau 4 Sek. vor Kampf-Beginn — einmalig ───
+      if ((cur === "rest" || cur === "prep") && left === 4) {
+        if (lastTickSecRef.current !== 4) {
+          lastTickSecRef.current = 4;
+          playCountdownTick(1.0);
+          vibrateTick();
         }
       }
 
