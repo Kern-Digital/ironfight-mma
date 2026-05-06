@@ -118,6 +118,23 @@ export default function Home() {
             "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.18), transparent 60%), radial-gradient(420px 260px at 0% 110%, rgba(255,45,120,.14), transparent 60%), linear-gradient(160deg, #0A1218, #050709 70%)",
         }}
       >
+        {/* Background photo */}
+        <Image
+          src="/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"
+          alt=""
+          fill
+          className="pointer-events-none object-cover object-center"
+          style={{ opacity: 0.12, mixBlendMode: "luminosity" }}
+          priority
+        />
+        {/* Dark scrim over photo */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(160deg, rgba(10,18,24,.85) 0%, rgba(5,7,9,.92) 100%)",
+          }}
+        />
         {/* Grid overlay */}
         <div
           className="pointer-events-none absolute inset-0"
