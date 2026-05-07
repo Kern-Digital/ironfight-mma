@@ -50,7 +50,7 @@ function makeSilentWavBlobUrl(): string {
   const dv = new DataView(buf.buffer);
 
   const str = (offset: number, s: string) =>
-    [...s].forEach((c, i) => (buf[offset + i] = c.charCodeAt(0)));
+    s.split("").forEach((c, i) => (buf[offset + i] = c.charCodeAt(0)));
 
   str(0, "RIFF");
   dv.setUint32(4, 36 + numSamples, true);

@@ -94,6 +94,8 @@ export interface Technique {
   animation?: LottieAnimation;
   /** Optional: animiertes GIF als Fallback */
   gif?: string;
+  /** IDs der Komponenten-Techniken (z. B. für Kombos) */
+  techniqueIds?: string[];
   /** IDs verwandter Techniken */
   relatedTechniqueIds?: string[];
   /** Sinnvolle nächste Technik zum Lernen */
