@@ -9,7 +9,7 @@ import {
 } from "@/lib/use-workout-timer";
 import { useAuth } from "@/lib/auth-context";
 import { logWorkout } from "@/lib/workouts";
-import { unlockAudio, isAudioUnlocked, initAudio } from "@/lib/audio";
+import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { useSearchParams } from "next/navigation";
@@ -215,8 +215,6 @@ function TimerView() {
       document.removeEventListener("webkitfullscreenchange", onFsChange);
     };
   }, []);
-
-  useEffect(() => { initAudio(); }, []);
 
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   useEffect(() => { setAudioUnlocked(isAudioUnlocked()); }, []);
