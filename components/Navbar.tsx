@@ -3,53 +3,166 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth, useFighterName } from "@/lib/auth-context";
 
-interface NavLink {
+// ── Icons ──────────────────────────────────────────────────────
+function IconDumbbell() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4v16M18 4v16M6 8h12M6 16h12M3 4h3M18 4h3M3 20h3M18 20h3" />
+    </svg>
+  );
+}
+
+function IconBook() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+
+function IconTimer() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 9v4l2.5 2.5" />
+      <path d="M9.5 3h5" />
+      <path d="M12 3v2" />
+    </svg>
+  );
+}
+
+function IconUser() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M6 20v-2a6 6 0 0 1 12 0v2" />
+    </svg>
+  );
+}
+
+function IconChevron({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+// ── Types ──────────────────────────────────────────────────────
+interface NavChild {
   href: string;
   label: string;
   activePattern?: RegExp;
 }
 
-const links: NavLink[] = [
-  { href: "/", label: "Home" },
+interface NavGroup {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  href?: string;
+  children?: NavChild[];
+}
+
+// ── Nav Config ─────────────────────────────────────────────────
+const navGroups: NavGroup[] = [
   {
-    href: "/workout/generator",
-    label: "Workout",
-    activePattern: /^\/(workout|training)/,
+    id: "training",
+    label: "Training",
+    icon: <IconDumbbell />,
+    children: [
+      { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
+      { href: "/schedule", label: "Kursplan" },
+      { href: "/training", label: "Pläne", activePattern: /^\/training/ },
+    ],
   },
-  { href: "/schedule", label: "Stundenplan" },
-  { href: "/library", label: "Bibliothek" },
-  { href: "/techniques", label: "Techniken" },
-  { href: "/regeln", label: "Regeln" },
-  { href: "/timer", label: "Timer" },
-  { href: "/dashboard", label: "Mein Training" },
+  {
+    id: "lernen",
+    label: "Lernen",
+    icon: <IconBook />,
+    children: [
+      { href: "/techniques", label: "Techniken" },
+      { href: "/regeln", label: "Regeln" },
+      { href: "/quiz", label: "Quiz" },
+    ],
+  },
+  {
+    id: "timer",
+    label: "Timer",
+    icon: <IconTimer />,
+    href: "/timer",
+  },
+  {
+    id: "profil",
+    label: "Profil",
+    icon: <IconUser />,
+    children: [
+      { href: "/library", label: "Sammlung" },
+      { href: "/dashboard", label: "Verlauf" },
+      { href: "/profile", label: "Account" },
+    ],
+  },
 ];
 
+// ── Helpers ────────────────────────────────────────────────────
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "F") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
+// ── Component ──────────────────────────────────────────────────
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, logOut } = useAuth();
   const fighterName = useFighterName();
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [openMobileGroups, setOpenMobileGroups] = useState<Set<string>>(new Set());
+  const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleLogout() {
     await logOut();
-    setOpen(false);
+    setMobileOpen(false);
     router.push("/");
   }
 
-  function isActive(link: NavLink): boolean {
-    if (link.activePattern) return link.activePattern.test(pathname);
-    if (link.href === "/") return pathname === "/";
-    return pathname.startsWith(link.href);
+  function isChildActive(child: NavChild): boolean {
+    if (child.activePattern) return child.activePattern.test(pathname);
+    if (child.href === "/") return pathname === "/";
+    return pathname.startsWith(child.href);
   }
+
+  function isGroupActive(group: NavGroup): boolean {
+    if (group.href) return pathname === group.href;
+    return group.children?.some(isChildActive) ?? false;
+  }
+
+  function handleGroupEnter(id: string) {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setOpenDesktopGroup(id);
+  }
+
+  function handleGroupLeave() {
+    closeTimerRef.current = setTimeout(() => setOpenDesktopGroup(null), 150);
+  }
+
+  function toggleMobileGroup(id: string) {
+    setOpenMobileGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const monoStyle = {
+    fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
+    letterSpacing: "0.12em",
+  };
 
   return (
     <header
@@ -61,11 +174,7 @@ export default function Navbar() {
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Brand */}
-        <Link
-          href="/"
-          className="flex items-center gap-3"
-          style={{ textDecoration: "none" }}
-        >
+        <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
           <Image
             src="/icons/icon-192.png"
             alt="Tidal Athletics"
@@ -90,37 +199,114 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop links */}
-        <div className="hidden items-center gap-1 md:flex">
-          {links.map((link) => {
-            const active = isActive(link);
+        {/* Desktop Navigation */}
+        <div className="hidden items-center gap-0.5 md:flex">
+          {navGroups.map((group) => {
+            const active = isGroupActive(group);
+            const isOpen = openDesktopGroup === group.id;
+
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="relative px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                style={{
-                  fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
-                  letterSpacing: "0.12em",
-                  color: active ? "var(--ta-cyan)" : "var(--fg-3)",
-                }}
+              <div
+                key={group.id}
+                className="relative"
+                onMouseEnter={() => handleGroupEnter(group.id)}
+                onMouseLeave={handleGroupLeave}
               >
-                {link.label}
-                {active && (
-                  <span
-                    className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                    style={{
-                      background: "var(--ta-cyan)",
-                      boxShadow: "0 0 8px var(--ta-cyan)",
-                    }}
-                  />
+                {group.href ? (
+                  // Direct link (Timer)
+                  <Link
+                    href={group.href}
+                    className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
+                    style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                  >
+                    <span style={{ opacity: 0.75 }}>{group.icon}</span>
+                    {group.label}
+                    {active && (
+                      <span
+                        className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
+                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                      />
+                    )}
+                  </Link>
+                ) : (
+                  // Dropdown trigger
+                  <button
+                    className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
+                    style={{ ...monoStyle, color: active || isOpen ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                    aria-haspopup="true"
+                    aria-expanded={isOpen}
+                  >
+                    <span style={{ opacity: 0.75 }}>{group.icon}</span>
+                    {group.label}
+                    <span
+                      style={{
+                        transition: "transform 0.2s",
+                        transform: isOpen ? "rotate(180deg)" : "none",
+                        opacity: 0.5,
+                      }}
+                    >
+                      <IconChevron />
+                    </span>
+                    {active && !isOpen && (
+                      <span
+                        className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
+                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                      />
+                    )}
+                  </button>
                 )}
-              </Link>
+
+                {/* Dropdown Panel */}
+                {group.children && isOpen && (
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-xl py-1"
+                    style={{
+                      background: "rgba(7,9,12,0.98)",
+                      border: "1px solid var(--ink-5)",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,230,0.06)",
+                    }}
+                  >
+                    {group.children.map((child) => {
+                      const childActive = isChildActive(child);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={() => setOpenDesktopGroup(null)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
+                          style={{
+                            ...monoStyle,
+                            color: childActive ? "var(--ta-cyan)" : "var(--fg-3)",
+                            background: childActive ? "rgba(0,212,230,0.07)" : "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!childActive)
+                              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = childActive
+                              ? "rgba(0,212,230,0.07)"
+                              : "transparent";
+                          }}
+                        >
+                          {childActive && (
+                            <span
+                              className="h-3 w-0.5 rounded-full"
+                              style={{ background: "var(--ta-cyan)", flexShrink: 0 }}
+                            />
+                          )}
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Auth controls */}
+        {/* Auth Controls — Desktop */}
         <div className="hidden items-center gap-3 md:flex">
           {loading ? (
             <div
@@ -158,12 +344,8 @@ export default function Navbar() {
                   letterSpacing: "0.1em",
                   color: "var(--fg-4)",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = "var(--ta-pink)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = "var(--fg-4)")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ta-pink)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-4)")}
               >
                 Logout
               </button>
@@ -188,16 +370,16 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
+        {/* Mobile Hamburger */}
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setMobileOpen((v) => !v)}
           className="rounded-xl p-2 md:hidden"
           style={{
             background: "var(--ink-3)",
             border: "1px solid var(--ink-5)",
             color: "var(--fg-2)",
           }}
-          aria-label="Toggle menu"
+          aria-label="Menü öffnen"
         >
           <span className="block h-0.5 w-5" style={{ background: "currentColor" }} />
           <span className="mt-1 block h-0.5 w-5" style={{ background: "currentColor" }} />
@@ -205,68 +387,117 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile drawer */}
-      {open && (
+      {/* Mobile Drawer */}
+      {mobileOpen && (
         <div
           className="border-t md:hidden"
-          style={{
-            borderColor: "var(--ink-4)",
-            background: "var(--ink-1)",
-          }}
+          style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
         >
           <div className="flex flex-col p-4">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="px-2 py-3 text-sm font-bold uppercase transition-colors"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.12em",
-                  color: isActive(link) ? "var(--ta-cyan)" : "var(--fg-3)",
-                }}
-              >
-                {link.label}
-              </Link>
-            ))}
-            {user && (
-              <Link
-                href="/profile"
-                onClick={() => setOpen(false)}
-                className="px-2 py-3 text-sm font-bold uppercase transition-colors"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.12em",
-                  color: "var(--fg-3)",
-                }}
-              >
-                Profil ({fighterName})
-              </Link>
-            )}
+            {navGroups.map((group) => {
+              const groupActive = isGroupActive(group);
+              const groupMobileOpen = openMobileGroups.has(group.id);
+
+              return (
+                <div key={group.id} className="overflow-hidden">
+                  {group.href ? (
+                    // Direct link (Timer)
+                    <Link
+                      href={group.href}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-2.5 px-2 py-3 text-sm font-bold uppercase transition-colors"
+                      style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                    >
+                      <span style={{ opacity: 0.7 }}>{group.icon}</span>
+                      {group.label}
+                    </Link>
+                  ) : (
+                    <>
+                      {/* Accordion header */}
+                      <button
+                        onClick={() => toggleMobileGroup(group.id)}
+                        className="flex w-full items-center justify-between px-2 py-3 text-sm font-bold uppercase transition-colors"
+                        style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <span style={{ opacity: 0.7 }}>{group.icon}</span>
+                          {group.label}
+                        </span>
+                        <span
+                          style={{
+                            transition: "transform 0.2s",
+                            transform: groupMobileOpen ? "rotate(180deg)" : "none",
+                          }}
+                        >
+                          <IconChevron size={14} />
+                        </span>
+                      </button>
+
+                      {/* Accordion children */}
+                      {groupMobileOpen && (
+                        <div
+                          className="mb-2 ml-6 flex flex-col border-l"
+                          style={{ borderColor: "var(--ink-5)" }}
+                        >
+                          {group.children?.map((child) => {
+                            const childActive = isChildActive(child);
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                onClick={() => setMobileOpen(false)}
+                                className="px-4 py-2.5 font-bold uppercase transition-colors"
+                                style={{
+                                  ...monoStyle,
+                                  fontSize: "0.75rem",
+                                  color: childActive ? "var(--ta-cyan)" : "var(--fg-4)",
+                                }}
+                              >
+                                {child.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Auth section */}
             <div
               className="mt-2 flex gap-2 border-t pt-3"
               style={{ borderColor: "var(--ink-4)" }}
             >
               {user ? (
-                <button
-                  onClick={handleLogout}
-                  className="btn-secondary flex-1 px-4 py-2 text-xs"
-                >
-                  Logout
-                </button>
+                <>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileOpen(false)}
+                    className="btn-secondary flex-1 px-4 py-2 text-xs"
+                  >
+                    {fighterName}
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="btn-secondary flex-1 px-4 py-2 text-xs"
+                  >
+                    Logout
+                  </button>
+                </>
               ) : (
                 <>
                   <Link
                     href="/login"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setMobileOpen(false)}
                     className="btn-secondary flex-1 px-4 py-2 text-xs"
                   >
                     Login
                   </Link>
                   <Link
                     href="/register"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setMobileOpen(false)}
                     className="btn-primary flex-1 px-4 py-2 text-xs"
                   >
                     Registrieren
