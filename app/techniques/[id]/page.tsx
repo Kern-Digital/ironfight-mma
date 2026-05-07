@@ -6,7 +6,13 @@ import {
   youtubeSearchUrl,
 } from "@/lib/techniques";
 import { EQUIPMENT } from "@/lib/equipment";
-import { DIFFICULTY_LABEL } from "@/lib/types";
+import {
+  DIFFICULTY_LABEL,
+  DISCIPLINE_LABEL,
+  TRAINING_AREA_LABEL,
+  TECHNIQUE_ROLE_LABEL,
+  TECHNIQUE_LEVEL_LABEL,
+} from "@/lib/types";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -36,6 +42,12 @@ export default function TechniqueDetailPage({
     .filter((x): x is NonNullable<typeof x> => Boolean(x));
   const next = t.nextTechniqueId ? getTechniqueById(t.nextTechniqueId) : null;
 
+  const trainingAreas = t.trainingArea
+    ? Array.isArray(t.trainingArea)
+      ? t.trainingArea
+      : [t.trainingArea]
+    : [];
+
   return (
     <>
       <PageHeader
@@ -43,7 +55,64 @@ export default function TechniqueDetailPage({
         title={t.name}
         description={t.description}
       />
+
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 space-y-8">
+
+        {/* Meta-Tags: disciplines, trainingArea, role, level, alternativeNames */}
+        {(t.disciplines?.length ||
+          trainingAreas.length ||
+          t.role ||
+          t.level ||
+          t.alternativeNames?.length) ? (
+          <div className="space-y-3">
+            {/* Disciplines + TrainingArea tags */}
+            {(t.disciplines?.length || trainingAreas.length) ? (
+              <div className="flex flex-wrap gap-2">
+                {t.disciplines?.map((d) => (
+                  <span
+                    key={d}
+                    className="rounded-sm border border-blood/40 bg-blood/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blood"
+                  >
+                    {DISCIPLINE_LABEL[d]}
+                  </span>
+                ))}
+                {trainingAreas.map((area) => (
+                  <span
+                    key={area}
+                    className="rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-1 text-xs font-bold uppercase tracking-wider text-foreground/70"
+                  >
+                    {TRAINING_AREA_LABEL[area]}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Role + Level */}
+            {(t.role || t.level) ? (
+              <div className="flex flex-wrap gap-2">
+                {t.role && (
+                  <span className="rounded-sm border border-carbon-400 bg-carbon-700/60 px-3 py-1 text-xs font-bold uppercase tracking-wider text-foreground/80">
+                    {TECHNIQUE_ROLE_LABEL[t.role]}
+                  </span>
+                )}
+                {t.level && (
+                  <span className="rounded-sm border border-carbon-400 bg-carbon-700/60 px-3 py-1 text-xs font-bold uppercase tracking-wider text-foreground/80">
+                    {TECHNIQUE_LEVEL_LABEL[t.level]}
+                  </span>
+                )}
+              </div>
+            ) : null}
+
+            {/* Alternative Namen */}
+            {t.alternativeNames?.length ? (
+              <p className="text-xs text-foreground/50">
+                <span className="font-bold uppercase tracking-widest">Auch bekannt als:</span>{" "}
+                {t.alternativeNames.join(", ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Video / Animation Slot */}
         <div className="card">
           <div className="text-xs font-bold uppercase tracking-widest text-blood">
@@ -99,6 +168,21 @@ export default function TechniqueDetailPage({
           </ol>
         </div>
 
+        {/* Coaching-Hinweise */}
+        {t.coachingCues?.length ? (
+          <div className="card">
+            <h2 className="heading-display text-2xl font-black">Coaching-Hinweise</h2>
+            <ul className="mt-4 space-y-2 text-sm text-foreground/85">
+              {t.coachingCues.map((cue) => (
+                <li key={cue} className="flex gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span>{cue}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {/* Typische Fehler */}
         <div className="card">
           <h2 className="heading-display text-2xl font-black">Typische Fehler</h2>
@@ -112,10 +196,37 @@ export default function TechniqueDetailPage({
           </ul>
         </div>
 
-        {/* Anwendung */}
+        {/* Sicherheitshinweise */}
+        {t.safetyNotes?.length ? (
+          <div className="card border-yellow-500/30 bg-yellow-500/5">
+            <h2 className="heading-display text-2xl font-black text-yellow-300">
+              Sicherheitshinweise
+            </h2>
+            <ul className="mt-4 space-y-2 text-sm text-foreground/85">
+              {t.safetyNotes.map((note) => (
+                <li key={note} className="flex gap-2">
+                  <span className="text-yellow-400">⚠</span>
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* Anwendung / Einsatzbereich */}
         <div className="card">
-          <h2 className="heading-display text-2xl font-black">Wann einsetzen?</h2>
+          <h2 className="heading-display text-2xl font-black">Einsatzbereich</h2>
           <p className="mt-3 text-sm text-foreground/85">{t.usage}</p>
+          {t.useCases?.length ? (
+            <ul className="mt-4 space-y-2 text-sm text-foreground/80">
+              {t.useCases.map((uc) => (
+                <li key={uc} className="flex gap-2">
+                  <span className="text-blood">›</span>
+                  <span>{uc}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         {/* Equipment */}

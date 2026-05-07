@@ -1,8 +1,10 @@
-import type { Category, Difficulty, Technique } from "../types";
+import type { Category, Difficulty, Discipline, Technique } from "../types";
 import { BOXING_TECHNIQUES } from "./boxing";
 import { WRESTLING_TECHNIQUES } from "./wrestling";
 import { BJJ_TECHNIQUES } from "./bjj";
 import { MUAY_THAI_TECHNIQUES } from "./muay-thai";
+import { KICKBOXEN_TECHNIQUES } from "./kickboxen";
+import { MMA_BASIC_TECHNIQUES } from "./mma-basics";
 
 /** Aggregierte Technikbibliothek über alle Disziplinen. */
 export const ALL_TECHNIQUES: Technique[] = [
@@ -10,6 +12,8 @@ export const ALL_TECHNIQUES: Technique[] = [
   ...WRESTLING_TECHNIQUES,
   ...BJJ_TECHNIQUES,
   ...MUAY_THAI_TECHNIQUES,
+  ...KICKBOXEN_TECHNIQUES,
+  ...MMA_BASIC_TECHNIQUES,
 ];
 
 const BY_ID = new Map<string, Technique>(
@@ -64,13 +68,28 @@ export const CATEGORY_TAG: Record<Category, string> = {
   "muay-thai": "Stand-Up",
 };
 
+export const DISCIPLINE_LABEL: Record<Discipline, string> = {
+  boxing: "Boxing",
+  kickboxen: "Kickboxen",
+  "muay-thai": "Muay Thai",
+  mma: "MMA",
+  wrestling: "Wrestling / Ringen",
+  bjj: "BJJ / Grappling",
+  karate: "Karate",
+  "wing-tsung": "Wing Tsung",
+  "self-defense": "Self-Defense",
+  "fitness-kickboxen": "Fitness-Kickboxen",
+};
+
 /**
  * Liefert eine YouTube-Suche für eine Technik.
- * Wird auf der Detail-Seite als „Externes Video suchen"-Button verwendet,
- * solange noch kein lizenz-validiertes Video zugeordnet ist.
+ * Verwendet `technique.videoSearchQuery` wenn vorhanden, sonst Fallback auf
+ * Name + Kategorie. Wird auf der Detail-Seite als „Externes Video suchen"-Button
+ * verwendet, solange noch kein lizenz-validiertes Video zugeordnet ist.
  */
 export function youtubeSearchUrl(technique: Technique): string {
-  const q = encodeURIComponent(`${technique.name} ${technique.category} tutorial`);
+  const raw = technique.videoSearchQuery ?? `${technique.name} ${technique.category} tutorial`;
+  const q = encodeURIComponent(raw);
   return `https://www.youtube.com/results?search_query=${q}`;
 }
 
@@ -79,4 +98,6 @@ export {
   WRESTLING_TECHNIQUES,
   BJJ_TECHNIQUES,
   MUAY_THAI_TECHNIQUES,
+  KICKBOXEN_TECHNIQUES,
+  MMA_BASIC_TECHNIQUES,
 };

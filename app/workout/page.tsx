@@ -1,6 +1,7 @@
 "use client";
 
 import PageHeader from "@/components/PageHeader";
+import TechniqueInlinePanel from "@/components/TechniqueInlinePanel";
 import { useAuth } from "@/lib/auth-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { getExerciseById } from "@/lib/exercises";
@@ -136,6 +137,12 @@ function WorkoutRunner() {
 
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   useEffect(() => setAudioUnlocked(isAudioUnlocked()), []);
+
+  // Technique accordion state (Übersicht-Sektion)
+  const [openTechniqueId, setOpenTechniqueId] = useState<string | null>(null);
+  function handleTechniqueToggle(tid: string) {
+    setOpenTechniqueId((prev) => (prev === tid ? null : tid));
+  }
 
   async function handleStart() {
     if (!audioUnlocked) {
@@ -450,7 +457,7 @@ function WorkoutRunner() {
                         ? "Konditionierung"
                         : "Cooldown"}
                 </div>
-                <ul className="mt-2 space-y-1 text-sm">
+                <ul className="mt-2 space-y-2 text-sm">
                   {block.exerciseIds.map((id, i) => {
                     const ex = getExerciseById(id);
                     if (!ex) return null;
@@ -458,21 +465,59 @@ function WorkoutRunner() {
                     const isCurrent = globalIdx === exerciseIndex;
                     const isPast = globalIdx < exerciseIndex;
                     return (
-                      <li
-                        key={`${id}-${i}`}
-                        className={`flex items-center gap-2 rounded-sm border px-2 py-1 ${
-                          isCurrent
-                            ? "border-blood bg-blood/10 text-blood font-bold"
-                            : isPast
-                              ? "border-carbon-500 bg-carbon-800/40 text-foreground/40 line-through"
-                              : "border-carbon-500 bg-carbon-800/60"
-                        }`}
-                      >
-                        <span>{isPast ? "✓" : isCurrent ? "▶" : "○"}</span>
-                        <span>{ex.name}</span>
-                        <span className="ml-auto text-[10px] uppercase tracking-widest text-foreground/50">
-                          {ex.defaultRounds}× {ex.durationSeconds}s
-                        </span>
+                      <li key={`${id}-${i}`}>
+                        <div
+                          className={`flex items-center gap-2 rounded-sm border px-2 py-1 ${
+                            isCurrent
+                              ? "border-blood bg-blood/10 text-blood font-bold"
+                              : isPast
+                                ? "border-carbon-500 bg-carbon-800/40 text-foreground/40 line-through"
+                                : "border-carbon-500 bg-carbon-800/60"
+                          }`}
+                        >
+                          <span>{isPast ? "✓" : isCurrent ? "▶" : "○"}</span>
+                          <span>{ex.name}</span>
+                          <span className="ml-auto text-[10px] uppercase tracking-widest text-foreground/50">
+                            {ex.defaultRounds}× {ex.durationSeconds}s
+                          </span>
+                        </div>
+
+                        {/* Technique accordion buttons */}
+                        {ex.techniqueIds && ex.techniqueIds.length > 0 && (
+                          <div className="mt-1 ml-4 space-y-1">
+                            {ex.techniqueIds.map((tid) => {
+                              const tech = getTechniqueById(tid);
+                              if (!tech) return null;
+                              const panelId = `technique-panel-${tid}`;
+                              const isOpen = openTechniqueId === tid;
+                              return (
+                                <div key={tid}>
+                                  <button
+                                    aria-expanded={isOpen}
+                                    aria-controls={panelId}
+                                    onClick={() => handleTechniqueToggle(tid)}
+                                    className={`flex w-full items-center justify-between gap-2 rounded-sm border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all ${
+                                      isOpen
+                                        ? "border-blood/50 bg-blood/10 text-blood"
+                                        : "border-blood/30 bg-blood/5 text-blood/70 hover:border-blood/50 hover:text-blood"
+                                    }`}
+                                  >
+                                    <span>Technik: {tech.name}</span>
+                                    <span className="shrink-0">
+                                      {isOpen ? "▴" : "▾"}
+                                    </span>
+                                  </button>
+                                  {isOpen && (
+                                    <TechniqueInlinePanel
+                                      id={panelId}
+                                      techniqueId={tid}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </li>
                     );
                   })}

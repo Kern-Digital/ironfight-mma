@@ -21,6 +21,108 @@ export type FutureCategory =
 
 export type AnyCategory = Category | FutureCategory;
 
+/** Vollständige Disziplin-Liste für die Master-Technikdatenbank */
+export type Discipline =
+  | "boxing"
+  | "kickboxen"
+  | "muay-thai"
+  | "mma"
+  | "wrestling"
+  | "bjj"
+  | "karate"
+  | "wing-tsung"
+  | "self-defense"
+  | "fitness-kickboxen";
+
+export const DISCIPLINE_LABEL: Record<Discipline, string> = {
+  boxing: "Boxing",
+  kickboxen: "Kickboxen",
+  "muay-thai": "Muay Thai",
+  mma: "MMA",
+  wrestling: "Wrestling / Ringen",
+  bjj: "BJJ / Grappling",
+  karate: "Karate",
+  "wing-tsung": "Wing Tsung",
+  "self-defense": "Self-Defense",
+  "fitness-kickboxen": "Fitness-Kickboxen",
+};
+
+/** Kampfphasen und Trainingsbereiche */
+export type TrainingArea =
+  | "stand-up"
+  | "footwork"
+  | "punches"
+  | "kicks"
+  | "knees"
+  | "elbows"
+  | "clinch"
+  | "takedowns"
+  | "takedown-defense"
+  | "ground-control"
+  | "guard"
+  | "sweeps"
+  | "submissions"
+  | "escapes"
+  | "transitions"
+  | "defense"
+  | "combos"
+  | "drills";
+
+export const TRAINING_AREA_LABEL: Record<TrainingArea, string> = {
+  "stand-up": "Stand-Up",
+  footwork: "Footwork",
+  punches: "Schläge",
+  kicks: "Kicks",
+  knees: "Knees",
+  elbows: "Elbows",
+  clinch: "Clinch",
+  takedowns: "Takedowns",
+  "takedown-defense": "Takedown Defense",
+  "ground-control": "Ground Control",
+  guard: "Guard",
+  sweeps: "Sweeps",
+  submissions: "Submissions",
+  escapes: "Escapes",
+  transitions: "Transitions",
+  defense: "Defense",
+  combos: "Kombos",
+  drills: "Drills",
+};
+
+/** Technikrolle: Core-Technik, Ergänzung, fortgeschritten, Spezialtechnik, Drill oder Kombo */
+export type TechniqueRole =
+  | "core"
+  | "support"
+  | "advanced"
+  | "specialist"
+  | "drill"
+  | "combo";
+
+export const TECHNIQUE_ROLE_LABEL: Record<TechniqueRole, string> = {
+  core: "Core-Technik",
+  support: "Support-Technik",
+  advanced: "Fortgeschrittene Technik",
+  specialist: "Spezial-Technik",
+  drill: "Drill",
+  combo: "Kombination",
+};
+
+/** Granulares Level — Obermenge von Difficulty */
+export type TechniqueLevel =
+  | "anfaenger"
+  | "aufbau"
+  | "fortgeschritten"
+  | "advanced"
+  | "pro";
+
+export const TECHNIQUE_LEVEL_LABEL: Record<TechniqueLevel, string> = {
+  anfaenger: "Anfänger",
+  aufbau: "Aufbau",
+  fortgeschritten: "Fortgeschritten",
+  advanced: "Advanced",
+  pro: "Pro / Wettkampf",
+};
+
 // ─── Schwierigkeit ─────────────────────────────────────────────────────────
 
 export type Difficulty = "anfaenger" | "fortgeschritten" | "pro";
@@ -79,6 +181,7 @@ export interface Technique {
   id: string;
   slug: string;
   name: string;
+  /** Primäre Kategorie (bestehende Struktur) */
   category: Category;
   difficulty: Difficulty;
   description: string;
@@ -100,6 +203,34 @@ export interface Technique {
   relatedTechniqueIds?: string[];
   /** Sinnvolle nächste Technik zum Lernen */
   nextTechniqueId?: string;
+
+  // ─── Erweiterte Felder der Master-Technikdatenbank ─────────────────────
+  /** Alle Disziplinen, in denen diese Technik eingesetzt wird */
+  disciplines?: Discipline[];
+  /** Trainingsbereich(e) dieser Technik */
+  trainingArea?: TrainingArea | TrainingArea[];
+  /** Technikrolle (Core, Support, Advanced, Specialist, Drill, Combo) */
+  role?: TechniqueRole;
+  /** Granulares Level (erweitert difficulty) */
+  level?: TechniqueLevel;
+  /** Alternative Namen / Bezeichnungen */
+  alternativeNames?: string[];
+  /** Sub-Kategorie (freier Text, z. B. "Jab-Variante") */
+  subCategory?: string;
+  /** Coaching-Hinweise für den Trainer */
+  coachingCues?: string[];
+  /** Sicherheitshinweise */
+  safetyNotes?: string[];
+  /** Konkrete Einsatzbereiche (strukturierter als usage) */
+  useCases?: string[];
+  /** Prioritätswert 1–10 (Wichtigkeit der Technik generell) */
+  priorityScore?: number;
+  /** Frequenzwert 1–10 (wie häufig im Training eingesetzt) */
+  frequencyScore?: number;
+  /** Diversitätsgruppe — verhindert zu viele Techniken eines Typs pro Kurs */
+  diversityGroup?: string;
+  /** YouTube-Suchbegriff als Fallback, wenn kein eigenes Video vorhanden */
+  videoSearchQuery?: string;
 }
 
 // ─── Übungen (Exercise = trainierbare Einheit, ggf. Technik-bezogen) ───────
@@ -305,4 +436,46 @@ export interface Participation {
   blockTitle: string;
   weekIdentifier: string;
   joinedAt: Date;
+}
+
+// ─── Kurs-Technik-System ────────────────────────────────────────────────────
+
+export interface CourseDefinition {
+  id: string;
+  name: string;
+  discipline: Discipline;
+  level: TechniqueLevel;
+  description: string;
+  /** Welche Trainingsbereiche dieser Kurs abdeckt */
+  techniqueAreas: TrainingArea[];
+  /** Maximale Anzahl Techniken pro Kurs (Default: 120) */
+  maxTechniques: number;
+  /** Optionale Gewichtung der Bereiche (Summe sollte 1 ergeben) */
+  areaWeights?: Partial<Record<TrainingArea, number>>;
+}
+
+export interface CourseTechniqueMapping {
+  courseId: string;
+  techniqueId: string;
+  relevanceScore: number;
+  sortOrder: number;
+  isCore: boolean;
+  isVisible: boolean;
+}
+
+// ─── Workout-Items mit Technik-Verlinkung ──────────────────────────────────
+
+export interface WorkoutItem {
+  id: string;
+  workoutId: string;
+  type: "technique" | "drill" | "exercise" | "rest";
+  techniqueId?: string;
+  exerciseId?: string;
+  title: string;
+  sets?: number;
+  reps?: number;
+  duration?: number;
+  intensity?: "low" | "medium" | "high";
+  sortOrder: number;
+  notes?: string;
 }
