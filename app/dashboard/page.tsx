@@ -319,8 +319,8 @@ function DashboardContent() {
               <Link href="/workout/generator" className="btn-primary text-sm">
                 Auto-Workout starten
               </Link>
-              <Link href="/training" className="btn-secondary text-sm">
-                Disziplin wählen
+              <Link href="/workout/generator" className="btn-secondary text-sm">
+                Trainingspläne
               </Link>
               <Link href="/timer" className="btn-secondary text-sm">
                 Nur Timer
@@ -348,7 +348,7 @@ function DashboardContent() {
               Letzte Trainings
             </h2>
             <Link
-              href="/training"
+              href="/workout/generator"
               className="font-mono-ta text-[10px] uppercase transition-colors"
               style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
             >
@@ -382,7 +382,7 @@ function DashboardContent() {
                   Generator
                 </Link>{" "}
                 oder{" "}
-                <Link href="/training" style={{ color: "var(--ta-cyan)" }}>
+                <Link href="/workout/generator" style={{ color: "var(--ta-cyan)" }}>
                   Trainingspläne
                 </Link>
                 .

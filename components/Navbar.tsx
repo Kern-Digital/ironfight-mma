@@ -76,7 +76,6 @@ const navGroups: NavGroup[] = [
     children: [
       { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
       { href: "/schedule", label: "Kursplan" },
-      { href: "/training", label: "Pläne", activePattern: /^\/training/ },
     ],
   },
   {

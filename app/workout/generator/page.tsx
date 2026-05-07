@@ -125,7 +125,7 @@ export default function WorkoutPage() {
                         Timer starten
                       </Link>
                       <Link
-                        href={`/training/${plan.slug}`}
+                        href={`/workout/plans/${plan.slug}`}
                         className="btn-secondary px-4 py-2 text-xs"
                       >
                         Plan ansehen →

@@ -34,33 +34,23 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="/training" className="hover:text-blood">
-                Pläne
-              </Link>
-            </li>
-          </ul>
-          <h4 className="mb-2 mt-5 text-xs font-bold uppercase tracking-widest text-foreground/40">
-            Disziplinen
-          </h4>
-          <ul className="space-y-2 text-sm text-foreground/70">
-            <li>
-              <Link href="/training/boxing" className="hover:text-blood">
-                Boxing
+              <Link href="/workout/plans/boxing" className="hover:text-blood">
+                Boxing Plan
               </Link>
             </li>
             <li>
-              <Link href="/training/wrestling" className="hover:text-blood">
-                Wrestling
+              <Link href="/workout/plans/wrestling" className="hover:text-blood">
+                Wrestling Plan
               </Link>
             </li>
             <li>
-              <Link href="/training/bjj" className="hover:text-blood">
-                Brazilian Jiu-Jitsu
+              <Link href="/workout/plans/bjj" className="hover:text-blood">
+                BJJ Plan
               </Link>
             </li>
             <li>
-              <Link href="/training/muay-thai" className="hover:text-blood">
-                Muay Thai
+              <Link href="/workout/plans/muay-thai" className="hover:text-blood">
+                Muay Thai Plan
               </Link>
             </li>
           </ul>

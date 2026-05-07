@@ -271,14 +271,14 @@ export default function Home() {
               </h2>
             </div>
             <Link
-              href="/training"
+              href="/workout/generator"
               className="hidden font-mono-ta text-[10px] uppercase transition-colors md:block"
               style={{
                 letterSpacing: "0.2em",
                 color: "var(--ta-cyan)",
               }}
             >
-              Alle Pläne →
+              Alle Workouts →
             </Link>
           </div>
 
@@ -286,7 +286,7 @@ export default function Home() {
             {disciplines.map((d) => (
               <Link
                 key={d.slug}
-                href={`/training/${d.slug}`}
+                href={`/workout/plans/${d.slug}`}
                 className="group relative overflow-hidden rounded-2xl transition-all duration-200"
                 style={{
                   height: "160px",
