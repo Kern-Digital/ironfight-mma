@@ -4,49 +4,121 @@ import PageHeader from "@/components/PageHeader";
 import {
   ALL_TECHNIQUES,
   CATEGORY_LABEL,
-  CATEGORY_TAG,
+  DISCIPLINE_LABEL,
   searchTechniques,
 } from "@/lib/techniques";
 import {
   DIFFICULTY_LABEL,
-  type Category,
+  TECHNIQUE_LEVEL_LABEL,
   type Difficulty,
+  type Discipline,
+  type TechniqueLevel,
 } from "@/lib/types";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-const CATEGORIES: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
+/** Alle Disziplinen die tatsächlich in der Datenbank vorkommen */
+const ALL_DISCIPLINES: Discipline[] = [
+  "boxing",
+  "kickboxen",
+  "muay-thai",
+  "mma",
+  "wrestling",
+  "bjj",
+  "fitness-kickboxen",
+];
+
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
+
+/** Primäre Disziplin einer Technik — nimmt disciplines[0] oder mapped category */
+function primaryDiscipline(t: (typeof ALL_TECHNIQUES)[0]): Discipline {
+  if (t.disciplines && t.disciplines.length > 0) return t.disciplines[0];
+  const map: Record<string, Discipline> = {
+    boxing: "boxing",
+    wrestling: "wrestling",
+    bjj: "bjj",
+    "muay-thai": "muay-thai",
+  };
+  return map[t.category] ?? "boxing";
+}
 
 export default function TechniquesPage() {
   const [search, setSearch] = useState("");
-  const [activeCat, setActiveCat] = useState<Category | "all">("all");
+  const [activeDiscipline, setActiveDiscipline] = useState<Discipline | "all">("all");
   const [activeDiff, setActiveDiff] = useState<Difficulty | "all">("all");
 
   const techniques = useMemo(() => {
     let list = searchTechniques(search);
-    if (activeCat !== "all") list = list.filter((t) => t.category === activeCat);
-    if (activeDiff !== "all")
-      list = list.filter((t) => t.difficulty === activeDiff);
-    return list;
-  }, [search, activeCat, activeDiff]);
 
+    if (activeDiscipline !== "all") {
+      list = list.filter((t) => {
+        if (t.disciplines && t.disciplines.length > 0) {
+          return t.disciplines.includes(activeDiscipline);
+        }
+        // Fallback: category-basiertes Matching
+        const map: Record<string, Discipline> = {
+          boxing: "boxing",
+          wrestling: "wrestling",
+          bjj: "bjj",
+          "muay-thai": "muay-thai",
+        };
+        return map[t.category] === activeDiscipline;
+      });
+    }
+
+    if (activeDiff !== "all") {
+      list = list.filter((t) => {
+        // Neues level-Feld hat Vorrang
+        if (t.level) {
+          const levelToDiff: Record<TechniqueLevel, Difficulty | null> = {
+            anfaenger: "anfaenger",
+            aufbau: "anfaenger",
+            fortgeschritten: "fortgeschritten",
+            advanced: "fortgeschritten",
+            pro: "pro",
+          };
+          return levelToDiff[t.level] === activeDiff;
+        }
+        return t.difficulty === activeDiff;
+      });
+    }
+
+    return list;
+  }, [search, activeDiscipline, activeDiff]);
+
+  /** Techniken nach primärer Disziplin gruppieren */
   const grouped = useMemo(() => {
-    const map = new Map<Category, typeof ALL_TECHNIQUES>();
+    const map = new Map<Discipline, typeof ALL_TECHNIQUES>();
     for (const t of techniques) {
-      const arr = map.get(t.category) ?? [];
+      const disc = primaryDiscipline(t);
+      const arr = map.get(disc) ?? [];
       arr.push(t);
-      map.set(t.category, arr);
+      map.set(disc, arr);
     }
     return map;
   }, [techniques]);
+
+  /** Reihenfolge der Disziplin-Sektionen — nur die die tatsächlich Techniken haben */
+  const disciplineOrder: Discipline[] = ALL_DISCIPLINES.filter(
+    (d) => grouped.has(d),
+  );
+
+  const DISC_TAG: Partial<Record<Discipline, string>> = {
+    boxing: "Stand-Up",
+    kickboxen: "Stand-Up",
+    "muay-thai": "Stand-Up",
+    mma: "Mixed",
+    wrestling: "Grappling",
+    bjj: "Ground",
+    "fitness-kickboxen": "Fitness",
+  };
 
   return (
     <>
       <PageHeader
         eyebrow="Bibliothek"
         title="Techniken"
-        description="Alle Techniken nach Disziplin und Schwierigkeit. Klicke eine Technik für Schritt-für-Schritt-Anleitung, typische Fehler und Anwendung."
+        description="Alle Techniken nach Disziplin und Level. Klicke eine Technik für Schritt-für-Schritt-Anleitung, typische Fehler und Anwendung."
       />
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         {/* Filter & Suche */}
@@ -58,21 +130,25 @@ export default function TechniquesPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-4 py-3 text-sm focus:border-blood focus:outline-none"
           />
+
+          {/* Disziplin-Filter */}
           <div className="flex flex-wrap gap-2">
             <FilterChip
               label="Alle Disziplinen"
-              active={activeCat === "all"}
-              onClick={() => setActiveCat("all")}
+              active={activeDiscipline === "all"}
+              onClick={() => setActiveDiscipline("all")}
             />
-            {CATEGORIES.map((c) => (
+            {ALL_DISCIPLINES.map((d) => (
               <FilterChip
-                key={c}
-                label={CATEGORY_LABEL[c]}
-                active={activeCat === c}
-                onClick={() => setActiveCat(c)}
+                key={d}
+                label={DISCIPLINE_LABEL[d]}
+                active={activeDiscipline === d}
+                onClick={() => setActiveDiscipline(d)}
               />
             ))}
           </div>
+
+          {/* Level-Filter */}
           <div className="flex flex-wrap gap-2">
             <FilterChip
               label="Alle Level"
@@ -90,6 +166,11 @@ export default function TechniquesPage() {
           </div>
         </div>
 
+        {/* Gesamt-Count */}
+        <div className="mb-6 text-xs uppercase tracking-widest text-foreground/50">
+          {techniques.length} {techniques.length === 1 ? "Technik" : "Techniken"} gefunden
+        </div>
+
         {/* Empty State */}
         {techniques.length === 0 && (
           <div className="card text-center text-foreground/60">
@@ -97,22 +178,22 @@ export default function TechniquesPage() {
           </div>
         )}
 
-        {/* Gruppiert nach Kategorie */}
+        {/* Gruppiert nach Disziplin */}
         <div className="space-y-12">
-          {CATEGORIES.map((cat) => {
-            const list = grouped.get(cat);
+          {disciplineOrder.map((disc) => {
+            const list = grouped.get(disc);
             if (!list?.length) return null;
             return (
-              <section key={cat}>
+              <section key={disc}>
                 <div className="mb-4 flex items-baseline gap-3">
                   <span className="text-xs font-bold uppercase tracking-widest text-blood">
-                    {CATEGORY_TAG[cat]}
+                    {DISC_TAG[disc] ?? "Kampfsport"}
                   </span>
                   <h2 className="heading-display text-3xl font-black">
-                    {CATEGORY_LABEL[cat]}
+                    {DISCIPLINE_LABEL[disc]}
                   </h2>
                   <span className="text-xs uppercase tracking-widest text-foreground/40">
-                    {list.length} Techniken
+                    {list.length} {list.length === 1 ? "Technik" : "Techniken"}
                   </span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -126,8 +207,23 @@ export default function TechniquesPage() {
                         <h3 className="heading-display text-xl font-black group-hover:text-blood">
                           {t.name}
                         </h3>
-                        <DifficultyBadge difficulty={t.difficulty} />
+                        <DifficultyBadge technique={t} />
                       </div>
+                      {t.trainingArea && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {(Array.isArray(t.trainingArea)
+                            ? t.trainingArea.slice(0, 2)
+                            : [t.trainingArea]
+                          ).map((area) => (
+                            <span
+                              key={area}
+                              className="text-[9px] font-bold uppercase tracking-widest text-foreground/40"
+                            >
+                              {area}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <p className="mt-2 text-sm text-foreground/70 line-clamp-2">
                         {t.description}
                       </p>
@@ -174,18 +270,39 @@ function FilterChip({
   );
 }
 
-function DifficultyBadge({ difficulty }: { difficulty: Difficulty }) {
+function DifficultyBadge({
+  technique,
+}: {
+  technique: (typeof ALL_TECHNIQUES)[0];
+}) {
+  const level = technique.level ?? null;
+  const diff = technique.difficulty;
+
+  const label = level
+    ? (() => {
+        const map: Record<string, string> = {
+          anfaenger: "Anfänger",
+          aufbau: "Aufbau",
+          fortgeschritten: "Fortgeschritten",
+          advanced: "Advanced",
+          pro: "Pro",
+        };
+        return map[level] ?? DIFFICULTY_LABEL[diff];
+      })()
+    : DIFFICULTY_LABEL[diff];
+
   const color =
-    difficulty === "anfaenger"
+    diff === "anfaenger" || level === "anfaenger" || level === "aufbau"
       ? "border-green-500/40 bg-green-500/10 text-green-300"
-      : difficulty === "fortgeschritten"
-        ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-300"
-        : "border-blood/60 bg-blood/15 text-blood";
+      : diff === "pro" || level === "pro" || level === "advanced"
+        ? "border-blood/60 bg-blood/15 text-blood"
+        : "border-yellow-500/40 bg-yellow-500/10 text-yellow-300";
+
   return (
     <span
       className={`rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${color}`}
     >
-      {DIFFICULTY_LABEL[difficulty]}
+      {label}
     </span>
   );
 }
