@@ -418,12 +418,14 @@ export interface TrainingSession {
   trainingBlockId: string;
   weekIdentifier: string; // "2026-W19" — nur intern, nie im UI
   exerciseIds: string[];
+  techniqueIds: string[]; // Kampftechniken aus lib/techniques — primäres Feld
   updatedAt?: Date;
   updatedBy?: string;
 }
 
 export interface LibraryEntry {
-  exerciseId: string;
+  exerciseId: string; // doc-ID (exerciseId oder techniqueId — je nach type)
+  type?: "exercise" | "technique";
   source: "training" | "manual";
   trainingSessionId?: string;
   contextLabel?: string;

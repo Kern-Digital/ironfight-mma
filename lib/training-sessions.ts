@@ -71,6 +71,7 @@ export async function getTrainingSession(
     trainingBlockId: d.trainingBlockId,
     weekIdentifier: d.weekIdentifier,
     exerciseIds: d.exerciseIds ?? [],
+    techniqueIds: d.techniqueIds ?? [],
     updatedAt: d.updatedAt?.toDate(),
     updatedBy: d.updatedBy,
   };
@@ -103,6 +104,39 @@ export async function setSessionExercises(
     trainingBlockId: blockId,
     weekIdentifier: weekId,
     exerciseIds,
+    techniqueIds: [],
+    updatedBy,
+  };
+}
+
+/**
+ * Speichert Kampftechniken für eine Trainingseinheit (Trainer-Aktion).
+ * Ersetzt exerciseIds als primäres Feld für Kurs-Inhalte.
+ */
+export async function setSessionTechniques(
+  blockId: string,
+  weekId: string,
+  techniqueIds: string[],
+  updatedBy: string,
+): Promise<TrainingSession> {
+  const ref = sessionDocRef(blockId, weekId);
+  await setDoc(
+    ref,
+    {
+      trainingBlockId: blockId,
+      weekIdentifier: weekId,
+      techniqueIds,
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    },
+    { merge: true },
+  );
+  return {
+    id: makeSessionId(blockId, weekId),
+    trainingBlockId: blockId,
+    weekIdentifier: weekId,
+    exerciseIds: [],
+    techniqueIds,
     updatedBy,
   };
 }
@@ -135,12 +169,63 @@ export async function addToLibrary(
 
   await setDoc(ref, {
     exerciseId,
+    type: "exercise",
     source,
     trainingSessionId: trainingSessionId ?? null,
     contextLabel: contextLabel ?? null,
     addedAt: serverTimestamp(),
   });
   return true;
+}
+
+/**
+ * Fügt eine Kampftechnik zur persönlichen Bibliothek hinzu.
+ * techniqueId = Document-ID → kein Duplikat möglich.
+ * Gibt `true` zurück wenn neu hinzugefügt, `false` wenn bereits vorhanden.
+ */
+export async function addTechniqueToLibrary(
+  uid: string,
+  techniqueId: string,
+  source: "training" | "manual",
+  trainingSessionId?: string,
+  contextLabel?: string,
+): Promise<boolean> {
+  const ref = libraryDocRef(uid, techniqueId);
+  const existing = await getDoc(ref);
+  if (existing.exists()) return false;
+
+  await setDoc(ref, {
+    exerciseId: techniqueId,
+    type: "technique",
+    source,
+    trainingSessionId: trainingSessionId ?? null,
+    contextLabel: contextLabel ?? null,
+    addedAt: serverTimestamp(),
+  });
+  return true;
+}
+
+/**
+ * Fügt alle Techniken einer Session zur Bibliothek hinzu.
+ * Vollständig dedup-sicher. Gibt Anzahl neu hinzugefügter Techniken zurück.
+ */
+export async function addSessionTechniquesToLibrary(
+  uid: string,
+  session: TrainingSession,
+  contextLabel: string,
+): Promise<number> {
+  let added = 0;
+  for (const techniqueId of session.techniqueIds ?? []) {
+    const wasNew = await addTechniqueToLibrary(
+      uid,
+      techniqueId,
+      "training",
+      session.id,
+      contextLabel,
+    );
+    if (wasNew) added++;
+  }
+  return added;
 }
 
 /**
@@ -174,6 +259,7 @@ export async function getLibrary(uid: string): Promise<LibraryEntry[]> {
     const data = d.data();
     return {
       exerciseId: data.exerciseId as string,
+      type: (data.type as "exercise" | "technique") ?? undefined,
       source: data.source as "training" | "manual",
       trainingSessionId: data.trainingSessionId ?? undefined,
       contextLabel: data.contextLabel ?? undefined,

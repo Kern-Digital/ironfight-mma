@@ -5,12 +5,13 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import {
-  addToLibrary,
+  addTechniqueToLibrary,
   getLibrary,
   removeFromLibrary,
 } from "@/lib/training-sessions";
-import { EXERCISES, getExerciseById } from "@/lib/exercises";
-import type { Category, Exercise, LibraryEntry } from "@/lib/types";
+import { ALL_TECHNIQUES, getTechniqueById } from "@/lib/techniques";
+import type { Category, LibraryEntry, Technique } from "@/lib/types";
+import { TECHNIQUE_LEVEL_LABEL } from "@/lib/types";
 
 // ─── Hilfskonstanten ───────────────────────────────────────────────────────
 
@@ -21,18 +22,30 @@ const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
   "muay-thai": { label: "Muay Thai", color: "#F87171" },
 };
 
-const KIND_LABEL: Record<string, string> = {
-  warmup:       "Aufwärmen",
-  technique:    "Technik",
-  conditioning: "Kondition",
-  cooldown:     "Cooldown",
+const DISCIPLINE_COLOR: Record<string, string> = {
+  boxing:            "#FB923C",
+  kickboxen:         "#FBBF24",
+  "muay-thai":       "#F87171",
+  "fitness-kickboxen": "#FCD34D",
+  wrestling:         "#60A5FA",
+  bjj:               "#C084FC",
+  mma:               "#00D4E6",
+  karate:            "#A78BFA",
 };
 
-const ALL_CATEGORIES: Array<Category | "all"> = [
+const TECHNIQUE_LEVEL_COLOR: Record<string, string> = {
+  anfaenger:       "#4ade80",
+  aufbau:          "#60a5fa",
+  fortgeschritten: "#f59e0b",
+  advanced:        "#f97316",
+  pro:             "#ef4444",
+};
+
+const ALL_FILTER_CATS: Array<Category | "all"> = [
   "all", "boxing", "wrestling", "bjj", "muay-thai",
 ];
 
-const CATEGORY_FILTER_LABEL: Record<string, string> = {
+const FILTER_LABEL: Record<string, string> = {
   all:         "Alle",
   boxing:      "Boxing",
   wrestling:   "Ringen",
@@ -43,7 +56,7 @@ const CATEGORY_FILTER_LABEL: Record<string, string> = {
 // ─── Typen ─────────────────────────────────────────────────────────────────
 
 interface EnrichedEntry extends LibraryEntry {
-  exercise: Exercise | undefined;
+  technique: Technique | undefined;
 }
 
 // ─── Hauptkomponente ───────────────────────────────────────────────────────
@@ -63,7 +76,8 @@ function LibraryContent() {
   const [loading, setLoading] = useState(true);
   const [filterCat, setFilterCat] = useState<Category | "all">("all");
   const [showBrowse, setShowBrowse] = useState(false);
-  const [browseSearch, setBrowseSearch] = useState("");
+  const [browseSearch, setBrowseSearch] = useState(""  );
+  const [browseDiscipline, setBrowseDiscipline] = useState<string>("all");
   const [addingId, setAddingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -73,7 +87,10 @@ function LibraryContent() {
     try {
       const raw = await getLibrary(user.uid);
       setEntries(
-        raw.map((e) => ({ ...e, exercise: getExerciseById(e.exerciseId) })),
+        raw.map((e) => ({
+          ...e,
+          technique: getTechniqueById(e.exerciseId),
+        })),
       );
     } finally {
       setLoading(false);
@@ -84,11 +101,11 @@ function LibraryContent() {
     loadLibrary();
   }, [loadLibrary]);
 
-  async function handleManualAdd(exerciseId: string) {
+  async function handleManualAdd(techniqueId: string) {
     if (!user) return;
-    setAddingId(exerciseId);
+    setAddingId(techniqueId);
     try {
-      await addToLibrary(user.uid, exerciseId, "manual");
+      await addTechniqueToLibrary(user.uid, techniqueId, "manual");
       await loadLibrary();
     } finally {
       setAddingId(null);
@@ -111,19 +128,30 @@ function LibraryContent() {
   // Filter nach Kategorie
   const filtered = entries.filter((e) => {
     if (filterCat === "all") return true;
-    if (!e.exercise) return false;
-    return e.exercise.category === filterCat || e.exercise.category === "any";
+    const cat = e.technique?.category;
+    if (!cat) return false;
+    return cat === filterCat;
   });
 
   const recent = entries.slice(0, 3);
 
-  // Browse-Liste: alle Übungen minus bereits gespeicherte, dann gefiltert
-  const browseList = EXERCISES.filter((e) => {
-    if (
-      browseSearch &&
-      !e.name.toLowerCase().includes(browseSearch.toLowerCase())
-    ) {
-      return false;
+  // Verfügbare Disziplinen für Browse-Tabs
+  const BROWSE_DISCIPLINES = [
+    { id: "all", label: "Alle" },
+    { id: "boxing", label: "Boxing" },
+    { id: "kickboxen", label: "Kickboxen" },
+    { id: "muay-thai", label: "Muay Thai" },
+    { id: "wrestling", label: "Wrestling" },
+    { id: "bjj", label: "BJJ" },
+    { id: "mma", label: "MMA" },
+  ];
+
+  // Browse-Liste: alle Techniken gefiltert nach Disziplin + Suche
+  const browseList = ALL_TECHNIQUES.filter((t) => {
+    if (browseSearch && !t.name.toLowerCase().includes(browseSearch.toLowerCase())) return false;
+    if (browseDiscipline !== "all") {
+      const matchesDiscipline = t.disciplines?.includes(browseDiscipline as never) ?? t.category === browseDiscipline;
+      if (!matchesDiscipline) return false;
     }
     return true;
   });
@@ -133,46 +161,27 @@ function LibraryContent() {
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
       {/* Header */}
-      <div
-        className="border-b px-4 py-8 sm:px-6"
-        style={{ borderColor: "var(--ink-4)" }}
-      >
+      <div className="border-b px-4 py-8 sm:px-6" style={{ borderColor: "var(--ink-4)" }}>
         <div className="mx-auto flex max-w-3xl items-end justify-between gap-4">
           <div>
-            <p
-              className="mb-1 font-mono-ta text-xs uppercase"
-              style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}
-            >
+            <p className="mb-1 font-mono-ta text-xs uppercase" style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}>
               Persönlich
             </p>
-            <h1
-              className="font-display-ta text-3xl font-black uppercase sm:text-4xl"
-              style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}
-            >
+            <h1 className="font-display-ta text-3xl font-black uppercase sm:text-4xl" style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}>
               Meine Bibliothek
             </h1>
-            <p
-              className="mt-1 text-sm"
-              style={{ color: "var(--fg-3)" }}
-            >
+            <p className="mt-1 text-sm" style={{ color: "var(--fg-3)" }}>
               {loading
                 ? "Lade…"
                 : entries.length === 0
-                  ? "Noch keine Übungen — besuche ein Training oder füge manuell hinzu."
-                  : `${entries.length} Übung${entries.length !== 1 ? "en" : ""} gespeichert`}
+                  ? "Noch keine Techniken — besuche ein Training und nehme teil."
+                  : `${entries.length} Technik${entries.length !== 1 ? "en" : ""} gespeichert`}
             </p>
           </div>
           <button
-            onClick={() => {
-              setShowBrowse(true);
-              setBrowseSearch("");
-            }}
+            onClick={() => { setShowBrowse(true); setBrowseSearch(""); setBrowseDiscipline("all"); }}
             className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold uppercase transition-colors"
-            style={{
-              background: "var(--ta-cyan)",
-              color: "var(--ink-1)",
-              letterSpacing: "0.1em",
-            }}
+            style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em" }}
           >
             + Hinzufügen
           </button>
@@ -183,11 +192,7 @@ function LibraryContent() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((n) => (
-              <div
-                key={n}
-                className="h-16 animate-pulse rounded-xl"
-                style={{ background: "var(--ink-3)" }}
-              />
+              <div key={n} className="h-16 animate-pulse rounded-xl" style={{ background: "var(--ink-3)" }} />
             ))}
           </div>
         ) : entries.length === 0 ? (
@@ -211,31 +216,27 @@ function LibraryContent() {
               </section>
             )}
 
-            {/* Alle Übungen mit Kategorie-Filter */}
+            {/* Alle Techniken mit Kategorie-Filter */}
             <section>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <SectionTitle>Alle Übungen</SectionTitle>
-                {/* Kategorie-Tabs */}
+                <SectionTitle>Alle Techniken</SectionTitle>
                 <div className="flex flex-wrap gap-1">
-                  {ALL_CATEGORIES.map((cat) => {
+                  {ALL_FILTER_CATS.map((cat) => {
                     const active = filterCat === cat;
-                    const style =
-                      cat !== "all" ? CATEGORY_STYLE[cat] : null;
+                    const style = cat !== "all" ? CATEGORY_STYLE[cat] : null;
                     return (
                       <button
                         key={cat}
                         onClick={() => setFilterCat(cat as Category | "all")}
                         className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
                         style={{
-                          background: active
-                            ? style?.color ?? "var(--ta-cyan)"
-                            : "var(--ink-3)",
+                          background: active ? style?.color ?? "var(--ta-cyan)" : "var(--ink-3)",
                           color: active ? "var(--ink-1)" : "var(--fg-3)",
                           border: `1px solid ${active ? "transparent" : "var(--ink-5)"}`,
                           letterSpacing: "0.08em",
                         }}
                       >
-                        {CATEGORY_FILTER_LABEL[cat]}
+                        {FILTER_LABEL[cat]}
                       </button>
                     );
                   })}
@@ -244,7 +245,7 @@ function LibraryContent() {
 
               {filtered.length === 0 ? (
                 <p className="text-sm" style={{ color: "var(--fg-4)" }}>
-                  Keine Übungen in dieser Kategorie.
+                  Keine Techniken in dieser Kategorie.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -262,36 +263,18 @@ function LibraryContent() {
           </>
         )}
 
-        {/* Hinweis auf Stundenplan */}
+        {/* Tipp */}
         {!loading && (
-          <div
-            className="mt-8 rounded-xl p-4"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
-            <p
-              className="mb-1 text-xs font-bold uppercase"
-              style={{
-                color: "var(--ta-cyan)",
-                letterSpacing: "0.1em",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
+          <div className="mt-8 rounded-xl p-4" style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)" }}>
+            <p className="mb-1 text-xs font-bold uppercase" style={{ color: "var(--ta-cyan)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
               Tipp
             </p>
             <p className="text-sm" style={{ color: "var(--fg-3)" }}>
               Klicke im{" "}
-              <Link
-                href="/schedule"
-                className="font-bold underline"
-                style={{ color: "var(--ta-cyan)" }}
-              >
+              <Link href="/schedule" className="font-bold underline" style={{ color: "var(--ta-cyan)" }}>
                 Stundenplan
               </Link>{" "}
-              auf ein Training und wähle „Ich nehme teil" — alle Übungen der
-              Einheit werden automatisch hier gespeichert.
+              auf ein Training und wähle „Ich nehme teil" — alle Techniken der Einheit werden automatisch hier gespeichert.
             </p>
           </div>
         )}
@@ -306,64 +289,68 @@ function LibraryContent() {
         >
           <div
             className="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl sm:max-w-lg sm:rounded-2xl"
-            style={{
-              background: "var(--ink-2)",
-              border: "1px solid var(--ink-4)",
-            }}
+            style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
           >
             <div className="p-5">
               {/* Browse-Header */}
               <div className="mb-4 flex items-center justify-between">
-                <h2
-                  className="font-display-ta text-lg font-black uppercase"
-                  style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}
-                >
-                  Übungen durchsuchen
+                <h2 className="font-display-ta text-lg font-black uppercase" style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}>
+                  Techniken durchsuchen
                 </h2>
                 <button
                   onClick={() => setShowBrowse(false)}
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
-                  style={{
-                    background: "var(--ink-4)",
-                    color: "var(--fg-3)",
-                    border: "1px solid var(--ink-5)",
-                  }}
+                  style={{ background: "var(--ink-4)", color: "var(--fg-3)", border: "1px solid var(--ink-5)" }}
                   aria-label="Schließen"
                 >
                   ✕
                 </button>
               </div>
 
+              {/* Disziplin-Filter */}
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {BROWSE_DISCIPLINES.map((d) => {
+                  const active = browseDiscipline === d.id;
+                  const color = d.id !== "all" ? (DISCIPLINE_COLOR[d.id] ?? "var(--ta-cyan)") : "var(--ta-cyan)";
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => setBrowseDiscipline(d.id)}
+                      className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
+                      style={{
+                        background: active ? `${color}22` : "var(--ink-3)",
+                        border: `1px solid ${active ? color : "var(--ink-5)"}`,
+                        color: active ? color : "var(--fg-3)",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <input
                 type="text"
-                placeholder="Übung suchen…"
+                placeholder="Technik suchen…"
                 value={browseSearch}
                 onChange={(e) => setBrowseSearch(e.target.value)}
                 autoFocus
                 className="mb-3 w-full rounded-lg px-3 py-2 text-sm"
-                style={{
-                  background: "var(--ink-3)",
-                  border: "1px solid var(--ink-5)",
-                  color: "var(--fg-1)",
-                  outline: "none",
-                }}
+                style={{ background: "var(--ink-3)", border: "1px solid var(--ink-5)", color: "var(--fg-1)", outline: "none" }}
               />
 
               <div className="space-y-1.5">
-                {browseList.map((ex) => {
-                  const alreadySaved = savedIds.has(ex.id);
-                  const catStyle =
-                    ex.category !== "any"
-                      ? CATEGORY_STYLE[ex.category]
-                      : null;
+                {browseList.slice(0, 80).map((t) => {
+                  const alreadySaved = savedIds.has(t.id);
+                  const catStyle = CATEGORY_STYLE[t.category] ?? null;
+                  const levelColor = TECHNIQUE_LEVEL_COLOR[t.level ?? ""] ?? "var(--fg-4)";
                   return (
                     <div
-                      key={ex.id}
+                      key={t.id}
                       className="flex items-center gap-3 rounded-lg px-3 py-2"
                       style={{
-                        background: alreadySaved
-                          ? "rgba(0,212,230,.06)"
-                          : "var(--ink-3)",
+                        background: alreadySaved ? "rgba(0,212,230,.06)" : "var(--ink-3)",
                         border: `1px solid ${alreadySaved ? "rgba(0,212,230,.2)" : "var(--ink-4)"}`,
                       }}
                     >
@@ -372,49 +359,42 @@ function LibraryContent() {
                         style={{ background: catStyle?.color ?? "var(--fg-4)" }}
                       />
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span
-                          className="truncate text-sm font-medium"
-                          style={{ color: "var(--fg-1)" }}
-                        >
-                          {ex.name}
+                        <span className="truncate text-sm font-medium" style={{ color: "var(--fg-1)" }}>
+                          {t.name}
                         </span>
-                        <span
-                          className="text-[10px]"
-                          style={{
-                            color: "var(--fg-4)",
-                            fontFamily: "var(--font-mono)",
-                            letterSpacing: "0.06em",
-                          }}
-                        >
-                          {catStyle?.label ?? "Allgemein"} ·{" "}
-                          {KIND_LABEL[ex.kind] ?? ex.kind}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px]" style={{ color: catStyle?.color ?? "var(--fg-4)", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
+                            {catStyle?.label ?? t.category}
+                          </span>
+                          {t.level && (
+                            <span className="text-[10px]" style={{ color: levelColor }}>
+                              {TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {alreadySaved ? (
-                        <span
-                          className="shrink-0 text-[10px] font-bold uppercase"
-                          style={{ color: "var(--ta-cyan)" }}
-                        >
+                        <span className="shrink-0 text-[10px] font-bold uppercase" style={{ color: "var(--ta-cyan)" }}>
                           ✓ Gespeichert
                         </span>
                       ) : (
                         <button
-                          onClick={() => handleManualAdd(ex.id)}
-                          disabled={addingId === ex.id}
+                          onClick={() => handleManualAdd(t.id)}
+                          disabled={addingId === t.id}
                           className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-opacity"
-                          style={{
-                            background: "var(--ta-cyan)",
-                            color: "var(--ink-1)",
-                            letterSpacing: "0.08em",
-                            opacity: addingId === ex.id ? 0.6 : 1,
-                          }}
+                          style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.08em", opacity: addingId === t.id ? 0.6 : 1 }}
                         >
-                          {addingId === ex.id ? "…" : "+ Speichern"}
+                          {addingId === t.id ? "…" : "+ Speichern"}
                         </button>
                       )}
                     </div>
                   );
                 })}
+                {browseList.length > 80 && (
+                  <p className="pt-2 text-center text-xs" style={{ color: "var(--fg-4)" }}>
+                    + {browseList.length - 80} weitere — Suche verfeinern
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -435,14 +415,11 @@ function LibraryCard({
   removing: boolean;
   onRemove: () => void;
 }) {
-  const ex = entry.exercise;
-  const catStyle =
-    ex && ex.category !== "any" ? CATEGORY_STYLE[ex.category] : null;
+  const t = entry.technique;
+  const catStyle = t ? CATEGORY_STYLE[t.category] ?? null : null;
+  const levelColor = TECHNIQUE_LEVEL_COLOR[t?.level ?? ""] ?? "var(--fg-4)";
 
-  const dateStr = entry.addedAt.toLocaleDateString("de-DE", {
-    day: "numeric",
-    month: "short",
-  });
+  const dateStr = entry.addedAt.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
 
   return (
     <div
@@ -456,52 +433,24 @@ function LibraryCard({
       }}
     >
       <div className="min-w-0 flex-1">
-        <div
-          className="truncate text-sm font-bold"
-          style={{ color: "var(--fg-1)" }}
-        >
-          {ex?.name ?? entry.exerciseId}
+        <div className="truncate text-sm font-bold" style={{ color: "var(--fg-1)" }}>
+          {t?.name ?? entry.exerciseId}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
           {catStyle && (
-            <span
-              className="text-[10px] font-bold uppercase"
-              style={{
-                color: catStyle.color,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.06em",
-              }}
-            >
+            <span className="text-[10px] font-bold uppercase" style={{ color: catStyle.color, fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
               {catStyle.label}
             </span>
           )}
-          {ex && (
-            <span
-              className="text-[10px]"
-              style={{ color: "var(--fg-4)", fontFamily: "var(--font-mono)" }}
-            >
-              {KIND_LABEL[ex.kind] ?? ex.kind}
+          {t?.level && (
+            <span className="text-[10px]" style={{ color: levelColor, fontFamily: "var(--font-mono)" }}>
+              {TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}
             </span>
           )}
-          <span
-            className="text-[10px]"
-            style={{ color: "var(--fg-4)" }}
-          >
-            {entry.source === "training" ? (
-              <>
-                📋{" "}
-                {entry.contextLabel ?? "Training"}
-              </>
-            ) : (
-              "✋ Manuell"
-            )}
+          <span className="text-[10px]" style={{ color: "var(--fg-4)" }}>
+            {entry.source === "training" ? `📋 ${entry.contextLabel ?? "Training"}` : "✋ Manuell"}
           </span>
-          <span
-            className="text-[10px]"
-            style={{ color: "var(--fg-4)" }}
-          >
-            {dateStr}
-          </span>
+          <span className="text-[10px]" style={{ color: "var(--fg-4)" }}>{dateStr}</span>
         </div>
       </div>
       <button
@@ -509,12 +458,8 @@ function LibraryCard({
         disabled={removing}
         className="shrink-0 rounded-lg px-2 py-1 text-[11px] transition-colors"
         style={{ color: "var(--fg-4)" }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLElement).style.color = "var(--ta-pink)")
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.color = "var(--fg-4)")
-        }
+        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--ta-pink)")}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--fg-4)")}
         aria-label="Entfernen"
       >
         ✕
@@ -527,14 +472,7 @@ function LibraryCard({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      className="mb-2 text-xs font-bold uppercase"
-      style={{
-        color: "var(--fg-3)",
-        letterSpacing: "0.12em",
-        fontFamily: "var(--font-mono)",
-      }}
-    >
+    <p className="mb-2 text-xs font-bold uppercase" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", fontFamily: "var(--font-mono)" }}>
       {children}
     </p>
   );
@@ -543,31 +481,20 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function EmptyState() {
   return (
     <div className="py-12 text-center">
-      <div
-        className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl"
-        style={{ background: "var(--ink-3)" }}
-      >
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl" style={{ background: "var(--ink-3)" }}>
         📚
       </div>
-      <h3
-        className="mb-2 font-display-ta text-lg font-black uppercase"
-        style={{ color: "var(--fg-2)", letterSpacing: "0.04em" }}
-      >
+      <h3 className="mb-2 font-display-ta text-lg font-black uppercase" style={{ color: "var(--fg-2)", letterSpacing: "0.04em" }}>
         Bibliothek leer
       </h3>
       <p className="mb-6 text-sm" style={{ color: "var(--fg-4)" }}>
-        Besuche ein Training im Stundenplan oder füge Übungen manuell hinzu.
+        Besuche ein Training im Stundenplan oder füge Techniken manuell hinzu.
       </p>
       <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
         <Link
           href="/schedule"
           className="rounded-xl px-5 py-2.5 text-xs font-bold uppercase"
-          style={{
-            background: "var(--ta-cyan)",
-            color: "var(--ink-1)",
-            letterSpacing: "0.1em",
-            textDecoration: "none",
-          }}
+          style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em", textDecoration: "none" }}
         >
           Zum Stundenplan
         </Link>
