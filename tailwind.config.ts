@@ -11,18 +11,17 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        // IronFight MMA — Blood Red primary
-        blood: {
-          DEFAULT: "#dc2626",
-          bright:  "#ef4444",
-          deep:    "#991b1b",
-          light:   "#fca5a5",
+        // Tidal Athletics — cyan primary
+        cyan: {
+          DEFAULT: "#00D4E6",
+          bright: "#4DEEFF",
+          deep: "#008FA0",
         },
-        // IronFight MMA — Amber secondary
-        amber: {
-          DEFAULT: "#f59e0b",
-          bright:  "#fbbf24",
-          deep:    "#d97706",
+        // Tidal Athletics — pink accent
+        pink: {
+          DEFAULT: "#FF2D78",
+          bright: "#FF5C99",
+          deep: "#B81E58",
         },
         // Ink scale (dark backgrounds)
         ink: {
@@ -42,15 +41,10 @@ const config: Config = {
           4: "#5A6573",
         },
         // Legacy aliases kept for backward compatibility
-        cyan: {
-          DEFAULT: "#dc2626",
-          bright:  "#ef4444",
-          deep:    "#991b1b",
-        },
-        pink: {
-          DEFAULT: "#f59e0b",
-          bright:  "#fbbf24",
-          deep:    "#d97706",
+        blood: {
+          DEFAULT: "#00D4E6",
+          dark: "#008FA0",
+          light: "#4DEEFF",
         },
         carbon: {
           900: "#030406",
@@ -63,45 +57,40 @@ const config: Config = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Barlow Condensed", "Impact", "sans-serif"],
-        sans:    ["var(--font-sans)",    "Inter",            "system-ui", "sans-serif"],
-        mono:    ["var(--font-mono)",    "JetBrains Mono",   "ui-monospace", "monospace"],
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
       },
       backgroundImage: {
         "grid-pattern":
-          "linear-gradient(rgba(220,38,38,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(220,38,38,0.05) 1px, transparent 1px)",
+          "linear-gradient(rgba(0,212,230,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,230,0.06) 1px, transparent 1px)",
         "radial-fade":
-          "radial-gradient(ellipse at top, rgba(220,38,38,0.1), transparent 60%)",
+          "radial-gradient(ellipse at top, rgba(0,212,230,0.12), transparent 60%)",
       },
       animation: {
-        "pulse-slow":   "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "fade-up":      "fadeUp 0.6s ease-out forwards",
-        "work-pulse":   "workPulse 1s ease-in-out infinite",
-        "dot-pulse":    "dotPulse 1.6s infinite",
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "fade-up": "fadeUp 0.6s ease-out forwards",
+        "work-pulse": "workPulse 1s ease-in-out infinite",
+        "dot-pulse": "dotPulse 1.6s infinite",
       },
       keyframes: {
         fadeUp: {
-          "0%":   { opacity: "0", transform: "translateY(20px)" },
+          "0%": { opacity: "0", transform: "translateY(20px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         workPulse: {
-          "0%, 100%": { filter: "drop-shadow(0 0 0 rgba(220,38,38,0))" },
-          "50%":      { filter: "drop-shadow(0 0 24px rgba(220,38,38,.6))" },
+          "0%, 100%": { filter: "drop-shadow(0 0 0 rgba(0,212,230,0))" },
+          "50%": { filter: "drop-shadow(0 0 24px rgba(0,212,230,.6))" },
         },
         dotPulse: {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
-          "50%":      { opacity: ".55", transform: "scale(.85)" },
+          "50%": { opacity: ".55", transform: "scale(.85)" },
         },
       },
       boxShadow: {
-        "glow-blood":    "0 0 0 1px rgba(220,38,38,.4), 0 0 24px rgba(220,38,38,.35), 0 0 60px rgba(220,38,38,.15)",
-        "glow-amber":    "0 0 0 1px rgba(245,158,11,.4), 0 0 24px rgba(245,158,11,.35)",
-        "glow-blood-sm": "0 0 12px rgba(220,38,38,.5)",
-        "glow-amber-sm": "0 0 12px rgba(245,158,11,.5)",
-        // Legacy aliases
-        "glow-cyan":     "0 0 0 1px rgba(220,38,38,.4), 0 0 24px rgba(220,38,38,.35), 0 0 60px rgba(220,38,38,.15)",
-        "glow-pink":     "0 0 0 1px rgba(245,158,11,.4), 0 0 24px rgba(245,158,11,.35)",
-        "glow-cyan-sm":  "0 0 12px rgba(220,38,38,.5)",
-        "glow-pink-sm":  "0 0 12px rgba(245,158,11,.5)",
+        "glow-cyan": "0 0 0 1px rgba(0,212,230,.4), 0 0 24px rgba(0,212,230,.35), 0 0 60px rgba(0,212,230,.15)",
+        "glow-pink": "0 0 0 1px rgba(255,45,120,.4), 0 0 24px rgba(255,45,120,.35)",
+        "glow-cyan-sm": "0 0 12px rgba(0,212,230,.5)",
+        "glow-pink-sm": "0 0 12px rgba(255,45,120,.5)",
       },
     },
   },

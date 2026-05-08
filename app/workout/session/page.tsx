@@ -83,7 +83,7 @@ const PHASE_BG: Record<Phase, string> = {
 const PHASE_GLOW: Record<Phase, string> = {
   idle:  "",
   prep:  "drop-shadow(0 0 20px rgba(234,179,8,.5))",
-  work:  "drop-shadow(0 0 28px rgba(220,38,38,.6))",
+  work:  "drop-shadow(0 0 28px rgba(0,212,230,.6))",
   rest:  "drop-shadow(0 0 20px rgba(59,130,246,.5))",
   done:  "drop-shadow(0 0 20px rgba(34,197,94,.5))",
 };

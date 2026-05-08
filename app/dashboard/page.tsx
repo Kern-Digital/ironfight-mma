@@ -83,9 +83,9 @@ function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
                 : "var(--ink-4)",
               color: isToday ? "#fff" : done ? "#001417" : "var(--fg-3)",
               boxShadow: isToday
-                ? "0 0 12px rgba(245,158,11,.5)"
+                ? "0 0 12px rgba(255,45,120,.5)"
                 : done
-                ? "0 0 12px rgba(220,38,38,.4)"
+                ? "0 0 12px rgba(0,212,230,.4)"
                 : "none",
             }}
           >
@@ -146,28 +146,20 @@ function DashboardContent() {
     {
       label: "Diese Woche",
       value: stats ? String(stats.thisWeek) : null,
-      accent: "var(--blood)",
-      glow: "rgba(220,38,38,.35)",
     },
     {
       label: "Streak",
       value: stats
         ? `${stats.streak} ${stats.streak === 1 ? "Tag" : "Tage"}`
         : null,
-      accent: "var(--amber)",
-      glow: "rgba(245,158,11,.35)",
     },
     {
       label: "Workouts gesamt",
       value: stats ? String(stats.total) : null,
-      accent: "var(--blood)",
-      glow: "rgba(220,38,38,.35)",
     },
     {
       label: "Trainingszeit",
       value: stats ? formatHours(stats.totalSeconds) : null,
-      accent: "var(--amber)",
-      glow: "rgba(245,158,11,.35)",
     },
   ];
 
@@ -196,65 +188,50 @@ function DashboardContent() {
 
         {/* Streak hero card */}
         <div
-          className="mb-6 rounded-2xl relative overflow-hidden"
+          className="mb-6 rounded-2xl p-5 relative overflow-hidden"
           style={{
             background:
-              "radial-gradient(500px 300px at 100% 0%, rgba(220,38,38,.18), transparent 55%), radial-gradient(300px 200px at 0% 100%, rgba(245,158,11,.06), transparent 60%), linear-gradient(160deg, #0E1016, #050709)",
-            border: "1px solid rgba(220,38,38,.15)",
+              "radial-gradient(300px 200px at 90% -20%, rgba(0,212,230,.22), transparent 60%), linear-gradient(160deg, #0B1218, #050709)",
+            border: "1px solid var(--ink-5)",
           }}
         >
-          {/* Decorative glow orb */}
           <div
-            className="pointer-events-none absolute right-[-60px] top-[-60px] h-72 w-72 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(220,38,38,.12), transparent 65%)" }}
+            className="pointer-events-none absolute right-[-20px] top-[-20px] h-48 w-48 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(0,212,230,.15), transparent 60%)",
+            }}
           />
-          {/* Top accent line */}
           <div
-            className="absolute top-0 left-6 right-6 h-px"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(220,38,38,.4), transparent)" }}
-          />
-          <div className="relative p-6 sm:p-8">
-            <div
-              className="font-mono-ta text-[10px] uppercase"
-              style={{ letterSpacing: "0.28em", color: "var(--fg-4)" }}
-            >
-              Trainings-Streak
-            </div>
-            {stats === null ? (
-              <Skeleton className="mt-3 h-20 w-32" />
-            ) : (
-              <div className="mt-2 flex items-end gap-3">
-                <div
-                  className="font-display-ta font-black leading-none"
-                  style={{
-                    fontSize: "clamp(72px, 12vw, 104px)",
-                    color: stats.streak > 0 ? "var(--blood)" : "var(--fg-3)",
-                    textShadow: stats.streak > 0 ? "0 0 40px rgba(220,38,38,.45)" : "none",
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  {stats.streak}
-                </div>
-                <div className="mb-3">
-                  <div
-                    className="font-mono-ta text-sm font-bold uppercase"
-                    style={{ color: "var(--fg-2)", letterSpacing: "0.15em" }}
-                  >
-                    {stats.streak === 1 ? "Tag" : "Tage"}
-                  </div>
-                  <div
-                    className="font-mono-ta text-[9px] uppercase mt-0.5"
-                    style={{ color: "var(--fg-4)", letterSpacing: "0.15em" }}
-                  >
-                    in Folge
-                  </div>
-                </div>
-              </div>
-            )}
-            {sessions !== null && (
-              <StreakCalendar sessions={sessions} />
-            )}
+            className="font-mono-ta text-[10px] uppercase"
+            style={{ letterSpacing: "0.25em", color: "var(--fg-3)" }}
+          >
+            Trainings-Streak
           </div>
+          {stats === null ? (
+            <Skeleton className="mt-2 h-16 w-24" />
+          ) : (
+            <div
+              className="font-display-ta mt-1 font-black leading-none"
+              style={{
+                fontSize: "72px",
+                color: "var(--ta-cyan)",
+                textShadow: "0 0 20px rgba(0,212,230,.5)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {stats.streak}
+              <span
+                className="font-mono-ta ml-2 text-base"
+                style={{ color: "var(--fg-3)", letterSpacing: "0.2em" }}
+              >
+                {stats.streak === 1 ? "Tag" : "Tage"}
+              </span>
+            </div>
+          )}
+          {sessions !== null && (
+            <StreakCalendar sessions={sessions} />
+          )}
         </div>
 
         {/* Stat grid */}
@@ -262,29 +239,25 @@ function DashboardContent() {
           {statCards.map((stat) => (
             <div
               key={stat.label}
-              className="rounded-2xl p-5 relative overflow-hidden transition-all duration-300"
+              className="rounded-2xl p-4"
               style={{
-                background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+                background:
+                  "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
                 border: "1px solid var(--ink-4)",
-                borderLeft: `2px solid ${stat.accent}`,
               }}
             >
               <div
                 className="font-mono-ta text-[9px] uppercase"
-                style={{ letterSpacing: "0.22em", color: "var(--fg-4)" }}
+                style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
               >
                 {stat.label}
               </div>
               {stat.value === null ? (
-                <Skeleton className="mt-2.5 h-9 w-20" />
+                <Skeleton className="mt-2 h-8 w-20" />
               ) : (
                 <div
-                  className="font-display-ta mt-2.5 font-black leading-none"
-                  style={{
-                    fontSize: "clamp(24px, 3.5vw, 32px)",
-                    color: "var(--fg)",
-                    textShadow: `0 0 20px ${stat.glow}`,
-                  }}
+                  className="font-display-ta mt-2 font-black leading-none"
+                  style={{ fontSize: "28px", color: "var(--fg)" }}
                 >
                   {stat.value}
                 </div>
@@ -408,15 +381,7 @@ function DashboardContent() {
                 background: "var(--ink-2)",
               }}
             >
-              <div className="flex justify-center">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--ink-6)" }} aria-hidden="true">
-                  <path d="M20 8.5V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v2.5" />
-                  <path d="M4 8.5h16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2Z" />
-                  <path d="M6 12.5v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7" />
-                  <path d="M9 8.5V6" />
-                  <path d="M15 8.5V6" />
-                </svg>
-              </div>
+              <div className="text-3xl">🥊</div>
               <p className="mt-3 text-sm font-bold" style={{ color: "var(--fg-3)" }}>
                 Noch keine Sessions.
               </p>
@@ -439,68 +404,73 @@ function DashboardContent() {
               {sessions.slice(0, 10).map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center gap-4 rounded-xl px-4 py-3.5 transition-all duration-200"
+                  className="flex items-center gap-3 rounded-xl p-3"
                   style={{
                     background: "var(--ink-2)",
                     border: "1px solid var(--ink-4)",
-                    borderLeft: `2px solid ${s.status === "aborted" ? "rgba(245,158,11,.5)" : "rgba(220,38,38,.4)"}`,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--ink-3)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--ink-2)";
                   }}
                 >
                   {/* Date block */}
-                  <div className="font-display-ta min-w-[40px] text-center leading-tight flex-shrink-0">
+                  <div className="font-display-ta min-w-[44px] text-center leading-tight">
                     <span
-                      className="block font-black"
-                      style={{ fontSize: "24px", color: "var(--blood)", lineHeight: 1 }}
+                      className="block"
+                      style={{ fontSize: "22px", color: "var(--ta-cyan)", lineHeight: 1 }}
                     >
                       {s.completedAt.getDate()}
                     </span>
                     <span
-                      className="font-mono-ta text-[8px] uppercase"
-                      style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
+                      className="font-mono-ta text-[9px] uppercase"
+                      style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
                     >
                       {s.completedAt.toLocaleDateString("de-DE", { month: "short" })}
                     </span>
                   </div>
                   {/* Divider */}
-                  <div className="h-10 w-px flex-shrink-0" style={{ background: "var(--ink-5)" }} />
+                  <div
+                    className="h-10 w-px flex-shrink-0"
+                    style={{ background: "var(--ink-5)" }}
+                  />
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="font-display-ta font-bold uppercase truncate"
-                        style={{ fontSize: "14px", letterSpacing: "0.04em" }}
-                      >
-                        {s.label ?? "Freies Workout"}
-                      </div>
+                    <div
+                      className="font-display-ta font-bold uppercase truncate"
+                      style={{ fontSize: "14px", letterSpacing: "0.04em" }}
+                    >
+                      {s.label ?? "Freies Workout"}
                       {s.status === "aborted" && (
-                        <span className="badge-amber flex-shrink-0">abgeb.</span>
+                        <span
+                          className="ml-2 rounded px-1.5 py-0.5 text-[9px] uppercase"
+                          style={{
+                            border: "1px solid rgba(255,45,120,.3)",
+                            background: "rgba(255,45,120,.08)",
+                            color: "var(--ta-pink)",
+                            letterSpacing: "0.15em",
+                          }}
+                        >
+                          abgebrochen
+                        </span>
                       )}
                     </div>
                     <div
-                      className="font-mono-ta mt-1 text-[9px] uppercase"
-                      style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+                      className="font-mono-ta mt-0.5 text-[9px] uppercase"
+                      style={{ letterSpacing: "0.15em", color: "var(--fg-3)" }}
                     >
                       {s.category ? CATEGORY_LABEL[s.category] : "—"} ·{" "}
-                      {s.rounds}× {Math.round(s.workSeconds / 60)} min
+                      {s.rounds}× {Math.round(s.workSeconds / 60)} min · Pause{" "}
+                      {s.restSeconds}s
                     </div>
                   </div>
                   {/* Duration + time */}
                   <div className="text-right flex-shrink-0">
                     <div
                       className="font-display-ta font-bold"
-                      style={{ fontSize: "17px", color: "var(--amber)" }}
+                      style={{ fontSize: "16px", color: "var(--ta-pink)" }}
                     >
                       {formatMinutes(s.totalWorkSeconds)}
                     </div>
                     <div
                       className="font-mono-ta text-[9px] uppercase"
-                      style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+                      style={{ letterSpacing: "0.15em", color: "var(--fg-4)" }}
                     >
                       {formatRelative(s.completedAt)}
                     </div>
@@ -563,9 +533,9 @@ function TrainerDashboardContent() {
       <div
         className="relative overflow-hidden border-b px-4 py-10 sm:px-6"
         style={{
-          borderColor: "rgba(245,158,11,.2)",
+          borderColor: "rgba(255,45,120,.2)",
           background:
-            "radial-gradient(500px 300px at 100% 50%, rgba(245,158,11,.12), transparent 60%), linear-gradient(160deg, #0d0608, #050505)",
+            "radial-gradient(500px 300px at 100% 50%, rgba(255,45,120,.12), transparent 60%), linear-gradient(160deg, #0d0608, #050505)",
         }}
       >
         {/* Dekorativer Hintergrund-Akzent */}
@@ -573,7 +543,7 @@ function TrainerDashboardContent() {
           className="pointer-events-none absolute right-0 top-0 h-full w-1/2"
           style={{
             background:
-              "radial-gradient(400px 200px at 100% 0%, rgba(245,158,11,.08), transparent 70%)",
+              "radial-gradient(400px 200px at 100% 0%, rgba(255,45,120,.08), transparent 70%)",
           }}
         />
         <div className="relative mx-auto max-w-7xl">
@@ -583,8 +553,8 @@ function TrainerDashboardContent() {
               className="font-mono-ta rounded px-2 py-0.5 text-[10px] font-black uppercase"
               style={{
                 letterSpacing: "0.2em",
-                background: "rgba(245,158,11,.15)",
-                border: "1px solid rgba(245,158,11,.4)",
+                background: "rgba(255,45,120,.15)",
+                border: "1px solid rgba(255,45,120,.4)",
                 color: "var(--ta-pink)",
               }}
             >
@@ -651,13 +621,13 @@ function TrainerDashboardContent() {
             label="Einheiten diese Woche"
             value={sessionCount !== null ? String(sessionCount) : null}
             accent="var(--ta-pink)"
-            glow="rgba(245,158,11,.3)"
+            glow="rgba(255,45,120,.3)"
           />
           <TrainerStatCard
             label="Trainingsblöcke"
             value={String(TRAINING_BLOCKS.length)}
             accent="var(--ta-cyan)"
-            glow="rgba(220,38,38,.3)"
+            glow="rgba(0,212,230,.3)"
           />
           <TrainerStatCard
             label="Heute"
@@ -669,7 +639,7 @@ function TrainerDashboardContent() {
             label="Top Techniken"
             value={topTechniques !== null ? String(topTechniques.length) : null}
             accent="var(--ta-cyan)"
-            glow="rgba(220,38,38,.3)"
+            glow="rgba(0,212,230,.3)"
           />
         </div>
 
@@ -804,8 +774,8 @@ function TrainerDashboardContent() {
               href="/schedule"
               className="group rounded-2xl p-5 transition-all"
               style={{
-                background: "linear-gradient(135deg, rgba(245,158,11,.12), var(--ink-2))",
-                border: "1px solid rgba(245,158,11,.25)",
+                background: "linear-gradient(135deg, rgba(255,45,120,.12), var(--ink-2))",
+                border: "1px solid rgba(255,45,120,.25)",
                 textDecoration: "none",
               }}
             >

@@ -362,9 +362,9 @@ function LibraryContent() {
                       className="flex items-center gap-3 rounded-lg px-3 py-2"
                       style={{
                         background: alreadySaved
-                          ? "rgba(220,38,38,.06)"
+                          ? "rgba(0,212,230,.06)"
                           : "var(--ink-3)",
-                        border: `1px solid ${alreadySaved ? "rgba(220,38,38,.2)" : "var(--ink-4)"}`,
+                        border: `1px solid ${alreadySaved ? "rgba(0,212,230,.2)" : "var(--ink-4)"}`,
                       }}
                     >
                       <div

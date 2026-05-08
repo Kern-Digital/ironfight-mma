@@ -184,40 +184,33 @@ export default function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-50"
+      className="sticky top-0 z-50 backdrop-blur"
       style={{
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        background: "linear-gradient(180deg, rgba(7,9,12,.96), rgba(3,4,6,.94))",
-        borderBottom: "1px solid rgba(220,38,38,.12)",
-        boxShadow: "0 1px 0 rgba(220,38,38,.06)",
+        background: "linear-gradient(180deg, rgba(7,9,12,.95), rgba(3,4,6,.92))",
+        borderBottom: "1px solid var(--ink-4)",
       }}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl font-display-ta text-sm font-black"
-            style={{
-              background: "linear-gradient(135deg, var(--blood), var(--blood-deep))",
-              color: "#fff",
-              boxShadow: "0 0 16px rgba(220,38,38,.35)",
-              letterSpacing: "0.06em",
-            }}
-          >
-            IF
-          </div>
+          <Image
+            src="/icons/icon-192.png"
+            alt="Tidal Athletics"
+            width={36}
+            height={36}
+            className="rounded-xl"
+          />
           <div>
             <div
               className="font-display-ta text-lg font-black uppercase leading-none"
-              style={{ letterSpacing: "0.1em" }}
+              style={{ letterSpacing: "0.12em" }}
             >
-              <span style={{ color: "#fff" }}>Iron</span>
-              <span style={{ color: "var(--blood)" }}>Fight</span>
+              <span style={{ color: "var(--ta-pink)" }}>Tidal</span>
+              <span style={{ color: "var(--ta-cyan)" }}>Athletics</span>
             </div>
             <div
               className="font-mono-ta text-[9px] uppercase"
-              style={{ letterSpacing: "0.25em", color: "var(--fg-4)", marginTop: "2px" }}
+              style={{ letterSpacing: "0.25em", color: "var(--fg-3)", marginTop: "2px" }}
             >
               MMA Training
             </div>
@@ -242,14 +235,14 @@ export default function Navbar() {
                   <Link
                     href={group.href}
                     className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                    style={{ ...monoStyle, color: active ? "var(--blood)" : "var(--fg-3)" }}
+                    style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
                   >
                     <span style={{ opacity: 0.75 }}>{group.icon}</span>
                     {group.label}
                     {active && (
                       <span
                         className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                        style={{ background: "var(--blood)", boxShadow: "0 0 8px var(--blood)" }}
+                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
                       />
                     )}
                   </Link>
@@ -257,7 +250,7 @@ export default function Navbar() {
                   // Dropdown trigger
                   <button
                     className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                    style={{ ...monoStyle, color: active || isOpen ? "var(--blood)" : "var(--fg-3)" }}
+                    style={{ ...monoStyle, color: active || isOpen ? "var(--ta-cyan)" : "var(--fg-3)" }}
                     aria-haspopup="true"
                     aria-expanded={isOpen}
                   >
@@ -275,7 +268,7 @@ export default function Navbar() {
                     {active && !isOpen && (
                       <span
                         className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                        style={{ background: "var(--blood)", boxShadow: "0 0 8px var(--blood)" }}
+                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
                       />
                     )}
                   </button>
@@ -286,11 +279,9 @@ export default function Navbar() {
                   <div
                     className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-xl py-1"
                     style={{
-                      backdropFilter: "blur(16px)",
-                      WebkitBackdropFilter: "blur(16px)",
-                      background: "rgba(7,9,12,0.97)",
-                      border: "1px solid rgba(220,38,38,.12)",
-                      boxShadow: "0 8px 32px rgba(0,0,0,0.8), 0 0 0 1px rgba(220,38,38,.05)",
+                      background: "rgba(7,9,12,0.98)",
+                      border: "1px solid var(--ink-5)",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,230,0.06)",
                     }}
                   >
                     {group.children.map((child) => {
@@ -303,8 +294,8 @@ export default function Navbar() {
                           className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
                           style={{
                             ...monoStyle,
-                            color: childActive ? "var(--blood)" : "var(--fg-3)",
-                            background: childActive ? "rgba(220,38,38,0.08)" : "transparent",
+                            color: childActive ? "var(--ta-cyan)" : "var(--fg-3)",
+                            background: childActive ? "rgba(0,212,230,0.07)" : "transparent",
                           }}
                           onMouseEnter={(e) => {
                             if (!childActive)
@@ -312,14 +303,14 @@ export default function Navbar() {
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = childActive
-                              ? "rgba(220,38,38,0.08)"
+                              ? "rgba(0,212,230,0.07)"
                               : "transparent";
                           }}
                         >
                           {childActive && (
                             <span
                               className="h-3 w-0.5 rounded-full"
-                              style={{ background: "var(--blood)", flexShrink: 0 }}
+                              style={{ background: "var(--ta-cyan)", flexShrink: 0 }}
                             />
                           )}
                           {child.label}
@@ -354,9 +345,9 @@ export default function Navbar() {
                 <span
                   className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black"
                   style={{
-                    border: "1px solid rgba(220,38,38,.4)",
-                    background: "rgba(220,38,38,.08)",
-                    color: "var(--blood)",
+                    border: "1px solid rgba(0,212,230,.4)",
+                    background: "rgba(0,212,230,.08)",
+                    color: "var(--ta-cyan)",
                   }}
                 >
                   {initialsOf(fighterName)}
@@ -371,7 +362,7 @@ export default function Navbar() {
                   letterSpacing: "0.1em",
                   color: "var(--fg-4)",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--blood)")}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ta-pink)")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-4)")}
               >
                 Logout
@@ -433,7 +424,7 @@ export default function Navbar() {
                       href={group.href}
                       onClick={() => setMobileOpen(false)}
                       className="flex items-center gap-2.5 px-2 py-3 text-sm font-bold uppercase transition-colors"
-                      style={{ ...monoStyle, color: groupActive ? "var(--blood)" : "var(--fg-3)" }}
+                      style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
                     >
                       <span style={{ opacity: 0.7 }}>{group.icon}</span>
                       {group.label}
@@ -444,7 +435,7 @@ export default function Navbar() {
                       <button
                         onClick={() => toggleMobileGroup(group.id)}
                         className="flex w-full items-center justify-between px-2 py-3 text-sm font-bold uppercase transition-colors"
-                        style={{ ...monoStyle, color: groupActive ? "var(--blood)" : "var(--fg-3)" }}
+                        style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
                       >
                         <span className="flex items-center gap-2.5">
                           <span style={{ opacity: 0.7 }}>{group.icon}</span>
@@ -477,7 +468,7 @@ export default function Navbar() {
                                 style={{
                                   ...monoStyle,
                                   fontSize: "0.75rem",
-                                  color: childActive ? "var(--blood)" : "var(--fg-4)",
+                                  color: childActive ? "var(--ta-cyan)" : "var(--fg-4)",
                                 }}
                               >
                                 {child.label}

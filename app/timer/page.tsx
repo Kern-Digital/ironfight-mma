@@ -249,7 +249,7 @@ function TimerView() {
     if (typeof document === "undefined") return;
     const original = document.title;
     if (t.running || t.phase === "done") {
-      document.title = `${formatTime(t.remaining)} · ${PHASE_LABEL[t.phase]} — IronFight MMA`;
+      document.title = `${formatTime(t.remaining)} · ${PHASE_LABEL[t.phase]} — Tidal Athletics`;
     }
     return () => { document.title = original; };
   }, [t.remaining, t.phase, t.running]);
@@ -370,8 +370,8 @@ function TimerView() {
           <div
             className="mb-6 rounded-xl px-4 py-3 text-sm"
             style={{
-              border: "1px solid rgba(220,38,38,.3)",
-              background: "rgba(220,38,38,.06)",
+              border: "1px solid rgba(0,212,230,.3)",
+              background: "rgba(0,212,230,.06)",
               color: "var(--fg-2)",
             }}
           >
@@ -384,8 +384,8 @@ function TimerView() {
               onClick={async () => { const ok = await unlockAudio(); setAudioUnlocked(ok); }}
               className="mt-3 rounded-xl px-4 py-2 text-xs font-bold uppercase transition-all"
               style={{
-                border: "1px solid rgba(220,38,38,.5)",
-                background: "rgba(220,38,38,.1)",
+                border: "1px solid rgba(0,212,230,.5)",
+                background: "rgba(0,212,230,.1)",
                 color: "var(--ta-cyan)",
                 fontFamily: "var(--font-mono)",
                 letterSpacing: "0.15em",
@@ -479,10 +479,10 @@ function TimerView() {
             onClick={t.running ? t.pause : handleStart}
             className="col-span-1 flex h-14 items-center justify-center rounded-xl transition-all"
             style={{
-              background: "var(--blood)",
-              color: "#fff",
+              background: "var(--ta-cyan)",
+              color: "#001417",
               boxShadow:
-                "0 0 0 1px rgba(220,38,38,.6), 0 0 24px rgba(220,38,38,.4)",
+                "0 0 0 1px rgba(0,212,230,.6), 0 0 24px rgba(0,212,230,.4)",
             }}
           >
             {t.running ? <IconPause /> : <IconPlay />}
@@ -633,9 +633,9 @@ function SettingToggle({
       className="flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all"
       style={{
         border: value
-          ? "1px solid rgba(220,38,38,.5)"
+          ? "1px solid rgba(0,212,230,.5)"
           : "1px solid var(--ink-5)",
-        background: value ? "rgba(220,38,38,.08)" : "var(--ink-3)",
+        background: value ? "rgba(0,212,230,.08)" : "var(--ink-3)",
         color: value ? "var(--ta-cyan)" : "var(--fg-4)",
       }}
     >
@@ -685,7 +685,7 @@ function ConfigField({
           }}
           onFocus={(e) => {
             (e.currentTarget as HTMLInputElement).style.borderColor = "var(--ta-cyan)";
-            (e.currentTarget as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(220,38,38,.18)";
+            (e.currentTarget as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(0,212,230,.18)";
           }}
           onBlur={(e) => {
             (e.currentTarget as HTMLInputElement).style.borderColor = "var(--ink-5)";

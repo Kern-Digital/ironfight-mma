@@ -21,8 +21,8 @@ const ROLES: { value: UserRole; label: string; color: string; bg: string; border
     value: "trainer",
     label: "Trainer",
     color: "var(--ta-cyan)",
-    bg: "rgba(220,38,38,.1)",
-    border: "rgba(220,38,38,.35)",
+    bg: "rgba(0,212,230,.1)",
+    border: "rgba(0,212,230,.35)",
   },
   {
     value: "admin",

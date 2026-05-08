@@ -189,7 +189,7 @@ export default function PwaInstallPrompt() {
                 background: "linear-gradient(160deg, var(--ink-4) 0%, var(--ink-3) 100%)",
                 border: "1px solid var(--ink-6)",
                 boxShadow:
-                  "0 -4px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(220,38,38,0.10)",
+                  "0 -4px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,212,230,0.10)",
               }}
             >
               {/* Top glow line */}
@@ -216,11 +216,11 @@ export default function PwaInstallPrompt() {
               <div className="mb-4 flex items-center gap-3 pr-8">
                 <img
                   src="/icons/icon-192.png"
-                  alt="IronFight MMA"
+                  alt="Tidal Athletics"
                   width={48}
                   height={48}
                   className="rounded-xl shrink-0"
-                  style={{ border: "1px solid rgba(220,38,38,0.2)" }}
+                  style={{ border: "1px solid rgba(0,212,230,0.2)" }}
                 />
                 <div>
                   <div
@@ -233,7 +233,7 @@ export default function PwaInstallPrompt() {
                     className="heading-display text-xl font-black leading-tight"
                     style={{ color: "var(--fg)" }}
                   >
-                    IronFight MMA
+                    Tidal Athletics
                   </div>
                 </div>
               </div>
@@ -278,9 +278,9 @@ export default function PwaInstallPrompt() {
                         <span
                           className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
                           style={{
-                            background: "rgba(220,38,38,0.12)",
+                            background: "rgba(0,212,230,0.12)",
                             color: "var(--ta-cyan)",
-                            border: "1px solid rgba(220,38,38,0.3)",
+                            border: "1px solid rgba(0,212,230,0.3)",
                           }}
                         >
                           1
@@ -306,9 +306,9 @@ export default function PwaInstallPrompt() {
                         <span
                           className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
                           style={{
-                            background: "rgba(220,38,38,0.12)",
+                            background: "rgba(0,212,230,0.12)",
                             color: "var(--ta-cyan)",
-                            border: "1px solid rgba(220,38,38,0.3)",
+                            border: "1px solid rgba(0,212,230,0.3)",
                           }}
                         >
                           2

@@ -24,9 +24,9 @@ import type { Exercise, TrainingBlock, TrainingSession } from "@/lib/types";
 // ─── Visuelle Hilfskonstanten ──────────────────────────────────────────────
 
 const LEVEL_STYLE: Record<string, { label: string; color: string }> = {
-  kids:     { label: "Kids",     color: "#f59e0b" },
+  kids:     { label: "Kids",     color: "#FF2D78" },
   teens:    { label: "Teens",    color: "#FBBF24" },
-  adult:    { label: "Adult",    color: "#dc2626" },
+  adult:    { label: "Adult",    color: "#00D4E6" },
   advanced: { label: "Advanced", color: "#F3F4F6" },
   mixed:    { label: "Mixed",    color: "#A78BFA" },
 };
@@ -333,8 +333,8 @@ function DayColumn({
         style={{
           fontFamily: "var(--font-mono)",
           letterSpacing: "0.12em",
-          background: isToday ? "rgba(220,38,38,.12)" : "var(--ink-3)",
-          border: `1px solid ${isToday ? "rgba(220,38,38,.4)" : "var(--ink-4)"}`,
+          background: isToday ? "rgba(0,212,230,.12)" : "var(--ink-3)",
+          border: `1px solid ${isToday ? "rgba(0,212,230,.4)" : "var(--ink-4)"}`,
           color: isToday ? "var(--ta-cyan)" : "var(--fg-3)",
         }}
       >
@@ -390,7 +390,7 @@ function BlockCard({
       className="w-full rounded-lg p-2 text-left transition-all"
       style={{
         background: "var(--ink-3)",
-        border: `1px solid ${isToday ? "rgba(220,38,38,.2)" : "var(--ink-4)"}`,
+        border: `1px solid ${isToday ? "rgba(0,212,230,.2)" : "var(--ink-4)"}`,
         borderLeft: `3px solid ${accentColor}`,
         cursor: "pointer",
       }}
@@ -531,7 +531,7 @@ function ModalReady({
             className="mt-4 rounded-xl p-3"
             style={{
               background: "var(--ink-3)",
-              border: "1px solid rgba(220,38,38,.3)",
+              border: "1px solid rgba(0,212,230,.3)",
             }}
           >
             <p
@@ -567,8 +567,8 @@ function ModalReady({
                     onClick={() => onToggleEditId(ex.id)}
                     className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors"
                     style={{
-                      background: selected ? "rgba(220,38,38,.12)" : "transparent",
-                      border: `1px solid ${selected ? "rgba(220,38,38,.4)" : "transparent"}`,
+                      background: selected ? "rgba(0,212,230,.12)" : "transparent",
+                      border: `1px solid ${selected ? "rgba(0,212,230,.4)" : "transparent"}`,
                       color: "var(--fg-2)",
                     }}
                   >
@@ -635,8 +635,8 @@ function ModalReady({
                       key={id}
                       className="rounded-lg px-2 py-1 text-[11px]"
                       style={{
-                        background: "rgba(220,38,38,.1)",
-                        border: "1px solid rgba(220,38,38,.3)",
+                        background: "rgba(0,212,230,.1)",
+                        border: "1px solid rgba(0,212,230,.3)",
                         color: "var(--ta-cyan)",
                       }}
                     >
@@ -701,8 +701,8 @@ function ModalReady({
                 <div
                   className="rounded-xl py-2.5 text-center text-xs font-bold uppercase"
                   style={{
-                    background: "rgba(220,38,38,.08)",
-                    border: "1px solid rgba(220,38,38,.3)",
+                    background: "rgba(0,212,230,.08)",
+                    border: "1px solid rgba(0,212,230,.3)",
                     color: "var(--ta-cyan)",
                     letterSpacing: "0.1em",
                   }}
