@@ -2,7 +2,7 @@
 
 ## Identität
 - **App:** IronFight MMA Trainings-App
-- **Pfad:** C:\Users\reich\mma-app
+- **Pfad:** D:\Tidal-Athletics\App
 - **Dev-Server:** http://localhost:3003 (Port kann variieren, immer +1 probieren)
 - **Firebase-Projekt:** ironfight-mma (ironfight-mma.firebaseapp.com)
 
