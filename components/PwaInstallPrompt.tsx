@@ -167,7 +167,7 @@ export default function PwaInstallPrompt() {
           {/* Backdrop */}
           <motion.div
             className="fixed inset-0 z-[80]"
-            style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}
+            style={{ background: "var(--modal-backdrop)", backdropFilter: "blur(3px)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -188,8 +188,7 @@ export default function PwaInstallPrompt() {
               style={{
                 background: "linear-gradient(160deg, var(--ink-4) 0%, var(--ink-3) 100%)",
                 border: "1px solid var(--ink-6)",
-                boxShadow:
-                  "0 -4px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,212,230,0.10)",
+                boxShadow: "var(--pwa-shadow)",
               }}
             >
               {/* Top glow line */}

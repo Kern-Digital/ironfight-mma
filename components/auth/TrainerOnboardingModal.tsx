@@ -106,14 +106,14 @@ export default function TrainerOnboardingModal() {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm"
-      style={{ background: "rgba(3,4,6,0.85)" }}
+      style={{ background: "var(--modal-backdrop)" }}
     >
       <div
         className="w-full max-w-md animate-fade-in space-y-5 rounded-2xl p-6"
         style={{
           background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
           border: "1px solid var(--ink-5)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,230,0.06)",
+          boxShadow: "var(--modal-shadow)",
         }}
       >
         {/* Eyebrow + Step-Indicator */}

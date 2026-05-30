@@ -284,7 +284,7 @@ function LibraryContent() {
       {showBrowse && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-          style={{ background: "rgba(3,4,6,0.85)" }}
+          style={{ background: "var(--modal-backdrop)" }}
           onClick={(e) => e.target === e.currentTarget && setShowBrowse(false)}
         >
           <div

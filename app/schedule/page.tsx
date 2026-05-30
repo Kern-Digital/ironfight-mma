@@ -406,7 +406,7 @@ export default function SchedulePage() {
       {modal.phase !== "idle" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(3,4,6,0.85)" }}
+          style={{ background: "var(--modal-backdrop)" }}
           onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
           <div

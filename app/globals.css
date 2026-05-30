@@ -48,6 +48,9 @@
   --dropdown-shadow:      0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,230,0.06);
   --hover-overlay:        rgba(255,255,255,0.04);
   --active-overlay-cyan:  rgba(0,212,230,0.07);
+  --modal-backdrop:       rgba(3,4,6,0.85);
+  --modal-shadow:         0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,230,0.06);
+  --pwa-shadow:           0 -4px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,212,230,0.10);
 }
 
 /* ─── Light Theme ─────────────────────────────────────────────────────────── */
@@ -75,12 +78,20 @@
   --glow-cyan: 0 0 0 1px rgba(0,143,160,.35), 0 2px 20px rgba(0,143,160,.18);
   --glow-pink: 0 0 0 1px rgba(184,30,88,.35), 0 2px 20px rgba(184,30,88,.18);
 
+  /* Subtile Abschnittsgrenzen für fließendes Layout */
+  --ink-4: rgba(0,0,0,0.07);
+  --ink-5: rgba(0,0,0,0.15);
+  --ink-6: rgba(0,0,0,0.26);
+
   /* Surface helpers */
   --nav-surface:          linear-gradient(180deg, rgba(248,250,253,.97), rgba(238,242,248,.96));
   --dropdown-surface:     rgba(255,255,255,0.99);
   --dropdown-shadow:      0 4px 24px rgba(0,0,0,0.11), 0 0 0 1px rgba(0,143,160,0.12);
   --hover-overlay:        rgba(0,0,0,0.04);
   --active-overlay-cyan:  rgba(0,143,160,0.09);
+  --modal-backdrop:       rgba(0,0,0,0.35);
+  --modal-shadow:         0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,143,160,0.15);
+  --pwa-shadow:           0 -4px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,143,160,0.15);
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -387,4 +398,50 @@ body {
 }
 [data-theme="light"] .text-glow {
   text-shadow: 0 0 14px rgba(0,143,160,.4);
+}
+
+/* ─── Light Theme: Footer (bleibt dunkel, Text muss weiß sein) ───────────── */
+[data-theme="light"] footer {
+  color: rgba(255,255,255,0.8);
+}
+[data-theme="light"] footer * {
+  color: rgba(255,255,255,0.72);
+}
+[data-theme="light"] footer .text-blood,
+[data-theme="light"] footer h4 {
+  color: var(--ta-cyan);
+}
+[data-theme="light"] footer p,
+[data-theme="light"] footer .text-foreground\/60 {
+  color: rgba(255,255,255,0.58);
+}
+
+/* ─── Light Theme: Tailwind carbon-Klassen (hardcodierte Farben) ────────── */
+[data-theme="light"] .bg-carbon-900\/80 {
+  /* Footer behält dunklen Hintergrund */
+}
+[data-theme="light"] .bg-carbon-800 {
+  background-color: var(--ink-2) !important;
+  color: var(--fg) !important;
+}
+[data-theme="light"] .border-carbon-400 {
+  border-color: var(--ink-5) !important;
+}
+[data-theme="light"] .bg-carbon-700\/60 {
+  background-color: rgba(255,255,255,0.8) !important;
+}
+[data-theme="light"] .bg-carbon-700\/40 {
+  background-color: rgba(0,0,0,0.04) !important;
+}
+[data-theme="light"] .bg-carbon-700\/30 {
+  background-color: rgba(0,0,0,0.03) !important;
+}
+[data-theme="light"] .border-carbon-500\/60 {
+  border-color: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] .bg-carbon-600\/60 {
+  background-color: rgba(0,0,0,0.07) !important;
+}
+[data-theme="light"] .bg-carbon-700\/40.text-fg-4 {
+  color: var(--fg-3) !important;
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { greetingFor } from "@/lib/greeting";
+import { useTheme } from "@/lib/theme-context";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,9 @@ const features = [
 // ─── Shared Components ────────────────────────────────────────────────────────
 
 function DisciplineGrid() {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {disciplines.map((d) => (
@@ -155,12 +159,16 @@ function DisciplineGrid() {
             height: "160px",
             border: "1px solid var(--ink-5)",
             background: d.cyanAccent
-              ? "radial-gradient(160px 120px at 80% 10%, rgba(0,212,230,.3), transparent 60%), linear-gradient(160deg, #0E1A22, #06090C)"
-              : "radial-gradient(160px 120px at 80% 10%, rgba(255,45,120,.25), transparent 60%), linear-gradient(160deg, #1A0E16, #08050A)",
+              ? isLight
+                ? "radial-gradient(160px 120px at 80% 10%, rgba(0,212,230,.45), transparent 60%), linear-gradient(160deg, #D8F4F8, #EBF9FC)"
+                : "radial-gradient(160px 120px at 80% 10%, rgba(0,212,230,.3), transparent 60%), linear-gradient(160deg, #0E1A22, #06090C)"
+              : isLight
+                ? "radial-gradient(160px 120px at 80% 10%, rgba(255,45,120,.38), transparent 60%), linear-gradient(160deg, #F8DAE8, #FCEEF5)"
+                : "radial-gradient(160px 120px at 80% 10%, rgba(255,45,120,.25), transparent 60%), linear-gradient(160deg, #1A0E16, #08050A)",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,212,230,.6)";
-            (e.currentTarget as HTMLElement).style.boxShadow = "0 0 28px rgba(0,212,230,.2)";
+            (e.currentTarget as HTMLElement).style.borderColor = d.cyanAccent ? "rgba(0,212,230,.6)" : "rgba(255,45,120,.5)";
+            (e.currentTarget as HTMLElement).style.boxShadow = d.cyanAccent ? "0 4px 24px rgba(0,212,230,.2)" : "0 4px 24px rgba(255,45,120,.15)";
             (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
           }}
           onMouseLeave={(e) => {
@@ -172,7 +180,9 @@ function DisciplineGrid() {
           <div
             className="pointer-events-none absolute inset-0"
             style={{
-              backgroundImage: "linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px)",
+              backgroundImage: isLight
+                ? "linear-gradient(rgba(0,0,0,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px)"
+                : "linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px)",
               backgroundSize: "18px 18px",
               WebkitMaskImage: "linear-gradient(135deg, #000, transparent)",
               maskImage: "linear-gradient(135deg, #000, transparent)",
@@ -180,11 +190,18 @@ function DisciplineGrid() {
           />
           <div
             className="pointer-events-none absolute inset-0"
-            style={{ background: "linear-gradient(180deg, transparent 30%, rgba(0,0,0,.4))" }}
+            style={{
+              background: isLight
+                ? "linear-gradient(180deg, transparent 35%, rgba(255,255,255,.3))"
+                : "linear-gradient(180deg, transparent 30%, rgba(0,0,0,.4))",
+            }}
           />
           <div
-            className="absolute right-[-10px] top-[-10px] h-28 w-28 opacity-30"
-            style={{ color: d.cyanAccent ? "var(--ta-cyan)" : "var(--ta-pink)" }}
+            className="absolute right-[-10px] top-[-10px] h-28 w-28"
+            style={{
+              color: d.cyanAccent ? "var(--ta-cyan)" : "var(--ta-pink)",
+              opacity: isLight ? 0.45 : 0.3,
+            }}
           >
             {d.glyph}
           </div>
@@ -194,13 +211,13 @@ function DisciplineGrid() {
           <div className="absolute bottom-3 left-3.5 z-10">
             <div
               className="font-mono-ta text-[9px] uppercase opacity-80"
-              style={{ letterSpacing: "0.2em", color: "var(--fg-2)" }}
+              style={{ letterSpacing: "0.2em", color: isLight ? "var(--fg-3)" : "var(--fg-2)" }}
             >
               {d.tag}
             </div>
             <div
               className="font-display-ta mt-0.5 font-black uppercase text-lg"
-              style={{ letterSpacing: "0.06em" }}
+              style={{ letterSpacing: "0.06em", color: isLight ? "var(--fg)" : "var(--fg)" }}
             >
               {d.name}
             </div>
@@ -265,23 +282,29 @@ function QuickActionCards({ actions }: { actions: QuickAction[] }) {
 // ─── Guest Landing Page ────────────────────────────────────────────────────────
 
 function GuestHome() {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
+
   return (
     <>
       {/* ── HERO ── */}
       <section className="relative overflow-hidden">
         <Image
-          src="/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"
+          src={isLight
+            ? "/background_pictures/Gemini_Generated_Image_.png"
+            : "/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"}
           alt=""
           fill
           className="pointer-events-none object-cover object-center"
-          style={{ opacity: 0.8 }}
+          style={{ opacity: isLight ? 0.55 : 0.8 }}
           priority
         />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background:
-              "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.12), transparent 60%), radial-gradient(420px 260px at 0% 110%, rgba(255,45,120,.1), transparent 60%), linear-gradient(160deg, rgba(10,18,24,.50), rgba(5,7,9,.60) 70%)",
+            background: isLight
+              ? "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.07), transparent 60%), radial-gradient(420px 260px at 0% 110%, rgba(255,45,120,.05), transparent 60%), linear-gradient(160deg, rgba(238,242,248,.52), rgba(240,244,248,.48) 70%)"
+              : "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.12), transparent 60%), radial-gradient(420px 260px at 0% 110%, rgba(255,45,120,.1), transparent 60%), linear-gradient(160deg, rgba(10,18,24,.50), rgba(5,7,9,.60) 70%)",
           }}
         />
         <div
@@ -523,6 +546,8 @@ function GuestHome() {
 
 function UserHome() {
   const { profile, profileLoading } = useAuth();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const greeting = greetingFor(profile?.displayName);
 
   return (
@@ -530,18 +555,21 @@ function UserHome() {
       {/* ── GREETING HERO ── */}
       <section className="relative overflow-hidden">
         <Image
-          src="/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"
+          src={isLight
+            ? "/background_pictures/Gemini_Generated_Image_.png"
+            : "/background_pictures/Gemini_Generated_Image_oxsx04oxsx04oxsx.png"}
           alt=""
           fill
           className="pointer-events-none object-cover object-center"
-          style={{ opacity: 0.75 }}
+          style={{ opacity: isLight ? 0.5 : 0.75 }}
           priority
         />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background:
-              "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.1), transparent 60%), linear-gradient(160deg, rgba(10,18,24,.55), rgba(5,7,9,.65) 70%)",
+            background: isLight
+              ? "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.06), transparent 60%), linear-gradient(160deg, rgba(238,242,248,.50), rgba(240,244,248,.45) 70%)"
+              : "radial-gradient(420px 260px at 90% -10%, rgba(0,212,230,.1), transparent 60%), linear-gradient(160deg, rgba(10,18,24,.55), rgba(5,7,9,.65) 70%)",
           }}
         />
         <div
