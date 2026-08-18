@@ -630,6 +630,12 @@ export interface AnalyzeRequest {
   existingStats: ActionStat[];
   /** Profil-Kontext (Stil, Auslage, Notizen) als Freitext. */
   profileContext: string;
+  /**
+   * "Analyse fortsetzen": bereits vorhandene Gemini-Beobachtung aus einem
+   * früheren Versuch — die Video-Stufe wird dann übersprungen (spart Token).
+   */
+  observation?: VideoObservation | null;
+  observationModel?: string | null;
 }
 
 export interface AnalyzeResult {
@@ -646,6 +652,8 @@ export interface AnalyzeResult {
 export async function runVideoAnalysis(
   req: AnalyzeRequest,
   onStage?: (stage: AnalysisStage) => void,
+  /** Wird gerufen, sobald die Gemini-Beobachtung fertig ist (für Resume). */
+  onObservation?: (observation: VideoObservation, model: string) => void,
 ): Promise<AnalyzeResult> {
   const token = await idToken();
   const res = await fetch("/api/video-analysis/analyze", {
@@ -677,9 +685,12 @@ export async function runVideoAnalysis(
     if (!trimmed) return;
     const event = JSON.parse(trimmed) as
       | { type: "stage"; stage: AnalysisStage }
+      | { type: "observation"; observation: VideoObservation; model: string }
       | ({ type: "result" } & AnalyzeResult)
       | { type: "error"; message: string };
     if (event.type === "stage") onStage?.(event.stage);
+    else if (event.type === "observation")
+      onObservation?.(event.observation, event.model);
     else if (event.type === "result") {
       const { type: _t, ...rest } = event;
       result = rest;

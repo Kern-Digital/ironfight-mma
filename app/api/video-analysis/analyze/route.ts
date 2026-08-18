@@ -81,13 +81,28 @@ export async function POST(req: Request) {
       const send = (event: Record<string, unknown>) =>
         controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
       try {
-        send({ type: "stage", stage: "gemini" });
-        const { observation, model: geminiModel } = await observeVideo({
-          source: body.source,
-          fighter: body.fighter,
-          tier: body.tier,
-          mode: body.mode,
-        });
+        // "Analyse fortsetzen": liegt die Gemini-Beobachtung aus einem
+        // früheren Versuch schon vor, wird die Video-Stufe übersprungen —
+        // spart die (teuren) Video-Token beim Retry.
+        let observation;
+        let geminiModel: string;
+        if (body.observation) {
+          observation = body.observation;
+          geminiModel = body.observationModel || "wiederverwendet";
+        } else {
+          send({ type: "stage", stage: "gemini" });
+          const result = await observeVideo({
+            source: body.source,
+            fighter: body.fighter,
+            tier: body.tier,
+            mode: body.mode,
+          });
+          observation = result.observation;
+          geminiModel = result.model;
+          // Beobachtung sofort an den Client geben — falls die Claude-Stufe
+          // oder die Verbindung scheitert, kann ohne Gemini fortgesetzt werden.
+          send({ type: "observation", observation, model: geminiModel });
+        }
 
         send({ type: "stage", stage: "claude" });
         const { evaluation, model: claudeModel, usage } = await evaluateObservation({

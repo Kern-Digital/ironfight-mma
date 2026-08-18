@@ -45,6 +45,7 @@ import {
   type CornerColor,
   type GeminiTier,
   type VideoAnalysis,
+  type VideoObservation,
   type VideoSource,
 } from "@/lib/video-analysis";
 
@@ -80,6 +81,17 @@ interface PendingUpload {
   fileName: string;
   fileSize: number;
   durationSeconds: number | null;
+}
+
+/**
+ * Fertige Gemini-Beobachtung aus einem früheren Versuch — "Analyse
+ * fortsetzen" überspringt damit die (teure) Video-Stufe. Der Fingerprint
+ * stellt sicher, dass Video + Kämpferbeschreibung unverändert sind.
+ */
+interface PendingObservation {
+  observation: VideoObservation;
+  model: string;
+  fingerprint: string;
 }
 
 const RUN_STEPS: [Exclude<RunStage, "idle">, string][] = [
@@ -145,6 +157,8 @@ export default function VideoAnalysisSection({
   const [sourceKind, setSourceKind] = useState<"upload" | "youtube">("upload");
   const [file, setFile] = useState<File | null>(null);
   const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
+  const [pendingObservation, setPendingObservation] =
+    useState<PendingObservation | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [ytStart, setYtStart] = useState("");
   const [ytEnd, setYtEnd] = useState("");
@@ -183,6 +197,7 @@ export default function VideoAnalysisSection({
           ytStart: string;
           ytEnd: string;
           pendingUpload: PendingUpload | null;
+          pendingObservation: PendingObservation | null;
         }>;
         if (s.corner) setCorner(s.corner);
         if (s.clothing) setClothing(s.clothing);
@@ -194,6 +209,8 @@ export default function VideoAnalysisSection({
         if (s.ytStart) setYtStart(s.ytStart);
         if (s.ytEnd) setYtEnd(s.ytEnd);
         if (s.pendingUpload?.name) setPendingUpload(s.pendingUpload);
+        if (s.pendingObservation?.fingerprint)
+          setPendingObservation(s.pendingObservation);
       }
     } catch {
       /* defekter Eintrag → ignorieren */
@@ -218,6 +235,7 @@ export default function VideoAnalysisSection({
           ytStart,
           ytEnd,
           pendingUpload,
+          pendingObservation,
         }),
       );
     } catch {
@@ -235,6 +253,7 @@ export default function VideoAnalysisSection({
     ytStart,
     ytEnd,
     pendingUpload,
+    pendingObservation,
   ]);
   /** Zähler, damit die Guthaben-Anzeige nach jeder Analyse neu lädt. */
   const [usageRefresh, setUsageRefresh] = useState(0);
@@ -364,10 +383,31 @@ export default function VideoAnalysisSection({
         };
       }
 
+      // Fingerprint: Beobachtung nur fortsetzen, wenn Video UND
+      // Kämpferbeschreibung unverändert sind.
+      const fingerprint = JSON.stringify({
+        mode,
+        tier,
+        corner,
+        clothing: clothing.trim(),
+        features: features.trim(),
+        startPosition: startPosition.trim(),
+        src:
+          source.kind === "upload"
+            ? source.fileUri
+            : `${source.url}|${source.startSeconds}|${source.endSeconds}`,
+      });
+      let cachedObs: PendingObservation | null =
+        pendingObservation && pendingObservation.fingerprint === fingerprint
+          ? pendingObservation
+          : null;
+
       // Analyse mit Auto-Neustart: Bei Google-Überlastung (503) warten wir
       // kurz und starten automatisch neu — erst nach 3 Gesamtversuchen
-      // bekommt der Nutzer die "später erneut versuchen"-Meldung.
-      const request = {
+      // bekommt der Nutzer die "später erneut versuchen"-Meldung. Sobald die
+      // Gemini-Beobachtung vorliegt, wird sie gemerkt — jeder weitere Versuch
+      // (auch nach Reload/Verbindungsabbruch) startet direkt bei Claude.
+      const baseRequest = {
         mode,
         source,
         fighter: {
@@ -387,10 +427,21 @@ export default function VideoAnalysisSection({
       let result: Awaited<ReturnType<typeof runVideoAnalysis>> | null = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          setStage("gemini");
-          result = await runVideoAnalysis(request, (s) => {
-            if (s === "gemini" || s === "claude") setStage(s);
-          });
+          setStage(cachedObs ? "claude" : "gemini");
+          result = await runVideoAnalysis(
+            {
+              ...baseRequest,
+              observation: cachedObs?.observation ?? null,
+              observationModel: cachedObs?.model ?? null,
+            },
+            (s) => {
+              if (s === "gemini" || s === "claude") setStage(s);
+            },
+            (observation, model) => {
+              cachedObs = { observation, model, fingerprint };
+              setPendingObservation(cachedObs);
+            },
+          );
           break;
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
@@ -457,9 +508,10 @@ export default function VideoAnalysisSection({
       setYtStart("");
       setYtEnd("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      // Erfolg → gespeicherte Kämpferbeschreibung + gemerkten Upload löschen
-      // (das Video wurde serverseitig bei Google entfernt).
+      // Erfolg → gespeicherte Kämpferbeschreibung, gemerkten Upload und
+      // Zwischenstand löschen (das Video wurde serverseitig entfernt).
       setPendingUpload(null);
+      setPendingObservation(null);
       setCorner("unknown");
       setClothing("");
       setFeatures("");
@@ -710,6 +762,7 @@ export default function VideoAnalysisSection({
                 <button
                   onClick={() => {
                     setPendingUpload(null);
+                    setPendingObservation(null);
                     setFile(null);
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
@@ -882,13 +935,34 @@ export default function VideoAnalysisSection({
             </div>
           )}
 
+          {pendingObservation && (
+            <div
+              className="flex items-start gap-2 rounded-lg px-3 py-2 text-[11px]"
+              style={{
+                background: "rgba(62,224,107,0.08)",
+                border: "1px solid rgba(62,224,107,0.35)",
+                color: "var(--fg-3)",
+              }}
+            >
+              <span style={{ color: "var(--ta-mint)", flexShrink: 0, marginTop: "1px" }}>
+                <Icon name="check" size={13} />
+              </span>
+              <span>
+                Die Video-Auswertung aus dem letzten Versuch ist gespeichert —
+                die Analyse setzt direkt bei der Bewertung fort (keine erneute
+                Video-Auswertung, keine doppelten Kosten). Gilt, solange Video
+                und Beschreibung unverändert bleiben.
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={handleStart}
               className="btn-primary px-5 py-2 text-xs"
               style={{ background: VIOLET }}
             >
-              Analyse starten
+              {pendingObservation ? "Analyse fortsetzen" : "Analyse starten"}
             </button>
             <button
               onClick={() => {
