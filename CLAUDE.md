@@ -71,28 +71,88 @@ Regeln + Indizes: `firestore.rules`, `firestore.indexes.json`, `firebase.json`.
 
 ## Deployment (Vercel)
 - **Produktion:** https://tidal-athletics.vercel.app — baut automatisch aus
-  `main` (github.com/Kern-Digital/ironfight-mma). Verwaltet von Leon.
-- **Umgebungsvariablen im Vercel-Dashboard** (Project → Settings →
-  Environment Variables) — nach Änderungen Redeploy nötig:
+  `main` (github.com/Kern-Digital/ironfight-mma). Verwaltet von Leon
+  (Vercel-Account `l3on95`, Projekt `tidal-athletics`, **Hobby-Plan**:
+  maxDuration ≤ 300 s, Request-Bodies ≤ 4,5 MB!).
+- **CLI-Zugänge auf Leons PC vorhanden** (für Claude nutzbar):
+  `npx -y vercel …` (eingeloggt; env vars, logs, redeploy) und
+  `npx firebase-tools …` (eingeloggt; Projekt ironfight-mma via .firebaserc).
+  Debugging: `npx -y vercel logs https://tidal-athletics.vercel.app`.
+- **Umgebungsvariablen** (Production, alle gesetzt am 2026-08-18):
   - `NEXT_PUBLIC_FIREBASE_*` (6 Stück, siehe `.env.local.example`)
-  - `GEMINI_API_KEY` — Video-Beobachtung (Stufe 1), **nur serverseitig**
+  - `GEMINI_API_KEY` — Video-Beobachtung (Stufe 1), **nur serverseitig**;
+    Free-Tier-Key (Pro-Modelle gesperrt, Billing in AI Studio schaltet frei)
   - `ANTHROPIC_API_KEY` — Claude-Bewertung (Stufe 2), **nur serverseitig**;
-    fehlt er, läuft automatisch der Gratis-Fallback über Gemini Flash
+    Prepaid-Guthaben (5 € am 2026-08-18); fehlt er, läuft automatisch der
+    Gratis-Fallback über Gemini Flash
+  - Env-Änderungen brauchen einen Redeploy (`npx -y vercel redeploy <url>`).
 - Firestore-Rules werden NICHT von Vercel deployt:
   `npx firebase-tools deploy --only firestore:rules`.
+- Rollen wurden am 2026-08-18 initial als Custom Claims gesetzt
+  (leonreichle95=admin; noelreichle/romanapolonov/alechoffmann=trainer) —
+  der Juni-Backfill war nie gelaufen, deshalb zeigte die App alle als Athlet.
+  Neue Rollen: `node scripts/set-role.mjs <uid> <role>` (braucht
+  Service-Account) oder Claims via identitytoolkit `accounts:update`.
 
-## KI-Video-Analyse (Konzept §6)
-- Spezifikation/Fragenkatalog: `docs/gegner-dna-video-analyse-fragenkatalog.md`.
-- Zweistufig: **Gemini** (`lib/server/gemini.ts`, Video → Beobachtung A+B, Modelle
-  `gemini-flash-latest`/`gemini-pro-latest`; Pro braucht Google-Bezahltarif) →
-  **Claude** (`lib/server/claude.ts`, `claude-opus-5`, Structured Outputs → C+D+E).
-- API-Routen `app/api/video-analysis/{upload,analyze}` — nur Trainer/Admin
-  (Rolle aus Custom Claims via `lib/server/verify-user.ts`, kein Admin-SDK).
-- UI: `components/trainer/VideoAnalysisSection.tsx` (Gegner-Tab „Videos" +
-  Schüler-Detailseite). Übernahme in die DNA per Trainer-Review; Konflikte
-  werden geflaggt, nie still überschrieben.
-- Kosten-Tracking: Token je Analyse → `aiUsage/summary`; Anzeige als
-  Guthaben-Ring (`AiBudgetGauge.tsx`), Budget dort per Klick anpassbar.
+## KI-Video-Analyse (Konzept §6) — Architektur & Betriebswissen
+Spezifikation/Fragenkatalog: `docs/gegner-dna-video-analyse-fragenkatalog.md`.
+UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
+(Gegner-Tab „Videos" + Schüler-Detailseite). DNA-Übernahme per Trainer-Review
+(„Alle übernehmen" = konfliktfreie Befunde + Stats; Konflikte nur einzeln per
+„Ersetzen", nie still überschreiben). Datenmodell: `lib/video-analysis.ts`.
+
+### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
+- **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)
+  laufen als **getrennte Requests** an `POST /api/video-analysis/analyze`:
+  Phase 1 mit `observeOnly:true`, Phase 2 mit `observation` (Gemini wird dann
+  übersprungen). Grund: **Vercel Hobby kappt Requests hart nach 300 s**
+  (`maxDuration` max. 300; in Produktion nachgewiesener Timeout, als beide
+  Stufen in einem Request liefen). Richtwerte 8-Min-Video: Gemini 2–4 Min,
+  Claude 1–4 Min.
+- Der Client orchestriert (`VideoAnalysisSection.handleStart`): 3× Auto-Neustart
+  mit 20-s-Countdown; retryfähig sind Fehlermeldungen mit **„überlastet"** oder
+  **„kein Ergebnis"** (Timeout/Stream-Abriss) — diese Wortmarken nicht ändern!
+
+### Resume & Wiederverwendung (Token-/Zeitersparnis)
+- localStorage-Key `ta-video-analysis-form:{mode}:{targetId}` hält:
+  Kämpferbeschreibung, `pendingUpload` (Gemini-Datei, 48 h gültig) und
+  `pendingObservation` (fertige Gemini-Beobachtung mit **Fingerprint** über
+  Video+Beschreibung+Stufe). Jede geschaffte Stufe bleibt geschafft: Retry
+  überspringt Upload und/oder Gemini („Analyse fortsetzen"-Button).
+- Erfolgreiche, gespeicherte Analyse räumt ALLES auf (Felder, localStorage,
+  Video wird serverseitig bei Google gelöscht). Fehlversuche: Google-Auto-
+  Expiry nach 48 h. In Firestore landet nie das Video, nur Ergebnisse.
+
+### Upload (Vercel-4,5-MB-Limit umgangen)
+- Browser lädt **direkt zu Google** (Resumable Session): `POST /upload` liefert
+  nur die Upload-URL (Key wird beim Start per **Header** übergeben → URL
+  enthält keinen Key, verifiziert). XHR mit Prozent-Fortschritt + Wake-Lock
+  (`use-wake-lock.ts`), Vollbild-Loader-Overlay (`.ai-loader-*` in globals.css).
+- **Googles finale Upload-Antwort ist CORS-blockiert** (kein
+  Access-Control-Allow-Origin) → Client toleriert das; Server bestätigt den
+  Upload via `POST /resolve-upload` über den einmaligen displayName
+  (`va-<uuid>-…`). Status-Polling via `POST /file-status`.
+
+### Modelle & Resilienz (lib/server/)
+- **Gemini** (`gemini.ts`): Ketten `gemini-flash-latest→3.6→3.5` bzw.
+  `pro-latest→3.1-pro-preview`. 503/5xx → Retry + nächstes Modell; **429 →
+  direkt nächstes Modell (Free-Tier-Quotas gelten PRO Modell)**. Achtung:
+  `gemini-2.5-*` ist für neue API-Keys abgeschaltet; Key ist Free Tier →
+  **Pro-Modelle haben Limit 0** (Detail-Analyse braucht Google-Billing).
+- **Claude** (`claude.ts`): `claude-opus-5` (Env `CLAUDE_MODEL`). **Structured
+  Outputs sind für das VideoEvaluation-Schema UNMÖGLICH** („compiled grammar
+  is too large", verifiziert) → Schema als Prompt-Text + `parseModelJson` +
+  `normalizeEvaluation`. Bei 529/5xx: Fallback auf `claude-sonnet-5` — **NUR
+  bei Standard-Analysen. FESTE VORGABE: Detail-Analyse (tier=pro) NIE unter
+  Opus**; dort stattdessen „überlastet"-Meldung → Client-Auto-Neustart.
+- Ohne `ANTHROPIC_API_KEY` läuft Stufe 2 gratis über Gemini Flash
+  (`evaluateWithGeminiFallback`).
+
+### Kosten-Tracking
+- Claude-Token je Analyse → Firestore `aiUsage/summary` (increment; Löschen
+  einer Analyse reduziert bewusst nicht). Anzeige: orangener Guthaben-Ring
+  (`AiBudgetGauge.tsx`, Budget per Klick änderbar, Start 5 €). Preise in
+  `claude.ts → priceFor()` (EUR≈USD, Schätzung — Anthropic hat keine Saldo-API).
 
 ## Konventionen
 - Deutsch in UI-Texten, Englisch im Code.
@@ -103,3 +163,6 @@ Regeln + Indizes: `firestore.rules`, `firestore.indexes.json`, `firebase.json`.
 ## Backlog (offen)
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)
 - [ ] Middleware: serverseitige Token-Signaturprüfung (Service-Account)
+- [ ] Video-Analyse: Web-Anreicherung (Fragenkatalog Abschnitt G, source=web)
+- [ ] Video-Analyse: Trends über mehrere Videos (Fragenkatalog E4, ab ≥2 Videos)
+- [ ] Optional: Google-Billing aktivieren → Detail-Analyse (Gemini Pro) nutzbar
