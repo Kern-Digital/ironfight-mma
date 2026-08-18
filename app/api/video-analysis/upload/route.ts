@@ -1,17 +1,19 @@
 /**
- * POST /api/video-analysis/upload — Videodatei zur Gemini-Files-API durchreichen.
+ * POST /api/video-analysis/upload — Upload-Session bei der Gemini-Files-API
+ * eröffnen.
  *
- * Der Client streamt die Datei als Raw-Body hierher; die Route reicht den
- * Stream direkt an Gemini weiter (kein Zwischenspeichern auf Disk). So bleibt
- * der GEMINI_API_KEY ausschließlich serverseitig.
+ * Die Videobytes laufen NICHT über diese Route (Vercel begrenzt Request-
+ * Bodies auf 4,5 MB): Der Server startet nur die Resumable-Session und gibt
+ * die Upload-URL zurück; der Client lädt die Datei damit DIREKT zu Google
+ * hoch. Die URL enthält keinen API-Key (Key wird beim Start per Header
+ * übergeben) — der GEMINI_API_KEY bleibt ausschließlich serverseitig.
  *
- * Header: authorization (Firebase-ID-Token), content-type (Video-MIME),
- *         x-file-name (URL-encodiert), x-file-size (Bytes).
- * Antwort: { fileUri, mimeType }
+ * Body:    { fileName, fileSize, mimeType }
+ * Antwort: { uploadUrl }
  */
 
 import { NextResponse } from "next/server";
-import { uploadVideoToGemini } from "@/lib/server/gemini";
+import { startUploadSession } from "@/lib/server/gemini";
 import {
   bearerToken,
   isTrainerOrAdmin,
@@ -19,8 +21,6 @@ import {
 } from "@/lib/server/verify-user";
 
 export const runtime = "nodejs";
-// Vercel-Limit: Hobby-Plan erlaubt maximal 300s Funktionslaufzeit.
-export const maxDuration = 300;
 
 /** ~2 GB — Limit der Gemini-Files-API. */
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
@@ -35,17 +35,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const size = Number(req.headers.get("x-file-size") || 0);
-  const mimeType = req.headers.get("content-type") || "video/mp4";
-  const fileName = decodeURIComponent(
-    req.headers.get("x-file-name") || "kampf-video",
-  );
+  let body: { fileName?: string; fileSize?: number; mimeType?: string };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Ungültiger Request." }, { status: 400 });
+  }
+
+  const size = Number(body.fileSize || 0);
+  const mimeType = body.mimeType || "video/mp4";
+  const fileName = (body.fileName || "kampf-video").slice(0, 120);
 
   if (!size || size <= 0) {
-    return NextResponse.json(
-      { error: "Dateigröße fehlt (x-file-size)." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Dateigröße fehlt." }, { status: 400 });
   }
   if (size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
@@ -59,15 +61,12 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (!req.body) {
-    return NextResponse.json({ error: "Leerer Upload." }, { status: 400 });
-  }
 
   try {
-    const file = await uploadVideoToGemini(req.body, size, mimeType, fileName);
-    return NextResponse.json({ fileUri: file.uri, mimeType: file.mimeType });
+    const uploadUrl = await startUploadSession(size, mimeType, fileName);
+    return NextResponse.json({ uploadUrl });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Upload fehlgeschlagen";
+    const msg = err instanceof Error ? err.message : "Upload-Start fehlgeschlagen";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

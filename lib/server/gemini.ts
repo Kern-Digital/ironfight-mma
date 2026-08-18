@@ -49,19 +49,21 @@ export interface GeminiFile {
 }
 
 /**
- * Lädt ein Video per Resumable-Upload zur Gemini-Files-API und wartet, bis
- * die serverseitige Verarbeitung abgeschlossen ist (state=ACTIVE).
+ * Startet eine Resumable-Upload-Session bei der Gemini-Files-API und liefert
+ * die Upload-URL. Der Client lädt die Bytes DIREKT zu Google hoch — so wird
+ * Vercels 4,5-MB-Request-Limit umgangen. Wichtig: Der API-Key wird per Header
+ * übergeben, damit die zurückgegebene Upload-URL KEINEN Key enthält
+ * (verifiziert: nur upload_id-Parameter) und gefahrlos an den Client gehen kann.
  */
-export async function uploadVideoToGemini(
-  body: ReadableStream<Uint8Array> | ArrayBuffer,
+export async function startUploadSession(
   sizeBytes: number,
   mimeType: string,
   displayName: string,
-): Promise<GeminiFile> {
-  // 1. Upload-Session starten
-  const startRes = await fetch(`${BASE}/upload/v1beta/files?key=${apiKey()}`, {
+): Promise<string> {
+  const startRes = await fetch(`${BASE}/upload/v1beta/files`, {
     method: "POST",
     headers: {
+      "x-goog-api-key": apiKey(),
       "x-goog-upload-protocol": "resumable",
       "x-goog-upload-command": "start",
       "x-goog-upload-header-content-length": String(sizeBytes),
@@ -75,38 +77,22 @@ export async function uploadVideoToGemini(
   }
   const uploadUrl = startRes.headers.get("x-goog-upload-url");
   if (!uploadUrl) throw new Error("Gemini-Upload-URL fehlt in der Antwort");
+  if (uploadUrl.includes("key=")) {
+    // Sicherheitsnetz: niemals eine URL mit eingebettetem Key herausgeben.
+    throw new Error("Upload-URL enthält unerwartet einen API-Key — Abbruch.");
+  }
+  return uploadUrl;
+}
 
-  // 2. Bytes hochladen + finalisieren
-  const uploadInit: RequestInit & { duplex?: "half" } = {
-    method: "POST",
-    headers: {
-      "content-length": String(sizeBytes),
-      "x-goog-upload-offset": "0",
-      "x-goog-upload-command": "upload, finalize",
-    },
-    body,
-  };
-  if (body instanceof ReadableStream) uploadInit.duplex = "half";
-  const uploadRes = await fetch(uploadUrl, uploadInit);
-  if (!uploadRes.ok) {
-    throw new Error(`Gemini-Upload fehlgeschlagen (${uploadRes.status})`);
+/** Liest den Verarbeitungs-Status einer hochgeladenen Datei (files/...). */
+export async function getFileState(name: string): Promise<GeminiFile> {
+  const res = await fetch(`${BASE}/v1beta/${name}`, {
+    headers: { "x-goog-api-key": apiKey() },
+  });
+  if (!res.ok) {
+    throw new Error(`Gemini-Datei-Status fehlgeschlagen (${res.status})`);
   }
-  const uploaded = (await uploadRes.json()) as { file: GeminiFile };
-  let file = uploaded.file;
-
-  // 3. Auf Verarbeitung warten (Video wird serverseitig aufbereitet)
-  const deadline = Date.now() + 5 * 60_000;
-  while (file.state === "PROCESSING" && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 4000));
-    const poll = await fetch(`${BASE}/v1beta/${file.name}?key=${apiKey()}`);
-    if (poll.ok) file = (await poll.json()) as GeminiFile;
-  }
-  if (file.state !== "ACTIVE") {
-    throw new Error(
-      `Gemini konnte das Video nicht verarbeiten (Status: ${file.state})`,
-    );
-  }
-  return file;
+  return (await res.json()) as GeminiFile;
 }
 
 // ─── Beobachtungs-Prompt (Abschnitte A + B) ─────────────────────────────────

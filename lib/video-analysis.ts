@@ -448,35 +448,96 @@ export function readVideoDuration(file: File): Promise<number | null> {
   });
 }
 
+/** Antwort robust parsen — Vercel-Fehlerseiten (413 & Co.) sind kein JSON. */
+async function apiJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  let data: (T & { error?: string }) | null = null;
+  try {
+    data = JSON.parse(text) as T & { error?: string };
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const msg =
+      data?.error ||
+      (res.status === 413
+        ? "Anfrage zu groß für den Server."
+        : `Server-Fehler (HTTP ${res.status})`);
+    throw new Error(msg);
+  }
+  if (data === null) throw new Error("Unerwartete Server-Antwort.");
+  return data;
+}
+
 /**
- * Lädt eine Videodatei über die Server-Route zur Gemini-Files-API hoch.
- * Liefert die file_uri für den Analyse-Aufruf.
+ * Lädt eine Videodatei zur Gemini-Files-API hoch — DIREKT vom Browser zu
+ * Google (umgeht Vercels 4,5-MB-Request-Limit). Der Server liefert nur die
+ * Upload-URL (ohne API-Key) und wird danach zum Status-Polling genutzt.
  */
 export async function uploadVideoFile(
   file: File,
   onProgress?: (msg: string) => void,
 ): Promise<{ fileUri: string; mimeType: string }> {
-  onProgress?.("Video wird hochgeladen …");
   const token = await idToken();
-  const res = await fetch("/api/video-analysis/upload", {
+  const mimeType = file.type || "video/mp4";
+
+  // 1. Upload-Session serverseitig eröffnen (Key bleibt auf dem Server)
+  onProgress?.("Upload wird vorbereitet …");
+  const session = await apiJson<{ uploadUrl: string }>(
+    await fetch("/api/video-analysis/upload", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType,
+      }),
+    }),
+  );
+
+  // 2. Bytes direkt zu Google hochladen + finalisieren
+  onProgress?.("Video wird hochgeladen …");
+  const uploadRes = await fetch(session.uploadUrl, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": file.type || "video/mp4",
-      "x-file-name": encodeURIComponent(file.name),
-      "x-file-size": String(file.size),
+      "x-goog-upload-offset": "0",
+      "x-goog-upload-command": "upload, finalize",
     },
     body: file,
   });
-  const data = (await res.json()) as {
-    fileUri?: string;
-    mimeType?: string;
-    error?: string;
-  };
-  if (!res.ok || !data.fileUri) {
-    throw new Error(data.error || "Upload fehlgeschlagen");
+  if (!uploadRes.ok) {
+    throw new Error(`Video-Upload zu Google fehlgeschlagen (HTTP ${uploadRes.status})`);
   }
-  return { fileUri: data.fileUri, mimeType: data.mimeType || file.type };
+  const uploaded = (await uploadRes.json()) as {
+    file: { name: string; uri: string; state: string; mimeType?: string };
+  };
+  let info = uploaded.file;
+
+  // 3. Warten, bis Google das Video verarbeitet hat (state=ACTIVE)
+  onProgress?.("Video wird verarbeitet …");
+  const deadline = Date.now() + 5 * 60_000;
+  while (info.state === "PROCESSING" && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 4000));
+    info = await apiJson<typeof info>(
+      await fetch("/api/video-analysis/file-status", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: info.name }),
+      }),
+    );
+  }
+  if (info.state !== "ACTIVE") {
+    throw new Error(
+      `Google konnte das Video nicht verarbeiten (Status: ${info.state})`,
+    );
+  }
+  return { fileUri: info.uri, mimeType: info.mimeType || mimeType };
 }
 
 export type AnalysisStage = "gemini" | "claude" | "done";
