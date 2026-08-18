@@ -19,7 +19,8 @@ import {
 } from "@/lib/server/verify-user";
 
 export const runtime = "nodejs";
-export const maxDuration = 600;
+// Vercel-Limit: Hobby-Plan erlaubt maximal 300s Funktionslaufzeit.
+export const maxDuration = 300;
 
 /** ~2 GB — Limit der Gemini-Files-API. */
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;

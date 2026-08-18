@@ -23,7 +23,8 @@ import {
 import { MAX_VIDEO_SECONDS, type AnalyzeRequest } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
-export const maxDuration = 600;
+// Vercel-Limit: Hobby-Plan erlaubt maximal 300s Funktionslaufzeit.
+export const maxDuration = 300;
 
 function validate(body: AnalyzeRequest): string | null {
   if (!body || (body.mode !== "opponent" && body.mode !== "athlete"))
