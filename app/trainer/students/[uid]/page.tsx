@@ -8,6 +8,7 @@ import CompetitionCard, {
   competitionGroup,
 } from "@/components/trainer/CompetitionCard";
 import MatchupBlock from "@/components/trainer/MatchupBlock";
+import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
@@ -614,6 +615,15 @@ function StudentDetailContent({ uid }: { uid: string }) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* KI-Video-Analyse: eigene Kampf-Videos des Athleten auswerten */}
+        <div className="mt-8">
+          <VideoAnalysisSection
+            mode="athlete"
+            targetId={uid}
+            targetName={displayLabel(entry)}
+          />
         </div>
       </div>
     </main>

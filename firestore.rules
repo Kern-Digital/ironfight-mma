@@ -34,6 +34,11 @@ service cloud.firestore {
       match /fightCamps/{campId} {
         allow read, write: if request.auth != null && isTrainerOrAdmin();
       }
+
+      // KI-Video-Analysen des eigenen Athleten (Konzept §6, mode=athlete)
+      match /videoAnalyses/{analysisId} {
+        allow read, write: if request.auth != null && isTrainerOrAdmin();
+      }
     }
 
     // CollectionGroup-Query: zentraler Wettkampfbereich liest alle fightCamps
@@ -47,6 +52,16 @@ service cloud.firestore {
     // ueber das gymId-Feld + belongsToGym (lib/gym.ts). Fuer echtes Multi-Gym
     // hier zusaetzlich auf das Gym des Trainers einschraenken.
     match /opponents/{opponentId} {
+      allow read, write: if request.auth != null && isTrainerOrAdmin();
+
+      // KI-Video-Analysen zum Gegner (Konzept §6, mode=opponent)
+      match /videoAnalyses/{analysisId} {
+        allow read, write: if request.auth != null && isTrainerOrAdmin();
+      }
+    }
+
+    // Laufende KI-Kosten-Summe + Budget (Guthaben-Anzeige der Video-Analyse)
+    match /aiUsage/{docId} {
       allow read, write: if request.auth != null && isTrainerOrAdmin();
     }
 

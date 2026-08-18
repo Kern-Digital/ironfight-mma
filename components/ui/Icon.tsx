@@ -42,7 +42,8 @@ export type IconName =
   | "arrow-right"
   | "arrow-left"
   | "plus"
-  | "wave";
+  | "wave"
+  | "video";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -259,6 +260,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M3 12c2-3 4-3 6 0s4 3 6 0 4-3 6 0" />
       <path d="M3 17c2-3 4-3 6 0s4 3 6 0 4-3 6 0" opacity=".5" />
+    </>
+  ),
+  // Videokamera (KI-Video-Analyse)
+  video: (
+    <>
+      <rect x="2.5" y="6.5" width="13" height="11" rx="2.5" />
+      <path d="M15.5 10.5 21 7.5v9l-5.5-3" />
     </>
   ),
 };

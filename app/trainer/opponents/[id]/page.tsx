@@ -9,6 +9,7 @@ import OpponentProfileView from "@/components/trainer/OpponentProfileView";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
+import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import { useAuth } from "@/lib/auth-context";
 import {
   deleteOpponent,
@@ -36,25 +37,6 @@ const DETAIL_TABS: [DetailTab, string][] = [
   ["videos", "Videos"],
 ];
 
-/** Platzhalter, bis Video-Upload + KI-Analyse (Konzept §6) gebaut sind. */
-function VideosPlaceholder() {
-  return (
-    <div
-      className="rounded-2xl p-8 text-center"
-      style={{ border: "1px dashed var(--ink-5)", background: "var(--ink-2)" }}
-    >
-      <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-        Video-Analyse — in Vorbereitung.
-      </p>
-      <p className="mx-auto mt-1 max-w-md text-xs" style={{ color: "var(--fg-4)" }}>
-        Hier lädst du künftig Kampf-Videos hoch. Die KI analysiert jedes Video
-        einzeln und aktualisiert die Gegner-DNA — Befunde mit Widerspruch
-        landen zur Bestätigung bei dir, nichts wird still überschrieben.
-      </p>
-    </div>
-  );
-}
-
 function OpponentDetailContent({ id }: { id: string }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -79,6 +61,16 @@ function OpponentDetailContent({ id }: { id: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  /** Stilles Neuladen ohne Skeleton — z. B. nach DNA-Übernahme aus einer Video-Analyse. */
+  const reload = useCallback(async () => {
+    try {
+      const o = await getOpponent(id);
+      if (o) setOpponent(o);
+    } catch {
+      /* Ansicht behält den letzten Stand */
+    }
+  }, [id]);
 
   async function handleSave(value: OpponentEditorValue) {
     if (!opponent) return;
@@ -262,7 +254,13 @@ function OpponentDetailContent({ id }: { id: string }) {
             </div>
 
             {tab === "videos" ? (
-              <VideosPlaceholder />
+              <VideoAnalysisSection
+                mode="opponent"
+                targetId={opponent.id}
+                targetName={opponent.name}
+                opponent={opponent}
+                onOpponentUpdated={reload}
+              />
             ) : (
               <OpponentProfileView
                 section={
