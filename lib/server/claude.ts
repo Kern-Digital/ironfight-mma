@@ -66,10 +66,12 @@ function computeUsage(
 
 // ─── JSON-Schema für Structured Outputs ─────────────────────────────────────
 
+// Nullable via Typ-Array statt anyOf — kompiliert zu einer deutlich
+// kleineren Grammatik (anyOf-Ketten sprengen das Schema-Limit der API).
 const str = { type: "string" } as const;
 const num = { type: "number" } as const;
-const nstr = { anyOf: [{ type: "string" }, { type: "null" }] } as const;
-const nnum = { anyOf: [{ type: "number" }, { type: "null" }] } as const;
+const nstr = { type: ["string", "null"] } as const;
+const nnum = { type: ["number", "null"] } as const;
 const strArr = { type: "array", items: str } as const;
 
 function obj(properties: Record<string, unknown>) {
@@ -106,7 +108,8 @@ const dnaSplitSchema = obj({
 });
 
 const zoneSchema = {
-  anyOf: [{ type: "string", enum: ["center", "open", "cage"] }, { type: "null" }],
+  type: ["string", "null"],
+  enum: ["center", "open", "cage", null],
 } as const;
 
 const EVALUATION_SCHEMA = obj({
@@ -318,19 +321,51 @@ export async function evaluateObservation(
   if (!key) return evaluateWithGeminiFallback(args);
   const client = new Anthropic({ apiKey: key });
 
-  const stream = client.messages.stream({
-    model: CLAUDE_MODEL,
-    max_tokens: 32000,
-    system: SYSTEM_PROMPT,
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: EVALUATION_SCHEMA as unknown as Record<string, unknown>,
-      },
-    },
-    messages: [{ role: "user", content: userPrompt(args) }],
-  });
-  const message = await stream.finalMessage();
+  // Kein Structured-Outputs-Enforcement: das VideoEvaluation-Schema
+  // überschreitet das Grammatik-Limit der API ("compiled grammar is too
+  // large", verifiziert 2026-08-18). Stattdessen wird das Schema als Text in
+  // den Prompt gelegt und die Antwort defensiv geparst + normalisiert —
+  // derselbe bewährte Weg wie beim Gemini-Fallback.
+  const content = `${userPrompt(args)}
+
+Gib AUSSCHLIESSLICH ein JSON-Objekt zurück, das exakt diesem JSON-Schema entspricht (keine Kommentare, kein Markdown):
+${JSON.stringify(EVALUATION_SCHEMA)}`;
+
+  const run = async (model: string): Promise<Anthropic.Message> => {
+    const stream = client.messages.stream({
+      model,
+      max_tokens: 32000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content }],
+    });
+    return stream.finalMessage();
+  };
+  const isOverloaded = (err: unknown): boolean =>
+    err instanceof Anthropic.APIError &&
+    typeof err.status === "number" &&
+    err.status >= 500;
+
+  // Opus 5 zuerst; bei Überlastung (529/5xx nach SDK-Retries) automatisch
+  // auf Sonnet 5 ausweichen. Scheitert auch das, meldet der Text
+  // "überlastet" — darauf springt der Auto-Neustart im Client an.
+  let usedModel = CLAUDE_MODEL;
+  let message: Anthropic.Message;
+  try {
+    message = await run(usedModel);
+  } catch (err) {
+    if (!isOverloaded(err)) throw err;
+    usedModel = "claude-sonnet-5";
+    try {
+      message = await run(usedModel);
+    } catch (err2) {
+      if (isOverloaded(err2)) {
+        throw new Error(
+          "Claude ist gerade überlastet (hohe Nachfrage bei Anthropic). Bitte in 1–2 Minuten erneut versuchen.",
+        );
+      }
+      throw err2;
+    }
+  }
 
   if (message.stop_reason === "refusal") {
     throw new Error("Claude hat die Auswertung abgelehnt (Safety-Filter).");
@@ -347,10 +382,10 @@ export async function evaluateObservation(
     .join("");
   if (!text.trim()) throw new Error("Claude lieferte kein Ergebnis");
 
-  const parsed = JSON.parse(text) as Partial<VideoEvaluation>;
+  const parsed = parseModelJson<Partial<VideoEvaluation>>(text);
   return {
     evaluation: normalizeEvaluation(parsed),
-    model: CLAUDE_MODEL,
-    usage: computeUsage(CLAUDE_MODEL, message.usage),
+    model: usedModel,
+    usage: computeUsage(usedModel, message.usage),
   };
 }
