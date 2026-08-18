@@ -58,13 +58,41 @@
 
 ## Firestore (Collections — Top-Level)
 ```
-users/{uid}              — Profil (role NUR via Custom Claims, nie Client-Write)
-users/{uid}/workouts     — geloggte Workouts
-opponents/{id}           — Gegner-DNA-Bibliothek (Trainer/Admin)
-trainingSessions/**      — gym-weites Curriculum (alle lesen, Trainer/Admin schreiben)
-techniqueStats/{id}      — anonyme Aufruf-Zähler (nur viewCount/lastViewed)
+users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write)
+users/{uid}/workouts              — geloggte Workouts
+users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des eigenen Athleten
+opponents/{id}                    — Gegner-DNA-Bibliothek (Trainer/Admin)
+opponents/{id}/videoAnalyses/{id} — KI-Video-Analysen zum Gegner
+aiUsage/summary                   — laufende KI-Kosten + Budget (Guthaben-Ring)
+trainingSessions/**               — gym-weites Curriculum (alle lesen, Trainer/Admin schreiben)
+techniqueStats/{id}               — anonyme Aufruf-Zähler (nur viewCount/lastViewed)
 ```
 Regeln + Indizes: `firestore.rules`, `firestore.indexes.json`, `firebase.json`.
+
+## Deployment (Vercel)
+- **Produktion:** https://tidal-athletics.vercel.app — baut automatisch aus
+  `main` (github.com/Kern-Digital/ironfight-mma). Verwaltet von Leon.
+- **Umgebungsvariablen im Vercel-Dashboard** (Project → Settings →
+  Environment Variables) — nach Änderungen Redeploy nötig:
+  - `NEXT_PUBLIC_FIREBASE_*` (6 Stück, siehe `.env.local.example`)
+  - `GEMINI_API_KEY` — Video-Beobachtung (Stufe 1), **nur serverseitig**
+  - `ANTHROPIC_API_KEY` — Claude-Bewertung (Stufe 2), **nur serverseitig**;
+    fehlt er, läuft automatisch der Gratis-Fallback über Gemini Flash
+- Firestore-Rules werden NICHT von Vercel deployt:
+  `npx firebase-tools deploy --only firestore:rules`.
+
+## KI-Video-Analyse (Konzept §6)
+- Spezifikation/Fragenkatalog: `docs/gegner-dna-video-analyse-fragenkatalog.md`.
+- Zweistufig: **Gemini** (`lib/server/gemini.ts`, Video → Beobachtung A+B, Modelle
+  `gemini-flash-latest`/`gemini-pro-latest`; Pro braucht Google-Bezahltarif) →
+  **Claude** (`lib/server/claude.ts`, `claude-opus-5`, Structured Outputs → C+D+E).
+- API-Routen `app/api/video-analysis/{upload,analyze}` — nur Trainer/Admin
+  (Rolle aus Custom Claims via `lib/server/verify-user.ts`, kein Admin-SDK).
+- UI: `components/trainer/VideoAnalysisSection.tsx` (Gegner-Tab „Videos" +
+  Schüler-Detailseite). Übernahme in die DNA per Trainer-Review; Konflikte
+  werden geflaggt, nie still überschrieben.
+- Kosten-Tracking: Token je Analyse → `aiUsage/summary`; Anzeige als
+  Guthaben-Ring (`AiBudgetGauge.tsx`), Budget dort per Klick anpassbar.
 
 ## Konventionen
 - Deutsch in UI-Texten, Englisch im Code.
