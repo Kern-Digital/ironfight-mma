@@ -8,7 +8,7 @@ import {
 } from "@/lib/fight-camp";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
 import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
-import GegnerDnaAccordion from "./GegnerDnaAccordion";
+import DnaCategoryGrid from "./DnaCategoryGrid";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
 import FightInsights from "./FightInsights";
@@ -207,7 +207,7 @@ export default function OpponentProfileView({
         <FightStatsBlock stats={opponent.actionStats ?? []} mode="view" />
       )}
 
-      {showDna && <GegnerDnaAccordion answers={opponent.dna ?? {}} mode="view" />}
+      {showDna && <DnaCategoryGrid answers={opponent.dna ?? {}} />}
     </div>
   );
 }

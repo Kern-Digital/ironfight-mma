@@ -17,10 +17,14 @@ const ITEMS: SubnavItem[] = [
     isActive: (p) => p.startsWith("/trainer/students"),
   },
   {
+    href: "/trainer/opponents",
+    label: "Gegner-DNA",
+    isActive: (p) => p.startsWith("/trainer/opponents"),
+  },
+  {
     href: "/trainer/competitions",
     label: "Wettkampf",
-    isActive: (p) =>
-      p.startsWith("/trainer/competitions") || p.startsWith("/trainer/opponents"),
+    isActive: (p) => p.startsWith("/trainer/competitions"),
   },
   // Stundenplan lebt bewusst unter /schedule (URL-Stabilität) — nur verlinkt.
   { href: "/schedule", label: "Stundenplan", isActive: () => false },

@@ -144,7 +144,7 @@ export default function TrainerDashboardPage() {
             + Neuer Wettkampf
           </Link>
           <Link
-            href="/trainer/competitions?tab=dna"
+            href="/trainer/opponents?new=1"
             className="btn-secondary px-4 py-2 text-xs"
           >
             + Neue Gegner-DNA
@@ -194,7 +194,7 @@ export default function TrainerDashboardPage() {
                   icon="target"
                   accent="var(--ta-pink)"
                   value={String((opponents ?? []).length)}
-                  href="/trainer/competitions?tab=dna"
+                  href="/trainer/opponents"
                 />
                 <StatCard
                   label="Schüler"
@@ -242,7 +242,7 @@ export default function TrainerDashboardPage() {
                 title="Zuletzt bearbeitete Gegner-DNA"
                 icon="target"
                 accent="var(--ta-pink)"
-                moreHref="/trainer/competitions?tab=dna"
+                moreHref="/trainer/opponents"
                 moreLabel="Bibliothek"
                 className="mt-5"
               >
