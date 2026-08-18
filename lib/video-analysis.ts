@@ -498,22 +498,48 @@ export async function uploadVideoFile(
     }),
   );
 
-  // 2. Bytes direkt zu Google hochladen + finalisieren
-  onProgress?.("Video wird hochgeladen …");
-  const uploadRes = await fetch(session.uploadUrl, {
-    method: "POST",
-    headers: {
-      "x-goog-upload-offset": "0",
-      "x-goog-upload-command": "upload, finalize",
-    },
-    body: file,
-  });
-  if (!uploadRes.ok) {
-    throw new Error(`Video-Upload zu Google fehlgeschlagen (HTTP ${uploadRes.status})`);
-  }
-  const uploaded = (await uploadRes.json()) as {
+  // 2. Bytes direkt zu Google hochladen + finalisieren.
+  // XMLHttpRequest statt fetch: liefert Upload-Fortschritt und ist auf
+  // iOS Safari bei großen Dateien zuverlässiger.
+  onProgress?.("Video wird hochgeladen … 0 %");
+  const uploaded = await new Promise<{
     file: { name: string; uri: string; state: string; mimeType?: string };
-  };
+  }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", session.uploadUrl);
+    xhr.setRequestHeader("x-goog-upload-offset", "0");
+    xhr.setRequestHeader("x-goog-upload-command", "upload, finalize");
+    xhr.timeout = 20 * 60_000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        onProgress?.(`Video wird hochgeladen … ${pct} %`);
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("Unerwartete Antwort vom Google-Upload."));
+        }
+      } else {
+        reject(
+          new Error(`Video-Upload zu Google fehlgeschlagen (HTTP ${xhr.status})`),
+        );
+      }
+    };
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          "Netzwerkfehler beim Video-Upload — WLAN prüfen, Bildschirm anlassen, App im Vordergrund behalten und erneut versuchen.",
+        ),
+      );
+    xhr.ontimeout = () =>
+      reject(new Error("Video-Upload dauerte zu lange (Timeout) — bitte erneut versuchen."));
+    xhr.onabort = () => reject(new Error("Video-Upload wurde abgebrochen."));
+    xhr.send(file);
+  });
   let info = uploaded.file;
 
   // 3. Warten, bis Google das Video verarbeitet hat (state=ACTIVE)

@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import VideoAnalysisResult from "./VideoAnalysisResult";
 import AiBudgetGauge, { formatEur } from "./AiBudgetGauge";
 import { useAuth } from "@/lib/auth-context";
@@ -144,7 +145,11 @@ export default function VideoAnalysisSection({
 
   // Pipeline-Status
   const [stage, setStage] = useState<RunStage>("idle");
+  const [stageDetail, setStageDetail] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  // Display anlassen, solange die Pipeline läuft — verhindert, dass mobile
+  // Browser den Upload beim Sperren des Bildschirms abbrechen.
+  useWakeLock(stage !== "idle");
   /** Zähler, damit die Guthaben-Anzeige nach jeder Analyse neu lädt. */
   const [usageRefresh, setUsageRefresh] = useState(0);
 
@@ -198,7 +203,10 @@ export default function VideoAnalysisSection({
           );
         }
         setStage("upload");
-        const uploaded = await uploadVideoFile(file);
+        const uploaded = await uploadVideoFile(file, (msg) =>
+          setStageDetail(msg),
+        );
+        setStageDetail(null);
         source = {
           kind: "upload",
           fileUri: uploaded.fileUri,
@@ -299,6 +307,7 @@ export default function VideoAnalysisSection({
       );
     } finally {
       setStage("idle");
+      setStageDetail(null);
     }
   }
 
@@ -700,11 +709,15 @@ export default function VideoAnalysisSection({
           }}
         >
           <div
-            className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
+            className="font-mono-ta mb-1 text-[10px] font-bold uppercase"
             style={{ letterSpacing: "0.18em", color: VIOLET }}
           >
             Analyse läuft — das kann einige Minuten dauern
           </div>
+          <p className="mb-3 text-[11px]" style={{ color: "var(--fg-4)" }}>
+            Bitte die App im Vordergrund lassen — der Bildschirm bleibt
+            automatisch an.
+          </p>
           <div className="flex flex-col gap-2">
             {visibleSteps.map(([s, label]) => {
               const order = visibleSteps.findIndex(([x]) => x === s);
@@ -745,6 +758,14 @@ export default function VideoAnalysisSection({
                     }}
                   >
                     {label}
+                    {active && stageDetail && (
+                      <span
+                        className="font-mono-ta ml-2 text-[10px]"
+                        style={{ color: VIOLET }}
+                      >
+                        {stageDetail}
+                      </span>
+                    )}
                   </span>
                 </div>
               );
