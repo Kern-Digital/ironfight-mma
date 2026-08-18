@@ -150,6 +150,76 @@ export default function VideoAnalysisSection({
   // Display anlassen, solange die Pipeline läuft — verhindert, dass mobile
   // Browser den Upload beim Sperren des Bildschirms abbrechen.
   useWakeLock(stage !== "idle");
+
+  // ── Formular-Persistenz: Kämpferbeschreibung überlebt Fehlversuche und
+  //    Seiten-Reloads; erst eine ERFOLGREICHE Analyse löscht sie wieder. ──
+  const storageKey = `ta-video-analysis-form:${mode}:${targetId}`;
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const s = JSON.parse(raw) as Partial<{
+          corner: CornerColor;
+          clothing: string;
+          features: string;
+          startPosition: string;
+          tier: GeminiTier;
+          sourceKind: "upload" | "youtube";
+          youtubeUrl: string;
+          ytStart: string;
+          ytEnd: string;
+        }>;
+        if (s.corner) setCorner(s.corner);
+        if (s.clothing) setClothing(s.clothing);
+        if (s.features) setFeatures(s.features);
+        if (s.startPosition) setStartPosition(s.startPosition);
+        if (s.tier) setTier(s.tier);
+        if (s.sourceKind) setSourceKind(s.sourceKind);
+        if (s.youtubeUrl) setYoutubeUrl(s.youtubeUrl);
+        if (s.ytStart) setYtStart(s.ytStart);
+        if (s.ytEnd) setYtEnd(s.ytEnd);
+      }
+    } catch {
+      /* defekter Eintrag → ignorieren */
+    }
+    hydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return; // nicht mit Defaults überschreiben
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          corner,
+          clothing,
+          features,
+          startPosition,
+          tier,
+          sourceKind,
+          youtubeUrl,
+          ytStart,
+          ytEnd,
+        }),
+      );
+    } catch {
+      /* Speicher voll/blockiert → Feature ist optional */
+    }
+  }, [
+    storageKey,
+    corner,
+    clothing,
+    features,
+    startPosition,
+    tier,
+    sourceKind,
+    youtubeUrl,
+    ytStart,
+    ytEnd,
+  ]);
   /** Zähler, damit die Guthaben-Anzeige nach jeder Analyse neu lädt. */
   const [usageRefresh, setUsageRefresh] = useState(0);
 
@@ -233,28 +303,53 @@ export default function VideoAnalysisSection({
         };
       }
 
-      setStage("gemini");
-      const result = await runVideoAnalysis(
-        {
-          mode,
-          source,
-          fighter: {
-            name: targetName,
-            corner,
-            clothing: clothing.trim(),
-            features: features.trim(),
-            startPosition: startPosition.trim(),
-          },
-          tier,
-          existingDna: mode === "opponent" ? (opponent?.dna ?? {}) : {},
-          existingSplit: mode === "opponent" ? (opponent?.dnaSplit ?? null) : null,
-          existingStats: mode === "opponent" ? (opponent?.actionStats ?? []) : [],
-          profileContext,
+      // Analyse mit Auto-Neustart: Bei Google-Überlastung (503) warten wir
+      // kurz und starten automatisch neu — erst nach 3 Gesamtversuchen
+      // bekommt der Nutzer die "später erneut versuchen"-Meldung.
+      const request = {
+        mode,
+        source,
+        fighter: {
+          name: targetName,
+          corner,
+          clothing: clothing.trim(),
+          features: features.trim(),
+          startPosition: startPosition.trim(),
         },
-        (s) => {
-          if (s === "gemini" || s === "claude") setStage(s);
-        },
-      );
+        tier,
+        existingDna: mode === "opponent" ? (opponent?.dna ?? {}) : {},
+        existingSplit: mode === "opponent" ? (opponent?.dnaSplit ?? null) : null,
+        existingStats: mode === "opponent" ? (opponent?.actionStats ?? []) : [],
+        profileContext,
+      };
+      const MAX_ATTEMPTS = 3;
+      let result: Awaited<ReturnType<typeof runVideoAnalysis>> | null = null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          setStage("gemini");
+          result = await runVideoAnalysis(request, (s) => {
+            if (s === "gemini" || s === "claude") setStage(s);
+          });
+          break;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "";
+          const overloaded = msg.includes("überlastet");
+          if (!overloaded) throw err;
+          if (attempt >= MAX_ATTEMPTS) {
+            throw new Error(
+              "Google ist gerade stark ausgelastet — wir haben es automatisch 3× versucht. Bitte in ein paar Minuten erneut starten; deine Kämpferbeschreibung bleibt gespeichert.",
+            );
+          }
+          for (let s = 20; s > 0; s--) {
+            setStageDetail(
+              `Google überlastet — automatischer Neustart in ${s} s (Versuch ${attempt + 1}/${MAX_ATTEMPTS})`,
+            );
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          setStageDetail(null);
+        }
+      }
+      if (!result) throw new Error("Analyse lieferte kein Ergebnis");
 
       setStage("save");
       const saved = await saveVideoAnalysis({
@@ -301,6 +396,16 @@ export default function VideoAnalysisSection({
       setYtStart("");
       setYtEnd("");
       if (fileInputRef.current) fileInputRef.current.value = "";
+      // Erfolg → gespeicherte Kämpferbeschreibung löschen und Felder leeren.
+      setCorner("unknown");
+      setClothing("");
+      setFeatures("");
+      setStartPosition("");
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        /* optionales Feature */
+      }
     } catch (err) {
       setRunError(
         err instanceof Error ? err.message : "Analyse fehlgeschlagen",
