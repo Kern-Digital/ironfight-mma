@@ -232,6 +232,8 @@ export interface EvaluateArgs {
   existingSplit: DnaSplit | null;
   existingStats: ActionStat[];
   profileContext: string;
+  /** Analyse-Stufe: bei "pro" (Detail-Analyse) darf NIE unter Opus gewechselt werden. */
+  tier: "flash" | "pro";
 }
 
 /** Defensive Normalisierung des Claude-Ergebnisses. */
@@ -346,23 +348,25 @@ ${JSON.stringify(EVALUATION_SCHEMA)}`;
     err.status >= 500;
 
   // Opus 5 zuerst; bei Überlastung (529/5xx nach SDK-Retries) automatisch
-  // auf Sonnet 5 ausweichen. Scheitert auch das, meldet der Text
-  // "überlastet" — darauf springt der Auto-Neustart im Client an.
+  // auf Sonnet 5 ausweichen — ABER: bei der Detail-Analyse (tier="pro") wird
+  // NIE unter Opus gewechselt (Vorgabe), dann greift stattdessen der
+  // Auto-Neustart im Client über die "überlastet"-Meldung.
+  const overloadedError = () =>
+    new Error(
+      "Claude ist gerade überlastet (hohe Nachfrage bei Anthropic). Bitte in 1–2 Minuten erneut versuchen.",
+    );
   let usedModel = CLAUDE_MODEL;
   let message: Anthropic.Message;
   try {
     message = await run(usedModel);
   } catch (err) {
     if (!isOverloaded(err)) throw err;
+    if (args.tier === "pro") throw overloadedError();
     usedModel = "claude-sonnet-5";
     try {
       message = await run(usedModel);
     } catch (err2) {
-      if (isOverloaded(err2)) {
-        throw new Error(
-          "Claude ist gerade überlastet (hohe Nachfrage bei Anthropic). Bitte in 1–2 Minuten erneut versuchen.",
-        );
-      }
+      if (isOverloaded(err2)) throw overloadedError();
       throw err2;
     }
   }

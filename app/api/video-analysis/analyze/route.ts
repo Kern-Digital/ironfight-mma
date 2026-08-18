@@ -93,6 +93,7 @@ export async function POST(req: Request) {
         const { evaluation, model: claudeModel, usage } = await evaluateObservation({
           mode: body.mode,
           fighter: body.fighter,
+          tier: body.tier,
           observation,
           existingDna: body.existingDna ?? {},
           existingSplit: body.existingSplit ?? null,
