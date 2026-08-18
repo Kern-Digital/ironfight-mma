@@ -699,26 +699,36 @@ export default function VideoAnalysisSection({
         </div>
       )}
 
-      {/* Fortschritt */}
+      {/* Fortschritt — Vollbild-Overlay: KI-Loader mittig, Schritte darunter */}
       {running && (
         <div
-          className="rounded-2xl p-4"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6"
           style={{
-            background: "var(--ink-2)",
-            border: "1px solid rgba(157,123,250,0.35)",
+            background: "rgba(7,4,13,0.92)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
           }}
         >
-          <div
-            className="font-mono-ta mb-1 text-[10px] font-bold uppercase"
-            style={{ letterSpacing: "0.18em", color: VIOLET }}
-          >
-            Analyse läuft — das kann einige Minuten dauern
+          <div className="ai-loader-wrapper" aria-label="Analyse läuft">
+            <div className="ai-loader" />
+            {"Analysiere".split("").map((ch, i) => (
+              <span
+                key={i}
+                className="ai-loader-letter"
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
+                {ch}
+              </span>
+            ))}
           </div>
-          <p className="mb-3 text-[11px]" style={{ color: "var(--fg-4)" }}>
-            Bitte die App im Vordergrund lassen — der Bildschirm bleibt
-            automatisch an.
+          <p
+            className="mt-6 max-w-xs text-center text-[11px]"
+            style={{ color: "var(--fg-4)" }}
+          >
+            Das kann einige Minuten dauern — bitte die App im Vordergrund
+            lassen, der Bildschirm bleibt automatisch an.
           </p>
-          <div className="flex flex-col gap-2">
+          <div className="mt-5 flex w-full max-w-xs flex-col gap-2">
             {visibleSteps.map(([s, label]) => {
               const order = visibleSteps.findIndex(([x]) => x === s);
               const current = visibleSteps.findIndex(([x]) => x === stage);

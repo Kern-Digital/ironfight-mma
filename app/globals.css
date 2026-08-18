@@ -557,3 +557,55 @@ body {
 [data-theme="light"] .bg-carbon-700\/40.text-fg-4 {
   color: var(--fg-3) !important;
 }
+
+/* ── KI-Analyse-Loader (VideoAnalysisSection) ─────────────────────────────
+   Rotierender Doppelring + nacheinander aufleuchtende Buchstaben.          */
+.ai-loader-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 190px;
+  height: 190px;
+}
+.ai-loader {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--ta-violet);
+  border-right-color: rgba(157, 123, 250, 0.35);
+  filter: drop-shadow(0 0 10px rgba(157, 123, 250, 0.65));
+  animation: ai-loader-spin 1.6s linear infinite;
+}
+.ai-loader::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-bottom-color: var(--ta-pink);
+  border-left-color: rgba(255, 79, 168, 0.25);
+  animation: ai-loader-spin 2.4s linear infinite reverse;
+}
+.ai-loader-letter {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  opacity: 0.2;
+  animation: ai-loader-letter 1.8s ease-in-out infinite;
+}
+@keyframes ai-loader-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ai-loader-letter {
+  0%, 100% { opacity: 0.2; }
+  20% {
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(157, 123, 250, 0.9);
+  }
+}
