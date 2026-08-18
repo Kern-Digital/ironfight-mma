@@ -95,6 +95,27 @@ export async function getFileState(name: string): Promise<GeminiFile> {
   return (await res.json()) as GeminiFile;
 }
 
+/**
+ * Findet eine frisch hochgeladene Datei über ihren (einmaligen) display_name.
+ * Nötig, weil Googles Upload-Endpoint die finale Antwort ohne CORS-Header
+ * schickt — der Browser kann sie nicht lesen, der Server schlägt die Datei
+ * deshalb hier nach.
+ */
+export async function findFileByDisplayName(
+  displayName: string,
+): Promise<GeminiFile | null> {
+  const res = await fetch(`${BASE}/v1beta/files?pageSize=100`, {
+    headers: { "x-goog-api-key": apiKey() },
+  });
+  if (!res.ok) {
+    throw new Error(`Gemini-Datei-Liste fehlgeschlagen (${res.status})`);
+  }
+  const data = (await res.json()) as {
+    files?: (GeminiFile & { displayName?: string })[];
+  };
+  return data.files?.find((f) => f.displayName === displayName) ?? null;
+}
+
 // ─── Beobachtungs-Prompt (Abschnitte A + B) ─────────────────────────────────
 
 function observationPrompt(

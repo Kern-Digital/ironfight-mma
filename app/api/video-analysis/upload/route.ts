@@ -63,8 +63,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const uploadUrl = await startUploadSession(size, mimeType, fileName);
-    return NextResponse.json({ uploadUrl });
+    // Einmaliger display_name: darüber schlägt der Server die Datei nach dem
+    // Upload nach (Googles finale Upload-Antwort ist für Browser CORS-blockiert).
+    const uploadName = `va-${crypto.randomUUID()}-${fileName}`.slice(0, 120);
+    const uploadUrl = await startUploadSession(size, mimeType, uploadName);
+    return NextResponse.json({ uploadUrl, uploadName });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload-Start fehlgeschlagen";
     return NextResponse.json({ error: msg }, { status: 502 });

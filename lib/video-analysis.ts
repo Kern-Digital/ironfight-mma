@@ -483,7 +483,7 @@ export async function uploadVideoFile(
 
   // 1. Upload-Session serverseitig eröffnen (Key bleibt auf dem Server)
   onProgress?.("Upload wird vorbereitet …");
-  const session = await apiJson<{ uploadUrl: string }>(
+  const session = await apiJson<{ uploadUrl: string; uploadName: string }>(
     await fetch("/api/video-analysis/upload", {
       method: "POST",
       headers: {
@@ -499,12 +499,14 @@ export async function uploadVideoFile(
   );
 
   // 2. Bytes direkt zu Google hochladen + finalisieren.
-  // XMLHttpRequest statt fetch: liefert Upload-Fortschritt und ist auf
-  // iOS Safari bei großen Dateien zuverlässiger.
+  // Wichtig: Googles FINALE Antwort kommt ohne CORS-Header — der Browser darf
+  // sie oft nicht lesen und meldet dann fälschlich einen Netzwerkfehler,
+  // obwohl der Upload durch ist. Deshalb: Antwort nur nutzen, wenn lesbar;
+  // sonst bestätigt der Server den Upload über den einmaligen uploadName.
+  type UploadedFile = { name: string; uri: string; state: string; mimeType?: string };
   onProgress?.("Video wird hochgeladen … 0 %");
-  const uploaded = await new Promise<{
-    file: { name: string; uri: string; state: string; mimeType?: string };
-  }>((resolve, reject) => {
+  let lastPct = 0;
+  const direct = await new Promise<UploadedFile | null>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", session.uploadUrl);
     xhr.setRequestHeader("x-goog-upload-offset", "0");
@@ -512,35 +514,54 @@ export async function uploadVideoFile(
     xhr.timeout = 20 * 60_000;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        onProgress?.(`Video wird hochgeladen … ${pct} %`);
+        lastPct = Math.round((e.loaded / e.total) * 100);
+        onProgress?.(`Video wird hochgeladen … ${lastPct} %`);
       }
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error("Unerwartete Antwort vom Google-Upload."));
-        }
-      } else {
-        reject(
-          new Error(`Video-Upload zu Google fehlgeschlagen (HTTP ${xhr.status})`),
-        );
+      try {
+        const parsed = JSON.parse(xhr.responseText) as { file?: UploadedFile };
+        resolve(parsed.file ?? null);
+      } catch {
+        resolve(null); // Antwort nicht lesbar → Server schlägt nach
       }
     };
-    xhr.onerror = () =>
-      reject(
-        new Error(
-          "Netzwerkfehler beim Video-Upload — WLAN prüfen, Bildschirm anlassen, App im Vordergrund behalten und erneut versuchen.",
-        ),
-      );
+    xhr.onerror = () => resolve(null); // meist CORS-blockierte Erfolgs-Antwort
     xhr.ontimeout = () =>
       reject(new Error("Video-Upload dauerte zu lange (Timeout) — bitte erneut versuchen."));
     xhr.onabort = () => reject(new Error("Video-Upload wurde abgebrochen."));
     xhr.send(file);
   });
-  let info = uploaded.file;
+
+  let info: UploadedFile | null = direct;
+  if (!info) {
+    // 2b. Upload serverseitig bestätigen (Antwort war nicht lesbar)
+    onProgress?.("Upload wird bestätigt …");
+    for (let attempt = 0; attempt < 6 && !info; attempt++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const res = await fetch("/api/video-analysis/resolve-upload", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ uploadName: session.uploadName }),
+        });
+        if (res.status === 404) continue; // noch nicht sichtbar → weiter warten
+        info = await apiJson<UploadedFile>(res);
+      } catch {
+        /* transient — nächster Versuch */
+      }
+    }
+    if (!info) {
+      throw new Error(
+        lastPct >= 99
+          ? "Upload war fertig, die Datei ist aber nicht auffindbar — bitte erneut versuchen."
+          : `Video-Upload abgebrochen (bei ${lastPct} %) — Verbindung prüfen und erneut versuchen.`,
+      );
+    }
+  }
 
   // 3. Warten, bis Google das Video verarbeitet hat (state=ACTIVE)
   onProgress?.("Video wird verarbeitet …");
