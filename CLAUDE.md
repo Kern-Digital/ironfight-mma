@@ -1,101 +1,77 @@
 # IronFight MMA — Projekt-Kontext
 
+> Quelle der Wahrheit ist der Code. Diese Datei hält nur **stabile** Konventionen
+> und Architektur-Entscheidungen fest — KEINE vollständige Datei-Liste (driftet
+> sonst sofort). Für die aktuelle Struktur: `app/`, `lib/`, `components/` ansehen.
+
 ## Identität
-- **App:** IronFight MMA Trainings-App
-- **Pfad:** D:\Tidal-Athletics\Tidal-Athletics-App
-- **Dev-Server:** http://localhost:3003 (Port kann variieren, immer +1 probieren)
+- **App:** IronFight MMA / Tidal Athletics — MMA-Trainings- & Coaching-App
 - **Firebase-Projekt:** ironfight-mma (ironfight-mma.firebaseapp.com)
+- **Repo:** github.com/Kern-Digital/ironfight-mma
 
 ## Tech-Stack
 | Layer | Technologie | Version |
 |---|---|---|
 | Framework | Next.js App Router | 14.2.35 |
-| Sprache | TypeScript strict | 5.x |
+| Sprache | TypeScript (strict) | 5.x |
 | Styling | Tailwind CSS | 3.4 |
-| Auth + DB | Firebase (Auth + Firestore) | 12.x |
-| 3D | @react-three/fiber + drei | **v8 + v9** (React 18 — NICHT v9/v10 installieren!) |
+| Auth + DB | Firebase Web SDK (Auth + Firestore) | 12.x |
+| Admin | firebase-admin (nur Scripts/serverseitig) | 14.x |
+| 3D | @react-three/fiber v8 + drei v9 | **React 18 — NICHT auf v9/v10 heben!** |
+| Animation | Framer Motion | 12.x |
+| State | Zustand (installiert) | 5.x |
 | Payments | Stripe (installiert, noch nicht gebaut) | — |
-| State | Zustand (installiert, noch nicht genutzt) | 5.x |
-| Animation | Framer Motion (installiert) | 12.x |
 | React | React | **18** (nicht 19!) |
 
-## Design-System (Tailwind)
-```
-Farben:   blood (rot #dc2626) | carbon-900..400 (schwarz-grau)
-Klassen:  btn-primary | btn-secondary | card | heading-display
-Thema:    immer dark, background #050505, kein light mode
-```
-- `btn-primary`      → roter CTA-Button mit hover-glow
-- `btn-secondary`    → transparenter Border-Button
-- `card`             → `bg-carbon-700/60 border border-carbon-500 rounded-sm`
-- `heading-display`  → `font-display uppercase tracking-tight`
+## Architektur & Patterns (wichtig)
+- **Firebase IMMER lazy** über `lib/firebase.ts`: `getFirebaseApp()` /
+  `getFirebaseAuth()` / `getFirestoreDb()` — nie module-level `initializeApp()`.
+- **`"use client"`** auf alle Komponenten mit `useAuth`/`useState`/`useEffect`.
+- **`@/` Alias** für alle Imports.
+- **Auth-Context:** `lib/auth-context.tsx` → `AuthProvider` + `useAuth()`.
+  Spiegelt das ID-Token in ein `__session`-Cookie (für die Middleware).
 
-## Datei-Map
-```
-app/
-  layout.tsx               — Root: AuthProvider > Navbar > main > Footer
-  page.tsx                 — Startseite: Hero3D + Disziplin-Cards + Features + CTA
-  globals.css              — CSS-Variablen, @layer components (btn-*, card)
-  training/page.tsx        — Disziplin-Liste (4 Cards → Slugs)
-  training/[slug]/page.tsx — SSG-Detailseite + "Workout starten" → Timer mit Query-Params
-  timer/page.tsx           — Workout-Timer (Client, Suspense für useSearchParams)
-  login/page.tsx           — Firebase Email/Password Login
-  register/page.tsx        — Firebase Register
-  dashboard/page.tsx       — Protected: echte Firestore-Stats, Streak, Session-Liste
+### Rollen & Berechtigungen (Sicherheits-kritisch)
+- Rollen (`user` | `trainer` | `admin`) liegen **autoritativ in Firebase Auth
+  Custom Claims**, NICHT im Firestore-Dokument.
+- Client liest die Rolle via `getIdTokenResult()` (`claims.role`) — siehe
+  `auth-context.tsx` (`refreshRole()` erzwingt Token-Refresh nach Claim-Änderung).
+- Rollen werden **ausschließlich serverseitig** per Admin-SDK gesetzt:
+  `node scripts/set-role.mjs <uid> <role>` oder `--backfill`
+  (braucht `GOOGLE_APPLICATION_CREDENTIALS`). **Kein In-App-Pfad** schreibt `role`.
+- `firestore.rules` liest `request.auth.token.role`; Clients dürfen das `role`-Feld
+  nie schreiben (Privilege-Escalation geschlossen).
 
-components/
-  Navbar.tsx               — Sticky, auth-aware (Avatar/Logout wenn eingeloggt)
-  Footer.tsx
-  PageHeader.tsx           — eyebrow + title + description Pattern
-  ProtectedRoute.tsx       — Client-Guard: redirect → /login wenn kein user
-  HeroScene.tsx            — R3F Scene: Octagon-Cage + Glove + Sparkles
-  Hero3D.tsx               — next/dynamic ssr:false Wrapper für HeroScene
+### Route-Schutz (zweischichtig)
+- **Server:** `middleware.ts` (Edge) gated über das `__session`-Cookie:
+  `/admin/*` → 404 (Existenz verbergen), übrige geschützte Bereiche → Redirect
+  `/login`. Not-Aus via `MIDDLEWARE_AUTH=off`. (Noch keine Signaturprüfung —
+  echte Datensicherheit liegt bei den Firestore-Regeln.)
+- **Client:** `<ProtectedRoute>` als zusätzlicher UI-Guard.
 
-lib/
-  firebase.ts              — Lazy init: getFirebaseApp() | getFirebaseAuth() | getFirestoreDb()
-  auth-context.tsx         — AuthProvider + useAuth() Hook
-  use-workout-timer.ts     — Timer State-Machine: Phase idle→prep→work→rest→done
-  beep.ts                  — Web Audio API Beeps (kein Audio-Asset nötig)
-  workouts.ts              — Firestore CRUD: logWorkout | getRecentWorkouts | computeStats
-  training-plans.ts        — Daten: 4 DisciplinePlan Objekte mit Exercises + Timer-Preset
-```
+## Design-System
+- Dark als Default, **zusätzlich Light-Theme** über `lib/theme-context.tsx`.
+- Tokens als CSS-Variablen in `app/globals.css`:
+  `--ink-0..6` (Hintergrund-Ebenen) · `--fg`, `--fg-2..4` (Text) · Pink-Akzent.
+- Tailwind-Farben in `tailwind.config`: `pink` (Akzent), `ink`, `blood`, `carbon`.
+- Utility-Klassen u.a.: `card-glass`, `font-mono-ta` (Mono via `var(--font-mono)`).
 
-## Firestore-Schema
+## Firestore (Collections — Top-Level)
 ```
-users/{uid}/workouts/{auto-id}
-  label: string | null       — z.B. "Boxing" oder null
-  rounds: number
-  workSeconds: number
-  restSeconds: number
-  completedAt: Timestamp
-  totalWorkSeconds: number
+users/{uid}              — Profil (role NUR via Custom Claims, nie Client-Write)
+users/{uid}/workouts     — geloggte Workouts
+opponents/{id}           — Gegner-DNA-Bibliothek (Trainer/Admin)
+trainingSessions/**      — gym-weites Curriculum (alle lesen, Trainer/Admin schreiben)
+techniqueStats/{id}      — anonyme Aufruf-Zähler (nur viewCount/lastViewed)
 ```
+Regeln + Indizes: `firestore.rules`, `firestore.indexes.json`, `firebase.json`.
 
-## Wichtige Patterns
-- Firebase IMMER lazy initialisieren (getFirebaseApp() etc.) — nie module-level initializeApp()
-- "use client" auf alle Komponenten die useAuth/useState/useEffect nutzen
-- Timer-URL: `/timer?rounds=5&work=300&rest=60&prep=10&label=MMA`
-- Protected Route: `<ProtectedRoute>` wrappen, kein middleware
+## Konventionen
+- Deutsch in UI-Texten, Englisch im Code.
+- Komponenten: Default-Export · Utilities: benannte Exports.
+- Env-Vars: ohne Anführungszeichen in `.env.local` (Vorlage: `.env.local.example`).
 - R3F: NIEMALS @react-three/fiber v9+ ohne React 19 — bleibt auf v8!
-
-## Was fertig ist
-- [x] Layout, Navbar, Footer, Dark-Theme
-- [x] Startseite mit 3D-Cage-Hero (Octagon + Boxhandschuh + Sparkles)
-- [x] Training-Übersicht + 4 Disziplin-Detail-Seiten (SSG)
-- [x] Workout-Timer: Runden/Pausen/Prep, Audio-Cues, Presets, Query-Params
-- [x] Firebase Auth: Login, Register, Logout, useAuth-Hook
-- [x] Dashboard: Protected, echte Firestore-Stats, Streak, Session-Liste
 
 ## Backlog (offen)
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)
-- [ ] Workout-History-Seite mit Filter + Kalender-Heatmap
-- [ ] Live-Übungs-Tracker auf Trainingsplan-Seite
-- [ ] User-Profil-Seite
-- [ ] Toast-Notifications (Framer Motion)
-- [ ] Zustand-Store für globalen App-State
-
-## Konventionen
-- Deutsch in UI-Texten, Englisch im Code
-- Komponenten: Default-Export | Utilities: benannte Exports
-- `@/` Alias für alle Imports
-- Env-Vars: ohne Anführungszeichen in .env.local
+- [ ] Middleware: serverseitige Token-Signaturprüfung (Service-Account)

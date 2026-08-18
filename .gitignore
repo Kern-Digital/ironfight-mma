@@ -37,5 +37,10 @@ next-env.d.ts
 
 # local backups & tooling (nicht versionieren)
 /backup
-/.claude/worktrees
 /Tidal-Athletics-App
+
+# agent / AI tooling (lokal, nicht versionieren)
+/.claude/
+/.cowork/
+/.agents/
+/.codex/

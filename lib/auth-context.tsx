@@ -14,6 +14,7 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -30,7 +31,7 @@ import {
   markOnboarded as markProfileOnboarded,
   markTrainerOnboarded as markProfileTrainerOnboarded,
 } from "./user-profile";
-import type { UserProfile } from "./types";
+import type { UserProfile, UserRole } from "./types";
 
 type AuthContextValue = {
   user: User | null;
@@ -48,6 +49,7 @@ type AuthContextValue = {
   finishOnboarding: () => Promise<void>;
   finishTrainerOnboarding: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshRole: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -92,7 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfileLoading(true);
       try {
         const p = await ensureUserProfile(u);
-        setProfile(p);
+        // Rolle kommt autoritativ aus den Auth Custom Claims, nicht aus Firestore
+        const { claims } = await u.getIdTokenResult();
+        setProfile({ ...p, role: claims.role as UserRole | undefined });
       } catch (err) {
         console.warn("[TidalAthletics] ensureUserProfile failed:", err);
         setProfile(null);
@@ -103,15 +107,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
+  // Spiegelt das Firebase-ID-Token in ein `__session`-Cookie, damit die
+  // Middleware (serverseitig) (un)authentifizierte Nutzer erkennen kann.
+  // onIdTokenChanged feuert bei Login, Logout und Token-Refresh (~stuendlich).
+  useEffect(() => {
+    return onIdTokenChanged(getFirebaseAuth(), async (u) => {
+      if (u) {
+        const token = await u.getIdToken();
+        const secure =
+          typeof location !== "undefined" && location.protocol === "https:"
+            ? "; secure"
+            : "";
+        document.cookie = `__session=${token}; path=/; max-age=3600; samesite=lax${secure}`;
+      } else {
+        document.cookie = "__session=; path=/; max-age=0; samesite=lax";
+      }
+    });
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     setProfileLoading(true);
     try {
       const p = await getUserProfile(user.uid);
-      setProfile(p);
+      const { claims } = await user.getIdTokenResult();
+      const role = claims.role as UserRole | undefined;
+      setProfile(p ? { ...p, role } : p);
     } finally {
       setProfileLoading(false);
     }
+  }, [user]);
+
+  /**
+   * Erzwingt ein Token-Refresh, damit ein frisch per Admin-SDK-Script gesetzter
+   * Rollen-Claim sofort im Client ankommt (ohne Re-Login).
+   */
+  const refreshRole = useCallback(async () => {
+    if (!user) return;
+    const { claims } = await user.getIdTokenResult(true);
+    const role = claims.role as UserRole | undefined;
+    setProfile((prev) => (prev ? { ...prev, role } : prev));
   }, [user]);
 
   const updateDisplayName = useCallback(
@@ -209,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       finishOnboarding,
       finishTrainerOnboarding,
       refreshProfile,
+      refreshRole,
     }),
     [
       user,
@@ -220,6 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       finishOnboarding,
       finishTrainerOnboarding,
       refreshProfile,
+      refreshRole,
     ],
   );
 

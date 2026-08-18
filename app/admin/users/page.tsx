@@ -7,7 +7,7 @@ import DashboardHero from "@/components/dashboard/DashboardHero";
 import SectionCard from "@/components/dashboard/SectionCard";
 import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
-import { listAllUsers, setUserRole, type AdminUserEntry } from "@/lib/admin";
+import { listAllUsers, type AdminUserEntry } from "@/lib/admin";
 import type { UserRole } from "@/lib/types";
 import { useCallback, useEffect, useState } from "react";
 
@@ -58,24 +58,11 @@ function displayLabel(entry: AdminUserEntry): string {
 function UserRow({
   entry,
   isSelf,
-  onRoleChange,
 }: {
   entry: AdminUserEntry;
   isSelf: boolean;
-  onRoleChange: (uid: string, role: UserRole) => void;
 }) {
-  const [pending, setPending] = useState(false);
   const meta = roleMeta(entry.role);
-
-  async function handleRoleChange(newRole: UserRole) {
-    if (pending || newRole === (entry.role ?? "user")) return;
-    setPending(true);
-    try {
-      await onRoleChange(entry.uid, newRole);
-    } finally {
-      setPending(false);
-    }
-  }
 
   return (
     <div
@@ -155,41 +142,6 @@ function UserRow({
         </div>
       </div>
 
-      {/* Rollen-Buttons */}
-      <div className="mt-3 flex gap-2">
-        {ROLES.map((r) => {
-          const isActive = (entry.role ?? "user") === r.value;
-          const isDisabled = pending || (isSelf && r.value !== "admin");
-          return (
-            <button
-              key={r.value}
-              onClick={() => handleRoleChange(r.value)}
-              disabled={isDisabled}
-              className="flex-1 rounded-xl py-1.5 text-[10px] font-bold uppercase transition-all"
-              style={{
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.12em",
-                background: isActive ? r.bg : "var(--ink-3)",
-                border: `1px solid ${isActive ? r.border : "var(--ink-5)"}`,
-                color: isActive ? r.color : "var(--fg-4)",
-                opacity: isDisabled && !isActive ? 0.4 : 1,
-                cursor: isDisabled ? "not-allowed" : "pointer",
-              }}
-            >
-              {pending && isActive ? "…" : r.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {isSelf && (
-        <p
-          className="font-mono-ta mt-2 text-[9px]"
-          style={{ letterSpacing: "0.08em", color: "var(--fg-4)" }}
-        >
-          Deine eigene Rolle kann nicht geändert werden.
-        </p>
-      )}
     </div>
   );
 }
@@ -232,13 +184,6 @@ function AdminUsersContent() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleRoleChange(uid: string, role: UserRole) {
-    await setUserRole(uid, role);
-    setUsers((prev) =>
-      prev ? prev.map((u) => (u.uid === uid ? { ...u, role } : u)) : prev,
-    );
-  }
-
   // Filter + Suche
   const filtered = (users ?? []).filter((u) => {
     const matchesFilter =
@@ -266,7 +211,7 @@ function AdminUsersContent() {
         badges={[{ label: "Admin", accent: "amber", icon: "shield" }]}
         accent="amber"
         title="Nutzerverwaltung"
-        subtitle="Rollen zuweisen · Mitglieder & Trainer verwalten"
+        subtitle="Mitglieder & Trainer einsehen · Rollen werden per Script vergeben"
       />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -353,7 +298,6 @@ function AdminUsersContent() {
                   key={entry.uid}
                   entry={entry}
                   isSelf={entry.uid === selfUid}
-                  onRoleChange={handleRoleChange}
                 />
               ))}
             </div>
@@ -391,6 +335,11 @@ function AdminUsersContent() {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs" style={{ color: "var(--fg-4)" }}>
+            Rollen werden serverseitig per Admin-SDK-Script vergeben
+            (<span className="font-mono-ta">scripts/set-role.mjs</span>) — aus
+            Sicherheitsgründen nicht mehr direkt in der App.
+          </p>
         </SectionCard>
       </div>
     </main>

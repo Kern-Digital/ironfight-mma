@@ -14,7 +14,6 @@ import {
   orderBy,
   query,
   Timestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import type { AthleteProfile, UserRole } from "./types";
@@ -104,11 +103,6 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
       createdAt: data.createdAt?.toDate() as Date | undefined,
     };
   });
-}
-
-/** Setzt die Rolle eines Nutzers. */
-export async function setUserRole(uid: string, role: UserRole): Promise<void> {
-  await updateDoc(doc(getFirestoreDb(), "users", uid), { role });
 }
 
 /**

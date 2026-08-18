@@ -1,19 +1,18 @@
 /**
- * Serverseitige Verifikation des Firebase-ID-Tokens — ohne firebase-admin.
+ * Serverseitige Verifikation des Firebase-ID-Tokens — ohne firebase-admin
+ * im Request-Pfad.
  *
- * Die App nutzt bewusst kein Admin-SDK (kein Service-Account). Stattdessen:
- *   1. Token-Check über die Identity-Toolkit-API (accounts:lookup) — bestätigt,
- *      dass das Token gültig und nicht abgelaufen ist, und liefert die uid.
- *   2. Rollen-Check über die Firestore-REST-API mit dem User-Token selbst —
- *      die Security-Rules erlauben dem User das Lesen des eigenen Profils,
- *      dort steht die Rolle (trainer/admin).
+ * Token-Check über die Identity-Toolkit-API (accounts:lookup): bestätigt,
+ * dass das Token gültig und nicht abgelaufen ist, und liefert uid + die
+ * Custom Claims (customAttributes). Die Rolle kommt — wie in firestore.rules
+ * und im Client — AUTORITATIV aus den Auth Custom Claims (`role`), die
+ * ausschließlich per Admin-SDK gesetzt werden (scripts/set-role.mjs).
  *
  * Damit können nur eingeloggte Trainer/Admins die kostenpflichtigen
  * KI-Routen aufrufen.
  */
 
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
 export interface VerifiedUser {
   uid: string;
@@ -27,9 +26,9 @@ export function bearerToken(req: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-/** Prüft das ID-Token und liest die Rolle. Liefert null bei ungültigem Token. */
+/** Prüft das ID-Token und liest die Rolle aus den Custom Claims. */
 export async function verifyUser(idToken: string): Promise<VerifiedUser | null> {
-  if (!API_KEY || !PROJECT_ID) return null;
+  if (!API_KEY) return null;
   try {
     const res = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${API_KEY}`,
@@ -40,27 +39,22 @@ export async function verifyUser(idToken: string): Promise<VerifiedUser | null> 
       },
     );
     if (!res.ok) return null;
-    const data = (await res.json()) as { users?: { localId: string }[] };
-    const uid = data.users?.[0]?.localId;
-    if (!uid) return null;
+    const data = (await res.json()) as {
+      users?: { localId: string; customAttributes?: string }[];
+    };
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
 
-    // Rolle aus dem eigenen User-Dokument (Firestore REST, User-Token).
     let role: string | null = null;
-    try {
-      const docRes = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
-        { headers: { authorization: `Bearer ${idToken}` } },
-      );
-      if (docRes.ok) {
-        const docData = (await docRes.json()) as {
-          fields?: { role?: { stringValue?: string } };
-        };
-        role = docData.fields?.role?.stringValue ?? null;
+    if (user.customAttributes) {
+      try {
+        const claims = JSON.parse(user.customAttributes) as { role?: string };
+        role = claims.role ?? null;
+      } catch {
+        role = null;
       }
-    } catch {
-      role = null;
     }
-    return { uid, role };
+    return { uid: user.localId, role };
   } catch {
     return null;
   }
