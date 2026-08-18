@@ -38,10 +38,12 @@ export const DNA_SPLIT_META: Record<
   DnaSplitKey,
   { label: string; color: string }
 > = {
+  // WICHTIG: alle 5 Farben müssen klar unterscheidbar sein (ein Balken!) —
+  // niemals zwei ähnliche Töne (z. B. zwei Violett) vergeben.
   boxing: { label: "Boxen", color: "var(--ta-cyan)" },
   kicking: { label: "Kicks", color: "#8A63E8" },
   wrestling: { label: "Wrestling", color: "var(--ta-pink)" },
-  ground: { label: "Boden", color: "#9D7BFA" },
+  ground: { label: "Boden", color: "#FFB648" },
   clinch: { label: "Clinch", color: "#3EE06B" },
 };
 
@@ -96,7 +98,7 @@ export const ACTION_GROUP_META: Record<
   strike: { label: "Schläge", color: "var(--ta-cyan)" },
   kick: { label: "Kicks", color: "#8A63E8" },
   takedown: { label: "Takedowns", color: "var(--ta-pink)" },
-  ground: { label: "Boden", color: "#9D7BFA" },
+  ground: { label: "Boden", color: "#FFB648" },
 };
 
 export interface ActionDef {

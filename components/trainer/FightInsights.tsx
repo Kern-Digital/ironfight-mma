@@ -20,6 +20,16 @@ const TONE_COLOR: Record<TendencyTone, string> = {
 };
 
 /**
+ * Feste Zonen-Farben (RGB-Tripel) — Heatmap und Prozent-Legende nutzen
+ * dieselbe Farbe je Zone, damit sich Anteil und Ort direkt zuordnen lassen.
+ */
+const ZONE_RGB: Record<CageZone, string> = {
+  center: "35,196,206", // Cyan — innerer Kreis
+  open: "157,123,250", // Violett — mittlerer Ring
+  cage: "255,79,168", // Pink — äußerer Ring
+};
+
+/**
  * §3 Tendenzen + §4 Vorschläge + §5 Käfig-Heatmap.
  *
  * Rein abgeleitete Read-Ansicht: berechnet sich vollständig aus Split + Stats.
@@ -84,19 +94,42 @@ export default function FightInsights({
             >
               Wo passiert die Aktion
             </div>
-            {(["cage", "open", "center"] as CageZone[]).map((z) => (
-              <div key={z} className="flex items-center gap-2">
-                <span
-                  className="font-mono-ta w-9 text-right text-xs"
-                  style={{ color: "var(--ta-pink)" }}
-                >
-                  {Math.round((zones[z] / zoneTotal) * 100)}%
-                </span>
-                <span className="text-xs" style={{ color: "var(--fg-2)" }}>
-                  {CAGE_ZONE_LABEL[z]}
-                </span>
-              </div>
-            ))}
+            {(["cage", "open", "center"] as CageZone[])
+              .sort((a, b) => zones[b] - zones[a])
+              .map((z, i) => {
+                const dominant = i === 0 && zones[z] > 0;
+                return (
+                  <div
+                    key={z}
+                    className="flex items-center gap-2"
+                    style={{ opacity: zones[z] > 0 ? 1 : 0.45 }}
+                  >
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                      style={{ background: `rgb(${ZONE_RGB[z]})` }}
+                      aria-hidden
+                    />
+                    <span
+                      className="font-mono-ta w-9 text-right text-xs"
+                      style={{
+                        color: `rgb(${ZONE_RGB[z]})`,
+                        fontWeight: dominant ? 700 : 400,
+                      }}
+                    >
+                      {Math.round((zones[z] / zoneTotal) * 100)}%
+                    </span>
+                    <span
+                      className="text-xs"
+                      style={{
+                        color: dominant ? "var(--fg-1)" : "var(--fg-2)",
+                        fontWeight: dominant ? 700 : 400,
+                      }}
+                    >
+                      {CAGE_ZONE_LABEL[z]}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -155,9 +188,17 @@ function CageHeatmap({
   zones: Record<CageZone, number>;
   total: number;
 }) {
-  // Anteil → Deckkraft (0.12 Grundton + bis 0.65 nach Anteil).
-  const alpha = (z: CageZone) => 0.12 + 0.65 * (total > 0 ? zones[z] / total : 0);
-  const pink = "255,79,168";
+  // Jede Zone hat ihre feste Farbe (siehe ZONE_RGB); der Anteil steuert die
+  // Deckkraft. Die dominante Zone bekommt zusätzlich eine kräftige Kontur.
+  const share = (z: CageZone) => (total > 0 ? zones[z] / total : 0);
+  const alpha = (z: CageZone) => 0.14 + 0.7 * share(z);
+  const dominant = (["cage", "open", "center"] as CageZone[]).reduce((a, b) =>
+    zones[b] > zones[a] ? b : a,
+  );
+  const outline = (z: CageZone) =>
+    z === dominant && zones[z] > 0
+      ? { stroke: `rgb(${ZONE_RGB[z]})`, width: 2 }
+      : { stroke: "rgba(255,255,255,0.14)", width: 0.75 };
 
   return (
     <svg
@@ -168,25 +209,32 @@ function CageHeatmap({
       aria-label="Käfig-Heatmap: Verteilung der Aktionen nach Zone"
     >
       {/* Cage-Ring (äußerste Zone) */}
-      <polygon points={octagon(44)} fill={`rgba(${pink},${alpha("cage")})`} />
+      <polygon points={octagon(44)} fill={`rgba(${ZONE_RGB.cage},${alpha("cage")})`} />
       {/* Open-Ring */}
-      <polygon points={octagon(30)} fill={`rgba(${pink},${alpha("open")})`} />
+      <polygon points={octagon(30)} fill={`rgba(${ZONE_RGB.open},${alpha("open")})`} />
       {/* Center */}
-      <circle cx="50" cy="50" r="15" fill={`rgba(${pink},${alpha("center")})`} />
-      {/* Konturen */}
+      <circle cx="50" cy="50" r="15" fill={`rgba(${ZONE_RGB.center},${alpha("center")})`} />
+      {/* Konturen — die dominante Zone wird farbig hervorgehoben */}
       <polygon
         points={octagon(44)}
         fill="none"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="1"
+        stroke={outline("cage").stroke}
+        strokeWidth={outline("cage").width}
       />
       <polygon
         points={octagon(30)}
         fill="none"
-        stroke="rgba(255,255,255,0.12)"
-        strokeWidth="0.75"
+        stroke={outline("open").stroke}
+        strokeWidth={outline("open").width}
       />
-      <circle cx="50" cy="50" r="15" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.75" />
+      <circle
+        cx="50"
+        cy="50"
+        r="15"
+        fill="none"
+        stroke={outline("center").stroke}
+        strokeWidth={outline("center").width}
+      />
     </svg>
   );
 }
