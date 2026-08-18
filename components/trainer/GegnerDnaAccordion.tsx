@@ -161,15 +161,12 @@ export default function GegnerDnaAccordion({
                 style={{ borderColor: "var(--ink-4)" }}
               >
                 {mode === "view" ? (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-4">
                     {answered.map(({ question, value }) => (
                       <div key={question.id}>
                         <div
-                          className="font-mono-ta text-[10px] uppercase"
-                          style={{
-                            letterSpacing: "0.1em",
-                            color: "var(--fg-4)",
-                          }}
+                          className="font-mono-ta text-[13px] font-bold uppercase leading-snug"
+                          style={{ color: "var(--fg)" }}
                         >
                           {question.label}
                         </div>

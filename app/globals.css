@@ -29,8 +29,8 @@
   /* Foreground scale */
   --fg:   #FFFFFF;
   --fg-2: #CCC9E0;
-  --fg-3: #8F8AA8;
-  --fg-4: #5F5878;
+  --fg-3: #ABA6C4;
+  --fg-4: #8D87AB;
 
   /* Semantic aliases */
   --background: var(--ink-0);
@@ -73,7 +73,7 @@
   --fg:   #110B1E;
   --fg-2: #2D3748;
   --fg-3: #4A5A72;
-  --fg-4: #8F8AA8;
+  --fg-4: #6E6890;
 
   /* Semantic */
   --background: var(--ink-0);
@@ -328,6 +328,9 @@ body {
   }
   .font-mono-ta {
     font-family: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+    /* !important schlägt die vielen inline gesetzten 0.1–0.2em-Werte —
+       app-weit engere Laufweite für bessere Lesbarkeit */
+    letter-spacing: 0.08em !important;
   }
 }
 
