@@ -104,6 +104,11 @@ export async function POST(req: Request) {
           send({ type: "observation", observation, model: geminiModel });
         }
 
+        // Zwei-Phasen-Betrieb: Stufe 1 und Stufe 2 laufen als getrennte
+        // Requests, damit jede ihr eigenes 300-s-Zeitbudget bekommt.
+        // (Stream wird im finally geschlossen.)
+        if (body.observeOnly) return;
+
         send({ type: "stage", stage: "claude" });
         const { evaluation, model: claudeModel, usage } = await evaluateObservation({
           mode: body.mode,

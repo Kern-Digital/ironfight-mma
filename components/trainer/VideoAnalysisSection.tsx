@@ -39,6 +39,7 @@ import {
   readVideoDuration,
   recordAiUsage,
   runVideoAnalysis,
+  runVideoObservation,
   saveVideoAnalysis,
   uploadVideoFile,
   type AnalysisMode,
@@ -427,34 +428,46 @@ export default function VideoAnalysisSection({
       let result: Awaited<ReturnType<typeof runVideoAnalysis>> | null = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          setStage(cachedObs ? "claude" : "gemini");
+          // Phase 1 — Video-Beobachtung (eigener Request mit eigenem
+          // 300-s-Budget), nur wenn noch keine Beobachtung vorliegt.
+          if (!cachedObs) {
+            setStage("gemini");
+            const observed = await runVideoObservation(baseRequest);
+            cachedObs = {
+              observation: observed.observation,
+              model: observed.model,
+              fingerprint,
+            };
+            setPendingObservation(cachedObs);
+          }
+          // Phase 2 — Bewertung (eigener Request, Gemini wird übersprungen).
+          setStage("claude");
           result = await runVideoAnalysis(
             {
               ...baseRequest,
-              observation: cachedObs?.observation ?? null,
-              observationModel: cachedObs?.model ?? null,
+              observation: cachedObs.observation,
+              observationModel: cachedObs.model,
             },
             (s) => {
-              if (s === "gemini" || s === "claude") setStage(s);
-            },
-            (observation, model) => {
-              cachedObs = { observation, model, fingerprint };
-              setPendingObservation(cachedObs);
+              if (s === "claude") setStage(s);
             },
           );
           break;
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
-          const overloaded = msg.includes("überlastet");
-          if (!overloaded) throw err;
+          // Wiederholbar: Überlastung (Gemini/Claude) sowie abgerissene
+          // Streams / Server-Timeouts ("kein Ergebnis").
+          const retryable =
+            msg.includes("überlastet") || msg.includes("kein Ergebnis");
+          if (!retryable) throw err;
           if (attempt >= MAX_ATTEMPTS) {
             throw new Error(
-              "Google ist gerade stark ausgelastet — wir haben es automatisch 3× versucht. Bitte in ein paar Minuten erneut starten; deine Kämpferbeschreibung bleibt gespeichert.",
+              "Die KI-Dienste sind gerade stark ausgelastet — wir haben es automatisch 3× versucht. Bitte in ein paar Minuten auf Analyse fortsetzen tippen; Beschreibung, Upload und Zwischenstand bleiben gespeichert.",
             );
           }
           for (let s = 20; s > 0; s--) {
             setStageDetail(
-              `Google überlastet — automatischer Neustart in ${s} s (Versuch ${attempt + 1}/${MAX_ATTEMPTS})`,
+              `KI-Dienst überlastet — automatischer Neustart in ${s} s (Versuch ${attempt + 1}/${MAX_ATTEMPTS})`,
             );
             await new Promise((r) => setTimeout(r, 1000));
           }

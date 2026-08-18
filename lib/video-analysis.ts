@@ -636,6 +636,69 @@ export interface AnalyzeRequest {
    */
   observation?: VideoObservation | null;
   observationModel?: string | null;
+  /**
+   * Nur Stufe 1 (Gemini) ausführen und die Beobachtung liefern. Beide Stufen
+   * laufen als getrennte Requests, damit jede ihr eigenes Vercel-Zeitbudget
+   * (300 s) bekommt — sonst reißt ein langes Video das Gesamtlimit.
+   */
+  observeOnly?: boolean;
+}
+
+/**
+ * Führt NUR die Gemini-Beobachtung aus (Stufe 1) — eigener Request mit
+ * eigenem Server-Zeitbudget. Die Bewertung folgt separat via runVideoAnalysis
+ * mit gesetzter observation.
+ */
+export async function runVideoObservation(
+  req: AnalyzeRequest,
+): Promise<{ observation: VideoObservation; model: string }> {
+  const token = await idToken();
+  const res = await fetch("/api/video-analysis/analyze", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ ...req, observeOnly: true }),
+  });
+  if (!res.ok || !res.body) {
+    let msg = "Video-Beobachtung fehlgeschlagen";
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data.error) msg = data.error;
+    } catch {
+      /* generische Meldung */
+    }
+    throw new Error(msg);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let observation: { observation: VideoObservation; model: string } | null =
+    null;
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    const event = JSON.parse(trimmed) as
+      | { type: "stage" }
+      | { type: "observation"; observation: VideoObservation; model: string }
+      | { type: "error"; message: string };
+    if (event.type === "observation")
+      observation = { observation: event.observation, model: event.model };
+    else if (event.type === "error") throw new Error(event.message);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) handleLine(line);
+  }
+  if (buffer.trim()) handleLine(buffer);
+  if (!observation)
+    throw new Error("Video-Beobachtung lieferte kein Ergebnis");
+  return observation;
 }
 
 export interface AnalyzeResult {
