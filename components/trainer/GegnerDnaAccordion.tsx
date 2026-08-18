@@ -166,7 +166,7 @@ export default function GegnerDnaAccordion({
                       <div key={question.id}>
                         <div
                           className="font-mono-ta text-[13px] font-bold uppercase leading-snug"
-                          style={{ color: "var(--fg)" }}
+                          style={{ color: category.accent }}
                         >
                           {question.label}
                         </div>
