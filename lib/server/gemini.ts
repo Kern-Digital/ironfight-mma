@@ -96,6 +96,22 @@ export async function getFileState(name: string): Promise<GeminiFile> {
 }
 
 /**
+ * Löscht eine hochgeladene Datei (files/...) sofort — sonst räumt Google sie
+ * automatisch nach 48 h ab. Fehler werden bewusst geschluckt: das Löschen
+ * darf eine fertige Analyse nie scheitern lassen.
+ */
+export async function deleteFile(name: string): Promise<void> {
+  try {
+    await fetch(`${BASE}/v1beta/${name}`, {
+      method: "DELETE",
+      headers: { "x-goog-api-key": apiKey() },
+    });
+  } catch {
+    /* Auto-Expiry (48 h) greift als Fallback */
+  }
+}
+
+/**
  * Findet eine frisch hochgeladene Datei über ihren (einmaligen) display_name.
  * Nötig, weil Googles Upload-Endpoint die finale Antwort ohne CORS-Header
  * schickt — der Browser kann sie nicht lesen, der Server schlägt die Datei

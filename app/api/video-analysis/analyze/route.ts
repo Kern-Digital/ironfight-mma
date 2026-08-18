@@ -13,7 +13,7 @@
  * Beide API-Keys bleiben serverseitig; Zugriff nur für Trainer/Admins.
  */
 
-import { observeVideo } from "@/lib/server/gemini";
+import { deleteFile, observeVideo } from "@/lib/server/gemini";
 import { evaluateObservation } from "@/lib/server/claude";
 import {
   bearerToken,
@@ -108,6 +108,14 @@ export async function POST(req: Request) {
           models: { gemini: geminiModel, claude: claudeModel },
           usage,
         });
+
+        // Hochgeladenes Video nach erfolgreicher Analyse sofort bei Google
+        // löschen (bei Fehlern bleibt es für einen Retry — Google räumt nach
+        // 48 h ohnehin automatisch auf). YouTube-Quellen: nichts zu löschen.
+        if (body.source.kind === "upload") {
+          const match = /files\/[A-Za-z0-9._-]+$/.exec(body.source.fileUri);
+          if (match) await deleteFile(match[0]);
+        }
       } catch (err) {
         send({
           type: "error",
