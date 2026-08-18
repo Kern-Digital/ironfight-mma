@@ -26,8 +26,8 @@
   --ink-5: #2B2243;
   --ink-6: #3C3158;
 
-  /* Foreground scale */
-  --fg:   #FFFFFF;
+  /* Foreground scale — fg leicht gedämpft statt reinem Weiß (OLED-Bloom) */
+  --fg:   #F0EEF9;
   --fg-2: #CCC9E0;
   --fg-3: #ABA6C4;
   --fg-4: #8D87AB;
@@ -210,22 +210,25 @@ body {
   .heading-display {
     font-family: var(--font-display), "Barlow Condensed", Impact, sans-serif;
     @apply uppercase;
-    font-weight: 800;
-    letter-spacing: 0.045em;
+    font-weight: 700;
+    letter-spacing: 0.065em;
   }
 
   /* Display-Font Utilities — einheitlich entspannter:
-     - leicht weiter auseinander stehende Buchstaben
-     - bei Kombination mit .font-black auf weight 800 begrenzen (bleibt massiv,
-       aber wirkt weniger gepresst). */
+     - !important schlägt die vielen inline gesetzten 0.02–0.06em-Werte
+     - Barlow Condensed über weight 700 verklumpt bei kleinen Größen,
+       deshalb font-black/font-extrabold app-weit auf 700 begrenzen. */
   .font-display-ta,
-  .font-display {
-    letter-spacing: 0.045em;
+  .font-display,
+  .heading-display {
+    letter-spacing: 0.065em !important;
   }
   .font-display-ta.font-black,
   .font-display.font-black,
-  .heading-display.font-black {
-    font-weight: 800;
+  .heading-display.font-black,
+  .font-display-ta.font-extrabold,
+  .font-display.font-extrabold {
+    font-weight: 700;
   }
 
   /* Card — dark layered, weicher & luftiger */
