@@ -34,6 +34,7 @@ import {
   MAX_VIDEO_SECONDS,
   deleteVideoAnalysis,
   listVideoAnalyses,
+  isUploadStillActive,
   markAnalysisApplied,
   readVideoDuration,
   recordAiUsage,
@@ -70,6 +71,16 @@ function formatDate(d: Date): string {
 }
 
 type RunStage = "idle" | "upload" | "gemini" | "claude" | "save";
+
+/** Erfolgreicher Upload, der bei Fehlversuchen wiederverwendet wird (48 h gültig). */
+interface PendingUpload {
+  name: string;
+  fileUri: string;
+  mimeType: string;
+  fileName: string;
+  fileSize: number;
+  durationSeconds: number | null;
+}
 
 const RUN_STEPS: [Exclude<RunStage, "idle">, string][] = [
   ["upload", "Video hochladen"],
@@ -133,6 +144,7 @@ export default function VideoAnalysisSection({
   const [formOpen, setFormOpen] = useState(false);
   const [sourceKind, setSourceKind] = useState<"upload" | "youtube">("upload");
   const [file, setFile] = useState<File | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [ytStart, setYtStart] = useState("");
   const [ytEnd, setYtEnd] = useState("");
@@ -170,6 +182,7 @@ export default function VideoAnalysisSection({
           youtubeUrl: string;
           ytStart: string;
           ytEnd: string;
+          pendingUpload: PendingUpload | null;
         }>;
         if (s.corner) setCorner(s.corner);
         if (s.clothing) setClothing(s.clothing);
@@ -180,6 +193,7 @@ export default function VideoAnalysisSection({
         if (s.youtubeUrl) setYoutubeUrl(s.youtubeUrl);
         if (s.ytStart) setYtStart(s.ytStart);
         if (s.ytEnd) setYtEnd(s.ytEnd);
+        if (s.pendingUpload?.name) setPendingUpload(s.pendingUpload);
       }
     } catch {
       /* defekter Eintrag → ignorieren */
@@ -203,6 +217,7 @@ export default function VideoAnalysisSection({
           youtubeUrl,
           ytStart,
           ytEnd,
+          pendingUpload,
         }),
       );
     } catch {
@@ -219,6 +234,7 @@ export default function VideoAnalysisSection({
     youtubeUrl,
     ytStart,
     ytEnd,
+    pendingUpload,
   ]);
   /** Zähler, damit die Guthaben-Anzeige nach jeder Analyse neu lädt. */
   const [usageRefresh, setUsageRefresh] = useState(0);
@@ -265,25 +281,70 @@ export default function VideoAnalysisSection({
     let source: VideoSource;
     try {
       if (sourceKind === "upload") {
-        if (!file) throw new Error("Bitte eine Videodatei auswählen.");
-        const duration = await readVideoDuration(file);
-        if (duration != null && duration > MAX_VIDEO_SECONDS + 5) {
-          throw new Error(
-            `Video ist ${Math.round(duration / 60)} Minuten lang — maximal 15 Minuten.`,
-          );
+        // Token-/Zeit-Ersparnis: ein bereits hochgeladenes Video (48 h gültig)
+        // wird wiederverwendet, statt es erneut hochzuladen — außer der
+        // Nutzer hat inzwischen eine andere Datei gewählt.
+        const matchesSelected =
+          !!file &&
+          !!pendingUpload &&
+          pendingUpload.fileName === file.name &&
+          pendingUpload.fileSize === file.size;
+        let reuse: PendingUpload | null = null;
+        if (pendingUpload && (!file || matchesSelected)) {
+          setStage("upload");
+          setStageDetail("Bereits hochgeladenes Video wird geprüft …");
+          if (await isUploadStillActive(pendingUpload.name)) {
+            reuse = pendingUpload;
+          } else {
+            setPendingUpload(null); // abgelaufen/gelöscht → Neuupload nötig
+          }
+          setStageDetail(null);
         }
-        setStage("upload");
-        const uploaded = await uploadVideoFile(file, (msg) =>
-          setStageDetail(msg),
-        );
-        setStageDetail(null);
-        source = {
-          kind: "upload",
-          fileUri: uploaded.fileUri,
-          mimeType: uploaded.mimeType,
-          fileName: file.name,
-          durationSeconds: duration,
-        };
+
+        if (reuse) {
+          source = {
+            kind: "upload",
+            fileUri: reuse.fileUri,
+            mimeType: reuse.mimeType,
+            fileName: reuse.fileName,
+            durationSeconds: reuse.durationSeconds,
+          };
+        } else {
+          if (!file) {
+            throw new Error(
+              pendingUpload
+                ? "Das zuvor hochgeladene Video ist nicht mehr gültig — bitte die Datei erneut auswählen."
+                : "Bitte eine Videodatei auswählen.",
+            );
+          }
+          const duration = await readVideoDuration(file);
+          if (duration != null && duration > MAX_VIDEO_SECONDS + 5) {
+            throw new Error(
+              `Video ist ${Math.round(duration / 60)} Minuten lang — maximal 15 Minuten.`,
+            );
+          }
+          setStage("upload");
+          const uploaded = await uploadVideoFile(file, (msg) =>
+            setStageDetail(msg),
+          );
+          setStageDetail(null);
+          // Upload sofort merken — überlebt Fehlversuche und Reloads.
+          setPendingUpload({
+            name: uploaded.name,
+            fileUri: uploaded.fileUri,
+            mimeType: uploaded.mimeType,
+            fileName: file.name,
+            fileSize: file.size,
+            durationSeconds: duration,
+          });
+          source = {
+            kind: "upload",
+            fileUri: uploaded.fileUri,
+            mimeType: uploaded.mimeType,
+            fileName: file.name,
+            durationSeconds: duration,
+          };
+        }
       } else {
         if (!youtubeUrl.trim()) throw new Error("Bitte einen YouTube-Link angeben.");
         const startSeconds = parseTimecode(ytStart);
@@ -396,7 +457,9 @@ export default function VideoAnalysisSection({
       setYtStart("");
       setYtEnd("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      // Erfolg → gespeicherte Kämpferbeschreibung löschen und Felder leeren.
+      // Erfolg → gespeicherte Kämpferbeschreibung + gemerkten Upload löschen
+      // (das Video wurde serverseitig bei Google entfernt).
+      setPendingUpload(null);
       setCorner("unknown");
       setClothing("");
       setFeatures("");
@@ -627,16 +690,52 @@ export default function VideoAnalysisSection({
           </div>
 
           {sourceKind === "upload" ? (
-            <Field label="Videodatei (MP4, MOV … — max. 15 Minuten)">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="rounded-lg px-3 py-2 text-xs"
-                style={inputStyle}
-              />
-            </Field>
+            pendingUpload ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2.5"
+                style={{
+                  background: "rgba(157,123,250,0.1)",
+                  border: "1px solid rgba(157,123,250,0.35)",
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-2 text-xs">
+                  <span style={{ color: VIOLET, flexShrink: 0 }}>
+                    <Icon name="check" size={14} />
+                  </span>
+                  <span className="min-w-0 truncate" style={{ color: "var(--fg-2)" }}>
+                    <b>{pendingUpload.fileName}</b> ist bereits hochgeladen und
+                    wird wiederverwendet.
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setPendingUpload(null);
+                    setFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="font-mono-ta rounded px-2 py-1 text-[9px] font-bold uppercase"
+                  style={{
+                    letterSpacing: "0.1em",
+                    border: "1px solid var(--ink-5)",
+                    color: "var(--fg-3)",
+                    background: "transparent",
+                  }}
+                >
+                  Anderes Video wählen
+                </button>
+              </div>
+            ) : (
+              <Field label="Videodatei (MP4, MOV … — max. 15 Minuten)">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="rounded-lg px-3 py-2 text-xs"
+                  style={inputStyle}
+                />
+              </Field>
+            )
           ) : (
             <>
               <Field label="YouTube-Link">

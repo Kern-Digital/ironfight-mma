@@ -474,10 +474,33 @@ async function apiJson<T>(res: Response): Promise<T> {
  * Google (umgeht Vercels 4,5-MB-Request-Limit). Der Server liefert nur die
  * Upload-URL (ohne API-Key) und wird danach zum Status-Polling genutzt.
  */
+/**
+ * Prüft, ob eine früher hochgeladene Datei bei Google noch existiert und
+ * einsatzbereit (ACTIVE) ist — für die Wiederverwendung nach Fehlversuchen.
+ */
+export async function isUploadStillActive(name: string): Promise<boolean> {
+  try {
+    const token = await idToken();
+    const res = await fetch("/api/video-analysis/file-status", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { state?: string };
+    return data.state === "ACTIVE";
+  } catch {
+    return false;
+  }
+}
+
 export async function uploadVideoFile(
   file: File,
   onProgress?: (msg: string) => void,
-): Promise<{ fileUri: string; mimeType: string }> {
+): Promise<{ fileUri: string; mimeType: string; name: string }> {
   const token = await idToken();
   const mimeType = file.type || "video/mp4";
 
@@ -584,7 +607,7 @@ export async function uploadVideoFile(
       `Google konnte das Video nicht verarbeiten (Status: ${info.state})`,
     );
   }
-  return { fileUri: info.uri, mimeType: info.mimeType || mimeType };
+  return { fileUri: info.uri, mimeType: info.mimeType || mimeType, name: info.name };
 }
 
 export type AnalysisStage = "gemini" | "claude" | "done";
