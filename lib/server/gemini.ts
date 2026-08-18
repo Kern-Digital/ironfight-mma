@@ -303,42 +303,113 @@ function normalizeObservation(o: Partial<VideoObservation>): VideoObservation {
   };
 }
 
+// ─── Robuste generateContent-Aufrufe (Retry + Modell-Kette) ─────────────────
+//
+// Free-Tier-Realität: "-latest"-Modelle sind unter Last öfter 503 (high
+// demand), und 429-Quotas gelten PRO Modell. Deshalb: pro Stufe eine Kette
+// von Modellen; 503/500 wird je Modell einmal wiederholt, bei 429 wird das
+// nächste Modell der Kette probiert (eigenes Kontingent).
+
+const FLASH_CHAIN = [
+  GEMINI_MODELS.flash,
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+];
+const PRO_CHAIN = [GEMINI_MODELS.pro, "gemini-3.1-pro-preview"];
+
+class GeminiHttpError extends Error {
+  constructor(
+    public status: number,
+    public detail: string,
+  ) {
+    super(`Gemini HTTP ${status}: ${detail.slice(0, 200)}`);
+  }
+}
+
+/** Ein einzelner generateContent-Aufruf; liefert den Text der Antwort. */
+async function generateContentOnce(
+  model: string,
+  body: Record<string, unknown>,
+): Promise<string> {
+  const res = await fetch(`${BASE}/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey(), "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new GeminiHttpError(res.status, detail);
+  }
+  const data = (await res.json()) as {
+    candidates?: {
+      content?: { parts?: { text?: string }[] };
+      finishReason?: string;
+    }[];
+  };
+  const text = (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? "")
+    .join("");
+  if (!text.trim()) {
+    const reason = data.candidates?.[0]?.finishReason ?? "leere Antwort";
+    throw new GeminiHttpError(502, `kein Ergebnis (${reason})`);
+  }
+  return text;
+}
+
+/**
+ * generateContent mit Modell-Kette: 503/500/502 → kurzer Retry, dann nächstes
+ * Modell; 429 → direkt nächstes Modell (eigene Quota). Liefert Text + Modell.
+ */
+async function generateContentResilient(
+  chain: string[],
+  body: Record<string, unknown>,
+): Promise<{ text: string; model: string }> {
+  let lastError: unknown = null;
+  for (const model of chain) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return { text: await generateContentOnce(model, body), model };
+      } catch (err) {
+        lastError = err;
+        if (err instanceof GeminiHttpError) {
+          if (err.status === 429) break; // Quota dieses Modells leer → nächstes
+          if (err.status >= 500) {
+            await new Promise((r) => setTimeout(r, 4000));
+            continue; // einmal wiederholen, dann nächstes Modell
+          }
+        }
+        throw err; // echte 4xx-Fehler nicht maskieren
+      }
+    }
+  }
+  if (lastError instanceof GeminiHttpError && lastError.status === 429) {
+    throw new Error(
+      chain === PRO_CHAIN
+        ? "Die Detail-Analyse (Gemini Pro) ist im kostenlosen Google-Tarif nicht enthalten. Bitte die Stufe Standard wählen — oder in Google AI Studio einen Bezahltarif aktivieren."
+        : "Gemini-Kontingent vorübergehend erschöpft (Free-Tier-Limit). Bitte 1–2 Minuten warten und erneut versuchen — oder einen kürzeren Ausschnitt wählen.",
+    );
+  }
+  throw new Error(
+    "Die Gemini-Modelle sind gerade überlastet (hohe Nachfrage bei Google). Bitte in 1–2 Minuten erneut versuchen.",
+  );
+}
+
 /**
  * Reiner Text→JSON-Aufruf (ohne Video) — wird von der Bewertungsstufe als
  * kostenloser Fallback genutzt, solange kein ANTHROPIC_API_KEY gesetzt ist.
  */
 export async function geminiGenerateJson(
-  model: string,
+  _model: string,
   prompt: string,
 ): Promise<string> {
-  const res = await fetch(
-    `${BASE}/v1beta/models/${model}:generateContent?key=${apiKey()}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          maxOutputTokens: 32768,
-          temperature: 0.3,
-        },
-      }),
+  const { text } = await generateContentResilient(FLASH_CHAIN, {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 32768,
+      temperature: 0.3,
     },
-  );
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(
-      `Gemini-Bewertung fehlgeschlagen (${res.status}): ${detail.slice(0, 300)}`,
-    );
-  }
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? "")
-    .join("");
-  if (!text.trim()) throw new Error("Gemini-Bewertung lieferte kein Ergebnis");
+  });
   return text;
 }
 
@@ -352,49 +423,23 @@ export async function observeVideo(args: {
   tier: GeminiTier;
   mode: "opponent" | "athlete";
 }): Promise<{ observation: VideoObservation; model: string }> {
-  const model = GEMINI_MODELS[args.tier];
-  const res = await fetch(
-    `${BASE}/v1beta/models/${model}:generateContent?key=${apiKey()}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              ...sourceParts(args.source),
-              { text: observationPrompt(args.fighter, args.mode) },
-            ],
-          },
+  const chain = args.tier === "pro" ? PRO_CHAIN : FLASH_CHAIN;
+  const { text, model } = await generateContentResilient(chain, {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          ...sourceParts(args.source),
+          { text: observationPrompt(args.fighter, args.mode) },
         ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          maxOutputTokens: 32768,
-          temperature: 0.2,
-        },
-      }),
+      },
+    ],
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 32768,
+      temperature: 0.2,
     },
-  );
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(
-      `Gemini-Analyse fehlgeschlagen (${res.status}): ${detail.slice(0, 300)}`,
-    );
-  }
-  const data = (await res.json()) as {
-    candidates?: {
-      content?: { parts?: { text?: string }[] };
-      finishReason?: string;
-    }[];
-  };
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? "")
-    .join("");
-  if (!text.trim()) {
-    const reason = data.candidates?.[0]?.finishReason ?? "leere Antwort";
-    throw new Error(`Gemini lieferte kein Ergebnis (${reason})`);
-  }
+  });
   const parsed = parseModelJson<Partial<VideoObservation>>(text);
   return { observation: normalizeObservation(parsed), model };
 }
