@@ -121,11 +121,11 @@ export default function GegnerDnaAccordion({
               </span>
               <span className="min-w-0 flex-1">
                 <span
-                  className="font-display-ta block truncate font-black uppercase"
+                  className="font-display-ta block truncate font-bold uppercase"
                   style={{
-                    fontSize: "14px",
-                    letterSpacing: "0.04em",
-                    color: count > 0 ? "var(--fg)" : "var(--fg-3)",
+                    fontSize: "15.5px",
+                    letterSpacing: "0.08em",
+                    color: count > 0 ? "var(--fg-2)" : "var(--fg-3)",
                   }}
                 >
                   {category.label}
