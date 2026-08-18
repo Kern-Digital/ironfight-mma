@@ -83,7 +83,7 @@ export default function FightCampPlanView({
               {camp.competitionName}
             </h2>
             <div
-              className="font-mono-ta mt-1 text-[11px] uppercase"
+              className="font-mono-ta mt-1 text-[11px]"
               style={{ letterSpacing: "0.15em", color: "var(--fg-3)" }}
             >
               {formatDate(camp.competitionDate)} ·{" "}

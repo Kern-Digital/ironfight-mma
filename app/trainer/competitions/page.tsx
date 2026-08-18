@@ -66,7 +66,7 @@ function OpponentCard({ opponent }: { opponent: Opponent }) {
         </span>
       </div>
       <div
-        className="font-mono-ta mt-1 truncate text-[10px] uppercase"
+        className="font-mono-ta mt-1 truncate text-[10px]"
         style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
       >
         {FIGHT_STYLE_LABEL[opponent.style]}
@@ -250,7 +250,7 @@ function CompetitionsHubContent() {
             Wettkampf
           </h1>
           <p
-            className="font-mono-ta mt-2 text-[11px] uppercase"
+            className="font-mono-ta mt-2 text-[11px]"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
             Wettkämpfe · Gegner-DNA · gym-weit geteilt

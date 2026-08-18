@@ -292,7 +292,7 @@ function StatRow({ stat, color }: { stat: ActionStat; color: string }) {
       </div>
       {meta.length > 0 && (
         <div
-          className="font-mono-ta mt-1 text-[10px] uppercase"
+          className="font-mono-ta mt-1 text-[10px]"
           style={{ letterSpacing: "0.08em", color: "var(--fg-4)" }}
         >
           {meta.join(" · ")}

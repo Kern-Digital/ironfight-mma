@@ -200,7 +200,7 @@ function CompetitionDetailContent({
                 </span>
               </div>
               <p
-                className="font-mono-ta mt-2 text-[10px] uppercase"
+                className="font-mono-ta mt-2 text-[10px]"
                 style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
               >
                 <Link

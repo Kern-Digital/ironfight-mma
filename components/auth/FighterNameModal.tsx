@@ -76,7 +76,7 @@ export default function FighterNameModal() {
             placeholder="z. B. IronWolf, Coach, Leon …"
             className="w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none"
           />
-          <p className="mt-1 text-[10px] uppercase tracking-widest text-foreground/40">
+          <p className="mt-1 text-[10px] tracking-widest text-foreground/40">
             Maximal 30 Zeichen — kein Zwang zur Eindeutigkeit.
           </p>
         </div>

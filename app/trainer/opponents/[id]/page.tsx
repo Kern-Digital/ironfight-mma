@@ -158,7 +158,7 @@ function OpponentDetailContent({ id }: { id: string }) {
                 {opponent.name}
               </h1>
               <p
-                className="font-mono-ta mt-2 text-[10px] uppercase"
+                className="font-mono-ta mt-2 text-[10px]"
                 style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
               >
                 Gegner-DNA · {answers} {answers === 1 ? "Eintrag" : "Einträge"} ·

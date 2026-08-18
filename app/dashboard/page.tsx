@@ -327,7 +327,7 @@ function DashboardContent() {
                     {CATEGORY_LABEL[stats.topCategory.category]}
                   </div>
                   <div
-                    className="font-mono-ta mt-1 text-[10px] uppercase"
+                    className="font-mono-ta mt-1 text-[10px]"
                     style={{ letterSpacing: "0.15em", color: "var(--fg-3)" }}
                   >
                     {stats.topCategory.count} Sessions

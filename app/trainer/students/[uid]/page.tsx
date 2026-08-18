@@ -229,7 +229,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 {displayLabel(entry)}
               </h1>
               <p
-                className="font-mono-ta mt-2 text-[11px] uppercase"
+                className="font-mono-ta mt-2 text-[11px]"
                 style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
               >
                 {entry.email ?? "—"} · Seit {formatDate(entry.createdAt)}
@@ -558,7 +558,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 Wettkämpfe
               </h2>
               <p
-                className="font-mono-ta mt-1 text-[10px] uppercase"
+                className="font-mono-ta mt-1 text-[10px]"
                 style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
               >
                 Zentral im Wettkampfbereich verwaltet · Gegner-DNA inklusive

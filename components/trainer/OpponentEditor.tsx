@@ -301,7 +301,7 @@ export default function OpponentEditor({
             Technik-Statistik
           </h3>
           <span
-            className="font-mono-ta text-[10px] uppercase"
+            className="font-mono-ta text-[10px]"
             style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
           >
             Versuche · Treffer · Zone · Setup
@@ -323,7 +323,7 @@ export default function OpponentEditor({
             Gegner-DNA
           </h3>
           <span
-            className="font-mono-ta text-[10px] uppercase"
+            className="font-mono-ta text-[10px]"
             style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
           >
             Optional · nur ausfüllen was bekannt ist

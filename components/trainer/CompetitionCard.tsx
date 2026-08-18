@@ -71,7 +71,7 @@ export default function CompetitionCard({
             {camp.competitionName}
           </div>
           <div
-            className="font-mono-ta mt-1 truncate text-[10px] uppercase"
+            className="font-mono-ta mt-1 truncate text-[10px]"
             style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
           >
             {studentLabel} · vs {camp.opponent.name}
@@ -91,7 +91,7 @@ export default function CompetitionCard({
       </div>
 
       <div
-        className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono-ta text-[10px] uppercase"
+        className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono-ta text-[10px]"
         style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
       >
         <span>{formatDate(camp.competitionDate)}</span>

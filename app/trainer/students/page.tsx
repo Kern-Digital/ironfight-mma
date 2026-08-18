@@ -463,7 +463,7 @@ function StudentsContent() {
             Schüler & Fortschritt
           </h1>
           <p
-            className="font-mono-ta mt-2 text-[11px] uppercase"
+            className="font-mono-ta mt-2 text-[11px]"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
             Alle Mitglieder · Profil-Daten · Aktivität
@@ -506,7 +506,7 @@ function StudentsContent() {
           />
           {students && (
             <div
-              className="font-mono-ta mt-2 text-[10px] uppercase"
+              className="font-mono-ta mt-2 text-[10px]"
               style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
             >
               {filtered.length} {filtered.length === 1 ? "Schüler" : "Schüler"}

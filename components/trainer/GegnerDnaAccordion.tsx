@@ -131,7 +131,7 @@ export default function GegnerDnaAccordion({
                   {category.label}
                 </span>
                 <span
-                  className="font-mono-ta mt-0.5 block truncate text-[10px] uppercase"
+                  className="font-mono-ta mt-0.5 block truncate text-[10px]"
                   style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
                 >
                   {category.hint}
