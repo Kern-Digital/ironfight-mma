@@ -25,6 +25,7 @@ import {
   type TechniqueProgress,
 } from "@/lib/types";
 import { listFightCamps, type FightCamp } from "@/lib/fight-camp";
+import { CATEGORY_COLOR } from "@/lib/discipline-colors";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -460,8 +461,11 @@ function StudentDetailContent({ uid }: { uid: string }) {
                         style={{
                           height: "100%",
                           width: `${Math.round(c.shareOfTotal * 100)}%`,
-                          background: "var(--ta-cyan)",
-                          boxShadow: "0 0 6px rgba(35,196,206,0.4)",
+                          // Disziplin-Farbe wie überall in der App (zentrale Map)
+                          background:
+                            (CATEGORY_COLOR as Record<string, string>)[
+                              c.category
+                            ] ?? "var(--ta-cyan)",
                         }}
                       />
                     </div>

@@ -13,6 +13,8 @@
  * manuell durch den Trainer beim Videoschauen. IDs sind stabil — niemals ändern.
  */
 
+import { FIGHT_FAMILY_COLOR } from "@/lib/discipline-colors";
+
 // ─── §1 Fight-DNA-Split ──────────────────────────────────────────────────────
 
 /** Prozentuale Verteilung der Kampfbereiche eines Gegners (Summe ~100). */
@@ -38,13 +40,13 @@ export const DNA_SPLIT_META: Record<
   DnaSplitKey,
   { label: string; color: string }
 > = {
-  // WICHTIG: alle 5 Farben müssen klar unterscheidbar sein (ein Balken!) —
-  // niemals zwei ähnliche Töne (z. B. zwei Violett) vergeben.
-  boxing: { label: "Boxen", color: "var(--ta-cyan)" },
-  kicking: { label: "Kicks", color: "#8A63E8" },
-  wrestling: { label: "Wrestling", color: "var(--ta-pink)" },
-  ground: { label: "Boden", color: "#FFB648" },
-  clinch: { label: "Clinch", color: "#3EE06B" },
+  // Farben kommen zentral aus lib/discipline-colors.ts — eine Rubrik hat
+  // app-weit immer dieselbe Farbe, und ein Chart nie zwei ähnliche Töne.
+  boxing: { label: "Boxen", color: FIGHT_FAMILY_COLOR.striking },
+  kicking: { label: "Kicks", color: FIGHT_FAMILY_COLOR.kicks },
+  wrestling: { label: "Wrestling", color: FIGHT_FAMILY_COLOR.wrestling },
+  ground: { label: "Boden", color: FIGHT_FAMILY_COLOR.ground },
+  clinch: { label: "Clinch", color: FIGHT_FAMILY_COLOR.clinch },
 };
 
 export const EMPTY_DNA_SPLIT: DnaSplit = {
@@ -95,10 +97,10 @@ export const ACTION_GROUP_META: Record<
   ActionGroup,
   { label: string; color: string }
 > = {
-  strike: { label: "Schläge", color: "var(--ta-cyan)" },
-  kick: { label: "Kicks", color: "#8A63E8" },
-  takedown: { label: "Takedowns", color: "var(--ta-pink)" },
-  ground: { label: "Boden", color: "#FFB648" },
+  strike: { label: "Schläge", color: FIGHT_FAMILY_COLOR.striking },
+  kick: { label: "Kicks", color: FIGHT_FAMILY_COLOR.kicks },
+  takedown: { label: "Takedowns", color: FIGHT_FAMILY_COLOR.wrestling },
+  ground: { label: "Boden", color: FIGHT_FAMILY_COLOR.ground },
 };
 
 export interface ActionDef {

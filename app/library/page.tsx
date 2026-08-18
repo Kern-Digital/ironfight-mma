@@ -14,25 +14,16 @@ import {
 import { ALL_TECHNIQUES, getTechniqueById } from "@/lib/techniques";
 import type { Category, LibraryEntry, Technique } from "@/lib/types";
 import { TECHNIQUE_LEVEL_LABEL } from "@/lib/types";
+import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 
 // ─── Hilfskonstanten ───────────────────────────────────────────────────────
 
+// Farben zentral aus lib/discipline-colors.ts — eine Rubrik = app-weit eine Farbe.
 const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
-  boxing:      { label: "Boxing",    color: "#FB923C" },
-  wrestling:   { label: "Ringen",    color: "#60A5FA" },
-  bjj:         { label: "BJJ",       color: "#C084FC" },
-  "muay-thai": { label: "Muay Thai", color: "#F87171" },
-};
-
-const DISCIPLINE_COLOR: Record<string, string> = {
-  boxing:            "#FB923C",
-  kickboxen:         "#8A63E8",
-  "muay-thai":       "#F87171",
-  "fitness-kickboxen": "#FCD34D",
-  wrestling:         "#60A5FA",
-  bjj:               "#C084FC",
-  mma:               "#23C4CE",
-  karate:            "#9D7BFA",
+  boxing:      { label: "Boxing",    color: CATEGORY_COLOR.boxing },
+  wrestling:   { label: "Ringen",    color: CATEGORY_COLOR.wrestling },
+  bjj:         { label: "BJJ",       color: CATEGORY_COLOR.bjj },
+  "muay-thai": { label: "Muay Thai", color: CATEGORY_COLOR["muay-thai"] },
 };
 
 const TECHNIQUE_LEVEL_COLOR: Record<string, string> = {
@@ -313,7 +304,11 @@ function LibraryContent() {
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {BROWSE_DISCIPLINES.map((d) => {
                   const active = browseDiscipline === d.id;
-                  const color = d.id !== "all" ? (DISCIPLINE_COLOR[d.id] ?? "var(--ta-cyan)") : "var(--ta-cyan)";
+                  const color =
+                    d.id !== "all"
+                      ? ((DISCIPLINE_COLOR as Record<string, string>)[d.id] ??
+                        "var(--ta-cyan)")
+                      : "var(--ta-cyan)";
                   return (
                     <button
                       key={d.id}

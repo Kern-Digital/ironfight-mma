@@ -31,7 +31,7 @@ export const TRAINING_PLANS: DisciplinePlan[] = [
     description:
       "Klassisches Boxing-Workout. Fokus auf saubere Technik, Bewegung und Konditionierung. 3-Minuten-Runden mit aktiver Erholung.",
     preset: { rounds: 5, workSeconds: 180, restSeconds: 60, prepSeconds: 10 },
-    accent: "from-red-700/40",
+    accent: "from-[#23C4CE]/40", // Boxen = Cyan (lib/discipline-colors.ts)
     blocks: [
       {
         title: "Aufwärmen",
@@ -65,7 +65,7 @@ export const TRAINING_PLANS: DisciplinePlan[] = [
     description:
       "Wrestling-Session mit Fokus auf Stand & Motion, Penetration Steps und Takedowns. Hohe Intensität, kurze Pausen.",
     preset: { rounds: 6, workSeconds: 120, restSeconds: 45, prepSeconds: 10 },
-    accent: "from-orange-700/40",
+    accent: "from-[#FF4FA8]/40", // Wrestling = Pink
     blocks: [
       {
         title: "Aufwärmen",
@@ -100,7 +100,7 @@ export const TRAINING_PLANS: DisciplinePlan[] = [
     description:
       "Bodenkampf-Session. Saubere Mechanik vor Geschwindigkeit. Lange Sparring-Runden — Position vor Submission.",
     preset: { rounds: 5, workSeconds: 300, restSeconds: 60, prepSeconds: 10 },
-    accent: "from-blue-700/40",
+    accent: "from-[#FFB648]/40", // BJJ/Boden = Amber
     blocks: [
       {
         title: "Solo-Movements",
@@ -136,7 +136,7 @@ export const TRAINING_PLANS: DisciplinePlan[] = [
     description:
       "Muay Thai mit allen acht Gliedmaßen. Schienbein-Konditionierung, schwere Kicks, Clinch-Arbeit.",
     preset: { rounds: 5, workSeconds: 180, restSeconds: 60, prepSeconds: 10 },
-    accent: "from-yellow-700/40",
+    accent: "from-[#8A63E8]/40", // Muay Thai/Kicks = Violett
     blocks: [
       {
         title: "Aufwärmen",

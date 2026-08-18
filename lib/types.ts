@@ -519,6 +519,8 @@ export interface TrainingBlock {
   startTime: string; // "16:15"
   endTime: string;   // "17:00"
   category?: Category;
+  /** Fein-Disziplin für die Farbcodierung (z. B. Kickboxen ≠ Boxen). */
+  discipline?: Discipline;
   level?: "kids" | "teens" | "adult" | "advanced" | "mixed";
 }
 

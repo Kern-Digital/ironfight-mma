@@ -14,6 +14,7 @@ import {
   type Discipline,
   type TechniqueLevel,
 } from "@/lib/types";
+import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -186,7 +187,10 @@ export default function TechniquesPage() {
             return (
               <section key={disc}>
                 <div className="mb-4 flex items-baseline gap-3">
-                  <span className="text-xs font-bold uppercase tracking-widest text-blood">
+                  <span
+                    className="text-xs font-bold uppercase tracking-widest"
+                    style={{ color: DISCIPLINE_COLOR[disc] }}
+                  >
                     {DISC_TAG[disc] ?? "Kampfsport"}
                   </span>
                   <h2 className="heading-display text-3xl font-black">
@@ -202,6 +206,10 @@ export default function TechniquesPage() {
                       key={t.id}
                       href={`/techniques/${t.id}`}
                       className="group rounded-sm border border-carbon-500 bg-carbon-700/60 p-5 transition-all hover:border-blood/60"
+                      style={{
+                        // Disziplin-Farbkante: gleiche Farbe wie die Rubrik app-weit
+                        borderLeft: `3px solid ${CATEGORY_COLOR[t.category]}`,
+                      }}
                     >
                       <div className="flex items-baseline justify-between gap-2">
                         <h3 className="heading-display text-xl font-black group-hover:text-blood">

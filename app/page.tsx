@@ -44,19 +44,21 @@ const ACCENTS: Record<string, Accent> = {
     bgLight: "linear-gradient(150deg, #FBDDE9, #FDF1F6 70%)",
     border: "rgba(255,79,168,.35)",
   },
+  // Disziplin-Familienfarben (siehe lib/discipline-colors.ts):
+  // violet = Kicks-Familie (Muay Thai/Kickboxen), amber = Boden-Familie (BJJ).
   violet: {
-    c: "#9D7BFA",
-    glow: "rgba(157,123,250,.32)",
+    c: "#8A63E8",
+    glow: "rgba(138,99,232,.32)",
     bgDark: "linear-gradient(150deg, #251341, #100A1C 70%)",
     bgLight: "linear-gradient(150deg, #E9E2FB, #F6F3FD 70%)",
-    border: "rgba(157,123,250,.35)",
+    border: "rgba(138,99,232,.35)",
   },
   amber: {
-    c: "#8A63E8",
-    glow: "rgba(138,99,232,.3)",
+    c: "#FFB648",
+    glow: "rgba(255,182,72,.3)",
     bgDark: "linear-gradient(150deg, #33200D, #150F08 70%)",
     bgLight: "linear-gradient(150deg, #FBF0D2, #FDF9EE 70%)",
-    border: "rgba(138,99,232,.4)",
+    border: "rgba(255,182,72,.4)",
   },
 };
 
@@ -70,8 +72,8 @@ const disciplines: {
 }[] = [
   { slug: "boxing", name: "Boxing", tag: "Stand-Up", desc: "Schlagtechnik · Footwork · Kondition", icon: "glove", accent: "cyan" },
   { slug: "wrestling", name: "Wrestling", tag: "Grappling", desc: "Takedowns · Kontrolle · Power", icon: "grapple", accent: "pink" },
-  { slug: "bjj", name: "BJJ", tag: "Ground", desc: "Submissions · Guard · Sweeps", icon: "gi", accent: "violet" },
-  { slug: "muay-thai", name: "Muay Thai", tag: "Stand-Up", desc: "Kicks · Knie · Clinch", icon: "kick", accent: "green" },
+  { slug: "bjj", name: "BJJ", tag: "Ground", desc: "Submissions · Guard · Sweeps", icon: "gi", accent: "amber" },
+  { slug: "muay-thai", name: "Muay Thai", tag: "Stand-Up", desc: "Kicks · Knie · Clinch", icon: "kick", accent: "violet" },
 ];
 
 interface QuickActionDef {

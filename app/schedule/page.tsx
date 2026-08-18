@@ -31,6 +31,7 @@ import type {
   TrainingSession,
 } from "@/lib/types";
 import { TRAINING_AREA_LABEL, TECHNIQUE_LEVEL_LABEL } from "@/lib/types";
+import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import TrainerHint from "@/components/TrainerHint";
 
 // ─── Visuelle Hilfskonstanten ──────────────────────────────────────────────
@@ -43,24 +44,12 @@ const LEVEL_STYLE: Record<string, { label: string; color: string }> = {
   mixed:    { label: "Mixed",    color: "#9D7BFA" },
 };
 
+// Farben zentral aus lib/discipline-colors.ts — eine Rubrik = app-weit eine Farbe.
 const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
-  boxing:      { label: "Box",       color: "#FB923C" },
-  wrestling:   { label: "Ringen",    color: "#60A5FA" },
-  bjj:         { label: "BJJ",       color: "#C084FC" },
-  "muay-thai": { label: "Muay Thai", color: "#F87171" },
-};
-
-const DISCIPLINE_COLOR: Record<string, string> = {
-  boxing:            "#FB923C",
-  kickboxen:         "#8A63E8",
-  "muay-thai":       "#F87171",
-  "fitness-kickboxen": "#FCD34D",
-  wrestling:         "#60A5FA",
-  bjj:               "#C084FC",
-  mma:               "#23C4CE",
-  karate:            "#9D7BFA",
-  "wing-tsung":      "#3EE06B",
-  "self-defense":    "#9CA3AF",
+  boxing:      { label: "Box",       color: CATEGORY_COLOR.boxing },
+  wrestling:   { label: "Ringen",    color: CATEGORY_COLOR.wrestling },
+  bjj:         { label: "BJJ",       color: CATEGORY_COLOR.bjj },
+  "muay-thai": { label: "Muay Thai", color: CATEGORY_COLOR["muay-thai"] },
 };
 
 const DISCIPLINE_LABEL: Record<string, string> = {
@@ -509,7 +498,13 @@ function DayColumn({
 function BlockCard({ block, isToday, onClick }: { block: TrainingBlock; isToday: boolean; onClick: () => void }) {
   const levelStyle = block.level ? LEVEL_STYLE[block.level] : null;
   const catStyle = block.category ? CATEGORY_STYLE[block.category] : null;
-  const accentColor = catStyle?.color ?? levelStyle?.color ?? "var(--fg-4)";
+  // Farbkante = Disziplin-Familie (zentrale Map); Kickboxen wird so violett
+  // statt Boxen-Cyan. Level-Farbe nur als letzter Fallback.
+  const accentColor =
+    (block.discipline ? DISCIPLINE_COLOR[block.discipline] : null) ??
+    catStyle?.color ??
+    levelStyle?.color ??
+    "var(--fg-4)";
 
   return (
     <button

@@ -20,7 +20,8 @@ export const SPORT_QUIZZES: SportQuiz[] = [
     id: "mma",
     name: "MMA",
     icon: "target",
-    color: "text-blood border-blood/60 bg-blood/10",
+    // MMA = Mischdisziplin → neutral hell (lib/discipline-colors.ts)
+    color: "text-[#F0EEF9] border-[#F0EEF9]/50 bg-[#F0EEF9]/10",
     quiz: [
       {
         question: "Wie lange dauert eine reguläre MMA-Profi-Runde?",
@@ -93,7 +94,8 @@ export const SPORT_QUIZZES: SportQuiz[] = [
     id: "bjj",
     name: "BJJ",
     icon: "gi",
-    color: "text-blue-400 border-blue-400/60 bg-blue-400/10",
+    // BJJ/Boden = Amber (lib/discipline-colors.ts)
+    color: "text-[#FFB648] border-[#FFB648]/60 bg-[#FFB648]/10",
     quiz: [
       {
         question: "Wie viele Punkte gibt ein Takedown im BJJ?",
@@ -175,7 +177,8 @@ export const SPORT_QUIZZES: SportQuiz[] = [
     id: "boxing",
     name: "Boxen",
     icon: "glove",
-    color: "text-yellow-400 border-yellow-400/60 bg-yellow-400/10",
+    // Boxen = Cyan (lib/discipline-colors.ts)
+    color: "text-[#23C4CE] border-[#23C4CE]/60 bg-[#23C4CE]/10",
     quiz: [
       {
         question: "Welche Treffer zählen im Boxen?",

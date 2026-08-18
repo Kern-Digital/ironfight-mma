@@ -3,6 +3,7 @@
 import Icon from "@/components/ui/Icon";
 
 import { getTechniqueById, youtubeSearchUrl, CATEGORY_LABEL } from "@/lib/techniques";
+import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
   DISCIPLINE_LABEL,
@@ -78,13 +79,26 @@ export default function TechniqueInlinePanel({
 
         {/* Tags */}
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="rounded-sm border border-blood/40 bg-blood/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blood">
+          {/* Rubrik-Farbe wie überall in der App (lib/discipline-colors.ts) */}
+          <span
+            className="rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+            style={{
+              color: CATEGORY_COLOR[t.category],
+              borderColor: `${CATEGORY_COLOR[t.category]}66`,
+              background: `${CATEGORY_COLOR[t.category]}1A`,
+            }}
+          >
             {CATEGORY_LABEL[t.category]}
           </span>
           {t.disciplines?.slice(0, 2).map((d) => (
             <span
               key={d}
-              className="rounded-sm border border-blood/30 bg-blood/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blood/80"
+              className="rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                color: DISCIPLINE_COLOR[d],
+                borderColor: `${DISCIPLINE_COLOR[d]}4D`,
+                background: `${DISCIPLINE_COLOR[d]}14`,
+              }}
             >
               {DISCIPLINE_LABEL[d]}
             </span>

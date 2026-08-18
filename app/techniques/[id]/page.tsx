@@ -8,6 +8,7 @@ import {
   youtubeSearchUrl,
 } from "@/lib/techniques";
 import { EQUIPMENT } from "@/lib/equipment";
+import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
   DISCIPLINE_LABEL,
@@ -71,10 +72,16 @@ export default function TechniqueDetailPage({
             {/* Disciplines + TrainingArea tags */}
             {(t.disciplines?.length || trainingAreas.length) ? (
               <div className="flex flex-wrap gap-2">
+                {/* Rubrik-Farbe wie überall in der App (lib/discipline-colors.ts) */}
                 {t.disciplines?.map((d) => (
                   <span
                     key={d}
-                    className="rounded-sm border border-blood/40 bg-blood/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blood"
+                    className="rounded-sm border px-3 py-1 text-xs font-bold uppercase tracking-wider"
+                    style={{
+                      color: DISCIPLINE_COLOR[d],
+                      borderColor: `${DISCIPLINE_COLOR[d]}66`,
+                      background: `${DISCIPLINE_COLOR[d]}1A`,
+                    }}
                   >
                     {DISCIPLINE_LABEL[d]}
                   </span>
