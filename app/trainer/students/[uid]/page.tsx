@@ -9,6 +9,7 @@ import CompetitionCard, {
 } from "@/components/trainer/CompetitionCard";
 import MatchupBlock from "@/components/trainer/MatchupBlock";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
@@ -137,6 +138,17 @@ function StudentDetailContent({ uid }: { uid: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Deep-Link aus dem DeepFight-Menü: #deepfight scrollt zum Analyse-Block,
+  // sobald die Seite fertig geladen ist.
+  useEffect(() => {
+    if (!entry) return;
+    if (window.location.hash === "#deepfight") {
+      document
+        .getElementById("deepfight")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [entry]);
 
   const analysis = useMemo<TrainingHistoryAnalysis | null>(() => {
     if (workouts === null || progress === null) return null;
@@ -603,13 +615,37 @@ function StudentDetailContent({ uid }: { uid: string }) {
           </div>
         </div>
 
-        {/* KI-Video-Analyse: eigene Kampf-Videos des Athleten auswerten */}
-        <div className="mt-8">
-          <VideoAnalysisSection
-            mode="athlete"
-            targetId={uid}
-            targetName={displayLabel(entry)}
-          />
+        {/* DeepFight für den eigenen Schüler: Kampf-Videos auswerten,
+            Ergebnisse optional für den Athleten freigeben */}
+        <div id="deepfight" className="mt-8 scroll-mt-24">
+          <div
+            className="rounded-2xl p-4 sm:p-5"
+            style={{
+              background:
+                "radial-gradient(500px 220px at 100% 0%, rgba(157,123,250,0.1), transparent 60%), var(--ink-2)",
+              border: "1px solid rgba(157,123,250,0.3)",
+            }}
+          >
+            <h2
+              className="font-display-ta flex items-center font-black uppercase"
+              style={{ fontSize: "20px", letterSpacing: "0.06em" }}
+            >
+              <DeepFightWordmark />
+            </h2>
+            <p
+              className="font-mono-ta mt-1 text-[10px]"
+              style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
+            >
+              Analyse & Auswertung für diesen Schüler
+            </p>
+            <div className="mt-4">
+              <VideoAnalysisSection
+                mode="athlete"
+                targetId={uid}
+                targetName={displayLabel(entry)}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </main>

@@ -349,6 +349,11 @@ export interface VideoAnalysis {
   appliedFindingIds: string[];
   /** True, wenn Split + Action-Stats übernommen wurden. */
   appliedStats: boolean;
+  /**
+   * Nur mode=athlete: Trainer hat das Ergebnis für den Schüler freigegeben —
+   * der Athlet sieht die Auswertung dann unter „Mein DeepFight".
+   */
+  sharedWithAthlete?: boolean;
   createdBy: string;
   createdByName: string | null;
   createdAt: Date;
@@ -379,6 +384,7 @@ function decode(id: string, d: VideoAnalysisDoc): VideoAnalysis {
     usage: d.usage ?? null,
     appliedFindingIds: d.appliedFindingIds ?? [],
     appliedStats: d.appliedStats ?? false,
+    sharedWithAthlete: d.sharedWithAthlete ?? false,
     createdAt: d.createdAt?.toDate() ?? new Date(),
   };
 }
@@ -410,6 +416,20 @@ export async function deleteVideoAnalysis(
   analysisId: string,
 ): Promise<void> {
   await deleteDoc(doc(analysesCol(mode, targetId), analysisId));
+}
+
+/**
+ * Gibt eine Athleten-Auswertung für den Schüler frei (oder zieht die
+ * Freigabe zurück) — sichtbar unter „Mein DeepFight".
+ */
+export async function setAnalysisSharedWithAthlete(
+  targetId: string,
+  analysisId: string,
+  shared: boolean,
+): Promise<void> {
+  await updateDoc(doc(analysesCol("athlete", targetId), analysisId), {
+    sharedWithAthlete: shared,
+  });
 }
 
 /** Merkt sich, welche Befunde/Stats bereits in die DNA übernommen wurden. */

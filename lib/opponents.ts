@@ -66,6 +66,12 @@ export interface Opponent {
   dnaSplit?: DnaSplit | null;
   /** §2 Action-Stats — gezählte Techniken (Versuche/Treffer/Zone/Setup, optional). */
   actionStats?: ActionStat[];
+  /**
+   * Schüler-uids, für die der Trainer dieses Profil freigegeben hat.
+   * Freigegebene Schüler sehen das Profil read-only unter „Mein DeepFight"
+   * (Firestore-Regel: read via array-contains).
+   */
+  sharedWith: string[];
   createdBy: string;
   createdByName: string | null;
   updatedBy?: string | null;
@@ -77,8 +83,8 @@ export interface Opponent {
 /** Eingabe zum Anlegen — alles außer den Server-/ID-Feldern. */
 export type OpponentInput = Omit<
   Opponent,
-  "id" | "createdAt" | "updatedAt"
->;
+  "id" | "createdAt" | "updatedAt" | "sharedWith"
+> & { sharedWith?: string[] };
 
 /** Felder, die beim Bearbeiten gepatcht werden dürfen. */
 export type OpponentPatch = Partial<
@@ -116,6 +122,7 @@ type OpponentDoc = {
   dna: GegnerDnaAnswers;
   dnaSplit?: DnaSplit | null;
   actionStats?: ActionStat[];
+  sharedWith?: string[];
   createdBy: string;
   createdByName: string | null;
   updatedBy?: string | null;
@@ -159,6 +166,7 @@ function decode(id: string, d: OpponentDoc): Opponent {
     dna: d.dna ?? {},
     dnaSplit: d.dnaSplit ?? null,
     actionStats: d.actionStats ?? [],
+    sharedWith: d.sharedWith ?? [],
     createdBy: d.createdBy,
     createdByName: d.createdByName ?? null,
     updatedBy: d.updatedBy ?? null,
@@ -185,6 +193,7 @@ export async function createOpponent(input: OpponentInput): Promise<Opponent> {
     favoriteAttacks: input.favoriteAttacks ?? [],
     notes: input.notes?.trim() || null,
     dna: cleanDna(input.dna),
+    sharedWith: input.sharedWith ?? [],
     createdBy: input.createdBy,
     createdByName: input.createdByName ?? null,
     updatedBy: input.createdBy,
@@ -261,6 +270,35 @@ export async function listOpponentsForGym(gymId: string): Promise<Opponent[]> {
       .filter((o) => belongsToGym(o.gymId, gymId))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
+}
+
+// ─── Schüler-Freigabe ────────────────────────────────────────────────────────
+
+/** Setzt die Schüler-Freigaben eines Profils (ersetzt die komplette Liste). */
+export async function updateOpponentSharing(
+  id: string,
+  sharedWith: string[],
+  updatedBy?: string | null,
+): Promise<void> {
+  await updateDoc(opponentDoc(id), {
+    sharedWith,
+    updatedBy: updatedBy ?? null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Für einen Schüler freigegebene Gegnerprofile (read-only Sicht
+ * „Mein DeepFight"). Bewusst ohne orderBy — kein Composite-Index nötig,
+ * sortiert wird clientseitig.
+ */
+export async function listOpponentsSharedWith(uid: string): Promise<Opponent[]> {
+  const snap = await getDocs(
+    query(opponentsCol(), where("sharedWith", "array-contains", uid)),
+  );
+  return snap.docs
+    .map((d) => decode(d.id, d.data() as OpponentDoc))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 // ─── Snapshot-Konvertierung ──────────────────────────────────────────────────

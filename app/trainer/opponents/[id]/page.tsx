@@ -17,8 +17,10 @@ import {
   deleteOpponent,
   getOpponent,
   updateOpponent,
+  updateOpponentSharing,
   type Opponent,
 } from "@/lib/opponents";
+import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { DNA_CATEGORIES, answeredCount, totalAnswered } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 
@@ -105,6 +107,167 @@ function GlanceCard({ opponent }: { opponent: Opponent }) {
   );
 }
 
+// ─── Schüler-Freigabe: Profil read-only für ausgewählte Schüler sichtbar ────
+
+function studentLabel(s: StudentEntry): string {
+  return s.displayName ?? s.authProviderName ?? s.email ?? s.uid;
+}
+
+function SharePanel({
+  opponent,
+  onSaved,
+  onClose,
+}: {
+  opponent: Opponent;
+  onSaved: () => Promise<void> | void;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const [students, setStudents] = useState<StudentEntry[] | null>(null);
+  const [draft, setDraft] = useState<Set<string>>(
+    () => new Set(opponent.sharedWith),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listAllStudents()
+      .then(setStudents)
+      .catch(() => setError("Schülerliste konnte nicht geladen werden"));
+  }, []);
+
+  function toggle(uid: string) {
+    setDraft((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await updateOpponentSharing(
+        opponent.id,
+        Array.from(draft),
+        user?.uid ?? null,
+      );
+      await onSaved();
+      onClose();
+    } catch {
+      setError("Freigabe konnte nicht gespeichert werden");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="mb-4 rounded-2xl p-4"
+      style={{
+        background:
+          "radial-gradient(400px 200px at 0% 0%, rgba(35,196,206,0.08), transparent 60%), var(--ink-2)",
+        border: "1px solid rgba(35,196,206,0.35)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div
+            className="font-mono-ta text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
+          >
+            Für Schüler freigeben
+          </div>
+          <p className="mt-1 text-[11px]" style={{ color: "var(--fg-4)" }}>
+            Freigegebene Schüler sehen dieses Gegnerprofil read-only in ihrem
+            Bereich „Mein DeepFight" — z. B. zur Vorbereitung auf den Kampf.
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Freigabe schließen"
+          className="rounded-lg p-1.5"
+          style={{ color: "var(--fg-4)" }}
+        >
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+
+      {error && (
+        <div
+          className="mt-3 rounded-lg px-3 py-2 text-xs"
+          style={{
+            background: "rgba(255,79,168,0.1)",
+            border: "1px solid rgba(255,79,168,0.4)",
+            color: "var(--ta-pink)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {students === null ? (
+        <div
+          className="mt-3 h-16 animate-pulse rounded-xl"
+          style={{ background: "var(--ink-3)" }}
+        />
+      ) : students.length === 0 ? (
+        <p className="mt-3 text-xs" style={{ color: "var(--fg-4)" }}>
+          Keine Schüler gefunden.
+        </p>
+      ) : (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {students.map((s) => {
+            const checked = draft.has(s.uid);
+            return (
+              <button
+                key={s.uid}
+                onClick={() => toggle(s.uid)}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs"
+                style={{
+                  background: checked ? "rgba(35,196,206,0.1)" : "var(--ink-3)",
+                  border: `1px solid ${checked ? "rgba(35,196,206,0.45)" : "var(--ink-5)"}`,
+                  color: checked ? "var(--fg)" : "var(--fg-3)",
+                }}
+              >
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded"
+                  style={{
+                    background: checked ? "var(--ta-cyan)" : "transparent",
+                    border: checked ? "none" : "1px solid var(--ink-5)",
+                    color: "#06121a",
+                  }}
+                >
+                  {checked && <Icon name="check" size={11} />}
+                </span>
+                <span className="min-w-0 truncate font-semibold">
+                  {studentLabel(s)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={save}
+          disabled={busy || students === null}
+          className="btn-primary px-4 py-2 text-xs"
+          style={{ opacity: busy ? 0.6 : 1 }}
+        >
+          Freigabe speichern
+        </button>
+        <button onClick={onClose} className="btn-secondary px-4 py-2 text-xs">
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Seite ───────────────────────────────────────────────────────────────────
 
 function OpponentDetailContent({ id }: { id: string }) {
@@ -115,6 +278,7 @@ function OpponentDetailContent({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<DetailTab>("uebersicht");
+  const [sharingOpen, setSharingOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -294,6 +458,24 @@ function OpponentDetailContent({ id }: { id: string }) {
                   <Icon name="plus" size={14} />
                   Wettkampf anlegen
                 </Link>
+                <button
+                  onClick={() => setSharingOpen((v) => !v)}
+                  className="btn-secondary px-4 py-2.5 text-xs"
+                >
+                  <Icon name="users" size={14} />
+                  Freigabe
+                  {opponent.sharedWith.length > 0 && (
+                    <span
+                      className="font-mono-ta ml-1 rounded px-1.5 text-[10px] font-bold"
+                      style={{
+                        background: "rgba(35,196,206,0.15)",
+                        color: "var(--ta-cyan)",
+                      }}
+                    >
+                      {opponent.sharedWith.length}
+                    </span>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -349,6 +531,14 @@ function OpponentDetailContent({ id }: { id: string }) {
           <div className="mb-4">
             <ErrorState title="Fehler" message={error} onRetry={load} />
           </div>
+        )}
+
+        {sharingOpen && !editing && (
+          <SharePanel
+            opponent={opponent}
+            onSaved={reload}
+            onClose={() => setSharingOpen(false)}
+          />
         )}
 
         {editing ? (

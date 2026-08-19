@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef } from "react";
 import { useAuth, useFighterName } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 
 // ── Icons ──────────────────────────────────────────────────────
 function IconDumbbell() {
@@ -21,17 +22,6 @@ function IconBook() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function IconTimer() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="13" r="8" />
-      <path d="M12 9v4l2.5 2.5" />
-      <path d="M9.5 3h5" />
-      <path d="M12 3v2" />
     </svg>
   );
 }
@@ -114,8 +104,9 @@ interface NavChild {
 
 interface NavGroup {
   id: string;
-  label: string;
-  icon: React.ReactNode;
+  label: React.ReactNode;
+  /** Optional — die DeepFight-Wortmarke bringt ihr eigenes Symbol mit. */
+  icon?: React.ReactNode;
   href?: string;
   children?: NavChild[];
 }
@@ -129,6 +120,7 @@ const navGroups: NavGroup[] = [
     children: [
       { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
       { href: "/schedule", label: "Kursplan" },
+      { href: "/timer", label: "Timer" },
     ],
   },
   {
@@ -142,16 +134,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    id: "timer",
-    label: "Timer",
-    icon: <IconTimer />,
-    href: "/timer",
-  },
-  {
     id: "profil",
     label: "Profil",
     icon: <IconUser />,
     children: [
+      // Mein DeepFight: vom Trainer freigegebene Auswertungen & Gegnerprofile
+      { href: "/deepfight", label: "DeepFight", activePattern: /^\/deepfight/ },
       { href: "/library", label: "Sammlung" },
       { href: "/dashboard", label: "Verlauf" },
       { href: "/profile", label: "Account" },
@@ -177,7 +165,27 @@ const trainerNavGroup: NavGroup = {
     {
       href: "/trainer/competitions",
       label: "Wettkampf",
-      activePattern: /^\/trainer\/(competitions|opponents)/,
+      activePattern: /^\/trainer\/competitions/,
+    },
+    { href: "/timer", label: "Timer" },
+  ],
+};
+
+// DeepFight als eigener Menüpunkt — nur für Trainer/Admins sichtbar.
+// Beide Richtungen des Scoutings: Gegner (Bibliothek) und eigene Schüler.
+const deepFightNavGroup: NavGroup = {
+  id: "deepfight",
+  label: <DeepFightWordmark />,
+  children: [
+    {
+      href: "/trainer/opponents",
+      label: "Gegner-Scouting",
+      activePattern: /^\/trainer\/opponents/,
+    },
+    {
+      href: "/trainer/deepfight/athletes",
+      label: "Schüler-Analysen",
+      activePattern: /^\/trainer\/deepfight/,
     },
   ],
 };
@@ -210,7 +218,7 @@ export default function Navbar() {
   const isTrainer = profile?.role === "trainer" || isAdmin;
   const visibleGroups: NavGroup[] = [
     ...navGroups,
-    ...(isTrainer ? [trainerNavGroup] : []),
+    ...(isTrainer ? [trainerNavGroup, deepFightNavGroup] : []),
     helpNavGroup,
     ...(isAdmin ? [adminNavGroup] : []),
   ];
@@ -314,7 +322,7 @@ export default function Navbar() {
                     className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
                     style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
                   >
-                    <span style={{ opacity: 0.75 }}>{group.icon}</span>
+                    {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
                     {group.label}
                     {active && (
                       <span
@@ -331,7 +339,7 @@ export default function Navbar() {
                     aria-haspopup="true"
                     aria-expanded={isOpen}
                   >
-                    <span style={{ opacity: 0.75 }}>{group.icon}</span>
+                    {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
                     {group.label}
                     <span
                       style={{
@@ -516,7 +524,7 @@ export default function Navbar() {
                       className="flex items-center gap-2.5 px-2 py-3 text-sm font-bold uppercase transition-colors"
                       style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
                     >
-                      <span style={{ opacity: 0.7 }}>{group.icon}</span>
+                      {group.icon && <span style={{ opacity: 0.7 }}>{group.icon}</span>}
                       {group.label}
                     </Link>
                   ) : (
@@ -528,7 +536,7 @@ export default function Navbar() {
                         style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
                       >
                         <span className="flex items-center gap-2.5">
-                          <span style={{ opacity: 0.7 }}>{group.icon}</span>
+                          {group.icon && <span style={{ opacity: 0.7 }}>{group.icon}</span>}
                           {group.label}
                         </span>
                         <span

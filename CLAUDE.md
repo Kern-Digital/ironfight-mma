@@ -14,6 +14,16 @@
   `public/deepfight-icon.png` + Schriftzug, untrennbar). Code/Datenmodell
   behält bewusst die alten Namen (`lib/gegner-dna.ts`, `opponents/…`, Feld
   `dna` — Firestore-Migration unnötig).
+- **DeepFight-Navigation & Rollen** (seit 2026-08-19): eigener Top-Level-
+  Menüpunkt (nur Trainer/Admin) mit beiden Richtungen — „Gegner-Scouting"
+  (`/trainer/opponents`) und „Schüler-Analysen" (`/trainer/deepfight/athletes`
+  → Schüler-Detailseite `#deepfight`). Schüler haben KEINEN Zugriff auf das
+  Werkzeug; sie sehen unter „Mein DeepFight" (`/deepfight`, im Profil-Menü)
+  nur explizit Freigegebenes: Gegnerprofile via `opponents.sharedWith[uid]`
+  (Firestore-Regel: read bei array-contains) und eigene Auswertungen via
+  `videoAnalyses.sharedWithAthlete` (clientseitig gefiltert — die generische
+  users-Subcollection-Regel erlaubt Owner-Read ohnehin). Timer ist kein
+  Top-Level-Punkt mehr: er hängt unter „Training" (alle) und „Trainer".
 
 ## Tech-Stack
 | Layer | Technologie | Version |

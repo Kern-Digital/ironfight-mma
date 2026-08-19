@@ -20,7 +20,8 @@ const ITEMS: SubnavItem[] = [
   {
     href: "/trainer/opponents",
     label: <DeepFightWordmark />,
-    isActive: (p) => p.startsWith("/trainer/opponents"),
+    isActive: (p) =>
+      p.startsWith("/trainer/opponents") || p.startsWith("/trainer/deepfight"),
   },
   {
     href: "/trainer/competitions",

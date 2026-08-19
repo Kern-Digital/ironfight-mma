@@ -19,7 +19,13 @@ import type { NextRequest } from "next/server";
  */
 
 const ADMIN_PREFIXES = ["/admin"];
-const PROTECTED_PREFIXES = ["/dashboard", "/library", "/profile", "/trainer"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/deepfight",
+  "/library",
+  "/profile",
+  "/trainer",
+];
 const SESSION_COOKIE = "__session";
 
 function matchesPrefix(pathname: string, prefixes: string[]): boolean {
@@ -79,6 +85,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/dashboard/:path*",
+    "/deepfight/:path*",
     "/library/:path*",
     "/profile/:path*",
     "/trainer/:path*",

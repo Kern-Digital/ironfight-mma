@@ -41,6 +41,7 @@ import {
   runVideoAnalysis,
   runVideoObservation,
   saveVideoAnalysis,
+  setAnalysisSharedWithAthlete,
   uploadVideoFile,
   type AnalysisMode,
   type CornerColor,
@@ -671,6 +672,26 @@ export default function VideoAnalysisSection({
     }
   }
 
+  /** mode=athlete: Auswertung für den Schüler freigeben / Freigabe zurückziehen. */
+  async function toggleSharedWithAthlete(a: VideoAnalysis) {
+    setBusy(true);
+    try {
+      const next = !a.sharedWithAthlete;
+      await setAnalysisSharedWithAthlete(targetId, a.id, next);
+      setAnalyses((prev) =>
+        (prev ?? []).map((x) =>
+          x.id === a.id ? { ...x, sharedWithAthlete: next } : x,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Freigabe fehlgeschlagen",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   const running = stage !== "idle";
@@ -1133,6 +1154,9 @@ export default function VideoAnalysisSection({
                           ? ` · ca. ${formatEur(a.usage.costEur)}`
                           : " · Gratis-Analyse"}
                         {a.appliedStats && " · In DeepFight übernommen"}
+                        {mode === "athlete" &&
+                          a.sharedWithAthlete &&
+                          " · Für Schüler freigegeben"}
                       </div>
                     </div>
                   </div>
@@ -1156,6 +1180,48 @@ export default function VideoAnalysisSection({
                 </button>
                 {open && (
                   <div className="mt-2">
+                    {mode === "athlete" && (
+                      <div
+                        className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5"
+                        style={{
+                          background: a.sharedWithAthlete
+                            ? "rgba(62,224,107,0.08)"
+                            : "var(--ink-2)",
+                          border: `1px solid ${a.sharedWithAthlete ? "rgba(62,224,107,0.35)" : "var(--ink-4)"}`,
+                        }}
+                      >
+                        <span
+                          className="text-[11px]"
+                          style={{ color: "var(--fg-3)" }}
+                        >
+                          {a.sharedWithAthlete
+                            ? 'Der Schüler sieht diese Auswertung unter „Mein DeepFight".'
+                            : "Nur für Trainer sichtbar — bei Freigabe sieht der Schüler das Ergebnis in seinem Profil."}
+                        </span>
+                        <button
+                          onClick={() => toggleSharedWithAthlete(a)}
+                          disabled={busy}
+                          className="font-mono-ta rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase"
+                          style={{
+                            letterSpacing: "0.12em",
+                            background: a.sharedWithAthlete
+                              ? "transparent"
+                              : "var(--ta-mint)",
+                            border: a.sharedWithAthlete
+                              ? "1px solid var(--ink-5)"
+                              : "none",
+                            color: a.sharedWithAthlete
+                              ? "var(--fg-3)"
+                              : "#06121a",
+                            opacity: busy ? 0.6 : 1,
+                          }}
+                        >
+                          {a.sharedWithAthlete
+                            ? "Freigabe zurückziehen"
+                            : "Für Schüler freigeben"}
+                        </button>
+                      </div>
+                    )}
                     <VideoAnalysisResult
                       analysis={a}
                       mode={mode}
