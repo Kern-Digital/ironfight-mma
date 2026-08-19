@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 
 interface SubnavItem {
   href: string;
-  label: string;
+  label: React.ReactNode;
   isActive: (pathname: string) => boolean;
 }
 
@@ -18,7 +19,7 @@ const ITEMS: SubnavItem[] = [
   },
   {
     href: "/trainer/opponents",
-    label: "Gegner-DNA",
+    label: <DeepFightWordmark />,
     isActive: (p) => p.startsWith("/trainer/opponents"),
   },
   {

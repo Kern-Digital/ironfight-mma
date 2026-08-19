@@ -291,7 +291,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <TrainerHint id="student-detail" title="Schüler-Detail">
           Hier siehst du das volle Athleten-Profil und die Trainings-Analyse aus
-          der App-Historie. Wettkämpfe inkl. Gegner-DNA werden zentral im
+          der App-Historie. Wettkämpfe inkl. DeepFight-Profil werden zentral im
           Wettkampfbereich verwaltet — unten kannst du direkt einen neuen
           Wettkampf für diesen Schüler anlegen.
         </TrainerHint>
@@ -547,7 +547,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 className="font-mono-ta mt-1 text-[10px]"
                 style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
               >
-                Zentral im Wettkampfbereich verwaltet · Gegner-DNA inklusive
+                Zentral im Wettkampfbereich verwaltet · DeepFight inklusive
               </p>
             </div>
             <Link
@@ -584,8 +584,8 @@ function StudentDetailContent({ uid }: { uid: string }) {
                   Noch kein Wettkampf für diesen Schüler.
                 </p>
                 <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
-                  Lege einen Wettkampf an, wähle einen Gegner aus der Gegner-DNA
-                  oder erstelle ein neues Gegnerprofil.
+                  Lege einen Wettkampf an, wähle einen Gegner aus der
+                  DeepFight-Bibliothek oder erstelle ein neues Gegnerprofil.
                 </p>
               </div>
             ) : (

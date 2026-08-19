@@ -680,7 +680,7 @@ export default function VideoAnalysisResult({
 
       {/* Merge-Hinweise */}
       {(ev.merge.confirms.length > 0 || ev.merge.contradicts.length > 0) && (
-        <SectionCard title="Abgleich mit bestehender DNA">
+        <SectionCard title="Abgleich mit bestehendem DeepFight-Profil">
           <div className="flex flex-col gap-2 text-xs">
             {ev.merge.confirms.length > 0 && (
               <div style={{ color: "var(--ta-mint)" }}>

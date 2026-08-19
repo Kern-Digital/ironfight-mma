@@ -34,7 +34,7 @@ type DetailTab = "uebersicht" | "dna" | "stats" | "videos";
 
 const DETAIL_TABS: [DetailTab, string][] = [
   ["uebersicht", "Übersicht"],
-  ["dna", "DNA"],
+  ["dna", "DeepFight"],
   ["stats", "Stats"],
   ["videos", "Videos"],
 ];
@@ -129,7 +129,7 @@ function OpponentDetailContent({ id }: { id: string }) {
     setOpponent(null);
     try {
       const o = await getOpponent(id);
-      if (!o) throw new Error("Gegner-DNA-Profil nicht gefunden");
+      if (!o) throw new Error("DeepFight-Profil nicht gefunden");
       setOpponent(o);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -171,7 +171,7 @@ function OpponentDetailContent({ id }: { id: string }) {
     if (!opponent) return;
     if (
       !confirm(
-        `Gegner-DNA „${opponent.name}" wirklich löschen? Bereits angelegte Wettkämpfe behalten ihren gespeicherten Snapshot.`,
+        `DeepFight-Profil „${opponent.name}" wirklich löschen? Bereits angelegte Wettkämpfe behalten ihren gespeicherten Snapshot.`,
       )
     )
       return;
@@ -226,7 +226,7 @@ function OpponentDetailContent({ id }: { id: string }) {
             className="font-mono-ta text-[10px] uppercase"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
-            ← Gegner-DNA-Bibliothek
+            ← DeepFight-Bibliothek
           </Link>
         </div>
       </div>
@@ -362,7 +362,7 @@ function OpponentDetailContent({ id }: { id: string }) {
                   color: "var(--fg-4)",
                 }}
               >
-                Gegner-DNA löschen
+                DeepFight-Profil löschen
               </button>
             </div>
           </>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 import OpponentProfileView from "@/components/trainer/OpponentProfileView";
 import OpponentEditor, {
   type OpponentEditorValue,
@@ -250,14 +251,14 @@ function CompetitionDetailContent({
           </div>
         )}
 
-        {/* Gegner-DNA (eingefrorener Snapshot dieses Wettkampfs) */}
+        {/* DeepFight-Profil (eingefrorener Snapshot dieses Wettkampfs) */}
         <div className="mb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2
               className="font-display-ta font-black uppercase"
               style={{ fontSize: "18px", letterSpacing: "0.05em" }}
             >
-              Gegner-DNA
+              <DeepFightWordmark />
             </h2>
             {!editingDna && (
               <button
@@ -287,7 +288,7 @@ function CompetitionDetailContent({
                 actionStats: camp.opponent.actionStats,
               }}
               busy={busy}
-              submitLabel="Gegner-DNA speichern"
+              submitLabel="DeepFight-Profil speichern"
               onSubmit={handleSaveDna}
               onCancel={() => setEditingDna(false)}
             />

@@ -8,6 +8,12 @@
 - **App:** IronFight MMA / Tidal Athletics — MMA-Trainings- & Coaching-App
 - **Firebase-Projekt:** ironfight-mma (ironfight-mma.firebaseapp.com)
 - **Repo:** github.com/Kern-Digital/ironfight-mma
+- **DeepFight** = UI-Markenname der Gegner-Scouting-/KI-Analyse (ehem.
+  „Gegner-DNA", umbenannt 2026-08-19). In sichtbaren Texten IMMER „DeepFight";
+  prominente Stellen nutzen `components/DeepFightWordmark.tsx` (Funkeln-Symbol
+  `public/deepfight-icon.png` + Schriftzug, untrennbar). Code/Datenmodell
+  behält bewusst die alten Namen (`lib/gegner-dna.ts`, `opponents/…`, Feld
+  `dna` — Firestore-Migration unnötig).
 
 ## Tech-Stack
 | Layer | Technologie | Version |

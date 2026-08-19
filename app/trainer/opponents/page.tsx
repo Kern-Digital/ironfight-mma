@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import TrainerHint from "@/components/TrainerHint";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import OpponentEditor, {
@@ -176,23 +177,23 @@ function OpponentsLibraryContent() {
             className="font-display-ta font-black uppercase leading-none"
             style={{ fontSize: "clamp(28px, 5vw, 42px)", letterSpacing: "0.02em" }}
           >
-            Gegner-DNA
+            <DeepFightWordmark />
           </h1>
           <p
             className="font-mono-ta mt-2 text-[11px]"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
-            Scouting-Bibliothek · gym-weit geteilt
+            KI-Gegneranalyse · gym-weit geteilt
           </p>
         </div>
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
-        <TrainerHint id="opponents-library" title="Gegner-DNA-Bibliothek">
-          Jedes Profil ist die lebende DNA eines Gegners: Muster, Waffen,
+        <TrainerHint id="opponents-library" title="DeepFight-Bibliothek">
+          Jedes Profil ist die lebende Analyse eines Gegners: Muster, Waffen,
           Schwächen, Gameplan. Alle Trainer deines Gyms arbeiten an denselben
           Profilen. Der Ring zeigt, wie viele der {DNA_CATEGORIES.length}{" "}
-          DNA-Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen
+          Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen
           den damaligen Stand ein.
         </TrainerHint>
 
@@ -212,11 +213,11 @@ function OpponentsLibraryContent() {
             onClick={() => setShowNewOpponent((v) => !v)}
             className="btn-primary px-4 py-2 text-xs"
           >
-            {showNewOpponent ? "Schließen" : "+ Neue Gegner-DNA"}
+            {showNewOpponent ? "Schließen" : "+ Neues DeepFight-Profil"}
           </button>
           <input
             type="search"
-            placeholder="Gegner-DNA suchen…"
+            placeholder="Gegner suchen…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="min-w-0 flex-1 rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
@@ -236,11 +237,11 @@ function OpponentsLibraryContent() {
               className="font-display-ta mb-4 font-black uppercase"
               style={{ fontSize: "16px", letterSpacing: "0.04em" }}
             >
-              Neue Gegner-DNA anlegen
+              Neues DeepFight-Profil anlegen
             </h3>
             <OpponentEditor
               busy={creating}
-              submitLabel="Gegner-DNA anlegen"
+              submitLabel="DeepFight-Profil anlegen"
               onSubmit={handleCreateOpponent}
               onCancel={() => setShowNewOpponent(false)}
             />
@@ -260,7 +261,7 @@ function OpponentsLibraryContent() {
             style={{ border: "1px dashed var(--ink-5)", background: "var(--ink-2)" }}
           >
             <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-              {search ? "Keine Gegner-DNA gefunden." : "Noch keine Gegner-DNA angelegt."}
+              {search ? "Keine DeepFight-Profile gefunden." : "Noch keine DeepFight-Profile angelegt."}
             </p>
             {!search && (
               <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>

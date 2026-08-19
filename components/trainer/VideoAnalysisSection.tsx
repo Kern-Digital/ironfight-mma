@@ -1091,7 +1091,7 @@ export default function VideoAnalysisSection({
           </p>
           <p className="mx-auto mt-1 max-w-md text-xs" style={{ color: "var(--fg-4)" }}>
             Jedes analysierte Video wird zu einem eigenen Beitrag — die
-            {mode === "opponent" ? " Gegner-DNA" : " Auswertung"} wird mit jedem
+            {mode === "opponent" ? " DeepFight-Analyse" : " Auswertung"} wird mit jedem
             Video präziser.
           </p>
         </div>
@@ -1132,7 +1132,7 @@ export default function VideoAnalysisSection({
                         {a.usage
                           ? ` · ca. ${formatEur(a.usage.costEur)}`
                           : " · Gratis-Analyse"}
-                        {a.appliedStats && " · In DNA übernommen"}
+                        {a.appliedStats && " · In DeepFight übernommen"}
                       </div>
                     </div>
                   </div>

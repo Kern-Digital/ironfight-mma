@@ -149,8 +149,8 @@ function CompetitionsHubContent() {
         <TrainerHint id="competitions-hub" title="Wettkampfbereich">
           Hier legst du Wettkämpfe an und verfolgst sie — jeder Wettkampf
           verbindet einen Schüler mit einem Gegner aus der
-          Gegner-DNA-Bibliothek und friert deren damaligen Stand ein. Die
-          Bibliothek selbst findest du im Bereich &bdquo;Gegner-DNA&ldquo;.
+          DeepFight-Bibliothek und friert deren damaligen Stand ein. Die
+          Bibliothek selbst findest du im Bereich &bdquo;DeepFight&ldquo;.
         </TrainerHint>
 
         {error && (

@@ -675,7 +675,7 @@ function TrainerDashboardContent() {
                   href="/trainer"
                   icon="trophy"
                   title="Wettkampf"
-                  sub="Schüler · Gegner-DNA"
+                  sub="Schüler · DeepFight"
                   accent="var(--ta-cyan)"
                 />
                 <QuickAction

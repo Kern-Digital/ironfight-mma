@@ -36,7 +36,7 @@ export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers
         style={{ background: "var(--ink-2)", border: "1px dashed var(--ink-5)" }}
       >
         <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-          Noch keine Gegner-DNA erfasst.
+          Noch keine DeepFight-Daten erfasst.
         </p>
         <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
           Über &bdquo;Bearbeiten&ldquo; lassen sich Scouting-Infos zum Gegner

@@ -137,7 +137,7 @@ export default function TrainerDashboardPage() {
         badges={[{ label: "Trainer", accent: "pink", icon: "users" }]}
         accent="pink"
         title="Wettkampf-Zentrale"
-        subtitle="Schüler · Stundenplan · Gegner-DNA"
+        subtitle="Schüler · Stundenplan · DeepFight"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/trainer/competitions/new" className="btn-primary px-4 py-2 text-xs">
@@ -147,7 +147,7 @@ export default function TrainerDashboardPage() {
             href="/trainer/opponents?new=1"
             className="btn-secondary px-4 py-2 text-xs"
           >
-            + Neue Gegner-DNA
+            + Neues DeepFight-Profil
           </Link>
           <Link href="/trainer/students" className="btn-secondary px-4 py-2 text-xs">
             Schüler ansehen
@@ -158,7 +158,7 @@ export default function TrainerDashboardPage() {
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
         <TrainerHint id="trainer-dashboard" title="Trainer-Dashboard">
           Dein Einstieg in den Trainerbereich: anstehende Wettkämpfe, zuletzt
-          bearbeitete Gegner-DNA und Schnellzugriffe. Alles Weitere findest du
+          bearbeitete DeepFight-Profile und Schnellzugriffe. Alles Weitere findest du
           über die Bereichs-Navigation oben.
         </TrainerHint>
 
@@ -190,7 +190,7 @@ export default function TrainerDashboardPage() {
                   href="/trainer/competitions"
                 />
                 <StatCard
-                  label="Gegner-DNA-Profile"
+                  label="DeepFight-Profile"
                   icon="target"
                   accent="var(--ta-pink)"
                   value={String((opponents ?? []).length)}
@@ -236,10 +236,10 @@ export default function TrainerDashboardPage() {
               </SectionCard>
             </Reveal>
 
-            {/* Zuletzt bearbeitete Gegner-DNA */}
+            {/* Zuletzt bearbeitete DeepFight-Profile */}
             <Reveal>
               <SectionCard
-                title="Zuletzt bearbeitete Gegner-DNA"
+                title="Zuletzt bearbeitete DeepFight-Profile"
                 icon="target"
                 accent="var(--ta-pink)"
                 moreHref="/trainer/opponents"
@@ -249,7 +249,7 @@ export default function TrainerDashboardPage() {
                 {recentOpponents.length === 0 ? (
                   <EmptyState
                     icon="target"
-                    title="Noch keine Gegner-DNA angelegt."
+                    title="Noch keine DeepFight-Profile angelegt."
                     hint="Gegnerprofile werden gym-weit für alle Trainer geteilt."
                   />
                 ) : (

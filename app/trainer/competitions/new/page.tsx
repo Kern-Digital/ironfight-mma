@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
@@ -44,7 +45,7 @@ const fieldStyle: React.CSSProperties = {
   outline: "none",
 };
 
-function StepHeader({ n, title }: { n: number; title: string }) {
+function StepHeader({ n, title }: { n: number; title: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-2.5">
       <span
@@ -167,7 +168,7 @@ function NewCompetitionContent() {
       setOppMode("existing");
       if (!name.trim()) setName(`Wettkampf vs ${created.name}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gegner-DNA konnte nicht angelegt werden");
+      setError(err instanceof Error ? err.message : "DeepFight-Profil konnte nicht angelegt werden");
     } finally {
       setCreatingOpp(false);
     }
@@ -181,7 +182,7 @@ function NewCompetitionContent() {
       // 1) Snapshot der Gegner-DNA holen (eingefroren für diesen Wettkampf)
       const opponent =
         selectedOpponent ?? (await getOpponent(selectedOpponentId));
-      if (!opponent) throw new Error("Ausgewählte Gegner-DNA nicht gefunden");
+      if (!opponent) throw new Error("Ausgewähltes DeepFight-Profil nicht gefunden");
       const snapshot = opponentToSnapshot(opponent);
 
       // 2) Trainingsanalyse des Schülers (für den 4-Phasen-Plan)
@@ -316,9 +317,9 @@ function NewCompetitionContent() {
               )}
             </section>
 
-            {/* Schritt 2: Gegner-DNA */}
+            {/* Schritt 2: DeepFight-Profil */}
             <section>
-              <StepHeader n={2} title="Gegner-DNA" />
+              <StepHeader n={2} title={<DeepFightWordmark />} />
               <div
                 className="mb-3 inline-flex gap-1 rounded-xl p-1"
                 style={{ background: "var(--ink-3)", border: "1px solid var(--ink-5)" }}
@@ -346,7 +347,7 @@ function NewCompetitionContent() {
                 <>
                   <input
                     type="search"
-                    placeholder="Gegner-DNA suchen…"
+                    placeholder="Gegner suchen…"
                     value={oppSearch}
                     onChange={(e) => setOppSearch(e.target.value)}
                     className="mb-3 w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
@@ -354,7 +355,7 @@ function NewCompetitionContent() {
                   />
                   {filteredOpponents.length === 0 ? (
                     <p className="text-xs" style={{ color: "var(--fg-4)" }}>
-                      Noch keine Gegner-DNA im Gym.{" "}
+                      Noch keine DeepFight-Profile im Gym.{" "}
                       <button
                         onClick={() => setOppMode("new")}
                         style={{ color: "var(--ta-cyan)", textDecoration: "underline" }}
@@ -402,7 +403,7 @@ function NewCompetitionContent() {
                   </p>
                   <OpponentEditor
                     busy={creatingOpp}
-                    submitLabel="Gegner-DNA speichern & auswählen"
+                    submitLabel="DeepFight-Profil speichern & auswählen"
                     onSubmit={handleCreateOpponent}
                   />
                 </div>
@@ -483,7 +484,7 @@ function NewCompetitionContent() {
                   className="font-mono-ta mt-2 text-center text-[9px] uppercase"
                   style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
                 >
-                  Schüler, Gegner-DNA, Name und Datum wählen
+                  Schüler, DeepFight-Profil, Name und Datum wählen
                 </p>
               )}
             </div>

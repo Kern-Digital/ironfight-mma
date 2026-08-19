@@ -223,7 +223,7 @@ export default function MatchupBlock({
       {tendencies.length === 0 && suggestions.length === 0 ? (
         <p className="mt-4 text-[11px]" style={{ color: "var(--fg-4)" }}>
           Noch keine Technik-Statistik zum Gegner erfasst — Bedrohungen und
-          Drill-Vorschläge erscheinen, sobald die Gegner-DNA Zahlen enthält.
+          Drill-Vorschläge erscheinen, sobald das DeepFight-Profil Zahlen enthält.
         </p>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -282,7 +282,7 @@ export default function MatchupBlock({
             href={`/trainer/opponents/${camp.opponentId}`}
             className="btn-secondary px-3 py-1.5 text-[11px]"
           >
-            Gegner-DNA öffnen
+            DeepFight-Profil öffnen
           </Link>
         )}
         <span

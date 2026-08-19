@@ -29,7 +29,7 @@ export default function DnaCompletenessRing({
       className="relative shrink-0"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`Gegner-DNA: ${covered} von ${total} Kategorien gescoutet`}
+      aria-label={`DeepFight: ${covered} von ${total} Kategorien gescoutet`}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle

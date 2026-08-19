@@ -10,6 +10,7 @@ import {
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
 import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
 import GegnerDnaAccordion from "./GegnerDnaAccordion";
+import DeepFightWordmark from "@/components/DeepFightWordmark";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
 import FightInsights from "./FightInsights";
@@ -310,14 +311,14 @@ export default function OpponentEditor({
       {/* ── §3/§4/§5 Live-Auswertung der eingegebenen Zahlen ── */}
       <FightInsights split={dnaSplit} stats={actionStats} />
 
-      {/* ── Gegner-DNA (ausklappbare Kategorien) ── */}
+      {/* ── DeepFight-Analyse (ausklappbare Kategorien) ── */}
       <div>
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h3
             className="font-display-ta font-black uppercase"
             style={{ fontSize: "15px", letterSpacing: "0.06em" }}
           >
-            Gegner-DNA
+            <DeepFightWordmark />
           </h3>
           <span
             className="font-mono-ta text-[10px]"
