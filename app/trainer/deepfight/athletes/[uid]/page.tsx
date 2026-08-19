@@ -7,7 +7,14 @@ import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
+import FightProfileView from "@/components/trainer/FightProfileView";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
+import {
+  getFightProfile,
+  isFightProfileEmpty,
+  type FightProfile,
+} from "@/lib/fight-profile";
+import { useAuth } from "@/lib/auth-context";
 import { DISCIPLINE_LABEL, WEIGHT_CLASS_LABEL } from "@/lib/types";
 
 function labelOf(entry: StudentEntry): string {
@@ -20,26 +27,44 @@ function initialsOf(entry: StudentEntry): string {
 }
 
 /**
- * DeepFight für EINEN eigenen Schüler — die „umgekehrte" DeepFight-Richtung.
- * Bewusst eine eigene Route (statt eines Anker-Blocks auf der Schülerseite):
- * die Analyse ist verlinkbar, aus dem DeepFight-Menü wie aus dem Schülerprofil
- * erreichbar und lädt nicht die komplette Trainings-Historie mit.
+ * DeepFight für EINEN eigenen Athleten — die „umgekehrte" DeepFight-Richtung.
+ * Funktioniert für Schüler UND für den Trainer selbst („Meine Analyse",
+ * /trainer/deepfight/me leitet mit der eigenen uid hierher). Bewusst eine
+ * eigene Route (statt eines Anker-Blocks auf der Schülerseite): die Analyse
+ * ist verlinkbar, aus dem DeepFight-Menü wie aus dem Schülerprofil erreichbar
+ * und lädt nicht die komplette Trainings-Historie mit.
+ *
+ * Übernommene Befunde landen im Kampfprofil (users/{uid}.fightProfile) und
+ * werden unten als gemergter Profil-Stand angezeigt.
  */
 function AthleteDeepFightContent({ uid }: { uid: string }) {
+  const { user } = useAuth();
   const [entry, setEntry] = useState<StudentEntry | null>(null);
+  const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isSelf = user?.uid === uid;
+
+  const loadFightProfile = useCallback(async () => {
+    try {
+      setFightProfile(await getFightProfile(uid));
+    } catch {
+      /* Profil-Anzeige ist optional — Analyse-Werkzeug bleibt nutzbar */
+    }
+  }, [uid]);
 
   const load = useCallback(async () => {
     setError(null);
     setEntry(null);
     try {
       const e = await getStudentEntry(uid);
-      if (!e) throw new Error("Schüler nicht gefunden");
+      if (!e) throw new Error("Athlet nicht gefunden");
       setEntry(e);
+      await loadFightProfile();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
-  }, [uid]);
+  }, [uid, loadFightProfile]);
 
   useEffect(() => {
     load();
@@ -49,7 +74,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <ErrorState
-          title="Schüler konnte nicht geladen werden"
+          title="Athlet konnte nicht geladen werden"
           message={error}
           onRetry={load}
         />
@@ -58,6 +83,8 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   }
 
   const athlete = entry?.athlete;
+  const profileHref = isSelf ? "/kampfprofil" : `/trainer/students/${uid}`;
+  const profileLabel = isSelf ? "Mein Kampfprofil" : "Schülerprofil";
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
@@ -110,6 +137,19 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                   {labelOf(entry)}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {isSelf && (
+                    <span
+                      className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
+                      style={{
+                        letterSpacing: "0.12em",
+                        background: "rgba(157,123,250,0.18)",
+                        border: "1px solid rgba(157,123,250,0.4)",
+                        color: "#9D7BFA",
+                      }}
+                    >
+                      Selbstanalyse
+                    </span>
+                  )}
                   {athlete?.primaryDiscipline && (
                     <span
                       className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
@@ -139,11 +179,11 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                 </div>
               </div>
               <Link
-                href={`/trainer/students/${uid}`}
+                href={profileHref}
                 className="btn-secondary hidden shrink-0 px-4 py-2 text-xs sm:inline-flex"
               >
                 <Icon name="users" size={14} />
-                Schülerprofil
+                {profileLabel}
               </Link>
             </div>
           )}
@@ -152,11 +192,11 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <Link
-          href={`/trainer/students/${uid}`}
+          href={profileHref}
           className="btn-secondary mb-5 inline-flex px-4 py-2 text-xs sm:hidden"
         >
           <Icon name="users" size={14} />
-          Schülerprofil
+          {profileLabel}
         </Link>
 
         {!entry ? (
@@ -165,11 +205,40 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
             <Skeleton className="h-64 w-full rounded-2xl" />
           </div>
         ) : (
-          <VideoAnalysisSection
-            mode="athlete"
-            targetId={uid}
-            targetName={labelOf(entry)}
-          />
+          <div className="flex flex-col gap-10">
+            <VideoAnalysisSection
+              mode="athlete"
+              targetId={uid}
+              targetName={labelOf(entry)}
+              fightProfile={fightProfile}
+              onFightProfileUpdated={loadFightProfile}
+            />
+
+            {/* Gemergtes Kampfprofil — Stand aller übernommenen Befunde */}
+            {fightProfile && !isFightProfileEmpty(fightProfile) && (
+              <section>
+                <h2
+                  className="font-display-ta font-black uppercase"
+                  style={{ fontSize: "18px", letterSpacing: "0.06em" }}
+                >
+                  Kampfprofil
+                </h2>
+                <p
+                  className="font-mono-ta mt-1 text-[10px]"
+                  style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
+                >
+                  Gemergter Stand aus allen übernommenen Analysen
+                </p>
+                <div className="mt-4">
+                  <FightProfileView
+                    dna={fightProfile.dna}
+                    dnaSplit={fightProfile.dnaSplit}
+                    actionStats={fightProfile.actionStats}
+                  />
+                </div>
+              </section>
+            )}
+          </div>
         )}
       </div>
     </main>

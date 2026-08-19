@@ -23,10 +23,16 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == uid
                     && !("role" in request.resource.data);
 
-      // Eigenes Profil aktualisieren — aber NIEMALS das Feld `role` aendern
-      // (schliesst die Privilege-Escalation: User kann sich nicht selbst zum Admin machen)
+      // Eigenes Profil aktualisieren — aber NIEMALS `role` (Privilege-Escalation)
+      // oder `fightProfile` aendern: das Kampfprofil (DeepFight-Merge-Ziel)
+      // kuratieren ausschliesslich Trainer/Admins; der Owner liest es nur.
       allow update: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "fightProfile"]);
+
+      // Trainer pflegen das Kampfprofil ihrer Athleten (und ihr eigenes):
+      // Update ausschliesslich auf das Feld `fightProfile`, sonst nichts.
+      allow update: if request.auth != null && isTrainerOrAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["fightProfile"]);
 
       // Admin verwaltet Profile, aber die Rolle wird AUSSCHLIESSLICH per
       // Admin-SDK-Script (Custom Claims) gesetzt — kein Client-Pfad schreibt `role`.

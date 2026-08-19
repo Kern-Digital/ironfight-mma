@@ -162,7 +162,9 @@ export default function VideoAnalysisResult({
 }) {
   const { observation: obs, evaluation: ev } = analysis;
   const applied = new Set(analysis.appliedFindingIds);
-  const canApply = mode === "opponent" && !!onApplyFindings;
+  // Übernahme gibt es in beiden Modi (Gegner-DNA bzw. Kampfprofil) — die
+  // read-only Schüler-Sicht übergibt schlicht keine onApply-Callbacks.
+  const canApply = !!onApplyFindings;
 
   const isConflict = (f: DnaFinding): boolean => {
     if (!existingDna) return false;
@@ -680,7 +682,13 @@ export default function VideoAnalysisResult({
 
       {/* Merge-Hinweise */}
       {(ev.merge.confirms.length > 0 || ev.merge.contradicts.length > 0) && (
-        <SectionCard title="Abgleich mit bestehendem DeepFight-Profil">
+        <SectionCard
+          title={
+            mode === "opponent"
+              ? "Abgleich mit bestehendem DeepFight-Profil"
+              : "Abgleich mit bestehendem Kampfprofil"
+          }
+        >
           <div className="flex flex-col gap-2 text-xs">
             {ev.merge.confirms.length > 0 && (
               <div style={{ color: "var(--ta-mint)" }}>

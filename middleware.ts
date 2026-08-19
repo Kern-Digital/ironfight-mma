@@ -22,6 +22,7 @@ const ADMIN_PREFIXES = ["/admin"];
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/deepfight",
+  "/kampfprofil",
   "/library",
   "/profile",
   "/trainer",
@@ -86,6 +87,7 @@ export const config = {
     "/admin/:path*",
     "/dashboard/:path*",
     "/deepfight/:path*",
+    "/kampfprofil/:path*",
     "/library/:path*",
     "/profile/:path*",
     "/trainer/:path*",

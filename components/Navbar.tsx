@@ -138,8 +138,13 @@ const navGroups: NavGroup[] = [
     label: "Profil",
     icon: <IconUser />,
     children: [
-      // Mein DeepFight: vom Trainer freigegebene Auswertungen & Gegnerprofile
-      { href: "/deepfight", label: "DeepFight", activePattern: /^\/deepfight/ },
+      // Kampfprofil: DeepFight-Daten, freigegebene Auswertungen & Gegner,
+      // Athleten-Daten. /deepfight leitet dorthin um (alte "Mein DeepFight"-Seite).
+      {
+        href: "/kampfprofil",
+        label: "Kampfprofil",
+        activePattern: /^\/(kampfprofil|deepfight)/,
+      },
       { href: "/library", label: "Sammlung" },
       { href: "/dashboard", label: "Verlauf" },
       { href: "/profile", label: "Account" },
@@ -172,7 +177,7 @@ const trainerNavGroup: NavGroup = {
 };
 
 // DeepFight als eigener Menüpunkt — nur für Trainer/Admins sichtbar.
-// Beide Richtungen des Scoutings: Gegner (Bibliothek) und eigene Schüler.
+// Alle drei Richtungen: Gegner (Bibliothek), eigene Schüler, sich selbst.
 const deepFightNavGroup: NavGroup = {
   id: "deepfight",
   label: <DeepFightWordmark />,
@@ -185,7 +190,12 @@ const deepFightNavGroup: NavGroup = {
     {
       href: "/trainer/deepfight/athletes",
       label: "Schüler-Analysen",
-      activePattern: /^\/trainer\/deepfight/,
+      activePattern: /^\/trainer\/deepfight\/athletes/,
+    },
+    {
+      href: "/trainer/deepfight/me",
+      label: "Meine Analyse",
+      activePattern: /^\/trainer\/deepfight\/me/,
     },
   ],
 };

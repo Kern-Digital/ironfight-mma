@@ -15,14 +15,32 @@
   behält bewusst die alten Namen (`lib/gegner-dna.ts`, `opponents/…`, Feld
   `dna` — Firestore-Migration unnötig).
 - **DeepFight-Navigation & Rollen** (seit 2026-08-19): eigener Top-Level-
-  Menüpunkt (nur Trainer/Admin) mit beiden Richtungen — „Gegner-Scouting"
-  (`/trainer/opponents`) und „Schüler-Analysen" (`/trainer/deepfight/athletes`
-  → Schüler-Detailseite `#deepfight`). Schüler haben KEINEN Zugriff auf das
-  Werkzeug; sie sehen unter „Mein DeepFight" (`/deepfight`, im Profil-Menü)
-  nur explizit Freigegebenes: Gegnerprofile via `opponents.sharedWith[uid]`
-  (Firestore-Regel: read bei array-contains) und eigene Auswertungen via
-  `videoAnalyses.sharedWithAthlete`. Timer ist kein Top-Level-Punkt mehr:
-  er hängt unter „Training" (alle) und „Trainer".
+  Menüpunkt (nur Trainer/Admin) mit drei Richtungen — „Gegner-Scouting"
+  (`/trainer/opponents`), „Schüler-Analysen" (`/trainer/deepfight/athletes`)
+  und „Meine Analyse" (`/trainer/deepfight/me` → Redirect auf
+  `/trainer/deepfight/athletes/{eigene uid}`; Trainer analysieren sich selbst
+  exakt wie einen Schüler). Schüler haben KEINEN Zugriff auf das Werkzeug;
+  sie sehen in ihrem **Kampfprofil** nur explizit Freigegebenes plus ihr
+  gemergtes Profil (siehe nächster Punkt). Timer ist kein Top-Level-Punkt
+  mehr: er hängt unter „Training" (alle) und „Trainer".
+- **Kampfprofil vs. Account** (seit 2026-08-19): Das Profil ist zweigeteilt.
+  `/kampfprofil` (alle Rollen, Profil-Menü) = „Wer bin ich als Kämpfer":
+  gemergtes DeepFight-Profil (`users/{uid}.fightProfile`, siehe
+  `lib/fight-profile.ts` — gleiche Form wie beim Gegner: dna + dnaSplit +
+  actionStats), freigegebene eigene Auswertungen (`sharedWithAthlete`),
+  freigegebene Gegnerprofile (`opponents.sharedWith`), editierbare
+  Athleten-Daten (`components/AthleteProfileForm.tsx`). `/profile` (Account) =
+  Fighter-Name, App-Einstellungen (Theme + Timer-Settings), Kurs-Abos,
+  Account-Infos. Die alte Seite „Mein DeepFight" (`/deepfight`) leitet auf
+  `/kampfprofil` um; `/deepfight/opponents/[id]` bleibt.
+  **Entscheidung:** Der Schüler sieht sein VOLLES gemergtes Kampfprofil
+  (read-only, entwicklungsorientiert) — nur rohe, nicht freigegebene Analysen
+  bleiben verborgen. Kuratiert wird ausschließlich vom Trainer:
+  `fightProfile` ist das Merge-Ziel der Athleten-Video-Analysen
+  (`VideoAnalysisSection` mode="athlete", „Alle übernehmen" funktioniert dort
+  seit 2026-08-19 genauso wie beim Gegner). Firestore-Regel: Owner darf
+  `fightProfile` NICHT schreiben (analog `role`), Trainer/Admin-Update
+  ausschließlich auf dieses Feld.
 - **⚠ Sicherheitsmodell der Analyse-Freigabe (bewusste Schuld, 2026-08-19):**
   Die Sichtbarkeit der eigenen Auswertungen (`sharedWithAthlete`) wird NUR
   clientseitig gefiltert — die generische users-Subcollection-Regel
@@ -85,7 +103,8 @@
 
 ## Firestore (Collections — Top-Level)
 ```
-users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write)
+users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write;
+                                    fightProfile = Kampfprofil, nur Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des eigenen Athleten
 opponents/{id}                    — Gegner-DNA-Bibliothek (Trainer/Admin)

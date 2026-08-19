@@ -9,8 +9,10 @@
  *      welcher Kämpfer ausgewertet werden soll + Modellstufe (Flash/Pro).
  *   2. Pipeline: Upload → Gemini-Beobachtung → Claude-Bewertung (Streaming-
  *      Fortschritt über /api/video-analysis/analyze).
- *   3. Ergebnis wird in Firestore gespeichert; im Gegner-Modus können Befunde
- *      per Trainer-Review in die Gegner-DNA übernommen werden.
+ *   3. Ergebnis wird in Firestore gespeichert; Befunde können per
+ *      Trainer-Review übernommen werden — im Gegner-Modus in die Gegner-DNA
+ *      (opponents/{id}), im Athleten-Modus in das Kampfprofil des Nutzers
+ *      (users/{uid}.fightProfile, siehe lib/fight-profile.ts).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +22,11 @@ import VideoAnalysisResult from "./VideoAnalysisResult";
 import AiBudgetGauge, { formatEur } from "./AiBudgetGauge";
 import { useAuth } from "@/lib/auth-context";
 import { updateOpponent, type Opponent } from "@/lib/opponents";
+import {
+  getFightProfile,
+  updateFightProfile,
+  type FightProfile,
+} from "@/lib/fight-profile";
 import {
   cleanActionStats,
   cleanDnaSplit,
@@ -137,6 +144,8 @@ export default function VideoAnalysisSection({
   targetName,
   opponent = null,
   onOpponentUpdated,
+  fightProfile = null,
+  onFightProfileUpdated,
 }: {
   mode: AnalysisMode;
   /** opponentId bzw. Schüler-uid. */
@@ -146,6 +155,10 @@ export default function VideoAnalysisSection({
   opponent?: Opponent | null;
   /** Nach Übernahme in die DNA aufrufen (Profil neu laden). */
   onOpponentUpdated?: () => void;
+  /** Nur mode="athlete": aktuelles Kampfprofil (Kontext + Merge-Ziel). */
+  fightProfile?: FightProfile | null;
+  /** Nach Übernahme ins Kampfprofil aufrufen (Profil neu laden). */
+  onFightProfileUpdated?: () => void;
 }) {
   const { user, profile } = useAuth();
 
@@ -294,6 +307,19 @@ export default function VideoAnalysisSection({
     return `Eigener Athlet des Gyms: ${targetName}`;
   }, [mode, opponent, targetName]);
 
+  // Merge-Ziel vereinheitlicht: Gegner-DNA (opponents/{id}) bzw. Kampfprofil
+  // (users/{uid}.fightProfile) — gleiche Form, unterschiedlicher Speicherort.
+  const targetDna =
+    mode === "opponent" ? (opponent?.dna ?? {}) : (fightProfile?.dna ?? {});
+  const targetSplit =
+    mode === "opponent"
+      ? (opponent?.dnaSplit ?? null)
+      : (fightProfile?.dnaSplit ?? null);
+  const targetStats =
+    mode === "opponent"
+      ? (opponent?.actionStats ?? [])
+      : (fightProfile?.actionStats ?? []);
+
   // ─── Pipeline starten ─────────────────────────────────────────────────────
 
   async function handleStart() {
@@ -420,9 +446,9 @@ export default function VideoAnalysisSection({
           startPosition: startPosition.trim(),
         },
         tier,
-        existingDna: mode === "opponent" ? (opponent?.dna ?? {}) : {},
-        existingSplit: mode === "opponent" ? (opponent?.dnaSplit ?? null) : null,
-        existingStats: mode === "opponent" ? (opponent?.actionStats ?? []) : [],
+        existingDna: targetDna,
+        existingSplit: targetSplit,
+        existingStats: targetStats,
         profileContext,
       };
       const MAX_ATTEMPTS = 3;
@@ -545,27 +571,76 @@ export default function VideoAnalysisSection({
     }
   }
 
-  // ─── Übernahme in die Gegner-DNA ─────────────────────────────────────────
+  // ─── Übernahme in Gegner-DNA bzw. Kampfprofil ────────────────────────────
 
   function isConflict(a: VideoAnalysis, questionId: string): boolean {
-    if (!opponent) return false;
     if (a.appliedFindingIds.includes(questionId)) return false;
     const finding = a.evaluation.findings.find((f) => f.questionId === questionId);
-    const existing = opponent.dna[questionId]?.trim();
+    const existing = targetDna[questionId]?.trim();
     return !!finding && !!existing && existing !== finding.answer.trim();
   }
 
+  /**
+   * Liest das Merge-Ziel frisch: Gegner aus dem Prop (Seite hält den Stand),
+   * Kampfprofil direkt aus Firestore (verhindert stale Merges).
+   */
+  async function readTarget(): Promise<{
+    dna: Record<string, string>;
+    dnaSplit: DnaSplit | null;
+    actionStats: ActionStat[];
+  }> {
+    if (mode === "opponent") {
+      return {
+        dna: opponent?.dna ?? {},
+        dnaSplit: opponent?.dnaSplit ?? null,
+        actionStats: opponent?.actionStats ?? [],
+      };
+    }
+    const fresh = await getFightProfile(targetId);
+    return {
+      dna: fresh.dna,
+      dnaSplit: fresh.dnaSplit,
+      actionStats: fresh.actionStats,
+    };
+  }
+
+  async function writeTarget(patch: {
+    dna: Record<string, string>;
+    dnaSplit?: DnaSplit | null;
+    actionStats?: ActionStat[];
+  }): Promise<void> {
+    if (mode === "opponent") {
+      if (!opponent) throw new Error("Kein Gegnerprofil geladen");
+      await updateOpponent(opponent.id, {
+        ...patch,
+        updatedBy: user?.uid ?? null,
+      });
+    } else {
+      await updateFightProfile(targetId, {
+        ...patch,
+        updatedBy: user?.uid ?? null,
+      });
+    }
+  }
+
+  function notifyTargetUpdated() {
+    if (mode === "opponent") onOpponentUpdated?.();
+    else onFightProfileUpdated?.();
+  }
+
   async function applyFindings(a: VideoAnalysis, ids: string[]) {
-    if (!opponent || busy) return;
+    if (busy) return;
+    if (mode === "opponent" && !opponent) return;
     setBusy(true);
     setError(null);
     try {
-      const dna = { ...opponent.dna };
+      const target = await readTarget();
+      const dna = { ...target.dna };
       for (const id of ids) {
         const finding = a.evaluation.findings.find((f) => f.questionId === id);
         if (finding) dna[id] = finding.answer;
       }
-      await updateOpponent(opponent.id, { dna, updatedBy: user?.uid ?? null });
+      await writeTarget({ dna });
       const appliedFindingIds = Array.from(
         new Set([...a.appliedFindingIds, ...ids]),
       );
@@ -573,7 +648,7 @@ export default function VideoAnalysisSection({
       setAnalyses((prev) =>
         (prev ?? []).map((x) => (x.id === a.id ? { ...x, appliedFindingIds } : x)),
       );
-      onOpponentUpdated?.();
+      notifyTargetUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Übernahme fehlgeschlagen");
     } finally {
@@ -583,17 +658,19 @@ export default function VideoAnalysisSection({
 
   /** Alle konfliktfreien Befunde + Zahlen (Split/Stats) auf einmal übernehmen. */
   async function applyAll(a: VideoAnalysis) {
-    if (!opponent || busy) return;
+    if (busy) return;
+    if (mode === "opponent" && !opponent) return;
     setBusy(true);
     setError(null);
     try {
+      const target = await readTarget();
       const ids = a.evaluation.findings
         .filter(
           (f) => !a.appliedFindingIds.includes(f.questionId) && !isConflict(a, f.questionId),
         )
         .map((f) => f.questionId);
 
-      const dna = { ...opponent.dna };
+      const dna = { ...target.dna };
       for (const id of ids) {
         const finding = a.evaluation.findings.find((f) => f.questionId === id);
         if (finding) dna[id] = finding.answer;
@@ -601,7 +678,7 @@ export default function VideoAnalysisSection({
 
       // Stats mergen: Versuche/Treffer aufsummieren, Zone/Setup behalten bzw. ergänzen.
       const merged = new Map<string, ActionStat>(
-        cleanActionStats(opponent.actionStats).map((s) => [s.id, { ...s }]),
+        cleanActionStats(target.actionStats).map((s) => [s.id, { ...s }]),
       );
       for (const stat of cleanActionStats(a.evaluation.actionStats)) {
         const existing = merged.get(stat.id);
@@ -616,7 +693,7 @@ export default function VideoAnalysisSection({
       }
 
       // Split: leer → übernehmen, sonst mitteln (jede Analyse präzisiert).
-      let dnaSplit: DnaSplit | null = opponent.dnaSplit ?? null;
+      let dnaSplit: DnaSplit | null = target.dnaSplit;
       const newSplit = a.evaluation.dnaSplit;
       if (newSplit && !isDnaSplitEmpty(newSplit)) {
         if (!dnaSplit || isDnaSplitEmpty(dnaSplit)) {
@@ -632,11 +709,10 @@ export default function VideoAnalysisSection({
         }
       }
 
-      await updateOpponent(opponent.id, {
+      await writeTarget({
         dna,
         actionStats: Array.from(merged.values()),
         dnaSplit,
-        updatedBy: user?.uid ?? null,
       });
       const appliedFindingIds = Array.from(
         new Set([...a.appliedFindingIds, ...ids]),
@@ -650,7 +726,7 @@ export default function VideoAnalysisSection({
           x.id === a.id ? { ...x, appliedFindingIds, appliedStats: true } : x,
         ),
       );
-      onOpponentUpdated?.();
+      notifyTargetUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Übernahme fehlgeschlagen");
     } finally {
@@ -1153,7 +1229,10 @@ export default function VideoAnalysisSection({
                         {a.usage
                           ? ` · ca. ${formatEur(a.usage.costEur)}`
                           : " · Gratis-Analyse"}
-                        {a.appliedStats && " · In DeepFight übernommen"}
+                        {a.appliedStats &&
+                          (mode === "opponent"
+                            ? " · In DeepFight übernommen"
+                            : " · Ins Kampfprofil übernommen")}
                         {mode === "athlete" &&
                           a.sharedWithAthlete &&
                           " · Für Schüler freigegeben"}
@@ -1195,8 +1274,8 @@ export default function VideoAnalysisSection({
                           style={{ color: "var(--fg-3)" }}
                         >
                           {a.sharedWithAthlete
-                            ? 'Der Schüler sieht diese Auswertung unter „Mein DeepFight".'
-                            : "Nur für Trainer sichtbar — bei Freigabe sieht der Schüler das Ergebnis in seinem Profil."}
+                            ? "Der Schüler sieht diese Auswertung in seinem Kampfprofil."
+                            : "Nur für Trainer sichtbar — bei Freigabe sieht der Schüler das Ergebnis in seinem Kampfprofil."}
                         </span>
                         <button
                           onClick={() => toggleSharedWithAthlete(a)}
@@ -1225,16 +1304,10 @@ export default function VideoAnalysisSection({
                     <VideoAnalysisResult
                       analysis={a}
                       mode={mode}
-                      existingDna={mode === "opponent" ? (opponent?.dna ?? {}) : null}
+                      existingDna={targetDna}
                       busy={busy}
-                      onApplyFindings={
-                        mode === "opponent"
-                          ? (ids) => applyFindings(a, ids)
-                          : undefined
-                      }
-                      onApplyAll={
-                        mode === "opponent" ? () => applyAll(a) : undefined
-                      }
+                      onApplyFindings={(ids) => applyFindings(a, ids)}
+                      onApplyAll={() => applyAll(a)}
                       onDelete={() => handleDelete(a)}
                     />
                   </div>

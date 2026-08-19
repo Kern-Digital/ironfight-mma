@@ -1,27 +1,21 @@
 "use client";
 
+/**
+ * Account-Seite — das „normale Profil": Name, App-Einstellungen, Kurs-Abos,
+ * Account-Infos. Alles Kämpferische (Athleten-Daten, DeepFight-Profil,
+ * freigegebene Auswertungen/Gegner) lebt seit 2026-08-19 im Kampfprofil
+ * (/kampfprofil, siehe components/AthleteProfileForm.tsx).
+ */
+
 import PageHeader from "@/components/PageHeader";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import { useTimerSettings } from "@/lib/use-timer-settings";
 import { greetingFor } from "@/lib/greeting";
-import {
-  ATHLETE_LEVEL_LABEL,
-  BJJ_BELT_LABEL,
-  DISCIPLINE_LABEL,
-  FIGHTER_STANCE_LABEL,
-  WEIGHT_CLASS_LABEL,
-  type AthleteLevel,
-  type AthleteProfile,
-  type BjjBelt,
-  type Discipline,
-  type FighterStance,
-  type WeightClass,
-  weightClassForKg,
-} from "@/lib/types";
-import { updateAthleteProfile } from "@/lib/user-profile";
 import { getSubscriptions, unsubscribeFromBlock } from "@/lib/training-sessions";
-import { TRAINING_BLOCKS, WEEKDAY_SHORT } from "@/lib/schedule";
-import { useEffect, useMemo, useState } from "react";
+import { WEEKDAY_SHORT } from "@/lib/schedule";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AchievementsPanel from "@/components/AchievementsPanel";
 import type { BlockSubscription } from "@/lib/types";
@@ -45,126 +39,48 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-widest text-foreground/60">
-        {label}
-      </span>
-      {hint && <p className="mt-1 text-xs text-foreground/50">{hint}</p>}
-      <div className="mt-2">{children}</div>
-    </label>
-  );
-}
-
 const inputClass =
   "w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none";
 
-// ─── Form-State Helpers ────────────────────────────────────────────────────
+// ─── Einstellungs-Toggle ───────────────────────────────────────────────────
 
-type AthleteForm = {
-  primaryDiscipline: Discipline | "";
-  level: AthleteLevel | "";
-  trainingStartDate: string; // YYYY-MM-DD
-  weightKg: string;
-  heightCm: string;
-  reachCm: string;
-  stance: FighterStance | "";
-  weightClassMode: "auto" | "manual";
-  weightClass: WeightClass | "";
-  bjjBelt: BjjBelt | "";
-  gymName: string;
-  trainerName: string;
-  nextCompetitionDate: string;
-  nextCompetitionName: string;
-};
-
-function emptyForm(): AthleteForm {
-  return {
-    primaryDiscipline: "",
-    level: "",
-    trainingStartDate: "",
-    weightKg: "",
-    heightCm: "",
-    reachCm: "",
-    stance: "",
-    weightClassMode: "auto",
-    weightClass: "",
-    bjjBelt: "",
-    gymName: "",
-    trainerName: "",
-    nextCompetitionDate: "",
-    nextCompetitionName: "",
-  };
-}
-
-function dateToInputValue(d: Date | null | undefined): string {
-  if (!d) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formFromAthlete(a: AthleteProfile | undefined): AthleteForm {
-  const f = emptyForm();
-  if (!a) return f;
-  f.primaryDiscipline = a.primaryDiscipline ?? "";
-  f.level = a.level ?? "";
-  f.trainingStartDate = dateToInputValue(a.trainingStartDate);
-  f.weightKg = a.weightKg != null ? String(a.weightKg) : "";
-  f.heightCm = a.heightCm != null ? String(a.heightCm) : "";
-  f.reachCm = a.reachCm != null ? String(a.reachCm) : "";
-  f.stance = a.stance ?? "";
-  f.weightClass = a.weightClass ?? "";
-  f.weightClassMode = a.weightClass ? "manual" : "auto";
-  f.bjjBelt = a.bjjBelt ?? "";
-  f.gymName = a.gymName ?? "";
-  f.trainerName = a.trainerName ?? "";
-  f.nextCompetitionDate = dateToInputValue(a.nextCompetitionDate);
-  f.nextCompetitionName = a.nextCompetitionName ?? "";
-  return f;
-}
-
-function patchFromForm(form: AthleteForm): Partial<AthleteProfile> {
-  const weightKg = form.weightKg ? Number(form.weightKg) : null;
-  const heightCm = form.heightCm ? Number(form.heightCm) : null;
-  const reachCm = form.reachCm ? Number(form.reachCm) : null;
-
-  let weightClass: WeightClass | null = null;
-  if (form.weightClassMode === "manual" && form.weightClass) {
-    weightClass = form.weightClass;
-  } else if (form.weightClassMode === "auto" && weightKg) {
-    weightClass = weightClassForKg(weightKg);
-  }
-
-  return {
-    primaryDiscipline: form.primaryDiscipline || null,
-    level: form.level || null,
-    trainingStartDate: form.trainingStartDate
-      ? new Date(form.trainingStartDate)
-      : null,
-    weightKg: Number.isFinite(weightKg) ? weightKg : null,
-    heightCm: Number.isFinite(heightCm) ? heightCm : null,
-    reachCm: Number.isFinite(reachCm) ? reachCm : null,
-    stance: form.stance || null,
-    weightClass,
-    bjjBelt: form.bjjBelt || null,
-    gymName: form.gymName.trim() || null,
-    trainerName: form.trainerName.trim() || null,
-    nextCompetitionDate: form.nextCompetitionDate
-      ? new Date(form.nextCompetitionDate)
-      : null,
-    nextCompetitionName: form.nextCompetitionName.trim() || null,
-  };
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1">
+      <div className="min-w-0">
+        <div className="text-sm font-bold">{label}</div>
+        {hint && <div className="text-xs text-foreground/60">{hint}</div>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className="relative h-6 w-11 shrink-0 rounded-full transition-colors"
+        style={{
+          background: checked ? "var(--ta-cyan)" : "var(--ink-5)",
+        }}
+      >
+        <span
+          className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform"
+          style={{
+            left: "2px",
+            transform: checked ? "translateX(20px)" : "none",
+          }}
+        />
+      </button>
+    </div>
+  );
 }
 
 // ─── Kurs-Abos Block ──────────────────────────────────────────────────────
@@ -249,44 +165,20 @@ function SubscriptionsBlock({ uid }: { uid: string }) {
 // ─── Hauptkomponente ───────────────────────────────────────────────────────
 
 function ProfileContent() {
-  const { user, profile, profileLoading, updateDisplayName, refreshProfile, logOut } =
-    useAuth();
+  const { user, profile, profileLoading, updateDisplayName, logOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const timer = useTimerSettings();
 
   const [name, setName] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<AthleteForm>(emptyForm());
-  const [savingAthlete, setSavingAthlete] = useState(false);
-  const [athleteSaved, setAthleteSaved] = useState(false);
-  const [athleteError, setAthleteError] = useState<string | null>(null);
-
   useEffect(() => {
     setName(profile?.displayName ?? "");
-    setForm(formFromAthlete(profile?.athlete));
-  }, [profile?.displayName, profile?.athlete]);
+  }, [profile?.displayName]);
 
   const greeting = greetingFor(profile?.displayName);
-
-  // Trainings-Jahre live berechnen
-  const trainingYears = useMemo(() => {
-    if (!form.trainingStartDate) return null;
-    const start = new Date(form.trainingStartDate);
-    if (Number.isNaN(start.getTime())) return null;
-    const months = (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
-    if (months < 1) return "Frisch dabei";
-    if (months < 12) return `${Math.round(months)} Monate`;
-    const years = months / 12;
-    return years >= 2 ? `${years.toFixed(1)} Jahre` : `${years.toFixed(1)} Jahr`;
-  }, [form.trainingStartDate]);
-
-  // Auto-Gewichtsklasse Vorschau
-  const autoWeightClass = useMemo(() => {
-    const kg = Number(form.weightKg);
-    if (!form.weightKg || !Number.isFinite(kg) || kg <= 0) return null;
-    return weightClassForKg(kg);
-  }, [form.weightKg]);
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
@@ -303,35 +195,12 @@ function ProfileContent() {
     }
   }
 
-  async function handleSaveAthlete(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    setAthleteError(null);
-    setSavingAthlete(true);
-    try {
-      await updateAthleteProfile(user.uid, patchFromForm(form));
-      await refreshProfile();
-      setAthleteSaved(true);
-      setTimeout(() => setAthleteSaved(false), 2000);
-    } catch (err) {
-      setAthleteError(
-        err instanceof Error ? err.message : "Speichern fehlgeschlagen",
-      );
-    } finally {
-      setSavingAthlete(false);
-    }
-  }
-
-  function update<K extends keyof AthleteForm>(key: K, value: AthleteForm[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
   return (
     <>
       <PageHeader
         eyebrow="Account"
         title={greeting}
-        description="Dein Athletenprofil, Kurs-Abos und persönliche Einstellungen."
+        description="Dein Name, App-Einstellungen, Kurs-Abos und Account-Infos."
       />
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
         {profileLoading ? (
@@ -343,6 +212,32 @@ function ProfileContent() {
           <>
             {/* Achievements */}
             {user && <AchievementsPanel uid={user.uid} />}
+
+            {/* Verweis aufs Kampfprofil (Athleten-Daten sind umgezogen) */}
+            <Link
+              href="/kampfprofil"
+              className="mt-8 flex items-center justify-between gap-3 rounded-xl p-4"
+              style={{
+                background:
+                  "radial-gradient(300px 120px at 0% 0%, rgba(157,123,250,0.14), transparent 60%), var(--ink-2)",
+                border: "1px solid rgba(157,123,250,0.35)",
+                textDecoration: "none",
+              }}
+            >
+              <div>
+                <div
+                  className="font-mono-ta text-[10px] font-bold uppercase"
+                  style={{ letterSpacing: "0.18em", color: "var(--ta-violet)" }}
+                >
+                  Kampfprofil
+                </div>
+                <p className="mt-1 text-xs" style={{ color: "var(--fg-3)" }}>
+                  Athleten-Daten, DeepFight-Auswertungen und freigegebene
+                  Gegnerprofile findest du jetzt in deinem Kampfprofil.
+                </p>
+              </div>
+              <span style={{ color: "var(--fg-4)", flexShrink: 0 }}>→</span>
+            </Link>
 
             {/* Fighter-Name */}
             <Section title="Fighter-Name">
@@ -381,253 +276,33 @@ function ProfileContent() {
               </form>
             </Section>
 
-            {/* Athleten-Profil */}
-            <form onSubmit={handleSaveAthlete}>
-              <Section title="Athleten-Basics">
-                <Field label="Hauptdisziplin">
-                  <select
-                    value={form.primaryDiscipline}
-                    onChange={(e) =>
-                      update("primaryDiscipline", e.target.value as Discipline | "")
-                    }
-                    className={inputClass}
-                  >
-                    <option value="">— wählen —</option>
-                    {(Object.keys(DISCIPLINE_LABEL) as Discipline[]).map((d) => (
-                      <option key={d} value={d}>
-                        {DISCIPLINE_LABEL[d]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Trainingslevel">
-                  <select
-                    value={form.level}
-                    onChange={(e) =>
-                      update("level", e.target.value as AthleteLevel | "")
-                    }
-                    className={inputClass}
-                  >
-                    <option value="">— wählen —</option>
-                    {(Object.keys(ATHLETE_LEVEL_LABEL) as AthleteLevel[]).map((l) => (
-                      <option key={l} value={l}>
-                        {ATHLETE_LEVEL_LABEL[l]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field
-                  label="Trainingsbeginn"
-                  hint={trainingYears ? `Du trainierst seit ${trainingYears}.` : undefined}
-                >
-                  <input
-                    type="date"
-                    value={form.trainingStartDate}
-                    onChange={(e) => update("trainingStartDate", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-
-                {form.primaryDiscipline === "bjj" && (
-                  <Field label="BJJ-Gurt">
-                    <select
-                      value={form.bjjBelt}
-                      onChange={(e) => update("bjjBelt", e.target.value as BjjBelt | "")}
-                      className={inputClass}
-                    >
-                      <option value="">— wählen —</option>
-                      {(Object.keys(BJJ_BELT_LABEL) as BjjBelt[]).map((b) => (
-                        <option key={b} value={b}>
-                          {BJJ_BELT_LABEL[b]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-              </Section>
-
-              <Section title="Körperdaten">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Gewicht (kg)">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="250"
-                      value={form.weightKg}
-                      onChange={(e) => update("weightKg", e.target.value)}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Größe (cm)">
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="250"
-                      value={form.heightCm}
-                      onChange={(e) => update("heightCm", e.target.value)}
-                      className={inputClass}
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Reichweite (cm)">
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="250"
-                      value={form.reachCm}
-                      onChange={(e) => update("reachCm", e.target.value)}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Auslage">
-                    <select
-                      value={form.stance}
-                      onChange={(e) =>
-                        update("stance", e.target.value as FighterStance | "")
-                      }
-                      className={inputClass}
-                    >
-                      <option value="">— wählen —</option>
-                      {(
-                        Object.keys(FIGHTER_STANCE_LABEL) as FighterStance[]
-                      ).map((s) => (
-                        <option key={s} value={s}>
-                          {FIGHTER_STANCE_LABEL[s]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-
-                <Field label="Gewichtsklasse">
-                  <div className="space-y-2">
-                    <div className="flex gap-3 text-xs">
-                      <label className="flex items-center gap-1.5">
-                        <input
-                          type="radio"
-                          checked={form.weightClassMode === "auto"}
-                          onChange={() => update("weightClassMode", "auto")}
-                        />
-                        Automatisch (aus Gewicht)
-                      </label>
-                      <label className="flex items-center gap-1.5">
-                        <input
-                          type="radio"
-                          checked={form.weightClassMode === "manual"}
-                          onChange={() => update("weightClassMode", "manual")}
-                        />
-                        Selbst wählen
-                      </label>
-                    </div>
-                    {form.weightClassMode === "auto" ? (
-                      <div className="rounded-sm border border-carbon-500 bg-carbon-800 px-3 py-2 text-sm">
-                        {autoWeightClass ? (
-                          <span className="text-blood">
-                            {WEIGHT_CLASS_LABEL[autoWeightClass]}
-                          </span>
-                        ) : (
-                          <span className="text-foreground/50">
-                            Trag dein Gewicht ein, dann wird die Klasse automatisch
-                            ermittelt.
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <select
-                        value={form.weightClass}
-                        onChange={(e) =>
-                          update("weightClass", e.target.value as WeightClass | "")
-                        }
-                        className={inputClass}
-                      >
-                        <option value="">— wählen —</option>
-                        {(Object.keys(WEIGHT_CLASS_LABEL) as WeightClass[]).map(
-                          (w) => (
-                            <option key={w} value={w}>
-                              {WEIGHT_CLASS_LABEL[w]}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                    )}
-                  </div>
-                </Field>
-              </Section>
-
-              <Section title="Gym & Coach">
-                <Field label="Gym / Verein">
-                  <input
-                    type="text"
-                    maxLength={60}
-                    value={form.gymName}
-                    onChange={(e) => update("gymName", e.target.value)}
-                    placeholder="z. B. Iron Fight Club"
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Hauptcoach">
-                  <input
-                    type="text"
-                    maxLength={60}
-                    value={form.trainerName}
-                    onChange={(e) => update("trainerName", e.target.value)}
-                    placeholder="z. B. Coach Mike"
-                    className={inputClass}
-                  />
-                </Field>
-              </Section>
-
-              <Section title="Nächster Wettkampf">
-                <Field label="Datum">
-                  <input
-                    type="date"
-                    value={form.nextCompetitionDate}
-                    onChange={(e) => update("nextCompetitionDate", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Event-Name (optional)">
-                  <input
-                    type="text"
-                    maxLength={80}
-                    value={form.nextCompetitionName}
-                    onChange={(e) => update("nextCompetitionName", e.target.value)}
-                    placeholder="z. B. Bavarian Open"
-                    className={inputClass}
-                  />
-                </Field>
-              </Section>
-
-              {/* Save Athlete */}
-              <div className="mt-8">
-                {athleteError && (
-                  <div className="mb-3 rounded-sm border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">
-                    {athleteError}
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="submit"
-                    disabled={savingAthlete}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    {savingAthlete ? "Speichere…" : "Athleten-Profil speichern"}
-                  </button>
-                  {athleteSaved && (
-                    <span className="text-xs uppercase tracking-widest text-green-400">
-                      Gespeichert ✓
-                    </span>
-                  )}
-                </div>
-              </div>
-            </form>
+            {/* App-Einstellungen */}
+            <Section title="Einstellungen">
+              <ToggleRow
+                label="Helles Design"
+                hint="Standard ist das dunkle Design."
+                checked={theme === "light"}
+                onChange={() => toggleTheme()}
+              />
+              <ToggleRow
+                label="Timer-Sound"
+                hint="Signaltöne bei Rundenwechseln."
+                checked={timer.settings.soundOn}
+                onChange={timer.setSoundOn}
+              />
+              <ToggleRow
+                label="Vibration"
+                hint="Vibrieren bei Rundenwechseln (nur Mobile)."
+                checked={timer.settings.vibrate}
+                onChange={timer.setVibrate}
+              />
+              <ToggleRow
+                label="Display anlassen"
+                hint="Bildschirm bleibt an, solange der Timer läuft."
+                checked={timer.settings.wakeLock}
+                onChange={timer.setWakeLock}
+              />
+            </Section>
 
             {/* Kurs-Abos */}
             {user && <SubscriptionsBlock uid={user.uid} />}
