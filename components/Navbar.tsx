@@ -223,7 +223,8 @@ export default function Navbar() {
     ...(isAdmin ? [adminNavGroup] : []),
   ];
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMobileGroups, setOpenMobileGroups] = useState<Set<string>>(new Set());
+  // Mobile: Akkordeon — es ist immer nur eine Rubrik gleichzeitig aufgeklappt.
+  const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -254,12 +255,7 @@ export default function Navbar() {
   }
 
   function toggleMobileGroup(id: string) {
-    setOpenMobileGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setOpenMobileGroup((prev) => (prev === id ? null : id));
   }
 
   const monoStyle = {
@@ -488,7 +484,12 @@ export default function Navbar() {
 
         {/* Mobile Hamburger */}
         <button
-          onClick={() => setMobileOpen((v) => !v)}
+          onClick={() =>
+            setMobileOpen((v) => {
+              if (v) setOpenMobileGroup(null);
+              return !v;
+            })
+          }
           className="rounded-xl p-2 md:hidden"
           style={{
             background: "var(--ink-3)",
@@ -512,7 +513,7 @@ export default function Navbar() {
           <div className="flex flex-col p-4">
             {visibleGroups.map((group) => {
               const groupActive = isGroupActive(group);
-              const groupMobileOpen = openMobileGroups.has(group.id);
+              const groupMobileOpen = openMobileGroup === group.id;
 
               return (
                 <div key={group.id} className="overflow-hidden">

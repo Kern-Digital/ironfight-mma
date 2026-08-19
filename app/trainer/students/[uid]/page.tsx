@@ -8,10 +8,11 @@ import CompetitionCard, {
   competitionGroup,
 } from "@/components/trainer/CompetitionCard";
 import MatchupBlock from "@/components/trainer/MatchupBlock";
-import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import Icon from "@/components/ui/Icon";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
+import { listVideoAnalyses, type VideoAnalysis } from "@/lib/video-analysis";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
 import {
   analyzeTrainingHistory,
@@ -110,6 +111,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
   const [workouts, setWorkouts] = useState<WorkoutSession[] | null>(null);
   const [progress, setProgress] = useState<TechniqueProgress[] | null>(null);
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
+  const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -118,18 +120,21 @@ function StudentDetailContent({ uid }: { uid: string }) {
     setWorkouts(null);
     setProgress(null);
     setCamps(null);
+    setAnalyses(null);
     try {
-      const [e, w, p, c] = await Promise.all([
+      const [e, w, p, c, a] = await Promise.all([
         getStudentEntry(uid),
         getRecentWorkouts(uid, 500),
         getAllProgress(uid).catch(() => [] as TechniqueProgress[]),
         listFightCamps(uid).catch(() => [] as FightCamp[]),
+        listVideoAnalyses("athlete", uid).catch(() => [] as VideoAnalysis[]),
       ]);
       if (!e) throw new Error("Schüler nicht gefunden");
       setEntry(e);
       setWorkouts(w);
       setProgress(p);
       setCamps(c);
+      setAnalyses(a);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
@@ -139,7 +144,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
     load();
   }, [load]);
 
-  // Deep-Link aus dem DeepFight-Menü: #deepfight scrollt zum Analyse-Block,
+  // Alt-Links mit #deepfight scrollen weiterhin zur DeepFight-Verlinkung,
   // sobald die Seite fertig geladen ist.
   useEffect(() => {
     if (!entry) return;
@@ -615,38 +620,61 @@ function StudentDetailContent({ uid }: { uid: string }) {
           </div>
         </div>
 
-        {/* DeepFight für den eigenen Schüler: Kampf-Videos auswerten,
-            Ergebnisse optional für den Athleten freigeben */}
+        {/* DeepFight: die Analyse selbst lebt unter /trainer/deepfight/athletes/[uid] —
+            hier steht nur die Verlinkung samt Status. Anker bleibt für Alt-Links. */}
         <div id="deepfight" className="mt-8 scroll-mt-24">
-          <div
-            className="rounded-2xl p-4 sm:p-5"
+          <Link
+            href={`/trainer/deepfight/athletes/${uid}`}
+            className="block rounded-2xl p-4 transition-colors sm:p-5"
             style={{
               background:
                 "radial-gradient(500px 220px at 100% 0%, rgba(157,123,250,0.1), transparent 60%), var(--ink-2)",
               border: "1px solid rgba(157,123,250,0.3)",
+              textDecoration: "none",
             }}
           >
-            <h2
-              className="font-display-ta flex items-center font-black uppercase"
-              style={{ fontSize: "20px", letterSpacing: "0.06em" }}
-            >
-              <DeepFightWordmark />
-            </h2>
-            <p
-              className="font-mono-ta mt-1 text-[10px]"
-              style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
-            >
-              Analyse & Auswertung für diesen Schüler
-            </p>
-            <div className="mt-4">
-              <VideoAnalysisSection
-                mode="athlete"
-                targetId={uid}
-                targetName={displayLabel(entry)}
-              />
+            <div className="flex items-center gap-4">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: "rgba(157,123,250,0.1)",
+                  border: "1px solid rgba(157,123,250,0.4)",
+                  color: "#9D7BFA",
+                }}
+              >
+                <Icon name="video" size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2
+                  className="font-display-ta flex items-center font-black uppercase"
+                  style={{ fontSize: "20px", letterSpacing: "0.06em" }}
+                >
+                  <DeepFightWordmark />
+                </h2>
+                <p
+                  className="font-mono-ta mt-1 text-[10px]"
+                  style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
+                >
+                  {analyses === null
+                    ? "Analyse & Auswertung für diesen Schüler"
+                    : analyses.length === 0
+                      ? "Noch keine Auswertung · Kampf-Video analysieren"
+                      : `${analyses.length} ${analyses.length === 1 ? "Auswertung" : "Auswertungen"} · ${analyses.filter((a) => a.sharedWithAthlete).length} freigegeben`}
+                </p>
+              </div>
+              <span
+                className="font-mono-ta hidden shrink-0 text-[10px] font-bold uppercase sm:block"
+                style={{ letterSpacing: "0.18em", color: "#9D7BFA" }}
+              >
+                Öffnen
+              </span>
+              <span style={{ color: "#9D7BFA", lineHeight: 0 }}>
+                <Icon name="arrow-right" size={16} />
+              </span>
             </div>
-          </div>
+          </Link>
         </div>
+
       </div>
     </main>
   );

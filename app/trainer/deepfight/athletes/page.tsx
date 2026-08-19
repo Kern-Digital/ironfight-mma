@@ -21,7 +21,8 @@ function initialsOf(s: StudentEntry): string {
 /**
  * DeepFight → Schüler-Analysen: Einstieg in die „umgekehrte" DeepFight-
  * Richtung — statt Gegner zu scouten wird der eigene Schüler ausgewertet.
- * Die Analyse selbst lebt auf der Schüler-Detailseite (#deepfight-Anker).
+ * Die Analyse selbst lebt unter /trainer/deepfight/athletes/[uid] und ist
+ * zusätzlich vom Schülerprofil aus verlinkt.
  */
 export default function DeepFightAthletesPage() {
   const [students, setStudents] = useState<StudentEntry[] | null>(null);
@@ -82,9 +83,8 @@ export default function DeepFightAthletesPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-xl text-xs" style={{ color: "var(--fg-4)" }}>
-            Wähle einen Schüler: Auf seiner Detailseite wertet DeepFight seine
-            Kampf-Videos aus — Ergebnisse lassen sich anschließend für ihn
-            freigeben.
+            Wähle einen Schüler: DeepFight wertet seine Kampf-Videos aus —
+            Ergebnisse lassen sich anschließend für ihn freigeben.
           </p>
           <Link
             href="/trainer/opponents"
@@ -138,7 +138,7 @@ export default function DeepFightAthletesPage() {
               {filtered.map((s) => (
                 <Link
                   key={s.uid}
-                  href={`/trainer/students/${s.uid}#deepfight`}
+                  href={`/trainer/deepfight/athletes/${s.uid}`}
                   className="flex items-center gap-3 rounded-2xl p-4 transition-colors"
                   style={{
                     background: "var(--ink-2)",
