@@ -118,7 +118,7 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
     .slice(0, 3);
 
   return (
-    <div className="card">
+    <div>
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs font-bold uppercase tracking-widest text-blood">
           Achievements
@@ -131,19 +131,19 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
       {/* Stats-Summary */}
       {stats && (
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-sm border border-carbon-500 bg-carbon-700/40 px-2 py-3">
+          <div className="py-2">
             <div className="text-lg font-black text-foreground">{stats.total}</div>
             <div className="text-[10px] uppercase tracking-widest text-foreground/60">
               Workouts
             </div>
           </div>
-          <div className="rounded-sm border border-carbon-500 bg-carbon-700/40 px-2 py-3">
+          <div className="py-2">
             <div className="text-lg font-black text-blood">{stats.streak}</div>
             <div className="text-[10px] uppercase tracking-widest text-foreground/60">
               Streak
             </div>
           </div>
-          <div className="rounded-sm border border-carbon-500 bg-carbon-700/40 px-2 py-3">
+          <div className="py-2">
             <div className="text-lg font-black text-foreground">{stats.thisWeek}</div>
             <div className="text-[10px] uppercase tracking-widest text-foreground/60">
               Diese Woche
@@ -181,7 +181,7 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
           </div>
           <div className="space-y-2">
             {upcoming.map((a) => (
-              <div key={a.id} className="rounded-sm border border-carbon-500 bg-carbon-700/40 px-3 py-2">
+              <div key={a.id} className="py-1">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold">{a.label}</div>
                   <div className="text-[10px] text-foreground/50">

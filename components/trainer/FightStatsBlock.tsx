@@ -88,16 +88,9 @@ function StatsEditor({
         const meta = ACTION_GROUP_META[group];
         const actions = ACTION_CATALOG.filter((a) => a.group === group);
         return (
-          <div
-            key={group}
-            className="overflow-hidden rounded-2xl"
-            style={{
-              background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+          <div key={group}>
             <div
-              className="flex items-center gap-2 px-4 py-2.5"
+              className="flex items-center gap-2 py-2.5"
               style={{ borderBottom: "1px solid var(--ink-4)" }}
             >
               <span
@@ -117,7 +110,7 @@ function StatsEditor({
                 return (
                   <div
                     key={a.id}
-                    className="flex flex-wrap items-center gap-2 px-4 py-2.5"
+                    className="flex flex-wrap items-center gap-2 py-2.5"
                     style={{
                       borderTop: i === 0 ? "none" : "1px solid var(--ink-4)",
                     }}
@@ -207,10 +200,7 @@ function StatsView({ stats }: { stats: ActionStat[] }) {
   if (grouped.length === 0) return null;
 
   return (
-    <div
-      className="rounded-2xl p-4 sm:p-5"
-      style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-    >
+    <div>
       <div
         className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
         style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}

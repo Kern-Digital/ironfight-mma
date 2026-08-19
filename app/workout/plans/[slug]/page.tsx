@@ -48,7 +48,7 @@ export default function TrainingPlanPage({
       />
 
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <div className="card mb-10">
+        <div className="mb-10">
           <div className="grid gap-6 sm:grid-cols-4">
             <Stat label="Runden" value={`${plan.preset.rounds}×`} />
             <Stat label="Kampfzeit" value={formatDuration(plan.preset.workSeconds)} />
@@ -80,7 +80,7 @@ export default function TrainingPlanPage({
                 {block.exercises.map((ex) => (
                   <div
                     key={ex.name}
-                    className="flex flex-col gap-2 rounded-sm border border-carbon-500 bg-carbon-700/60 p-4 transition-colors hover:border-blood/40 sm:flex-row sm:items-center sm:gap-6"
+                    className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:gap-6"
                   >
                     <div className="flex-1">
                       <div className="font-bold">{ex.name}</div>

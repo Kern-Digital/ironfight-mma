@@ -578,13 +578,7 @@ function TimerView() {
         </div>
 
         {/* Config */}
-        <div
-          className="mt-8 rounded-2xl p-5"
-          style={{
-            background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-            border: "1px solid var(--ink-4)",
-          }}
-        >
+        <div className="mt-8">
           <div
             className="font-mono-ta mb-4 text-[10px] uppercase"
             style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}

@@ -66,7 +66,7 @@ function UserRow({
 
   return (
     <div
-      className="card-glass !p-4"
+      className={isSelf ? "card-glass !p-4" : undefined}
       style={
         isSelf ? { borderColor: "rgba(138,99,232,.3)" } : undefined
       }

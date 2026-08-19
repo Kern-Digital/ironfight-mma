@@ -152,7 +152,7 @@ const STUDENT_HELP: HelpItem[] = [
 function HelpItemCard({ item }: { item: HelpItem }) {
   const Inner = (
     <div
-      className="card h-full"
+      className={item.href ? "card h-full" : "h-full"}
       style={{
         cursor: item.href ? "pointer" : "default",
       }}
@@ -275,13 +275,7 @@ export default function HelpPage() {
         )}
 
         {/* Kontakt-Box */}
-        <div
-          className="mt-8 rounded-2xl p-5"
-          style={{
-            background: "var(--ink-2)",
-            border: "1px solid var(--ink-4)",
-          }}
-        >
+        <div className="mt-8">
           <div
             className="font-mono-ta text-[10px] font-bold uppercase"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}

@@ -137,13 +137,7 @@ export default function FightCampForm({
         </label>
       </div>
 
-      <div
-        className="rounded-xl p-4"
-        style={{
-          background: "var(--ink-2)",
-          border: "1px solid var(--ink-4)",
-        }}
-      >
+      <div>
         <div
           className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
           style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}

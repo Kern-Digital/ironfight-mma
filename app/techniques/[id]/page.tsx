@@ -124,7 +124,7 @@ export default function TechniqueDetailPage({
         ) : null}
 
         {/* Video / Animation Slot */}
-        <div className="card">
+        <div>
           <div className="text-xs font-bold uppercase tracking-widest text-blood">
             Visuell
           </div>
@@ -164,7 +164,7 @@ export default function TechniqueDetailPage({
         </div>
 
         {/* Schritt-für-Schritt */}
-        <div className="card">
+        <div>
           <h2 className="heading-display text-2xl font-black">Schritt für Schritt</h2>
           <ol className="mt-4 space-y-3">
             {t.steps.map((step, idx) => (
@@ -180,7 +180,7 @@ export default function TechniqueDetailPage({
 
         {/* Coaching-Hinweise */}
         {t.coachingCues?.length ? (
-          <div className="card">
+          <div>
             <h2 className="heading-display text-2xl font-black">Coaching-Hinweise</h2>
             <ul className="mt-4 space-y-2 text-sm text-foreground/85">
               {t.coachingCues.map((cue) => (
@@ -194,7 +194,7 @@ export default function TechniqueDetailPage({
         ) : null}
 
         {/* Typische Fehler */}
-        <div className="card">
+        <div>
           <h2 className="heading-display text-2xl font-black">Typische Fehler</h2>
           <ul className="mt-4 space-y-2 text-sm text-foreground/85">
             {t.commonMistakes.map((m) => (
@@ -224,7 +224,7 @@ export default function TechniqueDetailPage({
         ) : null}
 
         {/* Anwendung / Einsatzbereich */}
-        <div className="card">
+        <div>
           <h2 className="heading-display text-2xl font-black">Einsatzbereich</h2>
           <p className="mt-3 text-sm text-foreground/85">{t.usage}</p>
           {t.useCases?.length ? (
@@ -241,7 +241,7 @@ export default function TechniqueDetailPage({
 
         {/* Equipment */}
         {t.equipment.length > 0 && (
-          <div className="card">
+          <div>
             <h2 className="heading-display text-2xl font-black">Empfohlenes Equipment</h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {t.equipment.map((eq) => {
@@ -281,7 +281,7 @@ export default function TechniqueDetailPage({
               </Link>
             )}
             {related.length > 0 && (
-              <div className="card">
+              <div>
                 <div className="text-xs font-bold uppercase tracking-widest text-blood">
                   Verwandt
                 </div>

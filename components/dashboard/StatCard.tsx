@@ -24,7 +24,7 @@ export default function StatCard({
   hint?: string;
 }) {
   const body = (
-    <div className="card-glass card-interactive h-full">
+    <div className="h-full">
       <div className="flex items-start justify-between gap-2">
         <div
           className="font-mono-ta text-[9px] uppercase"

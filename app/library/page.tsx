@@ -258,7 +258,7 @@ function LibraryContent() {
 
         {/* Tipp */}
         {!loading && (
-          <div className="mt-8 rounded-xl p-4" style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)" }}>
+          <div className="mt-8">
             <p className="mb-1 text-xs font-bold uppercase" style={{ color: "var(--ta-cyan)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
               Tipp
             </p>
@@ -420,10 +420,8 @@ function LibraryCard({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl px-3 py-3"
+      className="flex items-center gap-3 py-2 pl-3"
       style={{
-        background: "var(--ink-3)",
-        border: "1px solid var(--ink-4)",
         borderLeft: `3px solid ${catStyle?.color ?? "var(--fg-4)"}`,
         opacity: removing ? 0.5 : 1,
         transition: "opacity 0.2s",

@@ -429,7 +429,7 @@ function GuestHome() {
               { v: "120+", l: "Workouts", icon: "spark" as IconName },
               { v: "24/7", l: "Verfügbar", icon: "timer" as IconName },
             ].map((stat) => (
-              <div key={stat.l} className="card-glass flex flex-col items-center !p-4 text-center">
+              <div key={stat.l} className="flex flex-col items-center text-center">
                 <span style={{ color: "var(--ta-cyan)", opacity: 0.7 }}>
                   <Icon name={stat.icon} size={16} />
                 </span>
@@ -470,7 +470,7 @@ function GuestHome() {
                 return (
                   <div
                     key={f.title}
-                    className={`rise-${idx + 1} card-glass card-interactive group relative overflow-hidden !p-6`}
+                    className={`rise-${idx + 1} group relative overflow-hidden`}
                   >
                     <span
                       className="absolute left-0 top-0 h-[3px] w-full origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100"

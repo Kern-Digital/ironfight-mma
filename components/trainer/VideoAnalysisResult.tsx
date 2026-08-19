@@ -287,10 +287,7 @@ export default function VideoAnalysisResult({
 
       {/* Scores */}
       {SCORE_LABEL.some(([k]) => ev.scores[k] != null) && (
-        <div
-          className="rounded-xl p-4"
-          style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-        >
+        <div>
           <div
             className="font-mono-ta mb-2.5 text-[10px] font-bold uppercase"
             style={{ letterSpacing: "0.18em", color: VIOLET }}

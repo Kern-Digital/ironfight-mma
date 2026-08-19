@@ -68,10 +68,7 @@ function Stat({
   accent?: string;
 }) {
   return (
-    <div
-      className="rounded-xl px-3 py-3 text-center"
-      style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)" }}
-    >
+    <div className="text-center">
       <div
         className="font-display-ta text-base font-black"
         style={{ color: accent ?? "var(--ta-cyan)" }}
@@ -90,10 +87,7 @@ function Stat({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5"
-      style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)" }}
-    >
+    <div className="flex items-center justify-between gap-2 py-0.5">
       <dt
         className="font-mono-ta text-[9px] uppercase"
         style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
@@ -324,13 +318,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
         {/* Layout: Profil + Analyse nebeneinander */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Profil */}
-          <div
-            className="rounded-2xl p-5"
-            style={{
-              background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+          <div>
             <h2
               className="font-display-ta font-black uppercase"
               style={{ fontSize: "16px", letterSpacing: "0.06em" }}
@@ -415,13 +403,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
           </div>
 
           {/* Category-Verteilung + Stärken/Schwächen */}
-          <div
-            className="rounded-2xl p-5 lg:col-span-2"
-            style={{
-              background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+          <div className="lg:col-span-2">
             <h2
               className="font-display-ta font-black uppercase"
               style={{ fontSize: "16px", letterSpacing: "0.06em" }}

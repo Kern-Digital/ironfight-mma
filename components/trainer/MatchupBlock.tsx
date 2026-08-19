@@ -57,7 +57,6 @@ function CompareRow({
       style={{
         gridTemplateColumns: "1fr auto 1fr",
         background: "var(--ink-3)",
-        border: "1px solid var(--ink-4)",
       }}
     >
       <div className="truncate text-[12px] font-bold" style={{ color: "var(--fg-2)" }}>
@@ -131,14 +130,7 @@ export default function MatchupBlock({
     !athlete.stance;
 
   return (
-    <div
-      className="rounded-2xl p-4 sm:p-5"
-      style={{
-        background:
-          "radial-gradient(400px 200px at 0% 0%, rgba(35,196,206,0.08), transparent 60%), radial-gradient(400px 200px at 100% 0%, rgba(255,79,168,0.08), transparent 60%), linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-        border: "1px solid var(--ink-4)",
-      }}
-    >
+    <div>
       {/* Kopf */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div

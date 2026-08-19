@@ -36,7 +36,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card mt-6">
+    <div className="mt-8">
       <div className="text-xs font-bold uppercase tracking-widest text-blood">
         {title}
       </div>
@@ -217,7 +217,7 @@ function SubscriptionsBlock({ uid }: { uid: string }) {
           {subs.map((s) => (
             <div
               key={s.trainingBlockId}
-              className="flex items-center justify-between gap-3 rounded-sm border border-carbon-500 bg-carbon-700/40 px-3 py-2"
+              className="flex items-center justify-between gap-3 py-1"
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold">{s.blockTitle}</div>
@@ -606,7 +606,7 @@ function ProfileContent() {
               </Section>
 
               {/* Save Athlete */}
-              <div className="mt-6 card">
+              <div className="mt-8">
                 {athleteError && (
                   <div className="mb-3 rounded-sm border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">
                     {athleteError}

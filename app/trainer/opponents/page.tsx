@@ -231,13 +231,7 @@ function OpponentsLibraryContent() {
 
         {/* Inline-Editor: neue Gegner-DNA */}
         {showNewOpponent && (
-          <div
-            className="mb-5 mt-3 rounded-2xl p-4 sm:p-5"
-            style={{
-              background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+          <div className="mb-6 mt-4">
             <h3
               className="font-display-ta mb-4 font-black uppercase"
               style={{ fontSize: "16px", letterSpacing: "0.04em" }}

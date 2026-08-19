@@ -68,13 +68,7 @@ function Stat({
   loading?: boolean;
 }) {
   return (
-    <div
-      className="rounded-xl px-3 py-3 text-center"
-      style={{
-        background: "var(--ink-3)",
-        border: "1px solid var(--ink-4)",
-      }}
-    >
+    <div className="text-center">
       <div
         className="text-base font-black"
         style={{
@@ -374,10 +368,7 @@ function StudentCard({ entry }: { entry: StudentEntry }) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5"
-      style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)" }}
-    >
+    <div className="flex items-center justify-between gap-2 py-0.5">
       <dt
         className="font-mono-ta text-[9px] uppercase"
         style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}

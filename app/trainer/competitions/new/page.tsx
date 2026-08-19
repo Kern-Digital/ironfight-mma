@@ -395,13 +395,7 @@ function NewCompetitionContent() {
                   )}
                 </>
               ) : (
-                <div
-                  className="rounded-2xl p-4 sm:p-5"
-                  style={{
-                    background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-                    border: "1px solid var(--ink-4)",
-                  }}
-                >
+                <div className="mt-1">
                   <p className="mb-4 text-xs" style={{ color: "var(--fg-4)" }}>
                     Neues Gegnerprofil — wird gym-weit geteilt und nach dem
                     Speichern automatisch für diesen Wettkampf ausgewählt.

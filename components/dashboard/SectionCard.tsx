@@ -27,7 +27,7 @@ export default function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`card-glass ${className ?? ""}`}>
+    <section className={className ?? ""}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {icon && (

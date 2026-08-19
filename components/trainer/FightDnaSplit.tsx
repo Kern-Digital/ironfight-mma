@@ -40,10 +40,7 @@ export default function FightDnaSplit({
   if (mode === "view") {
     if (empty) return null;
     return (
-      <div
-        className="rounded-2xl p-4 sm:p-5"
-        style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-      >
+      <div>
         <div
           className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
           style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
@@ -70,10 +67,7 @@ export default function FightDnaSplit({
 
   // ── Edit ──
   return (
-    <div
-      className="rounded-2xl p-4 sm:p-5"
-      style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-    >
+    <div>
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <div
           className="font-mono-ta text-[10px] font-bold uppercase"

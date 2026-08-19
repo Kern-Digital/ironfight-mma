@@ -50,7 +50,7 @@ export default function QuizPage() {
         <Quiz key={activeSport} questions={sport.quiz} />
 
         {/* Link zu Regeln */}
-        <div className="mt-10 rounded-xl border border-carbon-500 bg-carbon-700/40 p-5">
+        <div className="mt-10">
           <p className="text-sm text-foreground/70">
             Noch unsicher bei den Regeln?{" "}
             <Link href="/regeln" className="font-bold text-blood hover:underline">

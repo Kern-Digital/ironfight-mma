@@ -235,7 +235,7 @@ export default function WorkoutPage() {
 
           {/* Zeit */}
           <Section title="Trainingsdauer">
-            <div className="rounded-xl border border-carbon-500 bg-carbon-700/40 p-5">
+            <div>
               <div className="flex items-baseline justify-between">
                 <span className="text-xs font-bold uppercase tracking-widest text-foreground/60">
                   Verfügbare Zeit
@@ -272,7 +272,7 @@ export default function WorkoutPage() {
           </Section>
 
           {/* Action */}
-          <div className="card space-y-4">
+          <div className="space-y-4">
             <div className="text-xs uppercase tracking-widest text-foreground/60">
               <div>
                 <strong className="text-foreground">{CATEGORY_LABEL[category]}</strong>{" "}

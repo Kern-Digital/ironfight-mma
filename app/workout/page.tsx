@@ -324,7 +324,7 @@ function WorkoutRunner() {
             </div>
 
             {/* Workout-Fortschritt */}
-            <div className="card">
+            <div>
               <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-foreground/60">
                 <span>Workout-Fortschritt</span>
                 <span>{Math.min(exerciseIndex + 1, totalExercises)} / {totalExercises}</span>
@@ -448,7 +448,7 @@ function WorkoutRunner() {
 
             {/* Als Nächstes */}
             {nextExercise && !allDone && (
-              <div className="rounded-sm border border-carbon-500/60 bg-carbon-800/40 px-4 py-3">
+              <div className="py-2">
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-foreground/50">
                   Als Nächstes
                 </div>
@@ -500,7 +500,7 @@ function WorkoutRunner() {
             )}
 
             {/* Alle Übungen — interaktive Accordion-Liste */}
-            <div className="card">
+            <div>
               <h3 className="heading-display mb-4 text-lg font-black">Alle Übungen</h3>
               <div className="space-y-6">
                 {workout.blocks.map((block) => (

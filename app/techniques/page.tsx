@@ -174,7 +174,7 @@ export default function TechniquesPage() {
 
         {/* Empty State */}
         {techniques.length === 0 && (
-          <div className="card text-center text-foreground/60">
+          <div className="py-8 text-center text-foreground/60">
             Keine Techniken gefunden. Filter zurücksetzen oder Suchbegriff ändern.
           </div>
         )}

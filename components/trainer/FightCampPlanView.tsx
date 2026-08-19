@@ -150,14 +150,8 @@ export default function FightCampPlanView({
 
         {/* Opponent summary */}
         {showOpponent && (
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <div
-            className="rounded-xl p-3"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
             <div
               className="font-mono-ta text-[9px] uppercase"
               style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
@@ -191,13 +185,7 @@ export default function FightCampPlanView({
             </div>
           </div>
 
-          <div
-            className="rounded-xl p-3"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-4)",
-            }}
-          >
+          <div>
             <div
               className="font-mono-ta text-[9px] uppercase"
               style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
@@ -253,13 +241,15 @@ export default function FightCampPlanView({
         return (
           <div
             key={`${phase.phase}-${idx}`}
-            className="rounded-2xl p-5"
-            style={{
-              background: isCurrent
-                ? `linear-gradient(160deg, ${accentBg}, var(--ink-2))`
-                : "var(--ink-2)",
-              border: `1px solid ${isCurrent ? accentBorder : "var(--ink-4)"}`,
-            }}
+            className={isCurrent ? "rounded-2xl p-5" : undefined}
+            style={
+              isCurrent
+                ? {
+                    background: `linear-gradient(160deg, ${accentBg}, var(--ink-2))`,
+                    border: `1px solid ${accentBorder}`,
+                  }
+                : undefined
+            }
           >
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -322,10 +312,7 @@ export default function FightCampPlanView({
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div
                 className="rounded-lg px-2 py-1.5 text-center"
-                style={{
-                  background: "var(--ink-3)",
-                  border: "1px solid var(--ink-4)",
-                }}
+                style={{ background: "var(--ink-3)" }}
               >
                 <div
                   className="font-display-ta text-sm font-black"
@@ -342,10 +329,7 @@ export default function FightCampPlanView({
               </div>
               <div
                 className="rounded-lg px-2 py-1.5 text-center"
-                style={{
-                  background: "var(--ink-3)",
-                  border: "1px solid var(--ink-4)",
-                }}
+                style={{ background: "var(--ink-3)" }}
               >
                 <div
                   className="font-display-ta text-sm font-black"
@@ -362,10 +346,7 @@ export default function FightCampPlanView({
               </div>
               <div
                 className="rounded-lg px-2 py-1.5 text-center"
-                style={{
-                  background: "var(--ink-3)",
-                  border: "1px solid var(--ink-4)",
-                }}
+                style={{ background: "var(--ink-3)" }}
               >
                 <div
                   className="font-display-ta text-sm font-black"
@@ -466,14 +447,7 @@ export default function FightCampPlanView({
       })}
 
       {/* Disclaimer */}
-      <div
-        className="rounded-xl p-3 text-[10px]"
-        style={{
-          background: "var(--ink-2)",
-          border: "1px solid var(--ink-4)",
-          color: "var(--fg-4)",
-        }}
-      >
+      <div className="text-[10px]" style={{ color: "var(--fg-4)" }}>
         <strong style={{ color: "var(--fg-3)" }}>Methodischer Hinweis:</strong>{" "}
         Der Plan wird automatisch aus der Trainings-Historie des Schülers und
         dem Gegnerstil generiert (Heuristik, keine wissenschaftliche Aussage).

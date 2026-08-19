@@ -43,14 +43,14 @@ export function Quiz({ questions }: { questions: QuizQuestion[] }) {
         return (
           <div
             key={qIdx}
-            className={`rounded-xl border p-5 transition-colors ${
+            className={`transition-colors ${
               submitted
                 ? isCorrect
-                  ? "border-green-500/60 bg-green-500/10"
+                  ? "rounded-xl border border-green-500/60 bg-green-500/10 p-5"
                   : isWrong
-                    ? "border-red-500/60 bg-red-500/10"
-                    : "border-carbon-500 bg-carbon-700/40"
-                : "border-carbon-500 bg-carbon-700/40"
+                    ? "rounded-xl border border-red-500/60 bg-red-500/10 p-5"
+                    : ""
+                : ""
             }`}
           >
             <p className="text-sm font-bold">

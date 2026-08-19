@@ -363,7 +363,7 @@ function SessionRunner() {
 
       {/* ── Nächste Übung ────────────────────────────────────────────────────── */}
       {nextExercise && !allDone && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-carbon-500/60 bg-carbon-700/30 px-4 py-2.5">
+        <div className="mb-4 flex items-center gap-2">
           <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-fg-4">
             Als Nächstes
           </span>

@@ -108,10 +108,7 @@ export default function AiBudgetGauge({
   const low = summary.budgetEur > 0 && fraction < 0.15;
 
   return (
-    <div
-      className="flex items-center gap-4 rounded-2xl px-4 py-3"
-      style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-    >
+    <div className="flex items-center gap-4">
       <div className="relative flex-shrink-0" style={{ width: 84, height: 84 }}>
         <Ring fraction={fraction} />
         <div className="absolute inset-0 flex flex-col items-center justify-center">

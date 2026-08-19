@@ -378,11 +378,7 @@ function DashboardContent() {
                   {sessions.slice(0, 10).map((s, idx) => (
                     <div
                       key={s.id}
-                      className={`rise-${Math.min(idx + 1, 6)} flex items-center gap-3 rounded-xl p-3 transition-colors`}
-                      style={{
-                        background: "rgba(255,255,255,.02)",
-                        border: "1px solid var(--ink-4)",
-                      }}
+                      className={`rise-${Math.min(idx + 1, 6)} flex items-center gap-3 py-2`}
                     >
                       {/* Date block */}
                       <div className="font-display-ta min-w-[44px] text-center leading-tight">
