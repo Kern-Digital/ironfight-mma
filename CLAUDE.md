@@ -21,9 +21,20 @@
   Werkzeug; sie sehen unter „Mein DeepFight" (`/deepfight`, im Profil-Menü)
   nur explizit Freigegebenes: Gegnerprofile via `opponents.sharedWith[uid]`
   (Firestore-Regel: read bei array-contains) und eigene Auswertungen via
-  `videoAnalyses.sharedWithAthlete` (clientseitig gefiltert — die generische
-  users-Subcollection-Regel erlaubt Owner-Read ohnehin). Timer ist kein
-  Top-Level-Punkt mehr: er hängt unter „Training" (alle) und „Trainer".
+  `videoAnalyses.sharedWithAthlete`. Timer ist kein Top-Level-Punkt mehr:
+  er hängt unter „Training" (alle) und „Trainer".
+- **⚠ Sicherheitsmodell der Analyse-Freigabe (bewusste Schuld, 2026-08-19):**
+  Die Sichtbarkeit der eigenen Auswertungen (`sharedWithAthlete`) wird NUR
+  clientseitig gefiltert — die generische users-Subcollection-Regel
+  (`match /users/{uid}/{subcollection}/{document=**}`) erlaubt einem Nutzer
+  ohnehin Owner-Read (und -Write!) auf ALLE eigenen Subcollections, also auch
+  auf nicht freigegebene `videoAnalyses`. Für das aktuelle gym-interne
+  Vertrauensniveau okay; eine harte serverseitige Trennung erfordert einen
+  Umbau der generischen users-Regel (videoAnalyses aus dem Wildcard
+  herauslösen: Owner-Read nur bei `resource.data.sharedWithAthlete == true`,
+  Owner-Write entziehen, Trainer/Admin voll). **Spätestens beim Ausbau auf
+  mehrere Gyms PFLICHT** — dann Trainer-Zugriff zusätzlich per gymId scopen
+  (siehe `lib/gym.ts` / `belongsToGym`).
 
 ## Tech-Stack
 | Layer | Technologie | Version |
@@ -177,6 +188,9 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 - R3F: NIEMALS @react-three/fiber v9+ ohne React 19 — bleibt auf v8!
 
 ## Backlog (offen)
+- [ ] Analyse-Freigabe serverseitig erzwingen: users-Regel umbauen, sodass
+      `videoAnalyses` nicht mehr unter das Owner-Wildcard fällt (Details siehe
+      Sicherheits-Hinweis oben) — Pflicht vor Multi-Gym
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)
 - [ ] Middleware: serverseitige Token-Signaturprüfung (Service-Account)
 - [ ] Video-Analyse: Web-Anreicherung (Fragenkatalog Abschnitt G, source=web)
