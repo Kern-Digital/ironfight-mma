@@ -113,6 +113,9 @@ function StudentDetailContent({ uid }: { uid: string }) {
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Kampfbereiche sind standardmäßig zugeklappt — der Kopf der Seite bleibt
+  // dadurch überschaubar, die Details holt man sich bei Bedarf.
+  const [areasOpen, setAreasOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -246,6 +249,46 @@ function StudentDetailContent({ uid }: { uid: string }) {
               >
                 {entry.email ?? "—"} · Seit {formatDate(entry.createdAt)}
               </p>
+
+              {/* DeepFight-Einstieg für diesen Schüler — die Analyse selbst
+                  lebt unter /trainer/deepfight/athletes/[uid]. */}
+              <Link
+                id="deepfight"
+                href={`/trainer/deepfight/athletes/${uid}`}
+                className="mt-2.5 inline-flex scroll-mt-24 items-center gap-2 rounded-xl px-3 py-1.5"
+                style={{
+                  background: "rgba(157,123,250,0.1)",
+                  border: "1px solid rgba(157,123,250,0.4)",
+                  textDecoration: "none",
+                }}
+              >
+                <span style={{ color: "#9D7BFA", lineHeight: 0 }}>
+                  <Icon name="video" size={14} />
+                </span>
+                <span
+                  className="font-display-ta font-black uppercase"
+                  style={{
+                    fontSize: "13px",
+                    letterSpacing: "0.06em",
+                    color: "var(--fg)",
+                  }}
+                >
+                  <DeepFightWordmark />
+                </span>
+                <span
+                  className="font-mono-ta text-[9px] uppercase"
+                  style={{ letterSpacing: "0.14em", color: "var(--fg-4)" }}
+                >
+                  {analyses === null
+                    ? "Öffnen"
+                    : analyses.length === 0
+                      ? "Analyse starten"
+                      : `${analyses.length} ${analyses.length === 1 ? "Auswertung" : "Auswertungen"} · ${analyses.filter((a) => a.sharedWithAthlete).length} frei`}
+                </span>
+                <span style={{ color: "#9D7BFA", lineHeight: 0 }}>
+                  <Icon name="arrow-right" size={13} />
+                </span>
+              </Link>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {athlete?.primaryDiscipline && (
                   <span
@@ -480,15 +523,43 @@ function StudentDetailContent({ uid }: { uid: string }) {
               </div>
             </div>
 
-            {/* Area coverage */}
+            {/* Area coverage — zugeklappt, bis der Trainer sie aufruft */}
             <div className="mt-4">
-              <div
-                className="font-mono-ta mb-2 text-[10px] font-bold uppercase"
-                style={{ letterSpacing: "0.18em", color: "var(--fg-3)" }}
+              <button
+                type="button"
+                onClick={() => setAreasOpen((o) => !o)}
+                aria-expanded={areasOpen}
+                className="flex w-full items-center gap-2 rounded-lg py-1 text-left"
               >
-                Kampfbereiche · Abdeckung
-              </div>
-              <AreaCoverageChart scores={analysis.areaScores} highlightWeak />
+                <span
+                  className="font-mono-ta text-[10px] font-bold uppercase"
+                  style={{ letterSpacing: "0.18em", color: "var(--fg-3)" }}
+                >
+                  Kampfbereiche · Abdeckung
+                </span>
+                <span
+                  className="font-mono-ta text-[9px] uppercase"
+                  style={{ letterSpacing: "0.14em", color: "var(--fg-4)" }}
+                >
+                  {analysis.areaScores.length} Bereiche
+                </span>
+                <span
+                  className="ml-auto"
+                  style={{
+                    color: "var(--fg-4)",
+                    transform: areasOpen ? "rotate(90deg)" : "none",
+                    transition: "transform 0.15s",
+                    lineHeight: 0,
+                  }}
+                >
+                  <Icon name="arrow-right" size={13} />
+                </span>
+              </button>
+              {areasOpen && (
+                <div className="mt-2">
+                  <AreaCoverageChart scores={analysis.areaScores} highlightWeak />
+                </div>
+              )}
             </div>
 
             {/* Strong / Weak summary */}
@@ -619,62 +690,6 @@ function StudentDetailContent({ uid }: { uid: string }) {
             )}
           </div>
         </div>
-
-        {/* DeepFight: die Analyse selbst lebt unter /trainer/deepfight/athletes/[uid] —
-            hier steht nur die Verlinkung samt Status. Anker bleibt für Alt-Links. */}
-        <div id="deepfight" className="mt-8 scroll-mt-24">
-          <Link
-            href={`/trainer/deepfight/athletes/${uid}`}
-            className="block rounded-2xl p-4 transition-colors sm:p-5"
-            style={{
-              background:
-                "radial-gradient(500px 220px at 100% 0%, rgba(157,123,250,0.1), transparent 60%), var(--ink-2)",
-              border: "1px solid rgba(157,123,250,0.3)",
-              textDecoration: "none",
-            }}
-          >
-            <div className="flex items-center gap-4">
-              <span
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                style={{
-                  background: "rgba(157,123,250,0.1)",
-                  border: "1px solid rgba(157,123,250,0.4)",
-                  color: "#9D7BFA",
-                }}
-              >
-                <Icon name="video" size={18} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2
-                  className="font-display-ta flex items-center font-black uppercase"
-                  style={{ fontSize: "20px", letterSpacing: "0.06em" }}
-                >
-                  <DeepFightWordmark />
-                </h2>
-                <p
-                  className="font-mono-ta mt-1 text-[10px]"
-                  style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
-                >
-                  {analyses === null
-                    ? "Analyse & Auswertung für diesen Schüler"
-                    : analyses.length === 0
-                      ? "Noch keine Auswertung · Kampf-Video analysieren"
-                      : `${analyses.length} ${analyses.length === 1 ? "Auswertung" : "Auswertungen"} · ${analyses.filter((a) => a.sharedWithAthlete).length} freigegeben`}
-                </p>
-              </div>
-              <span
-                className="font-mono-ta hidden shrink-0 text-[10px] font-bold uppercase sm:block"
-                style={{ letterSpacing: "0.18em", color: "#9D7BFA" }}
-              >
-                Öffnen
-              </span>
-              <span style={{ color: "#9D7BFA", lineHeight: 0 }}>
-                <Icon name="arrow-right" size={16} />
-              </span>
-            </div>
-          </Link>
-        </div>
-
       </div>
     </main>
   );
