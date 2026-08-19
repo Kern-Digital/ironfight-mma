@@ -10,6 +10,7 @@ export default function DnaCompletenessRing({
   total,
   size = 56,
   stroke = 5,
+  label,
 }: {
   /** Kategorien mit mindestens einer Antwort. */
   covered: number;
@@ -17,6 +18,8 @@ export default function DnaCompletenessRing({
   total: number;
   size?: number;
   stroke?: number;
+  /** Optionale Beschriftung unter der Zahl (z. B. „Score"). */
+  label?: string;
 }) {
   const ratio = total > 0 ? Math.min(1, covered / total) : 0;
   const r = (size - stroke) / 2;
@@ -31,7 +34,7 @@ export default function DnaCompletenessRing({
       role="img"
       aria-label={`DeepFight: ${covered} von ${total} Kategorien gescoutet`}
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: "visible" }}>
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -51,14 +54,42 @@ export default function DnaCompletenessRing({
           strokeDasharray={c}
           strokeDashoffset={c * (1 - ratio)}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: "stroke-dashoffset 0.4s ease" }}
+          style={{
+            transition: "stroke-dashoffset 0.4s ease",
+            filter:
+              covered > 0
+                ? `drop-shadow(0 0 6px ${
+                    ratio >= 0.667 ? "rgba(35,196,206,0.55)" : "rgba(157,123,250,0.5)"
+                  })`
+                : undefined,
+          }}
         />
       </svg>
       <span
-        className="font-mono-ta absolute inset-0 flex items-center justify-center font-bold"
-        style={{ fontSize: size * 0.24, color: covered === 0 ? "var(--fg-4)" : "var(--fg-1)" }}
+        className="absolute inset-0 flex flex-col items-center justify-center"
+        style={{ gap: size * 0.02 }}
       >
-        {covered}/{total}
+        <span
+          className="font-mono-ta font-bold leading-none"
+          style={{
+            fontSize: size * (label ? 0.22 : 0.24),
+            color: covered === 0 ? "var(--fg-4)" : "var(--fg-1)",
+          }}
+        >
+          {covered}/{total}
+        </span>
+        {label && (
+          <span
+            className="font-mono-ta uppercase leading-none"
+            style={{
+              fontSize: Math.max(8, size * 0.1),
+              letterSpacing: "0.18em",
+              color: "var(--fg-3)",
+            }}
+          >
+            {label}
+          </span>
+        )}
       </span>
     </div>
   );

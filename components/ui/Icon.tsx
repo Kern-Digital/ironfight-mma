@@ -43,7 +43,8 @@ export type IconName =
   | "arrow-left"
   | "plus"
   | "wave"
-  | "video";
+  | "video"
+  | "edit";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -267,6 +268,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="2.5" y="6.5" width="13" height="11" rx="2.5" />
       <path d="M15.5 10.5 21 7.5v9l-5.5-3" />
+    </>
+  ),
+  // Stift — Bearbeiten
+  edit: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.7 3.8a2.2 2.2 0 0 1 3.1 3.1L7.5 19.2 3.5 20.5l1.3-4z" />
     </>
   ),
 };

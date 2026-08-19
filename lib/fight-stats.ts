@@ -155,6 +155,13 @@ export const CAGE_ZONE_LABEL: Record<CageZone, string> = {
   cage: "Am Cage",
 };
 
+/** Gebeugte Ortsangabe für Fließtext („… passieren im offenen Raum"). */
+export const CAGE_ZONE_PHRASE: Record<CageZone, string> = {
+  center: "im Center",
+  open: "im offenen Raum",
+  cage: "am Cage",
+};
+
 /** Eine gezählte Aktion, aggregiert über die hochgeladenen Kämpfe. */
 export interface ActionStat {
   /** Katalog-ID (siehe ACTION_CATALOG). */
@@ -316,7 +323,7 @@ export function deriveTendencies(stats: ActionStat[]): Tendency[] {
         out.push({
           id: "takedown-zone",
           tone: "zone",
-          text: `${pct(zones[dom] / zTotal)} der Takedowns passieren ${CAGE_ZONE_LABEL[dom].toLowerCase() === "am cage" ? "am Cage" : `im ${CAGE_ZONE_LABEL[dom]}`}.`,
+          text: `${pct(zones[dom] / zTotal)} der Takedowns passieren ${CAGE_ZONE_PHRASE[dom]}.`,
         });
       }
     }

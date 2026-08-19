@@ -11,6 +11,7 @@ import OpponentEditor, {
 } from "@/components/trainer/OpponentEditor";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import DnaCompletenessRing from "@/components/trainer/DnaCompletenessRing";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import {
   deleteOpponent,
@@ -19,24 +20,15 @@ import {
   type Opponent,
 } from "@/lib/opponents";
 import { DNA_CATEGORIES, answeredCount, totalAnswered } from "@/lib/gegner-dna";
-import { FIGHTER_STANCE_LABEL, FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
-
-function formatDate(d: Date | null | undefined): string {
-  if (!d) return "—";
-  return d.toLocaleDateString("de-DE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 
 type DetailTab = "uebersicht" | "dna" | "stats" | "videos";
 
-const DETAIL_TABS: [DetailTab, string][] = [
-  ["uebersicht", "Übersicht"],
-  ["dna", "DeepFight"],
-  ["stats", "Stats"],
-  ["videos", "Videos"],
+const DETAIL_TABS: [DetailTab, string, IconName | null][] = [
+  ["uebersicht", "Übersicht", null],
+  ["dna", "DeepFight", "shield"],
+  ["stats", "Stats", "chart"],
+  ["videos", "Videos", "video"],
 ];
 
 // ─── Auf einen Blick: Stärken / Schwächen / Lieblingsangriffe als Chips ──────
@@ -217,78 +209,91 @@ function OpponentDetailContent({ id }: { id: string }) {
   ].filter(Boolean);
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
+    <main className="min-h-screen" style={{ background: "var(--ink-0)" }}>
       {/* Zurück-Zeile (scrollt mit) */}
       <div className="px-4 pt-4 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <Link
             href="/trainer/opponents"
-            className="font-mono-ta text-[10px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
+            aria-label="Zurück zur DeepFight-Bibliothek"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-white/5"
+            style={{ color: "var(--fg-2)" }}
           >
-            ← DeepFight-Bibliothek
+            <Icon name="arrow-left" size={22} />
           </Link>
         </div>
       </div>
 
       {/* Sticky Fighter-ID-Card: dockt unter der Haupt-Navbar (h-16) an */}
       <div
-        className="sticky top-16 z-30 mt-3 border-y px-4 sm:px-6"
+        className="sticky top-16 z-30 mt-1 px-4 sm:px-6"
         style={{
-          borderColor: "rgba(255,79,168,0.2)",
-          background:
-            "radial-gradient(500px 220px at 100% 50%, rgba(255,79,168,0.1), transparent 60%), linear-gradient(160deg, #140A12, #080512)",
+          borderBottom: "1px solid var(--ink-3)",
+          background: "linear-gradient(180deg, var(--ink-1), var(--ink-0))",
         }}
       >
-        <div className="mx-auto max-w-3xl py-3.5">
-          <div className="flex flex-wrap items-center gap-3.5">
+        <div className="mx-auto max-w-3xl py-4">
+          <div className="flex flex-wrap items-center gap-4">
             <DnaCompletenessRing
               covered={coveredCategories}
               total={DNA_CATEGORIES.length}
-              size={52}
-              stroke={4.5}
+              size={82}
+              stroke={5.5}
+              label="Score"
             />
             <div className="min-w-0 flex-1">
               <h1
-                className="font-display-ta truncate font-black uppercase leading-none"
+                className="font-display-ta truncate font-bold uppercase leading-none"
                 style={{
-                  fontSize: "clamp(20px, 3.5vw, 28px)",
-                  letterSpacing: "0.02em",
-                  color: "#F5F2F7",
+                  fontSize: "clamp(26px, 5vw, 38px)",
+                  letterSpacing: "0.04em",
+                  color: "var(--fg)",
                 }}
               >
                 {opponent.name}
               </h1>
               <p
-                className="font-mono-ta mt-1.5 truncate text-[10px]"
-                style={{ letterSpacing: "0.14em", color: "rgba(245,242,247,0.65)" }}
+                className="mt-2 flex items-center gap-2 truncate"
+                style={{ color: "#9D7BFA" }}
               >
-                {FIGHT_STYLE_LABEL[opponent.style]} ·{" "}
-                {FIGHTER_STANCE_LABEL[opponent.stance]}
-                {measures.length > 0 && <> · {measures.join(" · ")}</>}
+                <span
+                  className="font-mono-ta text-[11px] font-bold uppercase"
+                  style={{ letterSpacing: "0.16em" }}
+                >
+                  {FIGHT_STYLE_LABEL[opponent.style]}
+                </span>
+                <span aria-hidden style={{ color: "var(--ink-5)" }}>
+                  |
+                </span>
+                <Icon name="glove" size={15} />
               </p>
               <p
-                className="font-mono-ta mt-0.5 truncate text-[10px]"
-                style={{ letterSpacing: "0.14em", color: "rgba(245,242,247,0.45)" }}
+                className="font-mono-ta mt-1.5 flex items-center gap-1.5 truncate text-[11px]"
+                style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
               >
-                {answers} {answers === 1 ? "Eintrag" : "Einträge"} · Aktualisiert{" "}
-                {formatDate(opponent.updatedAt)}
+                <Icon name="calendar" size={13} />
+                <span>
+                  {answers} {answers === 1 ? "Eintrag" : "Einträge"}
+                  {measures.length > 0 && <> · {measures.join(" · ")}</>}
+                </span>
               </p>
             </div>
             {!editing && (
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <Link
-                  href={`/trainer/competitions/new?opponent=${opponent.id}`}
-                  className="btn-secondary px-3.5 py-2 text-xs"
-                >
-                  Wettkampf anlegen
-                </Link>
+              <div className="flex shrink-0 flex-col gap-2">
                 <button
                   onClick={() => setEditing(true)}
-                  className="btn-primary px-3.5 py-2 text-xs"
+                  className="btn-primary px-4 py-2.5 text-xs"
                 >
+                  <Icon name="edit" size={14} />
                   Bearbeiten
                 </button>
+                <Link
+                  href={`/trainer/competitions/new?opponent=${opponent.id}`}
+                  className="btn-secondary px-4 py-2.5 text-xs"
+                >
+                  <Icon name="plus" size={14} />
+                  Wettkampf anlegen
+                </Link>
               </div>
             )}
           </div>
@@ -296,26 +301,44 @@ function OpponentDetailContent({ id }: { id: string }) {
           {/* Bereichs-Tabs — bleiben beim Scrollen erreichbar */}
           {!editing && (
             <div
-              className="mt-3 inline-flex gap-1 rounded-xl p-1"
+              className="mt-4 flex rounded-2xl p-1"
               style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.09)",
               }}
             >
-              {DETAIL_TABS.map(([tabId, label]) => (
-                <button
-                  key={tabId}
-                  onClick={() => setTab(tabId)}
-                  className="font-mono-ta rounded-lg px-3.5 py-1.5 text-[11px] font-bold uppercase transition-colors"
-                  style={{
-                    letterSpacing: "0.12em",
-                    background: tab === tabId ? "var(--ta-pink)" : "transparent",
-                    color: tab === tabId ? "#fff" : "rgba(245,242,247,0.6)",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+              {DETAIL_TABS.map(([tabId, label, icon], i) => {
+                const active = tab === tabId;
+                return (
+                  <button
+                    key={tabId}
+                    onClick={() => setTab(tabId)}
+                    className="font-mono-ta flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-bold uppercase transition-colors"
+                    style={{
+                      letterSpacing: "0.14em",
+                      color: active ? "var(--ta-pink)" : "var(--fg-3)",
+                      borderLeft:
+                        i > 0 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                      borderRadius: 0,
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      {icon && <Icon name={icon} size={15} />}
+                      {label}
+                    </span>
+                    <span
+                      aria-hidden
+                      className="h-[3px] w-10 rounded-full"
+                      style={{
+                        background: active ? "var(--ta-pink)" : "transparent",
+                        boxShadow: active
+                          ? "0 0 10px rgba(255,79,168,0.7)"
+                          : "none",
+                      }}
+                    />
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
