@@ -89,8 +89,15 @@ function Stat({
 
 // ─── Schüler-Karte ────────────────────────────────────────────────────────
 
-function StudentCard({ entry }: { entry: StudentEntry }) {
-  const [open, setOpen] = useState(false);
+function StudentCard({
+  entry,
+  open,
+  onToggle,
+}: {
+  entry: StudentEntry;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressError, setProgressError] = useState<string | null>(null);
@@ -132,7 +139,7 @@ function StudentCard({ entry }: { entry: StudentEntry }) {
     >
       {/* Kopf-Zeile (klickbar) */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         className="flex w-full items-start gap-3 p-4 text-left"
         aria-expanded={open}
       >
@@ -391,6 +398,8 @@ function StudentsContent() {
   const [students, setStudents] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // Akkordeon: es ist immer nur eine Schüler-Karte gleichzeitig aufgeklappt.
+  const [openUid, setOpenUid] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -536,7 +545,14 @@ function StudentsContent() {
         {students !== null && filtered.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((entry) => (
-              <StudentCard key={entry.uid} entry={entry} />
+              <StudentCard
+                key={entry.uid}
+                entry={entry}
+                open={openUid === entry.uid}
+                onToggle={() =>
+                  setOpenUid((prev) => (prev === entry.uid ? null : entry.uid))
+                }
+              />
             ))}
           </div>
         )}
