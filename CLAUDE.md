@@ -159,6 +159,47 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   mit 20-s-Countdown; retryfähig sind Fehlermeldungen mit **„überlastet"** oder
   **„kein Ergebnis"** (Timeout/Stream-Abriss) — diese Wortmarken nicht ändern!
 
+### Gewichtung & Merge (seit 2026-08-20 — WICHTIG)
+- **Ein Video ≠ halbes Profil.** `dnaSplit` wird über einen echten gewichteten
+  Mittelwert gemergt (`mergeDnaSplit` in `lib/fight-stats.ts`):
+  `split_neu = (split_alt · W + split_video · w) / (W + w)`. Dafür trägt jedes
+  Merge-Ziel die Gewichtssumme **`dnaSplitWeight`** (`fightProfile` bzw.
+  `opponents/{id}`). Vorher lief das als `(alt + neu) / 2` — das gab JEDEM
+  neuen Video pauschal 50 %, egal wie viele Kämpfe schon drin waren.
+  `dnaSplitWeight = 0` (Bestandsprofile) → der neue Split wird voll übernommen.
+- **`w` = Aktualität × Abdeckung × Identifikationssicherheit**, geklemmt auf
+  0,2–1,0 (`computeVideoWeight` in `lib/video-analysis.ts`). Quellen:
+  Trainer-Dropdown `recency` (`FIGHT_RECENCY_WEIGHT`, Standard „unknown" = 0,8
+  — fehlendes Wissen ist KEIN Strafabzug), `meta.coverage` per Stichwort-Match
+  (`coverageWeight`, unbekannt → 0,8) und `identification.idConfidence`.
+- **Bewusst NICHT in der Gewichtung:** `meta.estimatedAge` und
+  `meta.opponentLevel`. Beides sind reine Bildschätzungen des Modells — es gibt
+  weder ein Kampfdatum noch Gegnerdaten im Input. Ebenso `evaluation.merge.weight`
+  (Claudes Selbsteinschätzung): wird weder gerechnet noch angezeigt.
+- **`actionStats` werden weiterhin nur summiert**, nie gewichtet — es sind
+  Zählungen; „3,7 Versuche" wäre nicht interpretierbar.
+- **DNA-Freitext bleibt manuell**: harter Ersatz pro Frage-ID, Konflikte nur
+  per „Ersetzen". Das Gewicht erscheint dort nur als Anzeige (aufgeschlüsselt
+  im Ergebniskopf).
+- Das Feld `recency` wird auf der Analyse gespeichert und geht additiv in den
+  Claude-Prompt: bei „unknown" ist der Prompt **zeichengleich** zu vor der
+  Einführung (verifiziert) — Regression-Schutz beim Ändern von `userPrompt`.
+
+### Fortschrittsanzeige (0–100 %, seit 2026-08-20)
+- `useAnalysisProgress` in `VideoAnalysisSection.tsx`. Zwei Schätzer parallel,
+  angezeigt wird der höhere; der Wert **fällt nie** (auch nicht beim
+  Auto-Neustart) und wird pro Tick nur zu 25 % nachgezogen.
+  1. **Echtes Signal**: Upload-Bytes (XHR) und die Zeichenzahl der
+     Claude-Antwort — NDJSON-Event `{"type":"progress","chars":N}`, gespeist aus
+     `stream.on("text")` in `claude.ts`, gedrosselt alle 250 Zeichen, Nenner
+     `EXPECTED_EVALUATION_CHARS`.
+  2. **Zeitschätzer** `1 − e^(−t/τ)` (`PHASE_TAU`), gedeckelt bei 92 % — nur er
+     überbrückt die Gemini-Phase, die **kein** Signal liefert
+     (`:generateContent` ist blockierend; Streaming-Umbau bewusst offen).
+- Bänder aus `PHASE_SHARE` (upload 30 / gemini 42 / claude 25 / save 3), auf die
+  tatsächlich laufenden Phasen normiert (YouTube → kein Upload-Band).
+- τ-Werte sind Schätzungen und dürfen an reale Laufzeiten angepasst werden.
+
 ### Resume & Wiederverwendung (Token-/Zeitersparnis)
 - localStorage-Key `ta-video-analysis-form:{mode}:{targetId}` hält:
   Kämpferbeschreibung, `pendingUpload` (Gemini-Datei, 48 h gültig) und
@@ -214,4 +255,15 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 - [ ] Middleware: serverseitige Token-Signaturprüfung (Service-Account)
 - [ ] Video-Analyse: Web-Anreicherung (Fragenkatalog Abschnitt G, source=web)
 - [ ] Video-Analyse: Trends über mehrere Videos (Fragenkatalog E4, ab ≥2 Videos)
+- [ ] Video-Analyse: Gemini auf `:streamGenerateContent` umstellen — würde die
+      heute rein zeitgeschätzte Gemini-Phase der Fortschrittsanzeige durch ein
+      echtes Signal ersetzen. Modell-Output ändert sich dadurch NICHT, wohl aber
+      die Fehlerfläche (Chunk-Zusammenbau + Retry-/Modellketten-Logik) →
+      blockierenden Aufruf als Fallback behalten
+- [ ] Video-Analyse: Löschen einer Analyse korrigiert `dnaSplitWeight` nicht
+      (gelöschtes Video wirkt im Split weiter). Sauber nur per Neuberechnung
+      aus allen Analysen mit `appliedStats`
+- [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert — die
+      Konflikt-Anzeige kann daher nicht sagen, aus welchem (wie gewichteten)
+      Video die bisherige Antwort stammt
 - [ ] Optional: Google-Billing aktivieren → Detail-Analyse (Gemini Pro) nutzbar
