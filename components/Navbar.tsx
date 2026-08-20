@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth, useFighterName } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
@@ -112,45 +112,45 @@ interface NavGroup {
 }
 
 // ── Nav Config ─────────────────────────────────────────────────
-const navGroups: NavGroup[] = [
-  {
-    id: "training",
-    label: "Training",
-    icon: <IconDumbbell />,
-    children: [
-      { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
-      { href: "/schedule", label: "Kursplan" },
-      { href: "/timer", label: "Timer" },
-    ],
-  },
-  {
-    id: "lernen",
-    label: "Lernen",
-    icon: <IconBook />,
-    children: [
-      { href: "/techniques", label: "Techniken" },
-      { href: "/regeln", label: "Regeln" },
-      { href: "/quiz", label: "Quiz" },
-    ],
-  },
-  {
-    id: "profil",
-    label: "Profil",
-    icon: <IconUser />,
-    children: [
-      // Kampfprofil: DeepFight-Daten, freigegebene Auswertungen & Gegner,
-      // Athleten-Daten. /deepfight leitet dorthin um (alte "Mein DeepFight"-Seite).
-      {
-        href: "/kampfprofil",
-        label: "Kampfprofil",
-        activePattern: /^\/(kampfprofil|deepfight)/,
-      },
-      { href: "/library", label: "Sammlung" },
-      { href: "/dashboard", label: "Verlauf" },
-      { href: "/profile", label: "Account" },
-    ],
-  },
-];
+const trainingNavGroup: NavGroup = {
+  id: "training",
+  label: "Training",
+  icon: <IconDumbbell />,
+  children: [
+    { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
+    { href: "/schedule", label: "Kursplan" },
+    { href: "/timer", label: "Timer" },
+  ],
+};
+
+const lernenNavGroup: NavGroup = {
+  id: "lernen",
+  label: "Lernen",
+  icon: <IconBook />,
+  children: [
+    { href: "/techniques", label: "Techniken" },
+    { href: "/regeln", label: "Regeln" },
+    { href: "/quiz", label: "Quiz" },
+  ],
+};
+
+const profilNavGroup: NavGroup = {
+  id: "profil",
+  label: "Profil",
+  icon: <IconUser />,
+  children: [
+    // Kampfprofil: DeepFight-Daten, freigegebene Auswertungen & Gegner,
+    // Athleten-Daten. /deepfight leitet dorthin um (alte "Mein DeepFight"-Seite).
+    {
+      href: "/kampfprofil",
+      label: "Kampfprofil",
+      activePattern: /^\/(kampfprofil|deepfight)/,
+    },
+    { href: "/library", label: "Sammlung" },
+    { href: "/dashboard", label: "Verlauf" },
+    { href: "/profile", label: "Account" },
+  ],
+};
 
 const helpNavGroup: NavGroup = {
   id: "help",
@@ -227,8 +227,12 @@ export default function Navbar() {
   const isAdmin = profile?.role === "admin";
   const isTrainer = profile?.role === "trainer" || isAdmin;
   const visibleGroups: NavGroup[] = [
-    ...navGroups,
-    ...(isTrainer ? [trainerNavGroup, deepFightNavGroup] : []),
+    trainingNavGroup,
+    lernenNavGroup,
+    // DeepFight steht als dritter Punkt direkt unter "Lernen".
+    ...(isTrainer ? [deepFightNavGroup] : []),
+    profilNavGroup,
+    ...(isTrainer ? [trainerNavGroup] : []),
     helpNavGroup,
     ...(isAdmin ? [adminNavGroup] : []),
   ];
@@ -237,6 +241,16 @@ export default function Navbar() {
   const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
   const [openDesktopGroup, setOpenDesktopGroup] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Vollbild-Menü: Hintergrund darf nicht mitscrollen.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileOpen]);
 
   async function handleLogout() {
     await logOut();
@@ -506,21 +520,37 @@ export default function Navbar() {
             border: "1px solid var(--ink-5)",
             color: "var(--fg-2)",
           }}
-          aria-label="Menü öffnen"
+          aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
+          aria-expanded={mobileOpen}
         >
-          <span className="block h-0.5 w-5" style={{ background: "currentColor" }} />
-          <span className="mt-1 block h-0.5 w-5" style={{ background: "currentColor" }} />
-          <span className="mt-1 block h-0.5 w-5" style={{ background: "currentColor" }} />
+          <span
+            className="block h-0.5 w-5 origin-center transition-transform"
+            style={{
+              background: "currentColor",
+              transform: mobileOpen ? "translateY(6px) rotate(45deg)" : "none",
+            }}
+          />
+          <span
+            className="mt-1 block h-0.5 w-5 transition-opacity"
+            style={{ background: "currentColor", opacity: mobileOpen ? 0 : 1 }}
+          />
+          <span
+            className="mt-1 block h-0.5 w-5 origin-center transition-transform"
+            style={{
+              background: "currentColor",
+              transform: mobileOpen ? "translateY(-6px) rotate(-45deg)" : "none",
+            }}
+          />
         </button>
       </nav>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Menü — Vollbild unterhalb der Kopfzeile */}
       {mobileOpen && (
         <div
-          className="border-t md:hidden"
+          className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto border-t md:hidden"
           style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
         >
-          <div className="flex flex-col p-4">
+          <div className="flex min-h-full flex-col p-4">
             {visibleGroups.map((group) => {
               const groupActive = isGroupActive(group);
               const groupMobileOpen = openMobileGroup === group.id;
@@ -594,7 +624,7 @@ export default function Navbar() {
 
             {/* Auth section */}
             <div
-              className="mt-2 flex flex-col gap-2 border-t pt-3"
+              className="mt-auto flex flex-col gap-2 border-t pt-4"
               style={{ borderColor: "var(--ink-4)" }}
             >
               {/* Theme toggle row */}
