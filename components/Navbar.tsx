@@ -288,261 +288,263 @@ export default function Navbar() {
   };
 
   return (
-    <header
-      className="sticky top-0 z-50 backdrop-blur"
-      style={{
-        background: "var(--nav-surface)",
-        borderBottom: "1px solid var(--ink-4)",
-      }}
-    >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Brand */}
-        <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
-          <Image
-            src="/icons/icon-192.png"
-            alt="Tidal Athletics"
-            width={36}
-            height={36}
-            className="rounded-xl"
-          />
-          <div>
-            <div
-              className="font-display-ta text-lg font-black uppercase leading-none"
-              style={{ letterSpacing: "0.12em" }}
-            >
-              <span style={{ color: "var(--ta-pink)" }}>Tidal</span>
-              <span style={{ color: "var(--ta-cyan)" }}>Athletics</span>
-            </div>
-            <div
-              className="font-mono-ta text-[9px] uppercase"
-              style={{ letterSpacing: "0.25em", color: "var(--fg-3)", marginTop: "2px" }}
-            >
-              MMA Training
-            </div>
-          </div>
-        </Link>
-
-        {/* Desktop Navigation */}
-        <div className="hidden items-center gap-0.5 md:flex">
-          {visibleGroups.map((group) => {
-            const active = isGroupActive(group);
-            const isOpen = openDesktopGroup === group.id;
-
-            return (
+    <>
+      <header
+        className="sticky top-0 z-50 backdrop-blur"
+        style={{
+          background: "var(--nav-surface)",
+          borderBottom: "1px solid var(--ink-4)",
+        }}
+      >
+        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
+            <Image
+              src="/icons/icon-192.png"
+              alt="Tidal Athletics"
+              width={36}
+              height={36}
+              className="rounded-xl"
+            />
+            <div>
               <div
-                key={group.id}
-                className="relative"
-                onMouseEnter={() => handleGroupEnter(group.id)}
-                onMouseLeave={handleGroupLeave}
+                className="font-display-ta text-lg font-black uppercase leading-none"
+                style={{ letterSpacing: "0.12em" }}
               >
-                {group.href ? (
-                  // Direct link (Timer)
-                  <Link
-                    href={group.href}
-                    className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                    style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
-                  >
-                    {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
-                    {group.label}
-                    {active && (
+                <span style={{ color: "var(--ta-pink)" }}>Tidal</span>
+                <span style={{ color: "var(--ta-cyan)" }}>Athletics</span>
+              </div>
+              <div
+                className="font-mono-ta text-[9px] uppercase"
+                style={{ letterSpacing: "0.25em", color: "var(--fg-3)", marginTop: "2px" }}
+              >
+                MMA Training
+              </div>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden items-center gap-0.5 md:flex">
+            {visibleGroups.map((group) => {
+              const active = isGroupActive(group);
+              const isOpen = openDesktopGroup === group.id;
+
+              return (
+                <div
+                  key={group.id}
+                  className="relative"
+                  onMouseEnter={() => handleGroupEnter(group.id)}
+                  onMouseLeave={handleGroupLeave}
+                >
+                  {group.href ? (
+                    // Direct link (Timer)
+                    <Link
+                      href={group.href}
+                      className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
+                      style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                    >
+                      {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
+                      {group.label}
+                      {active && (
+                        <span
+                          className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
+                          style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                        />
+                      )}
+                    </Link>
+                  ) : (
+                    // Dropdown trigger
+                    <button
+                      className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
+                      style={{ ...monoStyle, color: active || isOpen ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                      aria-haspopup="true"
+                      aria-expanded={isOpen}
+                    >
+                      {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
+                      {group.label}
                       <span
-                        className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
-                      />
-                    )}
-                  </Link>
-                ) : (
-                  // Dropdown trigger
-                  <button
-                    className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                    style={{ ...monoStyle, color: active || isOpen ? "var(--ta-cyan)" : "var(--fg-3)" }}
-                    aria-haspopup="true"
-                    aria-expanded={isOpen}
-                  >
-                    {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
-                    {group.label}
-                    <span
+                        style={{
+                          transition: "transform 0.2s",
+                          transform: isOpen ? "rotate(180deg)" : "none",
+                          opacity: 0.5,
+                        }}
+                      >
+                        <IconChevron />
+                      </span>
+                      {active && !isOpen && (
+                        <span
+                          className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
+                          style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                        />
+                      )}
+                    </button>
+                  )}
+
+                  {/* Dropdown Panel */}
+                  {group.children && isOpen && (
+                    <div
+                      className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-xl py-1"
                       style={{
-                        transition: "transform 0.2s",
-                        transform: isOpen ? "rotate(180deg)" : "none",
-                        opacity: 0.5,
+                        background: "var(--dropdown-surface)",
+                        border: "1px solid var(--ink-5)",
+                        boxShadow: "var(--dropdown-shadow)",
                       }}
                     >
-                      <IconChevron />
-                    </span>
-                    {active && !isOpen && (
-                      <span
-                        className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                        style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
-                      />
-                    )}
-                  </button>
-                )}
+                      {group.children.map((child) => {
+                        const childActive = isChildActive(child);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={() => setOpenDesktopGroup(null)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
+                            style={{
+                              ...monoStyle,
+                              color: childActive ? "var(--ta-cyan)" : "var(--fg-3)",
+                              background: childActive ? "var(--active-overlay-cyan)" : "transparent",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!childActive)
+                                e.currentTarget.style.background = "var(--hover-overlay)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = childActive
+                                ? "var(--active-overlay-cyan)"
+                                : "transparent";
+                            }}
+                          >
+                            {childActive && (
+                              <span
+                                className="h-3 w-0.5 rounded-full"
+                                style={{ background: "var(--ta-cyan)", flexShrink: 0 }}
+                              />
+                            )}
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-                {/* Dropdown Panel */}
-                {group.children && isOpen && (
-                  <div
-                    className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-xl py-1"
+          {/* Auth Controls — Desktop */}
+          <div className="hidden items-center gap-3 md:flex">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="rounded-xl p-2 transition-colors"
+              style={{
+                background: "var(--ink-3)",
+                border: "1px solid var(--ink-5)",
+                color: "var(--fg-3)",
+              }}
+              aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
+            >
+              {theme === "dark" ? <IconSun /> : <IconMoon />}
+            </button>
+            {loading ? (
+              <div
+                className="h-8 w-24 animate-pulse rounded-xl"
+                style={{ background: "var(--ink-4)" }}
+              />
+            ) : user ? (
+              <>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 text-sm font-bold uppercase transition-colors"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.1em",
+                    color: "var(--fg-2)",
+                  }}
+                >
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black"
                     style={{
-                      background: "var(--dropdown-surface)",
-                      border: "1px solid var(--ink-5)",
-                      boxShadow: "var(--dropdown-shadow)",
+                      border: "1px solid rgba(35,196,206,.4)",
+                      background: "rgba(35,196,206,.08)",
+                      color: "var(--ta-cyan)",
                     }}
                   >
-                    {group.children.map((child) => {
-                      const childActive = isChildActive(child);
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setOpenDesktopGroup(null)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
-                          style={{
-                            ...monoStyle,
-                            color: childActive ? "var(--ta-cyan)" : "var(--fg-3)",
-                            background: childActive ? "var(--active-overlay-cyan)" : "transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!childActive)
-                              e.currentTarget.style.background = "var(--hover-overlay)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = childActive
-                              ? "var(--active-overlay-cyan)"
-                              : "transparent";
-                          }}
-                        >
-                          {childActive && (
-                            <span
-                              className="h-3 w-0.5 rounded-full"
-                              style={{ background: "var(--ta-cyan)", flexShrink: 0 }}
-                            />
-                          )}
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                    {initialsOf(fighterName)}
+                  </span>
+                  <span className="hidden lg:inline">{fighterName}</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm font-bold uppercase transition-colors"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.1em",
+                    color: "var(--fg-4)",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ta-pink)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-4)")}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-sm font-bold uppercase transition-colors"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.1em",
+                    color: "var(--fg-3)",
+                  }}
+                >
+                  Login
+                </Link>
+                <Link href="/register" className="btn-primary px-4 py-2 text-xs">
+                  Registrieren
+                </Link>
+              </>
+            )}
+          </div>
 
-        {/* Auth Controls — Desktop */}
-        <div className="hidden items-center gap-3 md:flex">
-          {/* Theme Toggle */}
+          {/* Mobile Hamburger */}
           <button
-            onClick={toggleTheme}
-            className="rounded-xl p-2 transition-colors"
+            onClick={() =>
+              setMobileOpen((v) => {
+                if (v) setOpenMobileGroup(null);
+                return !v;
+              })
+            }
+            className="rounded-xl p-2 md:hidden"
             style={{
               background: "var(--ink-3)",
               border: "1px solid var(--ink-5)",
-              color: "var(--fg-3)",
+              color: "var(--fg-2)",
             }}
-            aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
+            aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
+            aria-expanded={mobileOpen}
           >
-            {theme === "dark" ? <IconSun /> : <IconMoon />}
-          </button>
-          {loading ? (
-            <div
-              className="h-8 w-24 animate-pulse rounded-xl"
-              style={{ background: "var(--ink-4)" }}
+            <span
+              className="block h-0.5 w-5 origin-center transition-transform"
+              style={{
+                background: "currentColor",
+                transform: mobileOpen ? "translateY(6px) rotate(45deg)" : "none",
+              }}
             />
-          ) : user ? (
-            <>
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 text-sm font-bold uppercase transition-colors"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.1em",
-                  color: "var(--fg-2)",
-                }}
-              >
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black"
-                  style={{
-                    border: "1px solid rgba(35,196,206,.4)",
-                    background: "rgba(35,196,206,.08)",
-                    color: "var(--ta-cyan)",
-                  }}
-                >
-                  {initialsOf(fighterName)}
-                </span>
-                <span className="hidden lg:inline">{fighterName}</span>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="text-sm font-bold uppercase transition-colors"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.1em",
-                  color: "var(--fg-4)",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ta-pink)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-4)")}
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="text-sm font-bold uppercase transition-colors"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.1em",
-                  color: "var(--fg-3)",
-                }}
-              >
-                Login
-              </Link>
-              <Link href="/register" className="btn-primary px-4 py-2 text-xs">
-                Registrieren
-              </Link>
-            </>
-          )}
-        </div>
-
-        {/* Mobile Hamburger */}
-        <button
-          onClick={() =>
-            setMobileOpen((v) => {
-              if (v) setOpenMobileGroup(null);
-              return !v;
-            })
-          }
-          className="rounded-xl p-2 md:hidden"
-          style={{
-            background: "var(--ink-3)",
-            border: "1px solid var(--ink-5)",
-            color: "var(--fg-2)",
-          }}
-          aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
-          aria-expanded={mobileOpen}
-        >
-          <span
-            className="block h-0.5 w-5 origin-center transition-transform"
-            style={{
-              background: "currentColor",
-              transform: mobileOpen ? "translateY(6px) rotate(45deg)" : "none",
-            }}
-          />
-          <span
-            className="mt-1 block h-0.5 w-5 transition-opacity"
-            style={{ background: "currentColor", opacity: mobileOpen ? 0 : 1 }}
-          />
-          <span
-            className="mt-1 block h-0.5 w-5 origin-center transition-transform"
-            style={{
-              background: "currentColor",
-              transform: mobileOpen ? "translateY(-6px) rotate(-45deg)" : "none",
-            }}
-          />
-        </button>
-      </nav>
+            <span
+              className="mt-1 block h-0.5 w-5 transition-opacity"
+              style={{ background: "currentColor", opacity: mobileOpen ? 0 : 1 }}
+            />
+            <span
+              className="mt-1 block h-0.5 w-5 origin-center transition-transform"
+              style={{
+                background: "currentColor",
+                transform: mobileOpen ? "translateY(-6px) rotate(-45deg)" : "none",
+              }}
+            />
+          </button>
+        </nav>
+      </header>
 
       {/* Mobile Menü — Vollbild unterhalb der Kopfzeile */}
       {mobileOpen && (
@@ -678,6 +680,6 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }
