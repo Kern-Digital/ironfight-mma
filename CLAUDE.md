@@ -184,6 +184,16 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 - Das Feld `recency` wird auf der Analyse gespeichert und geht additiv in den
   Claude-Prompt: bei „unknown" ist der Prompt **zeichengleich** zu vor der
   Einführung (verifiziert) — Regression-Schutz beim Ändern von `userPrompt`.
+- **`readTarget` liest IMMER frisch aus Firestore — in BEIDEN Modi. Nie wieder
+  auf den React-Prop umstellen.** Der Gegner kam früher aus dem Prop; arbeiten
+  mehrere Trainer am selben Profil, überschrieb ein veralteter Prop den Beitrag
+  eines anderen komplett (Split, `dnaSplitWeight`, `actionStats`). Das Fenster
+  war kein Millisekunden-Rennen, sondern die **Standzeit eines offenen Tabs**.
+  Aus demselben Grund prüft `isConflict` beim Übernehmen gegen den frisch
+  gelesenen Stand (3. Parameter), nicht gegen den Anzeigestand — sonst ginge
+  eine inzwischen von anderer Seite gesetzte Antwort als konfliktfrei durch.
+- Analysieren selbst ist unkritisch: jede Analyse ist ein eigenes Dokument in
+  der Subcollection. Nur das Übernehmen schreibt ins gemeinsame Profil.
 
 ### Fortschrittsanzeige (0–100 %, seit 2026-08-20)
 - `useAnalysisProgress` in `VideoAnalysisSection.tsx`. Zwei Schätzer parallel,
@@ -260,9 +270,15 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       echtes Signal ersetzen. Modell-Output ändert sich dadurch NICHT, wohl aber
       die Fehlerfläche (Chunk-Zusammenbau + Retry-/Modellketten-Logik) →
       blockierenden Aufruf als Fallback behalten
-- [ ] Video-Analyse: Löschen einer Analyse korrigiert `dnaSplitWeight` nicht
-      (gelöschtes Video wirkt im Split weiter). Sauber nur per Neuberechnung
-      aus allen Analysen mit `appliedStats`
+- [ ] Video-Analyse: `dnaSplit`/`dnaSplitWeight`/`actionStats` beim Übernehmen
+      aus ALLEN Analysen mit `appliedStats` neu berechnen, statt sie
+      fortzuschreiben. Der gewichtete Mittelwert ist reihenfolgeunabhängig →
+      gleiches Ergebnis, aber selbstheilend. Löst zwei Dinge auf einmal:
+      (a) Löschen einer Analyse korrigiert Gewicht und Zählungen automatisch —
+      heute wirkt ein gelöschtes Video weiter; (b) das verbliebene
+      Sekundenbruchteil-Fenster zwischen Lesen und Schreiben beim
+      gleichzeitigen Übernehmen durch zwei Trainer. Kosten: eine
+      Collection-Query pro Übernahme
 - [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert — die
       Konflikt-Anzeige kann daher nicht sagen, aus welchem (wie gewichteten)
       Video die bisherige Antwort stammt
