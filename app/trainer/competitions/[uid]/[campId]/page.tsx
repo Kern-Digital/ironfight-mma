@@ -13,12 +13,18 @@ import OpponentEditor, {
 import FightCampPlanView from "@/components/trainer/FightCampPlanView";
 import { competitionGroup } from "@/components/trainer/CompetitionCard";
 import {
+  campOpponentId,
   deleteFightCamp,
   getFightCamp,
   updateFightCamp,
   type FightCamp,
   type OpponentProfile,
 } from "@/lib/fight-camp";
+import {
+  getOpponent,
+  resolveCampOpponent,
+  type Opponent,
+} from "@/lib/opponents";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
 
 function formatDate(d: Date | null | undefined): string {
@@ -52,6 +58,9 @@ function CompetitionDetailContent({
   const router = useRouter();
   const [camp, setCamp] = useState<FightCamp | null>(null);
   const [student, setStudent] = useState<StudentEntry | null>(null);
+  // Verknüpftes DeepFight-Profil — ergänzt den eingefrorenen Snapshot um
+  // Antworten, die erst nach dem Anlegen des Wettkampfs dazugekommen sind.
+  const [opponent, setOpponent] = useState<Opponent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingDna, setEditingDna] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -59,6 +68,7 @@ function CompetitionDetailContent({
   const load = useCallback(async () => {
     setError(null);
     setCamp(null);
+    setOpponent(null);
     try {
       const [c, s] = await Promise.all([
         getFightCamp(uid, campId),
@@ -67,6 +77,8 @@ function CompetitionDetailContent({
       if (!c) throw new Error("Wettkampf nicht gefunden");
       setCamp(c);
       setStudent(s);
+      const oppId = campOpponentId(c);
+      setOpponent(oppId ? await getOpponent(oppId).catch(() => null) : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
@@ -154,6 +166,12 @@ function CompetitionDetailContent({
   }
 
   const group = competitionGroup(camp);
+  // Angezeigt wird der Snapshot, ergänzt um Antworten, die inzwischen im
+  // verknüpften Profil dazugekommen sind. Speichern friert genau diesen Stand ein.
+  const { profile: effOpponent, addedDnaCount } = resolveCampOpponent(
+    camp.opponent,
+    opponent,
+  );
   const studentName =
     student?.displayName ??
     student?.authProviderName ??
@@ -270,22 +288,41 @@ function CompetitionDetailContent({
             )}
           </div>
 
+          {addedDnaCount > 0 && (
+            <p
+              className="font-mono-ta mb-3 rounded-lg px-3 py-2 text-[10px]"
+              style={{
+                letterSpacing: "0.1em",
+                background: "rgba(157,123,250,0.1)",
+                border: "1px solid rgba(157,123,250,0.3)",
+                color: "#9D7BFA",
+              }}
+            >
+              {addedDnaCount}{" "}
+              {addedDnaCount === 1 ? "Antwort stammt" : "Antworten stammen"} aus
+              dem verknüpften DeepFight-Profil und {addedDnaCount === 1 ? "kam" : "kamen"}{" "}
+              nach dem Anlegen dieses Wettkampfs dazu. Eigene Wettkampf-Notizen
+              bleiben unverändert. Beim Speichern wird dieser Stand fest
+              übernommen.
+            </p>
+          )}
+
           {editingDna ? (
             <OpponentEditor
               initial={{
-                name: camp.opponent.name,
-                style: camp.opponent.style,
-                stance: camp.opponent.stance,
-                heightCm: camp.opponent.heightCm,
-                weightKg: camp.opponent.weightKg,
-                reachCm: camp.opponent.reachCm,
-                strengths: camp.opponent.strengths,
-                weaknesses: camp.opponent.weaknesses,
-                favoriteAttacks: camp.opponent.favoriteAttacks,
-                notes: camp.opponent.notes ?? null,
-                dna: camp.opponent.dna ?? {},
-                dnaSplit: camp.opponent.dnaSplit,
-                actionStats: camp.opponent.actionStats,
+                name: effOpponent.name,
+                style: effOpponent.style,
+                stance: effOpponent.stance,
+                heightCm: effOpponent.heightCm,
+                weightKg: effOpponent.weightKg,
+                reachCm: effOpponent.reachCm,
+                strengths: effOpponent.strengths,
+                weaknesses: effOpponent.weaknesses,
+                favoriteAttacks: effOpponent.favoriteAttacks,
+                notes: effOpponent.notes ?? null,
+                dna: effOpponent.dna ?? {},
+                dnaSplit: effOpponent.dnaSplit,
+                actionStats: effOpponent.actionStats,
               }}
               busy={busy}
               submitLabel="DeepFight-Profil speichern"
@@ -295,19 +332,19 @@ function CompetitionDetailContent({
           ) : (
             <OpponentProfileView
               opponent={{
-                name: camp.opponent.name,
-                style: camp.opponent.style,
-                stance: camp.opponent.stance,
-                heightCm: camp.opponent.heightCm,
-                weightKg: camp.opponent.weightKg,
-                reachCm: camp.opponent.reachCm,
-                strengths: camp.opponent.strengths,
-                weaknesses: camp.opponent.weaknesses,
-                favoriteAttacks: camp.opponent.favoriteAttacks,
-                notes: camp.opponent.notes ?? null,
-                dna: camp.opponent.dna ?? {},
-                dnaSplit: camp.opponent.dnaSplit,
-                actionStats: camp.opponent.actionStats,
+                name: effOpponent.name,
+                style: effOpponent.style,
+                stance: effOpponent.stance,
+                heightCm: effOpponent.heightCm,
+                weightKg: effOpponent.weightKg,
+                reachCm: effOpponent.reachCm,
+                strengths: effOpponent.strengths,
+                weaknesses: effOpponent.weaknesses,
+                favoriteAttacks: effOpponent.favoriteAttacks,
+                notes: effOpponent.notes ?? null,
+                dna: effOpponent.dna ?? {},
+                dnaSplit: effOpponent.dnaSplit,
+                actionStats: effOpponent.actionStats,
               }}
             />
           )}

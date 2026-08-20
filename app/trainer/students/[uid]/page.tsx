@@ -26,7 +26,12 @@ import {
   WEIGHT_CLASS_LABEL,
   type TechniqueProgress,
 } from "@/lib/types";
-import { listFightCamps, type FightCamp } from "@/lib/fight-camp";
+import {
+  campOpponentId,
+  listFightCamps,
+  type FightCamp,
+} from "@/lib/fight-camp";
+import { loadOpponentsByIds, type Opponent } from "@/lib/opponents";
 import { CATEGORY_COLOR } from "@/lib/discipline-colors";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -111,6 +116,9 @@ function StudentDetailContent({ uid }: { uid: string }) {
   const [workouts, setWorkouts] = useState<WorkoutSession[] | null>(null);
   const [progress, setProgress] = useState<TechniqueProgress[] | null>(null);
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
+  // Verknüpfte DeepFight-Profile der Wettkämpfe — zeigt den aktuellen
+  // Scouting-Stand statt nur den eingefrorenen Snapshot.
+  const [opponents, setOpponents] = useState<Map<string, Opponent>>(new Map());
   const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Kampfbereiche sind standardmäßig zugeklappt — der Kopf der Seite bleibt
@@ -124,6 +132,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
     setProgress(null);
     setCamps(null);
     setAnalyses(null);
+    setOpponents(new Map());
     try {
       const [e, w, p, c, a] = await Promise.all([
         getStudentEntry(uid),
@@ -138,6 +147,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
       setProgress(p);
       setCamps(c);
       setAnalyses(a);
+      setOpponents(await loadOpponentsByIds(c.map(campOpponentId)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
@@ -653,6 +663,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 athleteName={displayLabel(entry)}
                 athlete={athlete}
                 camp={nextCamp}
+                opponent={opponents.get(campOpponentId(nextCamp) ?? "")}
               />
             </div>
           )}
@@ -684,6 +695,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                     camp={c}
                     studentLabel={displayLabel(entry)}
                     href={`/trainer/competitions/${uid}/${c.id}`}
+                    opponent={opponents.get(campOpponentId(c) ?? "")}
                   />
                 ))}
               </div>

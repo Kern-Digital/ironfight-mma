@@ -33,7 +33,7 @@ import {
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import { belongsToGym } from "./gym";
-import type { GegnerDnaAnswers } from "./gegner-dna";
+import { pruneAnswers, type GegnerDnaAnswers } from "./gegner-dna";
 import {
   cleanActionStats,
   cleanDnaSplit,
@@ -336,6 +336,76 @@ export function opponentToSnapshot(o: Opponent): OpponentProfile {
   const actions = cleanActionStats(o.actionStats);
   if (actions.length > 0) snap.actionStats = actions;
   return snap;
+}
+
+// ─── Wettkampf-Gegner: Snapshot + verknüpftes Profil ────────────────────────
+
+/**
+ * Effektives Gegnerprofil eines Wettkampfs.
+ *
+ * Der eingefrorene Snapshot bleibt die Basis — er trägt die wettkampf-eigenen
+ * Ergänzungen des Trainers. Das verknüpfte DeepFight-Profil füllt ausschließlich
+ * LÜCKEN: Antworten, die es beim Anlegen des Wettkampfs noch nicht gab,
+ * erscheinen dadurch auch im Wettkampf. Vorhandene Snapshot-Antworten werden
+ * nie überschrieben (es gibt keine Zeitstempel pro Antwort — welche Fassung
+ * neuer ist, lässt sich nicht entscheiden; die bewusste Wettkampf-Notiz wiegt
+ * schwerer).
+ */
+export interface CampOpponent {
+  /** Snapshot, ergänzt um bisher fehlende Angaben des verknüpften Profils. */
+  profile: OpponentProfile;
+  /** true, wenn ein verknüpftes Profil gefunden und einbezogen wurde. */
+  linked: boolean;
+  /** Anzahl DNA-Antworten, die erst aus dem verknüpften Profil dazukamen. */
+  addedDnaCount: number;
+}
+
+export function resolveCampOpponent(
+  snapshot: OpponentProfile,
+  live?: Opponent | null,
+): CampOpponent {
+  const snapDna = pruneAnswers(snapshot.dna ?? {});
+  if (!live) {
+    return {
+      profile: { ...snapshot, dna: snapDna },
+      linked: false,
+      addedDnaCount: 0,
+    };
+  }
+
+  const liveDna = pruneAnswers(live.dna ?? {});
+  // Snapshot gewinnt bei Konflikt, das Profil ergänzt nur Fehlendes.
+  const profile: OpponentProfile = { ...snapshot, dna: { ...liveDna, ...snapDna } };
+  const addedDnaCount = Object.keys(liveDna).filter((id) => !(id in snapDna)).length;
+
+  // Split und Action-Stats bleiben eingefroren, solange der Wettkampf welche
+  // hat — sonst reicht das Profil sie nach (gleiche Lücken-Logik wie bei DNA).
+  if (isDnaSplitEmpty(snapshot.dnaSplit) && !isDnaSplitEmpty(live.dnaSplit)) {
+    profile.dnaSplit = cleanDnaSplit(live.dnaSplit);
+  }
+  if (cleanActionStats(snapshot.actionStats).length === 0) {
+    const stats = cleanActionStats(live.actionStats);
+    if (stats.length > 0) profile.actionStats = stats;
+  }
+
+  return { profile, linked: true, addedDnaCount };
+}
+
+/**
+ * Lädt die verknüpften Gegnerprofile zu einer Menge von IDs (Map id → Profil).
+ * Gelöschte oder nicht lesbare Profile fehlen einfach in der Map — der Aufrufer
+ * fällt dann auf den Snapshot zurück.
+ */
+export async function loadOpponentsByIds(
+  ids: (string | null | undefined)[],
+): Promise<Map<string, Opponent>> {
+  const unique = Array.from(new Set(ids.filter((id): id is string => !!id)));
+  const loaded = await Promise.all(
+    unique.map((id) => getOpponent(id).catch(() => null)),
+  );
+  const map = new Map<string, Opponent>();
+  for (const o of loaded) if (o) map.set(o.id, o);
+  return map;
 }
 
 // ─── Suche (clientseitig) ────────────────────────────────────────────────────

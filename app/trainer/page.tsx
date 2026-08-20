@@ -16,6 +16,7 @@ import CompetitionCard, {
 import { useAuth } from "@/lib/auth-context";
 import { belongsToGym, resolveGymId } from "@/lib/gym";
 import {
+  campOpponentId,
   FIGHT_STYLE_LABEL,
   listAllFightCamps,
   type FightCamp,
@@ -118,6 +119,12 @@ export default function TrainerDashboardPage() {
   const memberMap = useMemo(
     () => new Map((members ?? []).map((s) => [s.uid, s])),
     [members],
+  );
+  // Verknüpfte Profile für die Wettkampfkarten — so zählt die DNA-Zahl den
+  // aktuellen Stand mit, nicht nur den eingefrorenen Snapshot.
+  const opponentMap = useMemo(
+    () => new Map((opponents ?? []).map((o) => [o.id, o])),
+    [opponents],
   );
   const studentCount = useMemo(
     () => (members ?? []).filter((s) => !isStaffEntry(s)).length,
@@ -235,6 +242,7 @@ export default function TrainerDashboardPage() {
                         camp={c}
                         studentLabel={studentLabelOf(memberMap.get(c.studentUid))}
                         href={`/trainer/competitions/${c.studentUid}/${c.id}`}
+                        opponent={opponentMap.get(campOpponentId(c) ?? "")}
                       />
                     ))}
                   </div>

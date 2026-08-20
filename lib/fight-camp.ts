@@ -119,6 +119,9 @@ export interface OpponentProfile {
    * Strukturierte Gegner-DNA (Scouting-Antworten je Frage). Optional —
    * Altbestände ohne DNA bleiben gültig. In einem Wettkampf ist dies der
    * eingefrorene Snapshot, der auch bei alten Wettkämpfen erhalten bleibt.
+   * ANZEIGE aber über `resolveCampOpponent` (lib/opponents.ts): das verknüpfte
+   * Profil füllt nachträglich ergänzte Antworten auf, ohne den Snapshot zu
+   * überschreiben.
    */
   dna?: GegnerDnaAnswers;
   /** §1 Eingefrorener Fight-DNA-Split (optional). */
@@ -177,6 +180,14 @@ export interface FightCamp {
   /** Gesamt-Notizen vom Trainer */
   trainerNotes?: string;
   isDemo?: boolean;
+}
+
+/**
+ * ID des verknüpften DeepFight-Profils. Historisch gibt es das Feld an zwei
+ * Stellen (Camp-Stamm und Snapshot) — hier zentral aufgelöst.
+ */
+export function campOpponentId(camp: FightCamp): string | null {
+  return camp.opponentId ?? camp.opponent.opponentId ?? null;
 }
 
 // ─── Firestore-Helpers ─────────────────────────────────────────────────────

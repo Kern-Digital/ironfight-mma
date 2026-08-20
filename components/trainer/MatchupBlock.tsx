@@ -12,6 +12,7 @@ import {
   deriveTendencies,
 } from "@/lib/fight-stats";
 import { totalAnswered } from "@/lib/gegner-dna";
+import { resolveCampOpponent, type Opponent } from "@/lib/opponents";
 
 // ─── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -102,12 +103,18 @@ export default function MatchupBlock({
   athleteName,
   athlete,
   camp,
+  opponent,
 }: {
   athleteName: string;
   athlete?: AthleteProfile;
   camp: FightCamp;
+  /** Verknüpftes DeepFight-Profil — ergänzt den Snapshot um neueres Scouting. */
+  opponent?: Opponent | null;
 }) {
-  const opp = camp.opponent;
+  const { profile: opp, linked, addedDnaCount } = resolveCampOpponent(
+    camp.opponent,
+    opponent,
+  );
   const stats = opp.actionStats ?? [];
   const tendencies = deriveTendencies(stats).slice(0, 3);
   const suggestions = deriveSuggestions(opp.dnaSplit, stats).slice(0, 3);
@@ -289,7 +296,12 @@ export default function MatchupBlock({
           className="font-mono-ta ml-auto text-[9px] uppercase"
           style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
         >
-          DNA {dnaCount} {dnaCount === 1 ? "Eintrag" : "Einträge"} · Snapshot
+          DNA {dnaCount} {dnaCount === 1 ? "Eintrag" : "Einträge"} ·{" "}
+          {linked
+            ? addedDnaCount > 0
+              ? `Profil verknüpft (+${addedDnaCount})`
+              : "Profil verknüpft"
+            : "Snapshot"}
         </span>
       </div>
     </div>

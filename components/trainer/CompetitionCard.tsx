@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FIGHT_STYLE_LABEL, type FightCamp } from "@/lib/fight-camp";
+import { resolveCampOpponent, type Opponent } from "@/lib/opponents";
 import { totalAnswered } from "@/lib/gegner-dna";
 
 function formatDate(d: Date): string {
@@ -32,14 +33,22 @@ export default function CompetitionCard({
   camp,
   studentLabel,
   href,
+  opponent,
 }: {
   camp: FightCamp;
   studentLabel: string;
   href: string;
+  /**
+   * Verknüpftes DeepFight-Profil (falls geladen). Damit zeigt die Karte den
+   * aktuellen Scouting-Stand statt nur den eingefrorenen Snapshot — später
+   * ergänzte Antworten zählen mit.
+   */
+  opponent?: Opponent | null;
 }) {
   const group = competitionGroup(camp);
   const accent = GROUP_ACCENT[group];
-  const dnaCount = totalAnswered(camp.opponent.dna ?? {});
+  const { profile, addedDnaCount } = resolveCampOpponent(camp.opponent, opponent);
+  const dnaCount = totalAnswered(profile.dna ?? {});
   const days = Math.ceil(
     (camp.competitionDate.getTime() - Date.now()) / (24 * 3600 * 1000),
   );
@@ -100,6 +109,7 @@ export default function CompetitionCard({
         </span>
         <span
           className="rounded px-1.5 py-0.5"
+          title={`${dnaCount} beantwortete DeepFight-Fragen`}
           style={{
             background: dnaCount > 0 ? "rgba(35,196,206,0.1)" : "var(--ink-4)",
             border: `1px solid ${dnaCount > 0 ? "rgba(35,196,206,0.35)" : "var(--ink-5)"}`,
@@ -108,6 +118,19 @@ export default function CompetitionCard({
         >
           DNA {dnaCount}
         </span>
+        {addedDnaCount > 0 && (
+          <span
+            className="rounded px-1.5 py-0.5"
+            title="Aus dem verknüpften DeepFight-Profil ergänzt, seit der Wettkampf angelegt wurde"
+            style={{
+              background: "rgba(157,123,250,0.12)",
+              border: "1px solid rgba(157,123,250,0.35)",
+              color: "#9D7BFA",
+            }}
+          >
+            +{addedDnaCount} NEU
+          </span>
+        )}
       </div>
     </Link>
   );

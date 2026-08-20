@@ -11,7 +11,12 @@ import CompetitionCard, {
 } from "@/components/trainer/CompetitionCard";
 import { useAuth } from "@/lib/auth-context";
 import { belongsToGym, resolveGymId } from "@/lib/gym";
-import { listAllFightCamps, type FightCamp } from "@/lib/fight-camp";
+import {
+  campOpponentId,
+  listAllFightCamps,
+  type FightCamp,
+} from "@/lib/fight-camp";
+import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
@@ -54,6 +59,9 @@ function CompetitionsHubContent() {
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   // Alle Mitglieder inkl. Trainer: auch Coaches treten als Athleten an.
   const [members, setMembers] = useState<Map<string, StudentEntry>>(new Map());
+  // Verknüpfte DeepFight-Profile: die Karten zeigen den AKTUELLEN Scouting-Stand,
+  // nicht nur den beim Anlegen eingefrorenen Snapshot.
+  const [opponents, setOpponents] = useState<Map<string, Opponent>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -66,12 +74,14 @@ function CompetitionsHubContent() {
     setError(null);
     setCamps(null);
     try {
-      const [allCamps, memberList] = await Promise.all([
+      const [allCamps, memberList, gymOpponents] = await Promise.all([
         listAllFightCamps().catch(() => [] as FightCamp[]),
         listAllMembers().catch(() => [] as StudentEntry[]),
+        listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
       setMembers(new Map(memberList.map((s) => [s.uid, s])));
+      setOpponents(new Map(gymOpponents.map((o) => [o.id, o])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
       setCamps([]);
@@ -210,6 +220,7 @@ function CompetitionsHubContent() {
                     camp={c}
                     studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
+                    opponent={opponents.get(campOpponentId(c) ?? "")}
                   />
                 ))}
               </Section>
@@ -222,6 +233,7 @@ function CompetitionsHubContent() {
                     camp={c}
                     studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
+                    opponent={opponents.get(campOpponentId(c) ?? "")}
                   />
                 ))}
               </Section>
@@ -234,6 +246,7 @@ function CompetitionsHubContent() {
                     camp={c}
                     studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
+                    opponent={opponents.get(campOpponentId(c) ?? "")}
                   />
                 ))}
               </Section>
