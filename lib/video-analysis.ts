@@ -46,6 +46,92 @@ export type GeminiTier = "flash" | "pro";
 /** Maximale analysierbare Videolänge in Sekunden (15 Minuten). */
 export const MAX_VIDEO_SECONDS = 15 * 60;
 
+// ─── Gewichtung eines Videos ────────────────────────────────────────────────
+
+/**
+ * Grobe zeitliche Einordnung des Kampfes — wird vom Trainer gewählt, nie
+ * geraten. Absichtlich nur Stufen statt eines Datums: den genauen Tag kennt
+ * man selten, den Zeitraum fast immer.
+ */
+export type FightRecency = "recent" | "mid" | "old" | "ancient" | "unknown";
+
+export const FIGHT_RECENCY_LABEL: Record<FightRecency, string> = {
+  recent: "Letzte 6 Monate",
+  mid: "6–18 Monate",
+  old: "1–3 Jahre",
+  ancient: "Älter als 3 Jahre",
+  unknown: "Unbekannt",
+};
+
+/**
+ * Aktualitätsfaktor. „Unbekannt" liegt bewusst im oberen Mittelfeld: fehlendes
+ * Wissen darf kein Strafabzug sein, sonst würde undatiertes Archivmaterial
+ * systematisch benachteiligt.
+ */
+export const FIGHT_RECENCY_WEIGHT: Record<FightRecency, number> = {
+  recent: 1,
+  mid: 0.85,
+  old: 0.65,
+  ancient: 0.45,
+  unknown: 0.8,
+};
+
+/**
+ * Abdeckungsfaktor aus dem Freitext von `meta.coverage` (Stufe 1). Ein
+ * Highlight-Zusammenschnitt zeigt nur die besten Momente und zeichnet damit
+ * ein geschöntes Bild — er darf das Profil deutlich weniger bewegen als ein
+ * vollständiger Kampf.
+ */
+export function coverageWeight(coverage: string | null): number {
+  const t = (coverage ?? "").toLowerCase();
+  if (!t) return 0.8;
+  if (t.includes("highlight") || t.includes("best of")) return 0.45;
+  if (
+    t.includes("vollkampf") || t.includes("voller") || t.includes("komplett") ||
+    t.includes("ganzer") || t.includes("full")
+  )
+    return 1;
+  if (
+    t.includes("schnitt") || t.includes("clip") || t.includes("teil") ||
+    t.includes("auszug")
+  )
+    return 0.7;
+  return 0.8;
+}
+
+/** Aufgeschlüsseltes Gewicht eines Videos — die Faktoren bleiben sichtbar. */
+export interface VideoWeight {
+  /** Gesamtgewicht 0,2–1,0: so stark zählt dieses Video im Profil. */
+  value: number;
+  recency: number;
+  coverage: number;
+  identification: number;
+}
+
+/**
+ * Gewicht eines Videos aus den drei Faktoren, die wir wirklich kennen:
+ * Aktualität (Trainer-Eingabe), Abdeckung und Identifikationssicherheit.
+ * Bewusst NICHT enthalten: `meta.estimatedAge` und `meta.opponentLevel` —
+ * beides reine Bildschätzungen des Modells ohne belastbare Grundlage.
+ */
+export function computeVideoWeight(a: {
+  recency?: FightRecency;
+  observation: VideoObservation;
+}): VideoWeight {
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n || 0));
+  const recency = FIGHT_RECENCY_WEIGHT[a.recency ?? "unknown"];
+  const coverage = coverageWeight(a.observation.meta.coverage);
+  const identification = clamp01(a.observation.identification.idConfidence);
+  // Untergrenze 0,2: auch ein schwaches Video verschwindet nicht ganz.
+  const value = Math.max(0.2, Math.min(1, recency * coverage * identification));
+  return {
+    value: Math.round(value * 100) / 100,
+    recency,
+    coverage,
+    identification,
+  };
+}
+
 export type CornerColor = "red" | "blue" | "unknown";
 
 export const CORNER_LABEL: Record<CornerColor, string> = {
@@ -340,6 +426,8 @@ export interface VideoAnalysis {
   youtubeUrl: string | null;
   fighter: FighterDescription;
   tier: GeminiTier;
+  /** Zeitliche Einordnung des Kampfes (Trainer-Angabe) — Basis der Gewichtung. */
+  recency?: FightRecency;
   models: { gemini: string; claude: string };
   /** Token-Verbrauch + Kosten der Bewertungsstufe (null beim Gratis-Fallback). */
   usage: AnalysisUsage | null;
@@ -382,6 +470,7 @@ function decode(id: string, d: VideoAnalysisDoc): VideoAnalysis {
     ...d,
     id,
     usage: d.usage ?? null,
+    recency: d.recency ?? "unknown",
     appliedFindingIds: d.appliedFindingIds ?? [],
     appliedStats: d.appliedStats ?? false,
     sharedWithAthlete: d.sharedWithAthlete ?? false,
@@ -519,13 +608,14 @@ export async function isUploadStillActive(name: string): Promise<boolean> {
 
 export async function uploadVideoFile(
   file: File,
-  onProgress?: (msg: string) => void,
+  /** `fraction` ist der echte Byte-Fortschritt 0–1, sofern messbar. */
+  onProgress?: (msg: string, fraction?: number) => void,
 ): Promise<{ fileUri: string; mimeType: string; name: string }> {
   const token = await idToken();
   const mimeType = file.type || "video/mp4";
 
   // 1. Upload-Session serverseitig eröffnen (Key bleibt auf dem Server)
-  onProgress?.("Upload wird vorbereitet …");
+  onProgress?.("Upload wird vorbereitet …", 0);
   const session = await apiJson<{ uploadUrl: string; uploadName: string }>(
     await fetch("/api/video-analysis/upload", {
       method: "POST",
@@ -547,7 +637,7 @@ export async function uploadVideoFile(
   // obwohl der Upload durch ist. Deshalb: Antwort nur nutzen, wenn lesbar;
   // sonst bestätigt der Server den Upload über den einmaligen uploadName.
   type UploadedFile = { name: string; uri: string; state: string; mimeType?: string };
-  onProgress?.("Video wird hochgeladen … 0 %");
+  onProgress?.("Video wird hochgeladen … 0 %", 0);
   let lastPct = 0;
   const direct = await new Promise<UploadedFile | null>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -558,7 +648,12 @@ export async function uploadVideoFile(
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
         lastPct = Math.round((e.loaded / e.total) * 100);
-        onProgress?.(`Video wird hochgeladen … ${lastPct} %`);
+        // Bis 0,9 des Upload-Bands: der Rest gehört dem Finalisieren und
+        // Googles Verarbeitungs-Wartezeit (state=PROCESSING) darunter.
+        onProgress?.(
+          `Video wird hochgeladen … ${lastPct} %`,
+          (e.loaded / e.total) * 0.9,
+        );
       }
     };
     xhr.onload = () => {
@@ -579,7 +674,7 @@ export async function uploadVideoFile(
   let info: UploadedFile | null = direct;
   if (!info) {
     // 2b. Upload serverseitig bestätigen (Antwort war nicht lesbar)
-    onProgress?.("Upload wird bestätigt …");
+    onProgress?.("Upload wird bestätigt …", 0.92);
     for (let attempt = 0; attempt < 6 && !info; attempt++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
@@ -607,7 +702,7 @@ export async function uploadVideoFile(
   }
 
   // 3. Warten, bis Google das Video verarbeitet hat (state=ACTIVE)
-  onProgress?.("Video wird verarbeitet …");
+  onProgress?.("Video wird verarbeitet …", 0.93);
   const deadline = Date.now() + 5 * 60_000;
   while (info.state === "PROCESSING" && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 4000));
@@ -632,6 +727,13 @@ export async function uploadVideoFile(
 
 export type AnalysisStage = "gemini" | "claude" | "done";
 
+/**
+ * Erwartete Zeichenzahl der Bewertungs-Antwort — Nenner für den echten
+ * Fortschritt der Claude-Stufe. Grober Richtwert; der Fortschritt wird bei
+ * 97 % gedeckelt, damit ein längeres Ergebnis die Anzeige nicht überläuft.
+ */
+export const EXPECTED_EVALUATION_CHARS = 9000;
+
 export const STAGE_LABEL: Record<AnalysisStage, string> = {
   gemini: "Video wird analysiert (Beobachtung)",
   claude: "Befunde werden bewertet (Analyse)",
@@ -650,6 +752,8 @@ export interface AnalyzeRequest {
   existingStats: ActionStat[];
   /** Profil-Kontext (Stil, Auslage, Notizen) als Freitext. */
   profileContext: string;
+  /** Zeitliche Einordnung des Kampfes; bei "unknown" bleibt der Prompt unverändert. */
+  recency?: FightRecency;
   /**
    * "Analyse fortsetzen": bereits vorhandene Gemini-Beobachtung aus einem
    * früheren Versuch — die Video-Stufe wird dann übersprungen (spart Token).
@@ -737,6 +841,8 @@ export async function runVideoAnalysis(
   onStage?: (stage: AnalysisStage) => void,
   /** Wird gerufen, sobald die Gemini-Beobachtung fertig ist (für Resume). */
   onObservation?: (observation: VideoObservation, model: string) => void,
+  /** Echter Fortschritt der Bewertung: Anteil 0–1 der erwarteten Antwortlänge. */
+  onProgress?: (fraction: number) => void,
 ): Promise<AnalyzeResult> {
   const token = await idToken();
   const res = await fetch("/api/video-analysis/analyze", {
@@ -768,10 +874,13 @@ export async function runVideoAnalysis(
     if (!trimmed) return;
     const event = JSON.parse(trimmed) as
       | { type: "stage"; stage: AnalysisStage }
+      | { type: "progress"; chars: number }
       | { type: "observation"; observation: VideoObservation; model: string }
       | ({ type: "result" } & AnalyzeResult)
       | { type: "error"; message: string };
     if (event.type === "stage") onStage?.(event.stage);
+    else if (event.type === "progress")
+      onProgress?.(Math.min(0.97, event.chars / EXPECTED_EVALUATION_CHARS));
     else if (event.type === "observation")
       onObservation?.(event.observation, event.model);
     else if (event.type === "result") {

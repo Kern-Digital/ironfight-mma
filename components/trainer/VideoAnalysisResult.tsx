@@ -15,7 +15,9 @@ import Icon from "@/components/ui/Icon";
 import { DNA_CATEGORIES, DNA_QUESTION_BY_ID } from "@/lib/gegner-dna";
 import { actionLabel, CAGE_ZONE_LABEL, successRate } from "@/lib/fight-stats";
 import {
+  FIGHT_RECENCY_LABEL,
   ID_CONFIDENCE_WARN,
+  computeVideoWeight,
   type AnalysisMode,
   type DnaFinding,
   type TopListEntry,
@@ -161,6 +163,7 @@ export default function VideoAnalysisResult({
   onDelete?: () => void;
 }) {
   const { observation: obs, evaluation: ev } = analysis;
+  const weight = computeVideoWeight(analysis);
   const applied = new Set(analysis.appliedFindingIds);
   // Übernahme gibt es in beiden Modi (Gegner-DNA bzw. Kampfprofil) — die
   // read-only Schüler-Sicht übergibt schlicht keine onApply-Callbacks.
@@ -283,7 +286,23 @@ export default function VideoAnalysisResult({
           {ev.style.primaryStyle && <span>Stil: {ev.style.primaryStyle}</span>}
           {ev.style.approach && <span>Ansatz: {ev.style.approach}</span>}
           {ev.style.baseDiscipline && <span>Basis: {ev.style.baseDiscipline}</span>}
-          <span>Video-Gewichtung: {pct(ev.merge.weight)}</span>
+        </div>
+        {/* Gewichtung nachvollziehbar aufgeschlüsselt — berechnet aus dem, was
+            wir wirklich wissen, nicht aus der Alters-/Niveau-Schätzung. */}
+        <div
+          className="font-mono-ta mt-2 rounded-lg px-2.5 py-2 text-[10px]"
+          style={{ background: "var(--ink-3)", color: "var(--fg-4)" }}
+        >
+          <span style={{ color: VIOLET, fontWeight: 700 }}>
+            Video-Gewichtung {pct(weight.value)}
+          </span>
+          <span className="ml-2">
+            {FIGHT_RECENCY_LABEL[analysis.recency ?? "unknown"]} (
+            {weight.recency.toFixed(2).replace(".", ",")}) ×{" "}
+            {obs.meta.coverage || "Abdeckung unklar"} (
+            {weight.coverage.toFixed(2).replace(".", ",")}) × Identifikation{" "}
+            {pct(weight.identification)}
+          </span>
         </div>
       </div>
 

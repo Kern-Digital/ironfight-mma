@@ -29,16 +29,17 @@ import {
 } from "@/lib/fight-profile";
 import {
   cleanActionStats,
-  cleanDnaSplit,
-  isDnaSplitEmpty,
+  mergeDnaSplit,
   type ActionStat,
   type DnaSplit,
 } from "@/lib/fight-stats";
 import { FIGHTER_STANCE_LABEL, FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 import {
   CORNER_LABEL,
+  FIGHT_RECENCY_LABEL,
   ID_CONFIDENCE_WARN,
   MAX_VIDEO_SECONDS,
+  computeVideoWeight,
   deleteVideoAnalysis,
   listVideoAnalyses,
   isUploadStillActive,
@@ -52,6 +53,7 @@ import {
   uploadVideoFile,
   type AnalysisMode,
   type CornerColor,
+  type FightRecency,
   type GeminiTier,
   type VideoAnalysis,
   type VideoObservation,
@@ -109,6 +111,148 @@ const RUN_STEPS: [Exclude<RunStage, "idle">, string][] = [
   ["claude", "Bewertung & Analyse"],
   ["save", "Speichern"],
 ];
+
+// ─── Fortschritt (0–100 %) ──────────────────────────────────────────────────
+
+type PhaseKey = Exclude<RunStage, "idle">;
+
+/**
+ * Anteil jeder Phase an der Gesamtanzeige — nach realistischer Laufzeit
+ * gewichtet, nicht gleichmäßig. Übersprungene Phasen (YouTube-Quelle ohne
+ * Upload, fortgesetzte Analyse ohne Gemini) fallen raus, der Rest wird
+ * proportional auf 100 % gestreckt.
+ */
+const PHASE_SHARE: Record<PhaseKey, number> = {
+  upload: 30,
+  gemini: 42,
+  claude: 25,
+  save: 3,
+};
+
+/**
+ * Zeitkonstante je Phase in Sekunden für die Schätzung `1 − e^(−t/τ)`.
+ * Sie überbrückt die Phasen, in denen es objektiv nichts zu melden gibt —
+ * Gemini liest das Video minutenlang ein, bevor überhaupt etwas zurückkommt.
+ * Der Schätzer wird gedeckelt und kann den echten Wert daher nie überholen.
+ */
+const PHASE_TAU: Record<PhaseKey, number> = {
+  upload: 45,
+  gemini: 75,
+  claude: 30,
+  save: 3,
+};
+
+/** Obergrenze des Zeitschätzers je Phase — der Rest gehört dem echten Signal. */
+const TIME_ESTIMATE_CAP = 0.92;
+
+interface ProgressController {
+  /** Angezeigter Wert 0–100, geglättet und monoton steigend. */
+  percent: number;
+  /** Legt fest, welche Phasen überhaupt laufen (bestimmt die Bänder). */
+  begin: (phases: PhaseKey[]) => void;
+  /** Wechselt in eine Phase — startet deren Zeitschätzer neu. */
+  enter: (phase: PhaseKey) => void;
+  /** Meldet echten Fortschritt 0–1 innerhalb der aktuellen Phase. */
+  report: (fraction: number) => void;
+  /** Setzt hart auf 100 % — das Ergebnis liegt vor. */
+  complete: () => void;
+  reset: () => void;
+}
+
+/**
+ * Führt zwei Schätzer parallel und zeigt immer den höheren: den echten
+ * Fortschritt (Bytes bzw. empfangene Zeichen) und einen Zeitschätzer als
+ * Boden. Der angezeigte Wert fällt nie — auch nicht beim automatischen
+ * Neustart nach einer Überlastung.
+ */
+function useAnalysisProgress(running: boolean): ProgressController {
+  const [percent, setPercent] = useState(0);
+  const phasesRef = useRef<PhaseKey[]>([]);
+  const phaseRef = useRef<PhaseKey | null>(null);
+  const startedAtRef = useRef(0);
+  const realRef = useRef(0); // echtes Signal als Gesamtanteil 0–1
+  const shownRef = useRef(0); // zuletzt angezeigter Wert 0–1
+
+  const band = useCallback((phase: PhaseKey): [number, number] => {
+    const active = phasesRef.current;
+    const total = active.reduce((sum, p) => sum + PHASE_SHARE[p], 0);
+    if (total <= 0) return [0, 1];
+    let start = 0;
+    for (const p of active) {
+      const span = PHASE_SHARE[p] / total;
+      if (p === phase) return [start, start + span];
+      start += span;
+    }
+    return [start, 1];
+  }, []);
+
+  const reset = useCallback(() => {
+    phasesRef.current = [];
+    phaseRef.current = null;
+    realRef.current = 0;
+    shownRef.current = 0;
+    setPercent(0);
+  }, []);
+
+  const begin = useCallback((phases: PhaseKey[]) => {
+    phasesRef.current = phases;
+  }, []);
+
+  const enter = useCallback(
+    (phase: PhaseKey) => {
+      phaseRef.current = phase;
+      startedAtRef.current = Date.now();
+      const [start] = band(phase);
+      realRef.current = Math.max(realRef.current, start);
+    },
+    [band],
+  );
+
+  const report = useCallback(
+    (fraction: number) => {
+      const phase = phaseRef.current;
+      if (!phase) return;
+      const [start, end] = band(phase);
+      const value = start + (end - start) * Math.max(0, Math.min(1, fraction));
+      realRef.current = Math.max(realRef.current, value);
+    },
+    [band],
+  );
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      const phase = phaseRef.current;
+      let target = realRef.current;
+      if (phase) {
+        const [start, end] = band(phase);
+        const elapsed = (Date.now() - startedAtRef.current) / 1000;
+        const estimate =
+          (1 - Math.exp(-elapsed / PHASE_TAU[phase])) * TIME_ESTIMATE_CAP;
+        target = Math.max(target, start + (end - start) * estimate);
+      }
+      // Sanft nachziehen statt springen; nie rückwärts.
+      const next = Math.max(
+        shownRef.current,
+        shownRef.current + (target - shownRef.current) * 0.25,
+      );
+      if (Math.round(next * 100) !== Math.round(shownRef.current * 100)) {
+        setPercent(Math.round(next * 100));
+      }
+      shownRef.current = next;
+    }, 150);
+    return () => clearInterval(id);
+  }, [running, band]);
+
+  const complete = useCallback(() => {
+    phaseRef.current = null;
+    realRef.current = 1;
+    shownRef.current = 1;
+    setPercent(100);
+  }, []);
+
+  return { percent, begin, enter, report, complete, reset };
+}
 
 const inputStyle: React.CSSProperties = {
   background: "var(--ink-3)",
@@ -182,12 +326,15 @@ export default function VideoAnalysisSection({
   const [features, setFeatures] = useState("");
   const [startPosition, setStartPosition] = useState("");
   const [tier, setTier] = useState<GeminiTier>("flash");
+  // Zeitliche Einordnung des Kampfes — optional, Standard "unbekannt".
+  const [recency, setRecency] = useState<FightRecency>("unknown");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pipeline-Status
   const [stage, setStage] = useState<RunStage>("idle");
   const [stageDetail, setStageDetail] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const progress = useAnalysisProgress(stage !== "idle");
   // Display anlassen, solange die Pipeline läuft — verhindert, dass mobile
   // Browser den Upload beim Sperren des Bildschirms abbrechen.
   useWakeLock(stage !== "idle");
@@ -207,6 +354,7 @@ export default function VideoAnalysisSection({
           features: string;
           startPosition: string;
           tier: GeminiTier;
+          recency: FightRecency;
           sourceKind: "upload" | "youtube";
           youtubeUrl: string;
           ytStart: string;
@@ -219,6 +367,7 @@ export default function VideoAnalysisSection({
         if (s.features) setFeatures(s.features);
         if (s.startPosition) setStartPosition(s.startPosition);
         if (s.tier) setTier(s.tier);
+        if (s.recency) setRecency(s.recency);
         if (s.sourceKind) setSourceKind(s.sourceKind);
         if (s.youtubeUrl) setYoutubeUrl(s.youtubeUrl);
         if (s.ytStart) setYtStart(s.ytStart);
@@ -245,6 +394,7 @@ export default function VideoAnalysisSection({
           features,
           startPosition,
           tier,
+          recency,
           sourceKind,
           youtubeUrl,
           ytStart,
@@ -263,6 +413,7 @@ export default function VideoAnalysisSection({
     features,
     startPosition,
     tier,
+    recency,
     sourceKind,
     youtubeUrl,
     ytStart,
@@ -324,6 +475,14 @@ export default function VideoAnalysisSection({
 
   async function handleStart() {
     setRunError(null);
+    progress.reset();
+    // Bänder nur über die Phasen, die tatsächlich laufen — bei einem
+    // YouTube-Link gibt es keinen Upload, also auch kein Upload-Band.
+    progress.begin(
+      sourceKind === "upload"
+        ? ["upload", "gemini", "claude", "save"]
+        : ["gemini", "claude", "save"],
+    );
 
     let source: VideoSource;
     try {
@@ -339,9 +498,11 @@ export default function VideoAnalysisSection({
         let reuse: PendingUpload | null = null;
         if (pendingUpload && (!file || matchesSelected)) {
           setStage("upload");
+          progress.enter("upload");
           setStageDetail("Bereits hochgeladenes Video wird geprüft …");
           if (await isUploadStillActive(pendingUpload.name)) {
             reuse = pendingUpload;
+            progress.report(1); // Upload ist wirklich fertig
           } else {
             setPendingUpload(null); // abgelaufen/gelöscht → Neuupload nötig
           }
@@ -371,9 +532,11 @@ export default function VideoAnalysisSection({
             );
           }
           setStage("upload");
-          const uploaded = await uploadVideoFile(file, (msg) =>
-            setStageDetail(msg),
-          );
+          progress.enter("upload");
+          const uploaded = await uploadVideoFile(file, (msg, fraction) => {
+            setStageDetail(msg);
+            if (fraction != null) progress.report(fraction);
+          });
           setStageDetail(null);
           // Upload sofort merken — überlebt Fehlversuche und Reloads.
           setPendingUpload({
@@ -450,6 +613,7 @@ export default function VideoAnalysisSection({
         existingSplit: targetSplit,
         existingStats: targetStats,
         profileContext,
+        recency,
       };
       const MAX_ATTEMPTS = 3;
       let result: Awaited<ReturnType<typeof runVideoAnalysis>> | null = null;
@@ -459,6 +623,7 @@ export default function VideoAnalysisSection({
           // 300-s-Budget), nur wenn noch keine Beobachtung vorliegt.
           if (!cachedObs) {
             setStage("gemini");
+            progress.enter("gemini");
             const observed = await runVideoObservation(baseRequest);
             cachedObs = {
               observation: observed.observation,
@@ -469,6 +634,7 @@ export default function VideoAnalysisSection({
           }
           // Phase 2 — Bewertung (eigener Request, Gemini wird übersprungen).
           setStage("claude");
+          progress.enter("claude");
           result = await runVideoAnalysis(
             {
               ...baseRequest,
@@ -478,6 +644,8 @@ export default function VideoAnalysisSection({
             (s) => {
               if (s === "claude") setStage(s);
             },
+            undefined,
+            (fraction) => progress.report(fraction),
           );
           break;
         } catch (err) {
@@ -504,6 +672,7 @@ export default function VideoAnalysisSection({
       if (!result) throw new Error("Analyse lieferte kein Ergebnis");
 
       setStage("save");
+      progress.enter("save");
       const saved = await saveVideoAnalysis({
         mode,
         targetId,
@@ -520,6 +689,7 @@ export default function VideoAnalysisSection({
           startPosition: startPosition.trim(),
         },
         tier,
+        recency,
         models: result.models,
         usage: result.usage,
         observation: result.observation,
@@ -540,6 +710,7 @@ export default function VideoAnalysisSection({
         }
       }
 
+      progress.complete();
       setAnalyses((prev) => [saved, ...(prev ?? [])]);
       setExpandedId(saved.id);
       setFormOpen(false);
@@ -587,12 +758,14 @@ export default function VideoAnalysisSection({
   async function readTarget(): Promise<{
     dna: Record<string, string>;
     dnaSplit: DnaSplit | null;
+    dnaSplitWeight: number;
     actionStats: ActionStat[];
   }> {
     if (mode === "opponent") {
       return {
         dna: opponent?.dna ?? {},
         dnaSplit: opponent?.dnaSplit ?? null,
+        dnaSplitWeight: opponent?.dnaSplitWeight ?? 0,
         actionStats: opponent?.actionStats ?? [],
       };
     }
@@ -600,6 +773,7 @@ export default function VideoAnalysisSection({
     return {
       dna: fresh.dna,
       dnaSplit: fresh.dnaSplit,
+      dnaSplitWeight: fresh.dnaSplitWeight,
       actionStats: fresh.actionStats,
     };
   }
@@ -607,6 +781,7 @@ export default function VideoAnalysisSection({
   async function writeTarget(patch: {
     dna: Record<string, string>;
     dnaSplit?: DnaSplit | null;
+    dnaSplitWeight?: number;
     actionStats?: ActionStat[];
   }): Promise<void> {
     if (mode === "opponent") {
@@ -692,27 +867,20 @@ export default function VideoAnalysisSection({
         }
       }
 
-      // Split: leer → übernehmen, sonst mitteln (jede Analyse präzisiert).
-      let dnaSplit: DnaSplit | null = target.dnaSplit;
-      const newSplit = a.evaluation.dnaSplit;
-      if (newSplit && !isDnaSplitEmpty(newSplit)) {
-        if (!dnaSplit || isDnaSplitEmpty(dnaSplit)) {
-          dnaSplit = cleanDnaSplit(newSplit);
-        } else {
-          dnaSplit = cleanDnaSplit({
-            boxing: (dnaSplit.boxing + newSplit.boxing) / 2,
-            kicking: (dnaSplit.kicking + newSplit.kicking) / 2,
-            wrestling: (dnaSplit.wrestling + newSplit.wrestling) / 2,
-            ground: (dnaSplit.ground + newSplit.ground) / 2,
-            clinch: (dnaSplit.clinch + newSplit.clinch) / 2,
-          });
-        }
-      }
+      // Split: gewichteter laufender Mittelwert. Das Video bekommt nur seinen
+      // Anteil an der bisherigen Gewichtssumme — nicht pauschal die Hälfte.
+      const { split: dnaSplit, weight: dnaSplitWeight } = mergeDnaSplit(
+        target.dnaSplit,
+        target.dnaSplitWeight,
+        a.evaluation.dnaSplit,
+        computeVideoWeight(a).value,
+      );
 
       await writeTarget({
         dna,
         actionStats: Array.from(merged.values()),
         dnaSplit,
+        dnaSplitWeight,
       });
       const appliedFindingIds = Array.from(
         new Set([...a.appliedFindingIds, ...ids]),
@@ -995,6 +1163,26 @@ export default function VideoAnalysisSection({
                 style={inputStyle}
               />
             </Field>
+            <Field label="Wann fand der Kampf statt?">
+              <select
+                value={recency}
+                onChange={(e) => setRecency(e.target.value as FightRecency)}
+                className="rounded-lg px-3 py-2 text-xs"
+                style={inputStyle}
+              >
+                {(
+                  ["unknown", "recent", "mid", "old", "ancient"] as FightRecency[]
+                ).map((r) => (
+                  <option key={r} value={r}>
+                    {FIGHT_RECENCY_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 text-[10px]" style={{ color: "var(--fg-4)" }}>
+                Bestimmt mit, wie stark dieses Video das Profil gewichtet.
+                &bdquo;Unbekannt&ldquo; ist in Ordnung — es zählt fast voll.
+              </span>
+            </Field>
           </div>
 
           {/* Modellstufe */}
@@ -1109,8 +1297,30 @@ export default function VideoAnalysisSection({
               </span>
             ))}
           </div>
+          {/* Gesamtfortschritt: echtes Signal, wo vorhanden — sonst Schätzung.
+              Der Wert läuft nie rückwärts und springt nicht stufenweise. */}
+          <div
+            className="font-mono-ta mt-4 text-3xl font-bold tabular-nums"
+            style={{ color: VIOLET, letterSpacing: "0.05em" }}
+            aria-live="polite"
+          >
+            {progress.percent} %
+          </div>
+          <div
+            className="mt-2 h-1 w-full max-w-xs overflow-hidden rounded-full"
+            style={{ background: "var(--ink-3)" }}
+          >
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${progress.percent}%`,
+                background: VIOLET,
+                transition: "width 200ms linear",
+              }}
+            />
+          </div>
           <p
-            className="mt-6 max-w-xs text-center text-[11px]"
+            className="mt-4 max-w-xs text-center text-[11px]"
             style={{ color: "var(--fg-4)" }}
           >
             Das kann einige Minuten dauern — bitte die App im Vordergrund

@@ -36,6 +36,12 @@ export interface FightProfile {
   dna: GegnerDnaAnswers;
   /** §1 Fight-DNA-Split — prozentuale Verteilung der Kampfbereiche. */
   dnaSplit: DnaSplit | null;
+  /**
+   * Summe der Video-Gewichte, die bereits in `dnaSplit` eingeflossen sind.
+   * Nötig, damit ein neues Video nur seinen Anteil bekommt statt pauschal der
+   * Hälfte (siehe mergeDnaSplit in lib/fight-stats.ts). 0 = noch nichts gezählt.
+   */
+  dnaSplitWeight: number;
   /** §2 Action-Stats — gezählte Techniken (Versuche/Treffer/Zone/Setup). */
   actionStats: ActionStat[];
   updatedBy: string | null;
@@ -43,12 +49,16 @@ export interface FightProfile {
 }
 
 export type FightProfilePatch = Partial<
-  Pick<FightProfile, "dna" | "dnaSplit" | "actionStats" | "updatedBy">
+  Pick<
+    FightProfile,
+    "dna" | "dnaSplit" | "dnaSplitWeight" | "actionStats" | "updatedBy"
+  >
 >;
 
 type FightProfileDoc = {
   dna?: GegnerDnaAnswers;
   dnaSplit?: DnaSplit | null;
+  dnaSplitWeight?: number;
   actionStats?: ActionStat[];
   updatedBy?: string | null;
   updatedAt?: Timestamp;
@@ -58,6 +68,7 @@ export function emptyFightProfile(): FightProfile {
   return {
     dna: {},
     dnaSplit: null,
+    dnaSplitWeight: 0,
     actionStats: [],
     updatedBy: null,
     updatedAt: null,
@@ -78,6 +89,7 @@ function decode(data: FightProfileDoc | undefined | null): FightProfile {
   return {
     dna: data.dna ?? {},
     dnaSplit: data.dnaSplit ?? null,
+    dnaSplitWeight: data.dnaSplitWeight ?? 0,
     actionStats: data.actionStats ?? [],
     updatedBy: data.updatedBy ?? null,
     updatedAt: data.updatedAt?.toDate() ?? null,
@@ -111,6 +123,10 @@ export async function updateFightProfile(
   const body: FightProfileDoc = {
     dna,
     dnaSplit: isDnaSplitEmpty(split) ? null : split,
+    dnaSplitWeight: Math.max(
+      0,
+      patch.dnaSplitWeight ?? current.dnaSplitWeight ?? 0,
+    ),
     actionStats,
     updatedBy: patch.updatedBy ?? current.updatedBy ?? null,
   };

@@ -7,6 +7,7 @@
  * Antwort: NDJSON-Stream mit Fortschritts-Events:
  *   {"type":"stage","stage":"gemini"}   → Video-Beobachtung läuft
  *   {"type":"stage","stage":"claude"}   → Bewertung läuft
+ *   {"type":"progress","chars":1234}    → Zeichen der Bewertung bisher
  *   {"type":"result", observation, evaluation, models}
  *   {"type":"error","message":"…"}
  *
@@ -110,6 +111,9 @@ export async function POST(req: Request) {
         if (body.observeOnly) return;
 
         send({ type: "stage", stage: "claude" });
+        // Fortschritt gedrosselt melden (alle 250 Zeichen) — sonst würde jeder
+        // Token eine NDJSON-Zeile erzeugen.
+        let lastReported = 0;
         const { evaluation, model: claudeModel, usage } = await evaluateObservation({
           mode: body.mode,
           fighter: body.fighter,
@@ -119,6 +123,12 @@ export async function POST(req: Request) {
           existingSplit: body.existingSplit ?? null,
           existingStats: body.existingStats ?? [],
           profileContext: body.profileContext ?? "",
+          recency: body.recency ?? "unknown",
+          onProgress: (chars) => {
+            if (chars - lastReported < 250) return;
+            lastReported = chars;
+            send({ type: "progress", chars });
+          },
         });
 
         send({ type: "stage", stage: "done" });

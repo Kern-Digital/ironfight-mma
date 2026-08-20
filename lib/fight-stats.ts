@@ -89,6 +89,45 @@ export function cleanDnaSplit(split: DnaSplit | undefined | null): DnaSplit {
   return out;
 }
 
+/**
+ * Führt einen neuen Split gewichtet in den bestehenden ein.
+ *
+ * Echter gewichteter Mittelwert über alle bisher eingeflossenen Videos:
+ *
+ *   split_neu = (split_alt · W + split_video · w) / (W + w)
+ *
+ * `W` ist die Summe der bisherigen Gewichte. Ohne dieses Mitzählen bliebe nur
+ * `(alt + neu) / 2` — dabei bekäme jedes neue Video pauschal die Hälfte, egal
+ * wie viele Kämpfe schon im Profil stecken.
+ *
+ * Sonderfälle: bestehender Split leer oder `W = 0` → der neue Split wird
+ * vollständig übernommen. Neuer Split leer → nichts ändert sich.
+ */
+export function mergeDnaSplit(
+  current: DnaSplit | null | undefined,
+  currentWeight: number,
+  incoming: DnaSplit | null | undefined,
+  incomingWeight: number,
+): { split: DnaSplit | null; weight: number } {
+  const w = Math.max(0, incomingWeight);
+  const W = Math.max(0, currentWeight);
+  const base = current ?? null;
+
+  if (!incoming || isDnaSplitEmpty(incoming) || w === 0) {
+    return { split: base && !isDnaSplitEmpty(base) ? cleanDnaSplit(base) : null, weight: W };
+  }
+  if (!base || isDnaSplitEmpty(base) || W === 0) {
+    return { split: cleanDnaSplit(incoming), weight: w };
+  }
+
+  const total = W + w;
+  const out = { ...EMPTY_DNA_SPLIT };
+  for (const k of DNA_SPLIT_KEYS) {
+    out[k] = ((base[k] || 0) * W + (incoming[k] || 0) * w) / total;
+  }
+  return { split: cleanDnaSplit(out), weight: total };
+}
+
 // ─── §2 Action-Stats ─────────────────────────────────────────────────────────
 
 export type ActionGroup = "strike" | "kick" | "takedown" | "ground";

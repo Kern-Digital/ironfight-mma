@@ -64,6 +64,11 @@ export interface Opponent {
   dna: GegnerDnaAnswers;
   /** §1 Fight-DNA-Split — prozentuale Verteilung der Kampfbereiche (optional). */
   dnaSplit?: DnaSplit | null;
+  /**
+   * Summe der Video-Gewichte hinter `dnaSplit` — damit ein neues Video nur
+   * seinen Anteil bekommt statt pauschal der Hälfte. 0 = noch nichts gezählt.
+   */
+  dnaSplitWeight?: number;
   /** §2 Action-Stats — gezählte Techniken (Versuche/Treffer/Zone/Setup, optional). */
   actionStats?: ActionStat[];
   /**
@@ -102,6 +107,7 @@ export type OpponentPatch = Partial<
     | "notes"
     | "dna"
     | "dnaSplit"
+    | "dnaSplitWeight"
     | "actionStats"
     | "updatedBy"
   >
@@ -121,6 +127,7 @@ type OpponentDoc = {
   notes: string | null;
   dna: GegnerDnaAnswers;
   dnaSplit?: DnaSplit | null;
+  dnaSplitWeight?: number;
   actionStats?: ActionStat[];
   sharedWith?: string[];
   createdBy: string;
@@ -165,6 +172,7 @@ function decode(id: string, d: OpponentDoc): Opponent {
     notes: d.notes ?? null,
     dna: d.dna ?? {},
     dnaSplit: d.dnaSplit ?? null,
+    dnaSplitWeight: d.dnaSplitWeight ?? 0,
     actionStats: d.actionStats ?? [],
     sharedWith: d.sharedWith ?? [],
     createdBy: d.createdBy,
@@ -233,6 +241,8 @@ export async function updateOpponent(
     const split = cleanDnaSplit(patch.dnaSplit);
     data.dnaSplit = isDnaSplitEmpty(split) ? null : split;
   }
+  if (patch.dnaSplitWeight !== undefined)
+    data.dnaSplitWeight = Math.max(0, patch.dnaSplitWeight);
   if (patch.actionStats !== undefined)
     data.actionStats = cleanActionStats(patch.actionStats);
   if (patch.updatedBy !== undefined) data.updatedBy = patch.updatedBy ?? null;

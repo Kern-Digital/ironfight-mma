@@ -15,10 +15,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GEMINI_MODELS, geminiGenerateJson, parseModelJson } from "./gemini";
 import { DNA_CATEGORIES } from "../gegner-dna";
 import { cleanActionStats, cleanDnaSplit, isDnaSplitEmpty } from "../fight-stats";
+import { FIGHT_RECENCY_LABEL } from "../video-analysis";
 import type {
   AnalysisMode,
   AnalysisUsage,
   FighterDescription,
+  FightRecency,
   VideoEvaluation,
   VideoObservation,
 } from "../video-analysis";
@@ -174,7 +176,15 @@ function userPrompt(args: EvaluateArgs): string {
     existingSplit,
     existingStats,
     profileContext,
+    recency,
   } = args;
+
+  // Additiv: ohne Trainer-Angabe ("unknown") bleibt der Prompt exakt so, wie
+  // er vor Einführung des Zeitraum-Feldes war.
+  const recencyBlock =
+    recency && recency !== "unknown"
+      ? `\nZEITLICHE EINORDNUNG (Trainer-Angabe, verlässlich): Der Kampf liegt im Zeitraum "${FIGHT_RECENCY_LABEL[recency]}". Nutze das statt meta.estimatedAge (Schätzung des Video-Analysten) und berücksichtige es bei der Aktualität deiner Aussagen.\n`
+      : "";
 
   const modeText =
     mode === "opponent"
@@ -201,7 +211,7 @@ function userPrompt(args: EvaluateArgs): string {
   return `${modeText}
 
 PROFIL-KONTEXT: ${profileContext || "keiner"}
-
+${recencyBlock}
 FRAGE-KATALOG (nur diese IDs für findings verwenden):
 ${dnaCatalogText()}
 
@@ -232,8 +242,16 @@ export interface EvaluateArgs {
   existingSplit: DnaSplit | null;
   existingStats: ActionStat[];
   profileContext: string;
+  /** Zeitliche Einordnung des Kampfes; bei "unknown" bleibt der Prompt unverändert. */
+  recency?: FightRecency;
   /** Analyse-Stufe: bei "pro" (Detail-Analyse) darf NIE unter Opus gewechselt werden. */
   tier: "flash" | "pro";
+  /**
+   * Fortschritts-Rückmeldung: Zahl der bisher empfangenen Antwort-Zeichen.
+   * Nur die Claude-Stufe kann das liefern (sie streamt bereits); der
+   * Gemini-Fallback ruft es nicht — dort greift clientseitig die Zeitschätzung.
+   */
+  onProgress?: (chars: number) => void;
 }
 
 /** Defensive Normalisierung des Claude-Ergebnisses. */
@@ -340,6 +358,12 @@ ${JSON.stringify(EVALUATION_SCHEMA)}`;
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
     });
+    // Echter Fortschritt: die Antwort wächst zeichenweise. Bei einem
+    // Modellwechsel (Überlastung) startet der Zähler neu — die Anzeige beim
+    // Client ist gegen Rückschritte gesichert.
+    if (args.onProgress) {
+      stream.on("text", (_delta, snapshot) => args.onProgress?.(snapshot.length));
+    }
     return stream.finalMessage();
   };
   const isOverloaded = (err: unknown): boolean =>
