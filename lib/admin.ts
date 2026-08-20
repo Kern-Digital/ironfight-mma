@@ -31,6 +31,61 @@ export type StudentEntry = AdminUserEntry & {
   athlete?: AthleteProfile;
 };
 
+type AthleteDoc = {
+  primaryDiscipline?: AthleteProfile["primaryDiscipline"];
+  level?: AthleteProfile["level"];
+  trainingStartDate?: Timestamp | null;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  reachCm?: number | null;
+  stance?: AthleteProfile["stance"];
+  weightClass?: AthleteProfile["weightClass"];
+  bjjBelt?: AthleteProfile["bjjBelt"];
+  gymName?: string | null;
+  trainerName?: string | null;
+  nextCompetitionDate?: Timestamp | null;
+  nextCompetitionName?: string | null;
+};
+
+function decodeAthlete(raw: AthleteDoc | undefined): AthleteProfile | undefined {
+  if (!raw) return undefined;
+  return {
+    primaryDiscipline: raw.primaryDiscipline ?? null,
+    level: raw.level ?? null,
+    trainingStartDate: raw.trainingStartDate?.toDate() ?? null,
+    weightKg: raw.weightKg ?? null,
+    heightCm: raw.heightCm ?? null,
+    reachCm: raw.reachCm ?? null,
+    stance: raw.stance ?? null,
+    weightClass: raw.weightClass ?? null,
+    bjjBelt: raw.bjjBelt ?? null,
+    gymName: raw.gymName ?? null,
+    trainerName: raw.trainerName ?? null,
+    nextCompetitionDate: raw.nextCompetitionDate?.toDate() ?? null,
+    nextCompetitionName: raw.nextCompetitionName ?? null,
+  };
+}
+
+function decodeStudentEntry(
+  uid: string,
+  data: Record<string, unknown>,
+): StudentEntry {
+  return {
+    uid,
+    email: (data.email as string | null) ?? null,
+    displayName: (data.displayName as string | null) ?? null,
+    authProviderName: (data.authProviderName as string | null) ?? null,
+    role: data.role as UserRole | undefined,
+    createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
+    athlete: decodeAthlete(data.athlete as AthleteDoc | undefined),
+  } satisfies StudentEntry;
+}
+
+/** Trainer- oder Admin-Account (im Kampfkontext trotzdem ein Athlet). */
+export function isStaffEntry(entry: { role: UserRole | undefined }): boolean {
+  return entry.role === "trainer" || entry.role === "admin";
+}
+
 /**
  * Lädt einen einzelnen Schüler inkl. Athleten-Profil (Trainer-Detailansicht).
  * Wirft, wenn das Profil nicht existiert oder Lese-Zugriff fehlt.
@@ -39,50 +94,7 @@ export async function getStudentEntry(uid: string): Promise<StudentEntry | null>
   const ref = doc(getFirestoreDb(), "users", uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  const data = snap.data() as Record<string, unknown>;
-  const athleteData = data.athlete as
-    | {
-        primaryDiscipline?: AthleteProfile["primaryDiscipline"];
-        level?: AthleteProfile["level"];
-        trainingStartDate?: Timestamp | null;
-        weightKg?: number | null;
-        heightCm?: number | null;
-        reachCm?: number | null;
-        stance?: AthleteProfile["stance"];
-        weightClass?: AthleteProfile["weightClass"];
-        bjjBelt?: AthleteProfile["bjjBelt"];
-        gymName?: string | null;
-        trainerName?: string | null;
-        nextCompetitionDate?: Timestamp | null;
-        nextCompetitionName?: string | null;
-      }
-    | undefined;
-  const athlete: AthleteProfile | undefined = athleteData
-    ? {
-        primaryDiscipline: athleteData.primaryDiscipline ?? null,
-        level: athleteData.level ?? null,
-        trainingStartDate: athleteData.trainingStartDate?.toDate() ?? null,
-        weightKg: athleteData.weightKg ?? null,
-        heightCm: athleteData.heightCm ?? null,
-        reachCm: athleteData.reachCm ?? null,
-        stance: athleteData.stance ?? null,
-        weightClass: athleteData.weightClass ?? null,
-        bjjBelt: athleteData.bjjBelt ?? null,
-        gymName: athleteData.gymName ?? null,
-        trainerName: athleteData.trainerName ?? null,
-        nextCompetitionDate: athleteData.nextCompetitionDate?.toDate() ?? null,
-        nextCompetitionName: athleteData.nextCompetitionName ?? null,
-      }
-    : undefined;
-  return {
-    uid: snap.id,
-    email: (data.email as string | null) ?? null,
-    displayName: (data.displayName as string | null) ?? null,
-    authProviderName: (data.authProviderName as string | null) ?? null,
-    role: data.role as UserRole | undefined,
-    createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
-    athlete,
-  } satisfies StudentEntry;
+  return decodeStudentEntry(snap.id, snap.data() as Record<string, unknown>);
 }
 
 /** Lädt alle registrierten Nutzer (absteigend nach Registrierungsdatum). */
@@ -106,63 +118,30 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
 }
 
 /**
- * Lädt alle Schüler/Mitglieder inkl. Athleten-Profil.
- * Trainer und Admins sehen die gesamte Mitgliederliste; Trainer-/Admin-Accounts
- * werden ausgefiltert, da der Fokus auf Schülern liegt.
+ * Lädt ALLE Mitglieder des Gyms inkl. Athleten-Profil — ohne Rollenfilter.
+ *
+ * Gedacht für Kontexte, in denen auch Trainer/Admins **Athleten** sind
+ * (Wettkampf anlegen, DeepFight-Analysen): dort ist die Rolle nur ein Label,
+ * kein Ausschlusskriterium. Wer eine reine Schülerliste braucht (Verwaltung,
+ * Kurs-Abos, Fortschritt), nimmt `listAllStudents()`.
  */
-export async function listAllStudents(): Promise<StudentEntry[]> {
+export async function listAllMembers(): Promise<StudentEntry[]> {
   const q = query(
     collection(getFirestoreDb(), "users"),
     orderBy("createdAt", "desc"),
   );
   const snap = await getDocs(q);
-  return snap.docs
-    .map((d) => {
-      const data = d.data() as Record<string, unknown>;
-      const athleteData = data.athlete as
-        | {
-            primaryDiscipline?: AthleteProfile["primaryDiscipline"];
-            level?: AthleteProfile["level"];
-            trainingStartDate?: Timestamp | null;
-            weightKg?: number | null;
-            heightCm?: number | null;
-            reachCm?: number | null;
-            stance?: AthleteProfile["stance"];
-            weightClass?: AthleteProfile["weightClass"];
-            bjjBelt?: AthleteProfile["bjjBelt"];
-            gymName?: string | null;
-            trainerName?: string | null;
-            nextCompetitionDate?: Timestamp | null;
-            nextCompetitionName?: string | null;
-          }
-        | undefined;
-      const athlete: AthleteProfile | undefined = athleteData
-        ? {
-            primaryDiscipline: athleteData.primaryDiscipline ?? null,
-            level: athleteData.level ?? null,
-            trainingStartDate: athleteData.trainingStartDate?.toDate() ?? null,
-            weightKg: athleteData.weightKg ?? null,
-            heightCm: athleteData.heightCm ?? null,
-            reachCm: athleteData.reachCm ?? null,
-            stance: athleteData.stance ?? null,
-            weightClass: athleteData.weightClass ?? null,
-            bjjBelt: athleteData.bjjBelt ?? null,
-            gymName: athleteData.gymName ?? null,
-            trainerName: athleteData.trainerName ?? null,
-            nextCompetitionDate:
-              athleteData.nextCompetitionDate?.toDate() ?? null,
-            nextCompetitionName: athleteData.nextCompetitionName ?? null,
-          }
-        : undefined;
-      return {
-        uid: d.id,
-        email: (data.email as string | null) ?? null,
-        displayName: (data.displayName as string | null) ?? null,
-        authProviderName: (data.authProviderName as string | null) ?? null,
-        role: data.role as UserRole | undefined,
-        createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
-        athlete,
-      } satisfies StudentEntry;
-    })
-    .filter((u) => (u.role ?? "user") === "user");
+  return snap.docs.map((d) =>
+    decodeStudentEntry(d.id, d.data() as Record<string, unknown>),
+  );
+}
+
+/**
+ * Lädt alle Schüler/Mitglieder inkl. Athleten-Profil.
+ * Trainer und Admins sehen die gesamte Mitgliederliste; Trainer-/Admin-Accounts
+ * werden ausgefiltert, da der Fokus auf Schülern liegt.
+ */
+export async function listAllStudents(): Promise<StudentEntry[]> {
+  const members = await listAllMembers();
+  return members.filter((u) => !isStaffEntry(u));
 }

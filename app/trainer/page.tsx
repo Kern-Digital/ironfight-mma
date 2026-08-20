@@ -21,7 +21,7 @@ import {
   type FightCamp,
 } from "@/lib/fight-camp";
 import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
-import { listAllStudents, type StudentEntry } from "@/lib/admin";
+import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import { totalAnswered } from "@/lib/gegner-dna";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
@@ -84,28 +84,30 @@ export default function TrainerDashboardPage() {
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [opponents, setOpponents] = useState<Opponent[] | null>(null);
-  const [students, setStudents] = useState<StudentEntry[] | null>(null);
+  // Alle Mitglieder (inkl. Trainer) — Trainer können selbst Wettkämpfe haben,
+  // daher müssen ihre Namen auflösbar sein. Die Schüler-Kachel zählt separat.
+  const [members, setMembers] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     setCamps(null);
     setOpponents(null);
-    setStudents(null);
+    setMembers(null);
     try {
-      const [allCamps, gymOpponents, studentList] = await Promise.all([
+      const [allCamps, gymOpponents, memberList] = await Promise.all([
         listAllFightCamps().catch(() => [] as FightCamp[]),
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
-        listAllStudents().catch(() => [] as StudentEntry[]),
+        listAllMembers().catch(() => [] as StudentEntry[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
       setOpponents(gymOpponents);
-      setStudents(studentList);
+      setMembers(memberList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
       setCamps([]);
       setOpponents([]);
-      setStudents([]);
+      setMembers([]);
     }
   }, [gymId]);
 
@@ -113,9 +115,13 @@ export default function TrainerDashboardPage() {
     load();
   }, [load]);
 
-  const studentMap = useMemo(
-    () => new Map((students ?? []).map((s) => [s.uid, s])),
-    [students],
+  const memberMap = useMemo(
+    () => new Map((members ?? []).map((s) => [s.uid, s])),
+    [members],
+  );
+  const studentCount = useMemo(
+    () => (members ?? []).filter((s) => !isStaffEntry(s)).length,
+    [members],
   );
 
   const upcoming = useMemo(
@@ -129,7 +135,7 @@ export default function TrainerDashboardPage() {
   // listOpponentsForGym liefert bereits nach updatedAt absteigend sortiert.
   const recentOpponents = useMemo(() => (opponents ?? []).slice(0, 6), [opponents]);
 
-  const loading = camps === null || opponents === null || students === null;
+  const loading = camps === null || opponents === null || members === null;
 
   return (
     <main className="min-h-screen">
@@ -199,7 +205,7 @@ export default function TrainerDashboardPage() {
                 <StatCard
                   label="Schüler"
                   icon="users"
-                  value={String((students ?? []).length)}
+                  value={String(studentCount)}
                   href="/trainer/students"
                 />
               </div>
@@ -227,7 +233,7 @@ export default function TrainerDashboardPage() {
                       <CompetitionCard
                         key={c.id}
                         camp={c}
-                        studentLabel={studentLabelOf(studentMap.get(c.studentUid))}
+                        studentLabel={studentLabelOf(memberMap.get(c.studentUid))}
                         href={`/trainer/competitions/${c.studentUid}/${c.id}`}
                       />
                     ))}

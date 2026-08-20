@@ -11,7 +11,7 @@ import OpponentEditor, {
 } from "@/components/trainer/OpponentEditor";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
-import { listAllStudents, type StudentEntry } from "@/lib/admin";
+import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import {
   createOpponent,
   getOpponent,
@@ -31,6 +31,18 @@ import { ATHLETE_LEVEL_LABEL, type TechniqueProgress } from "@/lib/types";
 
 function studentLabel(s: StudentEntry): string {
   return s.displayName ?? s.authProviderName ?? s.email ?? s.uid;
+}
+
+/**
+ * Zweite Zeile der Athleten-Karte: bei Trainern/Admins zuerst die Rolle
+ * (sonst wäre nicht erkennbar, dass hier ein Coach als Athlet antritt),
+ * danach — wenn gepflegt — das Athleten-Level.
+ */
+function athleteSubLabel(s: StudentEntry): string | null {
+  const level = s.athlete?.level ? ATHLETE_LEVEL_LABEL[s.athlete.level] : null;
+  if (!isStaffEntry(s)) return level;
+  const role = s.role === "admin" ? "Admin" : "Trainer";
+  return level ? `${role} · ${level}` : role;
 }
 
 const labelStyle: React.CSSProperties = {
@@ -68,13 +80,97 @@ function StepHeader({ n, title }: { n: number; title: React.ReactNode }) {
   );
 }
 
+function AthleteCard({
+  entry,
+  active,
+  onSelect,
+}: {
+  entry: StudentEntry;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const sub = athleteSubLabel(entry);
+  return (
+    <button
+      onClick={onSelect}
+      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors"
+      style={{
+        background: active ? "rgba(35,196,206,0.1)" : "var(--ink-3)",
+        border: `1px solid ${active ? "var(--ta-cyan)" : "var(--ink-5)"}`,
+      }}
+    >
+      <span
+        className="font-display-ta flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black"
+        style={{
+          background: "var(--ink-4)",
+          color: active ? "var(--ta-cyan)" : "var(--fg-3)",
+        }}
+      >
+        {studentLabel(entry).slice(0, 2).toUpperCase()}
+      </span>
+      <span className="min-w-0">
+        <span
+          className="block truncate text-sm font-bold"
+          style={{ color: active ? "var(--ta-cyan)" : "var(--fg-2)" }}
+        >
+          {studentLabel(entry)}
+        </span>
+        {sub && (
+          <span
+            className="font-mono-ta block truncate text-[9px] uppercase"
+            style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
+          >
+            {sub}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+function AthleteGroup({
+  title,
+  accent,
+  entries,
+  selectedUid,
+  onSelect,
+}: {
+  title: string;
+  accent: string;
+  entries: StudentEntry[];
+  selectedUid: string | null;
+  onSelect: (uid: string) => void;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <div>
+      <p
+        className="font-mono-ta mb-2 text-[9px] font-bold uppercase"
+        style={{ letterSpacing: "0.18em", color: accent }}
+      >
+        {title}
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {entries.map((e) => (
+          <AthleteCard
+            key={e.uid}
+            entry={e}
+            active={e.uid === selectedUid}
+            onSelect={() => onSelect(e.uid)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NewCompetitionContent() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const gymId = resolveGymId(profile);
 
-  const [students, setStudents] = useState<StudentEntry[] | null>(null);
+  const [members, setMembers] = useState<StudentEntry[] | null>(null);
   const [opponents, setOpponents] = useState<Opponent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,15 +195,15 @@ function NewCompetitionContent() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [studentList, opponentList] = await Promise.all([
-        listAllStudents().catch(() => [] as StudentEntry[]),
+      const [memberList, opponentList] = await Promise.all([
+        listAllMembers().catch(() => [] as StudentEntry[]),
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
       ]);
-      setStudents(studentList);
+      setMembers(memberList);
       setOpponents(opponentList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
-      setStudents([]);
+      setMembers([]);
       setOpponents([]);
     }
   }, [gymId]);
@@ -127,23 +223,41 @@ function NewCompetitionContent() {
     }
   }, [searchParams]);
 
-  const filteredStudents = useMemo(() => {
+  const filteredMembers = useMemo(() => {
     const q = studentSearch.trim().toLowerCase();
-    const list = students ?? [];
+    const list = members ?? [];
     if (!q) return list;
     return list.filter(
       (s) =>
         studentLabel(s).toLowerCase().includes(q) ||
         (s.email ?? "").toLowerCase().includes(q),
     );
-  }, [students, studentSearch]);
+  }, [members, studentSearch]);
+
+  // Trainer sind ebenfalls Athleten — sie stehen nur in eigenen Gruppen, damit
+  // niemand sie versehentlich statt eines Schülers erwischt.
+  const selfEntry = useMemo(
+    () => filteredMembers.find((s) => s.uid === user?.uid) ?? null,
+    [filteredMembers, user?.uid],
+  );
+  const staffEntries = useMemo(
+    () =>
+      filteredMembers
+        .filter((s) => s.uid !== user?.uid && isStaffEntry(s))
+        .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "de")),
+    [filteredMembers, user?.uid],
+  );
+  const studentEntries = useMemo(
+    () => filteredMembers.filter((s) => s.uid !== user?.uid && !isStaffEntry(s)),
+    [filteredMembers, user?.uid],
+  );
 
   const filteredOpponents = useMemo(
     () => searchOpponents(opponents ?? [], oppSearch),
     [opponents, oppSearch],
   );
 
-  const selectedStudent = students?.find((s) => s.uid === studentUid) ?? null;
+  const selectedStudent = members?.find((s) => s.uid === studentUid) ?? null;
   const selectedOpponent =
     opponents?.find((o) => o.id === selectedOpponentId) ?? null;
 
@@ -249,7 +363,7 @@ function NewCompetitionContent() {
           </div>
         )}
 
-        {students === null || opponents === null ? (
+        {members === null || opponents === null ? (
           <div className="flex flex-col gap-4">
             <Skeleton className="h-40 w-full rounded-2xl" />
             <Skeleton className="h-40 w-full rounded-2xl" />
@@ -258,61 +372,42 @@ function NewCompetitionContent() {
           <div className="flex flex-col gap-7">
             {/* Schritt 1: Schüler */}
             <section>
-              <StepHeader n={1} title="Schüler / Athlet" />
+              <StepHeader n={1} title="Athlet" />
               <input
                 type="search"
-                placeholder="Schüler suchen…"
+                placeholder="Athlet suchen…"
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 className="mb-3 w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
                 style={fieldStyle}
               />
-              {filteredStudents.length === 0 ? (
+              {filteredMembers.length === 0 ? (
                 <p className="text-xs" style={{ color: "var(--fg-4)" }}>
-                  Keine Schüler gefunden.
+                  Keine Athleten gefunden.
                 </p>
               ) : (
-                <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-                  {filteredStudents.map((s) => {
-                    const active = s.uid === studentUid;
-                    return (
-                      <button
-                        key={s.uid}
-                        onClick={() => setStudentUid(s.uid)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors"
-                        style={{
-                          background: active ? "rgba(35,196,206,0.1)" : "var(--ink-3)",
-                          border: `1px solid ${active ? "var(--ta-cyan)" : "var(--ink-5)"}`,
-                        }}
-                      >
-                        <span
-                          className="font-display-ta flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black"
-                          style={{
-                            background: "var(--ink-4)",
-                            color: active ? "var(--ta-cyan)" : "var(--fg-3)",
-                          }}
-                        >
-                          {studentLabel(s).slice(0, 2).toUpperCase()}
-                        </span>
-                        <span className="min-w-0">
-                          <span
-                            className="block truncate text-sm font-bold"
-                            style={{ color: active ? "var(--ta-cyan)" : "var(--fg-2)" }}
-                          >
-                            {studentLabel(s)}
-                          </span>
-                          {s.athlete?.level && (
-                            <span
-                              className="font-mono-ta block truncate text-[9px] uppercase"
-                              style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
-                            >
-                              {ATHLETE_LEVEL_LABEL[s.athlete.level]}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="flex max-h-72 flex-col gap-4 overflow-y-auto">
+                  <AthleteGroup
+                    title="Ich selbst"
+                    accent="var(--ta-cyan)"
+                    entries={selfEntry ? [selfEntry] : []}
+                    selectedUid={studentUid}
+                    onSelect={setStudentUid}
+                  />
+                  <AthleteGroup
+                    title="Trainer & Coaches"
+                    accent="#9D7BFA"
+                    entries={staffEntries}
+                    selectedUid={studentUid}
+                    onSelect={setStudentUid}
+                  />
+                  <AthleteGroup
+                    title="Schüler"
+                    accent="var(--fg-4)"
+                    entries={studentEntries}
+                    selectedUid={studentUid}
+                    onSelect={setStudentUid}
+                  />
                 </div>
               )}
             </section>
@@ -456,7 +551,7 @@ function NewCompetitionContent() {
                 style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
               >
                 <span>
-                  Schüler:{" "}
+                  Athlet:{" "}
                   <span style={{ color: selectedStudent ? "var(--ta-cyan)" : "var(--fg-4)" }}>
                     {selectedStudent ? studentLabel(selectedStudent) : "—"}
                   </span>
@@ -484,7 +579,7 @@ function NewCompetitionContent() {
                   className="font-mono-ta mt-2 text-center text-[9px] uppercase"
                   style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
                 >
-                  Schüler, DeepFight-Profil, Name und Datum wählen
+                  Athlet, DeepFight-Profil, Name und Datum wählen
                 </p>
               )}
             </div>

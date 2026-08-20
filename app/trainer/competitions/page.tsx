@@ -12,7 +12,7 @@ import CompetitionCard, {
 import { useAuth } from "@/lib/auth-context";
 import { belongsToGym, resolveGymId } from "@/lib/gym";
 import { listAllFightCamps, type FightCamp } from "@/lib/fight-camp";
-import { listAllStudents, type StudentEntry } from "@/lib/admin";
+import { listAllMembers, type StudentEntry } from "@/lib/admin";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
   if (!entry) return "Schüler";
@@ -52,7 +52,8 @@ function CompetitionsHubContent() {
   const gymId = resolveGymId(profile);
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
-  const [students, setStudents] = useState<Map<string, StudentEntry>>(new Map());
+  // Alle Mitglieder inkl. Trainer: auch Coaches treten als Athleten an.
+  const [members, setMembers] = useState<Map<string, StudentEntry>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -65,12 +66,12 @@ function CompetitionsHubContent() {
     setError(null);
     setCamps(null);
     try {
-      const [allCamps, studentList] = await Promise.all([
+      const [allCamps, memberList] = await Promise.all([
         listAllFightCamps().catch(() => [] as FightCamp[]),
-        listAllStudents().catch(() => [] as StudentEntry[]),
+        listAllMembers().catch(() => [] as StudentEntry[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
-      setStudents(new Map(studentList.map((s) => [s.uid, s])));
+      setMembers(new Map(memberList.map((s) => [s.uid, s])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
       setCamps([]);
@@ -87,14 +88,14 @@ function CompetitionsHubContent() {
     const list = camps ?? [];
     if (!q) return list;
     return list.filter((c) => {
-      const label = studentLabelOf(students.get(c.studentUid)).toLowerCase();
+      const label = studentLabelOf(members.get(c.studentUid)).toLowerCase();
       return (
         c.competitionName.toLowerCase().includes(q) ||
         c.opponent.name.toLowerCase().includes(q) ||
         label.includes(q)
       );
     });
-  }, [camps, search, students]);
+  }, [camps, search, members]);
 
   const grouped = useMemo(() => {
     const g = { upcoming: [] as FightCamp[], past: [] as FightCamp[], archived: [] as FightCamp[] };
@@ -207,7 +208,7 @@ function CompetitionsHubContent() {
                   <CompetitionCard
                     key={c.id}
                     camp={c}
-                    studentLabel={studentLabelOf(students.get(c.studentUid))}
+                    studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
                   />
                 ))}
@@ -219,7 +220,7 @@ function CompetitionsHubContent() {
                   <CompetitionCard
                     key={c.id}
                     camp={c}
-                    studentLabel={studentLabelOf(students.get(c.studentUid))}
+                    studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
                   />
                 ))}
@@ -231,7 +232,7 @@ function CompetitionsHubContent() {
                   <CompetitionCard
                     key={c.id}
                     camp={c}
-                    studentLabel={studentLabelOf(students.get(c.studentUid))}
+                    studentLabel={studentLabelOf(members.get(c.studentUid))}
                     href={`/trainer/competitions/${c.studentUid}/${c.id}`}
                   />
                 ))}

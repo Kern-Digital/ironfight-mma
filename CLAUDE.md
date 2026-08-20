@@ -41,6 +41,18 @@
   seit 2026-08-19 genauso wie beim Gegner). Firestore-Regel: Owner darf
   `fightProfile` NICHT schreiben (analog `role`), Trainer/Admin-Update
   ausschließlich auf dieses Feld.
+- **Trainer sind auch Athleten** (seit 2026-08-20): Die Rolle entscheidet über
+  Werkzeug-Zugriff, NICHT darüber, wer Athlet sein darf. Zwei Leser in
+  `lib/admin.ts`: **`listAllMembers()`** (alle User, kein Rollenfilter) für
+  Kampfkontexte — „Neuer Wettkampf" (Schritt 1), Wettkampf-Übersicht +
+  Trainer-Dashboard (Namensauflösung) und das DeepFight-Grid
+  `/trainer/deepfight/athletes`; **`listAllStudents()`** (= Members ohne
+  Trainer/Admin, via `isStaffEntry`) bleibt für die reine Schülerverwaltung
+  (`/trainer/students`, Admin-Seed, Freigabe-Panel im Gegnerprofil) und für die
+  „Schüler"-Kachel auf dem Dashboard. UI-Gruppierung in beiden Kampfkontexten
+  identisch: „Ich selbst"/„Meine Analyse" (cyan) · „Trainer & Coaches"
+  (violet) · „Schüler" (neutral). Firestore brauchte dafür KEINE Änderung —
+  `users/{uid}/fightCamps` erlaubt Trainer/Admin ohnehin jede uid.
 - **⚠ Sicherheitsmodell der Analyse-Freigabe (bewusste Schuld, 2026-08-19):**
   Die Sichtbarkeit der eigenen Auswertungen (`sharedWithAthlete`) wird NUR
   clientseitig gefiltert — die generische users-Subcollection-Regel
@@ -106,6 +118,9 @@
 users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write;
                                     fightProfile = Kampfprofil, nur Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
+users/{uid}/fightCamps/{campId}   — Wettkampf + eingefrorener Gegner-Snapshot
+                                    (Trainer/Admin lesen+schreiben JEDE uid;
+                                    zentrale Liste via collectionGroup)
 users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des eigenen Athleten
 opponents/{id}                    — Gegner-DNA-Bibliothek (Trainer/Admin)
 opponents/{id}/videoAnalyses/{id} — KI-Video-Analysen zum Gegner
