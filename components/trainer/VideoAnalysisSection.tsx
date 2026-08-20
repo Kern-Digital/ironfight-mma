@@ -21,7 +21,7 @@ import { useWakeLock } from "@/lib/use-wake-lock";
 import VideoAnalysisResult from "./VideoAnalysisResult";
 import AiBudgetGauge, { formatEur } from "./AiBudgetGauge";
 import { useAuth } from "@/lib/auth-context";
-import { updateOpponent, type Opponent } from "@/lib/opponents";
+import { getOpponent, updateOpponent, type Opponent } from "@/lib/opponents";
 import {
   getFightProfile,
   updateFightProfile,
@@ -744,16 +744,31 @@ export default function VideoAnalysisSection({
 
   // ─── Übernahme in Gegner-DNA bzw. Kampfprofil ────────────────────────────
 
-  function isConflict(a: VideoAnalysis, questionId: string): boolean {
+  /**
+   * `dna` optional: beim Übernehmen wird gegen den FRISCH gelesenen Stand
+   * geprüft, sonst gegen den Anzeigestand. Ohne das könnte eine Antwort, die
+   * ein anderer Trainer inzwischen gesetzt hat, als konfliktfrei durchgehen
+   * und still überschrieben werden.
+   */
+  function isConflict(
+    a: VideoAnalysis,
+    questionId: string,
+    dna: Record<string, string> = targetDna,
+  ): boolean {
     if (a.appliedFindingIds.includes(questionId)) return false;
     const finding = a.evaluation.findings.find((f) => f.questionId === questionId);
-    const existing = targetDna[questionId]?.trim();
+    const existing = dna[questionId]?.trim();
     return !!finding && !!existing && existing !== finding.answer.trim();
   }
 
   /**
-   * Liest das Merge-Ziel frisch: Gegner aus dem Prop (Seite hält den Stand),
-   * Kampfprofil direkt aus Firestore (verhindert stale Merges).
+   * Liest das Merge-Ziel IMMER frisch aus Firestore — in beiden Modi.
+   *
+   * Der Gegner kam früher aus dem React-Prop. Das reichte, solange nur eine
+   * Person am Profil arbeitete: hat ein zweiter Trainer zwischenzeitlich etwas
+   * übernommen, überschrieb der veraltete Prop dessen Beitrag komplett
+   * (Split, Gewichtssumme und Zählungen). Das Zeitfenster war nicht ein
+   * Rennen um Millisekunden, sondern die gesamte Standzeit eines offenen Tabs.
    */
   async function readTarget(): Promise<{
     dna: Record<string, string>;
@@ -762,11 +777,14 @@ export default function VideoAnalysisSection({
     actionStats: ActionStat[];
   }> {
     if (mode === "opponent") {
+      if (!opponent) throw new Error("Kein Gegnerprofil geladen");
+      // Fällt auf den Prop zurück, falls der Gegner nicht (mehr) lesbar ist.
+      const fresh = (await getOpponent(opponent.id)) ?? opponent;
       return {
-        dna: opponent?.dna ?? {},
-        dnaSplit: opponent?.dnaSplit ?? null,
-        dnaSplitWeight: opponent?.dnaSplitWeight ?? 0,
-        actionStats: opponent?.actionStats ?? [],
+        dna: fresh.dna ?? {},
+        dnaSplit: fresh.dnaSplit ?? null,
+        dnaSplitWeight: fresh.dnaSplitWeight ?? 0,
+        actionStats: fresh.actionStats ?? [],
       };
     }
     const fresh = await getFightProfile(targetId);
@@ -841,7 +859,9 @@ export default function VideoAnalysisSection({
       const target = await readTarget();
       const ids = a.evaluation.findings
         .filter(
-          (f) => !a.appliedFindingIds.includes(f.questionId) && !isConflict(a, f.questionId),
+          (f) =>
+            !a.appliedFindingIds.includes(f.questionId) &&
+            !isConflict(a, f.questionId, target.dna),
         )
         .map((f) => f.questionId);
 
