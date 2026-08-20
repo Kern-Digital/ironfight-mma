@@ -53,6 +53,21 @@
   identisch: „Ich selbst"/„Meine Analyse" (cyan) · „Trainer & Coaches"
   (violet) · „Schüler" (neutral). Firestore brauchte dafür KEINE Änderung —
   `users/{uid}/fightCamps` erlaubt Trainer/Admin ohnehin jede uid.
+- **Wettkampf-Gegner: Snapshot + verknüpftes Profil** (seit 2026-08-20):
+  Der Snapshot in `fightCamps/{id}.opponent` bleibt gespeichert wie bisher,
+  ist aber **nicht mehr das, was angezeigt wird**. Anzeige und Editor-Vorbelegung
+  laufen über `resolveCampOpponent(snapshot, live)` (`lib/opponents.ts`): das
+  verknüpfte `opponents/{opponentId}` füllt **nur Lücken** — DNA-Antworten, die
+  der Snapshot nicht hat, dazu `dnaSplit`/`actionStats`, falls der Snapshot
+  keine hat. **Vorhandene Snapshot-Werte gewinnen immer** (es gibt keine
+  Zeitstempel pro Antwort → „neuer" ist nicht entscheidbar; die bewusste
+  Wettkampf-Notiz wiegt schwerer). Dadurch zählt die `DNA n`-Zahl auf den
+  Wettkampfkarten später ergänztes Scouting mit; ein violettes `+n NEU`-Badge
+  bzw. ein Hinweis auf der Detailseite macht die Ergänzung sichtbar.
+  Geschrieben wird weiter nur beim Speichern im Wettkampf-Editor — dann friert
+  der angezeigte (gemergte) Stand ein. Ist das Profil gelöscht/nicht lesbar,
+  greift automatisch der reine Snapshot. Verknüpfungs-ID immer über
+  `campOpponentId(camp)` lesen (liegt historisch am Camp UND am Snapshot).
 - **⚠ Sicherheitsmodell der Analyse-Freigabe (bewusste Schuld, 2026-08-19):**
   Die Sichtbarkeit der eigenen Auswertungen (`sharedWithAthlete`) wird NUR
   clientseitig gefiltert — die generische users-Subcollection-Regel
@@ -118,7 +133,8 @@
 users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write;
                                     fightProfile = Kampfprofil, nur Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
-users/{uid}/fightCamps/{campId}   — Wettkampf + eingefrorener Gegner-Snapshot
+users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
+                                    + Lücken aus opponents/{opponentId}, s.o.)
                                     (Trainer/Admin lesen+schreiben JEDE uid;
                                     zentrale Liste via collectionGroup)
 users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des eigenen Athleten
@@ -191,6 +207,17 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   `meta.opponentLevel`. Beides sind reine Bildschätzungen des Modells — es gibt
   weder ein Kampfdatum noch Gegnerdaten im Input. Ebenso `evaluation.merge.weight`
   (Claudes Selbsteinschätzung): wird weder gerechnet noch angezeigt.
+- **Split ist normiert & video-exklusiv** (seit 2026-08-20): `cleanDnaSplit`
+  normiert jeden gespeicherten Split per Largest-Remainder auf Summe EXAKT
+  100 (idempotent — normierte Werte bleiben beim erneuten Säubern gleich);
+  `mergeDnaSplit` normiert BEIDE Seiten vor dem Mittel. Roh-Summen ≠ 100
+  (Modell liefert 95/108, Feld-Rundung erzeugt 99/101) wirkten vorher als
+  verstecktes Zusatzgewicht. Die manuelle Eingabe von Split UND
+  Technik-Statistik wurde ENTFERNT: `FightDnaSplit` und `FightStatsBlock`
+  sind reine Anzeige, `OpponentEditor` reicht beide Werte nur unverändert
+  durch (damit Speichern anderer Felder sie nicht löscht) — einzige Quelle
+  ist die Video-Analyse. Altbestände heilen ohne Migration beim nächsten
+  Speichern/Merge; die Anzeige normalisiert ohnehin.
 - **`actionStats` werden weiterhin nur summiert**, nie gewichtet — es sind
   Zählungen; „3,7 Versuche" wäre nicht interpretierbar.
 - **DNA-Freitext bleibt manuell**: harter Ersatz pro Frage-ID, Konflikte nur
@@ -292,7 +319,10 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       (a) Löschen einer Analyse korrigiert Gewicht und Zählungen automatisch —
       heute wirkt ein gelöschtes Video weiter; (b) das verbliebene
       Sekundenbruchteil-Fenster zwischen Lesen und Schreiben beim
-      gleichzeitigen Übernehmen durch zwei Trainer. Kosten: eine
+      gleichzeitigen Übernehmen durch zwei Trainer. Seit Entfernung der
+      manuellen Eingabe von Split und Technik-Statistik (2026-08-20) zudem
+      der einzige Weg, einen falschen Split oder eine falsche Technik-Zählung
+      zu korrigieren. Kosten: eine
       Collection-Query pro Übernahme
 - [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert — die
       Konflikt-Anzeige kann daher nicht sagen, aus welchem (wie gewichteten)

@@ -192,7 +192,7 @@ export default function OpponentProfileView({
       {showOverview && (
         <>
           {/* §1 Fight-DNA-Split */}
-          <FightDnaSplit split={opponent.dnaSplit} mode="view" />
+          <FightDnaSplit split={opponent.dnaSplit} />
 
           {/* §3/§4/§5 Auto-Insights aus den Zahlen */}
           <FightInsights
@@ -204,7 +204,7 @@ export default function OpponentProfileView({
 
       {/* §2 Technik-Statistik (Detailzahlen) */}
       {showStats && (
-        <FightStatsBlock stats={opponent.actionStats ?? []} mode="view" />
+        <FightStatsBlock stats={opponent.actionStats ?? []} />
       )}
 
       {showDna && <DnaCategoryGrid answers={opponent.dna ?? {}} />}

@@ -27,9 +27,9 @@ export default function FightProfileView({
   const stats = actionStats ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <FightDnaSplit split={dnaSplit} mode="view" />
+      <FightDnaSplit split={dnaSplit} />
       <FightInsights split={dnaSplit} stats={stats} />
-      <FightStatsBlock stats={stats} mode="view" />
+      <FightStatsBlock stats={stats} />
       <DnaCategoryGrid answers={dna} />
     </div>
   );

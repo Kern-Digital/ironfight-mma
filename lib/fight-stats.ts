@@ -17,7 +17,7 @@ import { FIGHT_FAMILY_COLOR } from "@/lib/discipline-colors";
 
 // ─── §1 Fight-DNA-Split ──────────────────────────────────────────────────────
 
-/** Prozentuale Verteilung der Kampfbereiche eines Gegners (Summe ~100). */
+/** Prozentuale Verteilung der Kampfbereiche (gespeichert normiert: Summe exakt 100). */
 export interface DnaSplit {
   boxing: number;
   kicking: number;
@@ -78,14 +78,41 @@ export function normalizeDnaSplit(split: DnaSplit): Record<DnaSplitKey, number> 
   return out;
 }
 
-/** Säubert einen Split für Firestore — clampt auf 0..100, ganze Zahlen. */
+/**
+ * Säubert einen Split für Firestore und normiert ihn auf Summe EXAKT 100.
+ *
+ * Largest-Remainder-Verfahren: jeden Anteil abrunden, dann die fehlenden
+ * Punkte an die größten Nachkommareste vergeben (bei Gleichstand entscheidet
+ * die Katalog-Reihenfolge — deterministisch). Ein bereits normierter Split
+ * bleibt beim erneuten Säubern unverändert.
+ *
+ * Warum: Modelle liefern gelegentlich Summen wie 95 oder 108, und Runden je
+ * Feld allein kann 99/101 erzeugen (33,3/33,3/33,4). Beides würde in
+ * mergeDnaSplit als verstecktes Zusatzgewicht wirken und die Anzeige von
+ * "100 %" brechen. Leerer Split (alle Werte ≤ 0) bleibt leer.
+ */
 export function cleanDnaSplit(split: DnaSplit | undefined | null): DnaSplit {
-  if (!split) return { ...EMPTY_DNA_SPLIT };
   const out = { ...EMPTY_DNA_SPLIT };
+  if (!split) return out;
+  const raw = { ...EMPTY_DNA_SPLIT };
+  let total = 0;
   for (const k of DNA_SPLIT_KEYS) {
     const v = Number(split[k]);
-    out[k] = Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : 0;
+    raw[k] = Number.isFinite(v) && v > 0 ? v : 0;
+    total += raw[k];
   }
+  if (total <= 0) return out;
+  let used = 0;
+  const rest: { k: DnaSplitKey; frac: number }[] = [];
+  for (const k of DNA_SPLIT_KEYS) {
+    const exact = (raw[k] * 100) / total;
+    out[k] = Math.floor(exact);
+    used += out[k];
+    rest.push({ k, frac: exact - out[k] });
+  }
+  // sort ist stabil — bei gleichem Rest bleibt die Katalog-Reihenfolge.
+  rest.sort((a, b) => b.frac - a.frac);
+  for (let i = 0; i < 100 - used; i++) out[rest[i].k] += 1;
   return out;
 }
 
@@ -121,9 +148,13 @@ export function mergeDnaSplit(
   }
 
   const total = W + w;
+  // Beide Seiten VOR dem Mittel auf Summe 100 normieren — sonst wirkt eine
+  // Roh-Summe ≠ 100 (Modell-Output, Altbestand) als verstecktes Zusatzgewicht.
+  const base100 = cleanDnaSplit(base);
+  const incoming100 = cleanDnaSplit(incoming);
   const out = { ...EMPTY_DNA_SPLIT };
   for (const k of DNA_SPLIT_KEYS) {
-    out[k] = ((base[k] || 0) * W + (incoming[k] || 0) * w) / total;
+    out[k] = (base100[k] * W + incoming100[k] * w) / total;
   }
   return { split: cleanDnaSplit(out), weight: total };
 }

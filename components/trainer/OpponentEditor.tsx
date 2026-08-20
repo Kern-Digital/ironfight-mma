@@ -108,12 +108,14 @@ export default function OpponentEditor({
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [dna, setDna] = useState<GegnerDnaAnswers>(initial?.dna ?? {});
-  const [dnaSplit, setDnaSplit] = useState<DnaSplit | null>(
-    initial?.dnaSplit ?? null,
-  );
-  const [actionStats, setActionStats] = useState<ActionStat[]>(
-    initial?.actionStats ?? [],
-  );
+  // Split ist NICHT editierbar — einzige Quelle ist die Video-Analyse
+  // (gewichteter Merge). Der Wert wird nur durchgereicht, damit Speichern
+  // anderer Felder ihn nicht löscht.
+  const dnaSplit: DnaSplit | null = initial?.dnaSplit ?? null;
+  // Stats sind NICHT editierbar — einzige Quelle ist die Video-Analyse
+  // (Summen beim Übernehmen). Wert wird nur durchgereicht, damit Speichern
+  // anderer Felder ihn nicht löscht.
+  const actionStats: ActionStat[] = initial?.actionStats ?? [];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -286,29 +288,25 @@ export default function OpponentEditor({
         </label>
       </div>
 
-      {/* ── §1 Fight-DNA-Split ── */}
-      <FightDnaSplit split={dnaSplit} mode="edit" onChange={setDnaSplit} />
-
-      {/* ── §2 Technik-Statistik ── */}
+      {/* ── §1 Fight-DNA-Split (nur Anzeige — Quelle ist die Video-Analyse) ── */}
       <div>
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <h3
-            className="font-display-ta font-black uppercase"
-            style={{ fontSize: "15px", letterSpacing: "0.06em" }}
-          >
-            Technik-Statistik
-          </h3>
-          <span
-            className="font-mono-ta text-[10px]"
-            style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
-          >
-            Versuche · Treffer · Zone · Setup
-          </span>
-        </div>
-        <FightStatsBlock stats={actionStats} mode="edit" onChange={setActionStats} />
+        <FightDnaSplit split={dnaSplit} />
+        <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
+          Der Fight-DNA-Split wird automatisch aus der KI-Video-Analyse
+          berechnet (gewichteter Mittelwert) und hier nicht manuell gepflegt.
+        </p>
       </div>
 
-      {/* ── §3/§4/§5 Live-Auswertung der eingegebenen Zahlen ── */}
+      {/* ── §2 Technik-Statistik (nur Anzeige — Quelle ist die Video-Analyse) ── */}
+      <div>
+        <FightStatsBlock stats={actionStats} />
+        <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
+          Die Technik-Statistik (Versuche/Treffer/Zone/Setup) wird automatisch
+          aus der KI-Video-Analyse gezählt und hier nicht manuell gepflegt.
+        </p>
+      </div>
+
+      {/* ── §3/§4/§5 Auswertung der gespeicherten Zahlen ── */}
       <FightInsights split={dnaSplit} stats={actionStats} />
 
       {/* ── DeepFight-Analyse (ausklappbare Kategorien) ── */}
