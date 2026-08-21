@@ -28,6 +28,14 @@
 7. **Tech-Grenzen:** Tailwind CSS 3.4, React 18 (KEIN Upgrade), R3F bleibt
    v8, Tokens leben in `app/globals.css`, Tailwind-Farbwelt in
    `tailwind.config`.
+8. **Mobile-First / Native-Ready** (die App soll später via Capacitor o. ä.
+   in die App-Stores): Touch-Ziele ≥ 44 px; KEINE Hover-only-Funktionen
+   (Hover nur als Verstärkung); Safe-Area-Insets einplanen
+   (`env(safe-area-inset-*)`, Notch/Home-Indicator); Schüler-Kernbereiche
+   für Bottom-Navigation ausgelegt, Trainer-Werkzeuge zusätzlich in
+   Desktop-Breite entworfen; Tokens als plattformneutrale WERTE (Farben,
+   Typo-Skala, Radien) — keine CSS-Spezialeffekte als tragendes
+   Gestaltungselement.
 
 ## 2. Verhandelbar (steht zur Disposition)
 
