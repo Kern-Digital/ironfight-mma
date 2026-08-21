@@ -169,10 +169,10 @@ Beschlossenes Modell: **Fixbetrag + Kontingent + Nachkauf.**
 
 1. **Phase 0 — UMGESETZT 2026-08-20** (bis auf Rollen-API → Phase 2):
    videoAnalyses-Härtung + Middleware-Signaturprüfung sind im Code.
-2. **Phase 1 — UMGESETZT 2026-08-20, Cutover ausstehend**: `gyms/`-Collection,
-   gymId in Claims, Regeln gym-gescoped, Queries gefiltert. Deploy-Runbook:
-   siehe CLAUDE.md Backlog bzw. Kopf von `scripts/migrate-multi-gym.mjs`
-   (Reihenfolge Migration → Indizes → Client → Rules ist PFLICHT).
+2. **Phase 1 — LIVE seit 2026-08-21**: `gyms/`-Collection, gymId in Claims,
+   Regeln gym-gescoped, Queries gefiltert. Cutover (Migration → Indizes →
+   Client → Rules) ist komplett durchgelaufen; künftige Gym-Backfills:
+   `scripts/migrate-multi-gym.mjs`.
 3. **REDESIGN** (siehe `docs/DESIGN-BRIEF.md`) — bewusst HIER: nach dem
    Unterbau, VOR den neuen Oberflächen, damit jeder neue Screen nur einmal
    gebaut wird. Architektur- und Optik-Umbau nie vermischen.

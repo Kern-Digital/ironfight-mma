@@ -76,6 +76,9 @@
   `listVideoAnalyses(..., { sharedOnly: true })`), die Middleware prüft
   Token-SIGNATUREN (jose gegen Googles Zertifikate) und gated `/admin`
   (role=admin, sonst 404) und `/trainer` (trainer/admin, sonst Redirect).
+  **Cutover ist LIVE seit 2026-08-21** (Migration + Indizes + Client + Rules
+  deployed; Migration lief als REST-Variante über die eingeloggten
+  firebase-tools-Credentials, da kein Service-Account-Key auf dem PC liegt).
   Gym-Trennung: `gymId` liegt als **Custom Claim** neben `role`
   (auth-context spiegelt ihn ins Profil); die Rules prüfen `data.gymId`
   **STRIKT** gegen den Token-Claim (fehlender CLAIM = Default-Gym, fehlendes
@@ -333,11 +336,6 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Abnahme-Checkliste. Jede Design-Session startet mit dieser Datei.
 
 ## Backlog (offen)
-- [ ] **Multi-Gym-Cutover ausführen** (Code ist fertig, Deploy steht aus):
-      1. `node scripts/migrate-multi-gym.mjs` · 2. `npx firebase-tools deploy
-      --only firestore:indexes` · 3. Client deployen (git push → Vercel) ·
-      4. `npx firebase-tools deploy --only firestore:rules`. Reihenfolge ist
-      PFLICHT (Rules prüfen data.gymId strikt; Client braucht die Indizes).
 - [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
       Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
