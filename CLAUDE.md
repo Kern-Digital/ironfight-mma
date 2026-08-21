@@ -68,18 +68,25 @@
   der angezeigte (gemergte) Stand ein. Ist das Profil gelöscht/nicht lesbar,
   greift automatisch der reine Snapshot. Verknüpfungs-ID immer über
   `campOpponentId(camp)` lesen (liegt historisch am Camp UND am Snapshot).
-- **⚠ Sicherheitsmodell der Analyse-Freigabe (bewusste Schuld, 2026-08-19):**
-  Die Sichtbarkeit der eigenen Auswertungen (`sharedWithAthlete`) wird NUR
-  clientseitig gefiltert — die generische users-Subcollection-Regel
-  (`match /users/{uid}/{subcollection}/{document=**}`) erlaubt einem Nutzer
-  ohnehin Owner-Read (und -Write!) auf ALLE eigenen Subcollections, also auch
-  auf nicht freigegebene `videoAnalyses`. Für das aktuelle gym-interne
-  Vertrauensniveau okay; eine harte serverseitige Trennung erfordert einen
-  Umbau der generischen users-Regel (videoAnalyses aus dem Wildcard
-  herauslösen: Owner-Read nur bei `resource.data.sharedWithAthlete == true`,
-  Owner-Write entziehen, Trainer/Admin voll). **Spätestens beim Ausbau auf
-  mehrere Gyms PFLICHT** — dann Trainer-Zugriff zusätzlich per gymId scopen
-  (siehe `lib/gym.ts` / `belongsToGym`).
+- **Multi-Gym Phase 0+1 implementiert (2026-08-20, siehe
+  `docs/MULTI-GYM-KONZEPT.md`):** Die früheren Schulden sind getilgt —
+  `videoAnalyses` ist aus dem users-Owner-Wildcard herausgelöst (Owner-Read
+  nur bei `sharedWithAthlete == true`, Owner-Write NIE; Athleten-Queries
+  MÜSSEN `where("sharedWithAthlete","==",true)` filtern →
+  `listVideoAnalyses(..., { sharedOnly: true })`), die Middleware prüft
+  Token-SIGNATUREN (jose gegen Googles Zertifikate) und gated `/admin`
+  (role=admin, sonst 404) und `/trainer` (trainer/admin, sonst Redirect).
+  Gym-Trennung: `gymId` liegt als **Custom Claim** neben `role`
+  (auth-context spiegelt ihn ins Profil); die Rules prüfen `data.gymId`
+  **STRIKT** gegen den Token-Claim (fehlender CLAIM = Default-Gym, fehlendes
+  DOKUMENT-Feld = Zugriff verweigert — deshalb Migration nötig,
+  `scripts/migrate-multi-gym.mjs`, Cutover-Reihenfolge im Script-Kopf!).
+  Trainer-Listen-Queries filtern deshalb zwingend nach gymId:
+  `listAllMembers(gymId)`, `listAllStudents(gymId)`,
+  `listAllFightCamps(gymId)`, `listOpponentsForGym(gymId)`;
+  `belongsToGym` ist jetzt strikt. `set-role.mjs` MERGT Claims (gymId bleibt
+  erhalten). Noch bewusst OHNE Gym-Scope (Phase 2/3): `trainingSessions`,
+  `aiUsage`, `techniqueStats`, Rollen-API/Einladungen.
 
 ## Tech-Stack
 | Layer | Technologie | Version |
@@ -104,21 +111,31 @@
   Spiegelt das ID-Token in ein `__session`-Cookie (für die Middleware).
 
 ### Rollen & Berechtigungen (Sicherheits-kritisch)
-- Rollen (`user` | `trainer` | `admin`) liegen **autoritativ in Firebase Auth
-  Custom Claims**, NICHT im Firestore-Dokument.
-- Client liest die Rolle via `getIdTokenResult()` (`claims.role`) — siehe
-  `auth-context.tsx` (`refreshRole()` erzwingt Token-Refresh nach Claim-Änderung).
-- Rollen werden **ausschließlich serverseitig** per Admin-SDK gesetzt:
-  `node scripts/set-role.mjs <uid> <role>` oder `--backfill`
-  (braucht `GOOGLE_APPLICATION_CREDENTIALS`). **Kein In-App-Pfad** schreibt `role`.
-- `firestore.rules` liest `request.auth.token.role`; Clients dürfen das `role`-Feld
-  nie schreiben (Privilege-Escalation geschlossen).
+- Rollen (`user` | `trainer` | `admin`) UND `gymId` liegen **autoritativ in
+  Firebase Auth Custom Claims**, NICHT im Firestore-Dokument (dort nur
+  Anzeige-/Query-Spiegel).
+- Client liest beides via `getIdTokenResult()` (`claims.role`, `claims.gymId`)
+  — siehe `auth-context.tsx` (`refreshRole()` erzwingt Token-Refresh nach
+  Claim-Änderung).
+- Claims werden **ausschließlich serverseitig** per Admin-SDK gesetzt:
+  `node scripts/set-role.mjs <uid> <role>` (mergt, gymId bleibt erhalten)
+  bzw. `node scripts/migrate-multi-gym.mjs` (gymId-Backfill; braucht
+  `GOOGLE_APPLICATION_CREDENTIALS`). **Kein In-App-Pfad** schreibt `role`
+  oder `gymId`.
+- `firestore.rules` liest `request.auth.token.role`/`.gymId`; Clients dürfen
+  `role`/`gymId` im users-Dokument nie schreiben (Privilege-Escalation und
+  Gym-Wechsel geschlossen).
 
 ### Route-Schutz (zweischichtig)
-- **Server:** `middleware.ts` (Edge) gated über das `__session`-Cookie:
-  `/admin/*` → 404 (Existenz verbergen), übrige geschützte Bereiche → Redirect
-  `/login`. Not-Aus via `MIDDLEWARE_AUTH=off`. (Noch keine Signaturprüfung —
-  echte Datensicherheit liegt bei den Firestore-Regeln.)
+- **Server:** `middleware.ts` (Edge) verifiziert das `__session`-Cookie
+  **kryptografisch** (jose/RS256 gegen Googles Firebase-Zertifikate, Issuer +
+  Audience = Projekt) und gated per Claim: `/admin/*` nur role=admin (sonst
+  404, Existenz verbergen), `/trainer/*` nur trainer/admin (sonst Redirect
+  `/dashboard`), übrige geschützte Bereiche → Redirect `/login`. Bewusster
+  Fail-Open NUR wenn Googles Zertifikat-Endpoint nicht erreichbar ist
+  (unverifizierter exp-Check statt Aussperrung — Datensicherheit liegt bei
+  den Firestore-Regeln); ungültige Signaturen werden IMMER abgewiesen.
+  Not-Aus via `MIDDLEWARE_AUTH=off`.
 - **Client:** `<ProtectedRoute>` als zusätzlicher UI-Guard.
 
 ## Design-System
@@ -130,14 +147,17 @@
 
 ## Firestore (Collections — Top-Level)
 ```
-users/{uid}                       — Profil (role NUR via Custom Claims, nie Client-Write;
-                                    fightProfile = Kampfprofil, nur Trainer/Admin-Write)
+gyms/{gymId}                      — Gym-Stammdaten (Multi-Gym; Mitglieder lesen ihr
+                                    eigenes Gym, Schreiben nur Admin/serverseitig)
+users/{uid}                       — Profil (role+gymId NUR via Custom Claims, nie
+                                    Client-Write; fightProfile nur Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
                                     + Lücken aus opponents/{opponentId}, s.o.)
                                     (Trainer/Admin lesen+schreiben JEDE uid;
                                     zentrale Liste via collectionGroup)
-users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des eigenen Athleten
+users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des Athleten (Owner liest NUR
+                                    sharedWithAthlete==true, schreibt NIE)
 opponents/{id}                    — Gegner-DNA-Bibliothek (Trainer/Admin)
 opponents/{id}/videoAnalyses/{id} — KI-Video-Analysen zum Gegner
 aiUsage/summary                   — laufende KI-Kosten + Budget (Guthaben-Ring)
@@ -299,12 +319,30 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 - Env-Vars: ohne Anführungszeichen in `.env.local` (Vorlage: `.env.local.example`).
 - R3F: NIEMALS @react-three/fiber v9+ ohne React 19 — bleibt auf v8!
 
+## Konzept-Dokumente (verbindlich)
+- **`docs/MULTI-GYM-KONZEPT.md`** — beschlossenes Zielbild Multi-Gym
+  (2026-08-20): Rollenmodell (verwaltung/trainer als Zusatzrechte, Athlet =
+  Grundzustand), gymId in Custom Claims, Abrechnungsmodell
+  (Fixbetrag + Analysen-Kontingent + Nachkauf), Wochenplan-Mehrplan-Modell,
+  Branding-Stufen + KI-Branding-Kit, Secure-by-Design-Grundregeln und die
+  Roadmap Phase 0 → 1 → Redesign → 2 → 3 → 4. Bei Multi-Gym-Arbeit ZUERST
+  dort nachlesen.
+- **`docs/DESIGN-BRIEF.md`** — verbindlicher Rahmen fürs anstehende Redesign:
+  Token-only-Branding (Palette aus 1–2 Eingabefarben ableitbar), harte vs.
+  verhandelbare Regeln, Arbeitsmodus (Tokens → Referenzseite → Rollout),
+  Abnahme-Checkliste. Jede Design-Session startet mit dieser Datei.
+
 ## Backlog (offen)
-- [ ] Analyse-Freigabe serverseitig erzwingen: users-Regel umbauen, sodass
-      `videoAnalyses` nicht mehr unter das Owner-Wildcard fällt (Details siehe
-      Sicherheits-Hinweis oben) — Pflicht vor Multi-Gym
+- [ ] **Multi-Gym-Cutover ausführen** (Code ist fertig, Deploy steht aus):
+      1. `node scripts/migrate-multi-gym.mjs` · 2. `npx firebase-tools deploy
+      --only firestore:indexes` · 3. Client deployen (git push → Vercel) ·
+      4. `npx firebase-tools deploy --only firestore:rules`. Reihenfolge ist
+      PFLICHT (Rules prüfen data.gymId strikt; Client braucht die Indizes).
+- [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
+      Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
+- [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
+      Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)
-- [ ] Middleware: serverseitige Token-Signaturprüfung (Service-Account)
 - [ ] Video-Analyse: Web-Anreicherung (Fragenkatalog Abschnitt G, source=web)
 - [ ] Video-Analyse: Trends über mehrere Videos (Fragenkatalog E4, ab ≥2 Videos)
 - [ ] Video-Analyse: Gemini auf `:streamGenerateContent` umstellen — würde die

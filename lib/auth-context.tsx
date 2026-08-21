@@ -94,9 +94,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfileLoading(true);
       try {
         const p = await ensureUserProfile(u);
-        // Rolle kommt autoritativ aus den Auth Custom Claims, nicht aus Firestore
+        // Rolle UND Gym kommen autoritativ aus den Auth Custom Claims,
+        // nicht aus Firestore (dort nur Anzeige-Spiegel).
         const { claims } = await u.getIdTokenResult();
-        setProfile({ ...p, role: claims.role as UserRole | undefined });
+        setProfile({
+          ...p,
+          role: claims.role as UserRole | undefined,
+          gymId: (claims.gymId as string | undefined) ?? p.gymId ?? null,
+        });
       } catch (err) {
         console.warn("[TidalAthletics] ensureUserProfile failed:", err);
         setProfile(null);
@@ -132,7 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const p = await getUserProfile(user.uid);
       const { claims } = await user.getIdTokenResult();
       const role = claims.role as UserRole | undefined;
-      setProfile(p ? { ...p, role } : p);
+      const gymId = (claims.gymId as string | undefined) ?? p?.gymId ?? null;
+      setProfile(p ? { ...p, role, gymId } : p);
     } finally {
       setProfileLoading(false);
     }
@@ -146,7 +152,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     const { claims } = await user.getIdTokenResult(true);
     const role = claims.role as UserRole | undefined;
-    setProfile((prev) => (prev ? { ...prev, role } : prev));
+    const claimGymId = claims.gymId as string | undefined;
+    setProfile((prev) =>
+      prev ? { ...prev, role, gymId: claimGymId ?? prev.gymId } : prev,
+    );
   }, [user]);
 
   const updateDisplayName = useCallback(

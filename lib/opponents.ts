@@ -263,8 +263,10 @@ export async function deleteOpponent(id: string): Promise<void> {
 }
 
 /**
- * Lädt alle Gegner-DNA-Profile des Gyms (neueste zuerst). Fehlt der Index für
- * die `where + orderBy`-Kombination, wird ohne orderBy geladen und sortiert.
+ * Lädt alle Gegner-DNA-Profile des eigenen Gyms (neueste zuerst). Fehlt der
+ * Index für die `where + orderBy`-Kombination, wird nur gym-gefiltert geladen
+ * und clientseitig sortiert. Der Fallback darf NICHT ungefiltert laden: die
+ * Firestore-Regeln lehnen ungefilterte opponents-Queries für Trainer ab.
  */
 export async function listOpponentsForGym(gymId: string): Promise<Opponent[]> {
   const col = opponentsCol();
@@ -274,7 +276,7 @@ export async function listOpponentsForGym(gymId: string): Promise<Opponent[]> {
     );
     return snap.docs.map((d) => decode(d.id, d.data() as OpponentDoc));
   } catch {
-    const snap = await getDocs(col);
+    const snap = await getDocs(query(col, where("gymId", "==", gymId)));
     return snap.docs
       .map((d) => decode(d.id, d.data() as OpponentDoc))
       .filter((o) => belongsToGym(o.gymId, gymId))

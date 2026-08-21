@@ -2,10 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ─── Identität: ausschliesslich aus signierten Auth Custom Claims ───────
+    // (per Admin-SDK gesetzt — kein Client kann role oder gymId schreiben)
+
     function userRole() {
-      // Rolle kommt autoritativ aus den Auth Custom Claims (per Admin-SDK gesetzt),
-      // NICHT mehr aus dem Firestore-Dokument — kein Client kann sie schreiben.
-      return request.auth.token.role;
+      return ("role" in request.auth.token) ? request.auth.token.role : "user";
     }
     function isTrainerOrAdmin() {
       return userRole() in ["trainer", "admin"];
@@ -13,83 +14,141 @@ service cloud.firestore {
     function isAdmin() {
       return userRole() == "admin";
     }
+    // Gym aus dem Token. Fehlender Claim = Default-Gym (Bestand vor Migration
+    // und frische Signups ohne Einladung — Phase 2 setzt Claims via Invite).
+    function userGymId() {
+      return ("gymId" in request.auth.token) ? request.auth.token.gymId : "tidal-athletics";
+    }
+    // Dokument-Seite BEWUSST strikt (kein Fallback): nur so bleiben
+    // where("gymId","==",…)-Queries fuer die Rules-Engine beweisbar.
+    // Altbestaende werden vor dem Rules-Deploy migriert
+    // (scripts/migrate-multi-gym.mjs).
+    function sameGym(data) {
+      return data.gymId == userGymId();
+    }
+    // Trainer nur im eigenen Gym; Plattform-Admin gym-uebergreifend.
+    function isGymStaffFor(data) {
+      return isAdmin() || (isTrainerOrAdmin() && sameGym(data));
+    }
+    // Gym-Scope ueber das Eltern-User-Dokument (fuer users-Subcollections).
+    function isStaffForUser(uid) {
+      return isAdmin()
+             || (isTrainerOrAdmin()
+                 && sameGym(get(/databases/$(database)/documents/users/$(uid)).data));
+    }
 
     match /users/{uid} {
-      // Lesen: eigenes Profil oder Trainer/Admin
+      // Lesen: eigenes Profil, Trainer desselben Gyms oder Admin.
+      // resource == null: get() auf nicht existentes Dokument bleibt erlaubt
+      // (liefert exists:false; verhindert Fehlwuerfe in Detailansichten).
       allow read: if request.auth != null
-                  && (request.auth.uid == uid || isTrainerOrAdmin());
+                  && (request.auth.uid == uid
+                      || isAdmin()
+                      || (isTrainerOrAdmin()
+                          && (resource == null || sameGym(resource.data))));
 
-      // Eigenes Profil anlegen (Signup) — niemals selbst ein `role`-Feld setzen
+      // Eigenes Profil anlegen (Signup) — niemals selbst `role` oder `gymId`
+      // setzen (beides autoritativ serverseitig; gymId kommt per Einladung).
       allow create: if request.auth != null && request.auth.uid == uid
-                    && !("role" in request.resource.data);
+                    && !request.resource.data.keys().hasAny(["role", "gymId"]);
 
-      // Eigenes Profil aktualisieren — aber NIEMALS `role` (Privilege-Escalation)
-      // oder `fightProfile` aendern: das Kampfprofil (DeepFight-Merge-Ziel)
-      // kuratieren ausschliesslich Trainer/Admins; der Owner liest es nur.
+      // Eigenes Profil aktualisieren — aber NIEMALS `role` (Privilege-
+      // Escalation), `gymId` (Gym-Wechsel nur serverseitig) oder
+      // `fightProfile` (kuratieren ausschliesslich Trainer/Admins).
       allow update: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "fightProfile"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "gymId", "fightProfile"]);
 
-      // Trainer pflegen das Kampfprofil ihrer Athleten (und ihr eigenes):
-      // Update ausschliesslich auf das Feld `fightProfile`, sonst nichts.
-      allow update: if request.auth != null && isTrainerOrAdmin()
+      // Trainer pflegen das Kampfprofil ihrer Athleten (und ihr eigenes) —
+      // nur im eigenen Gym, Update ausschliesslich auf `fightProfile`.
+      allow update: if request.auth != null && isGymStaffFor(resource.data)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["fightProfile"]);
 
-      // Admin verwaltet Profile, aber die Rolle wird AUSSCHLIESSLICH per
-      // Admin-SDK-Script (Custom Claims) gesetzt — kein Client-Pfad schreibt `role`.
+      // Admin verwaltet Profile (inkl. gymId-Zuordnung), aber die Rolle wird
+      // AUSSCHLIESSLICH per Admin-SDK (Custom Claims) gesetzt.
       allow create: if request.auth != null && isAdmin()
                     && !("role" in request.resource.data);
       allow update: if request.auth != null && isAdmin()
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"]);
       allow delete: if request.auth != null && isAdmin();
 
+      // Generische Subcollections (workouts, …).
+      // WICHTIG: `videoAnalyses` ist hier BEWUSST AUSGENOMMEN — der Owner
+      // darf rohe KI-Analysen ueber sich weder frei lesen noch schreiben
+      // (eigene Regel unten). Schliesst die frueher nur clientseitig
+      // gefilterte Freigabe (`sharedWithAthlete`) serverseitig.
       match /{subcollection}/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-        allow read: if request.auth != null && isTrainerOrAdmin();
+        allow read, write: if request.auth != null && request.auth.uid == uid
+                           && subcollection != "videoAnalyses";
+        allow read: if request.auth != null && isStaffForUser(uid);
 
         // Admin schreibt in alle Sub-Collections (Demo-Seed)
         allow write: if request.auth != null && isAdmin();
       }
 
-      // Trainer + Admin verwalten Wettkaempfe (fightCamps) fuer ihre Schueler
+      // Trainer + Admin verwalten Wettkaempfe (fightCamps) — eigenes Gym.
       match /fightCamps/{campId} {
-        allow read, write: if request.auth != null && isTrainerOrAdmin();
+        allow read, write: if request.auth != null && isStaffForUser(uid);
       }
 
-      // KI-Video-Analysen des eigenen Athleten (Konzept §6, mode=athlete)
+      // KI-Video-Analysen des Athleten (Konzept §6, mode=athlete).
+      // Athlet: liest NUR vom Trainer freigegebene Auswertungen, schreibt NIE.
+      // (Queries brauchen where("sharedWithAthlete","==",true).)
       match /videoAnalyses/{analysisId} {
-        allow read, write: if request.auth != null && isTrainerOrAdmin();
+        allow read: if request.auth != null && request.auth.uid == uid
+                    && resource.data.sharedWithAthlete == true;
+        allow read, write: if request.auth != null && isStaffForUser(uid);
       }
     }
 
-    // CollectionGroup-Query: zentraler Wettkampfbereich liest alle fightCamps
-    // gym-weit ueber alle Schueler. Schreiben bleibt ueber den users-Pfad oben.
+    // CollectionGroup-Query: zentraler Wettkampfbereich liest fightCamps
+    // gym-weit ueber alle Schueler — nur eigenes Gym (Query braucht
+    // where("gymId","==",…)); Admin gym-uebergreifend.
     match /{path=**}/fightCamps/{campId} {
-      allow read: if request.auth != null && isTrainerOrAdmin();
+      allow read: if request.auth != null
+                  && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));
     }
 
-    // Gegner-DNA-Bibliothek (gym-weit geteilte Gegnerprofile).
-    // Schueler duerfen Profile LESEN, die ein Trainer explizit fuer sie
-    // freigegeben hat (sharedWith enthaelt ihre uid) — Schreiben bleibt
-    // ausschliesslich Trainer/Admin.
+    // Gym-Stammdaten (Multi-Gym): Mitglieder lesen ihr eigenes Gym,
+    // Admin verwaltet alle. Verwaltungs-Schreibrechte kommen in Phase 2
+    // ausschliesslich ueber serverseitige APIs (Admin-SDK), nie per Client.
+    match /gyms/{gymId} {
+      allow read: if request.auth != null
+                  && (isAdmin() || userGymId() == gymId);
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Gegner-DNA-Bibliothek — pro Gym. Trainer sehen/pflegen nur die
+    // Bibliothek des eigenen Gyms; Schueler lesen explizit freigegebene
+    // Profile (sharedWith enthaelt ihre uid). Ein Update kann das Profil
+    // nicht in ein anderes Gym verschieben.
     match /opponents/{opponentId} {
       allow read: if request.auth != null
-                  && (isTrainerOrAdmin()
-                      || request.auth.uid in resource.data.get("sharedWith", []));
-      allow write: if request.auth != null && isTrainerOrAdmin();
+                  && (isGymStaffFor(resource.data)
+                      || request.auth.uid in resource.data.sharedWith);
+      allow create: if request.auth != null && isGymStaffFor(request.resource.data);
+      allow update: if request.auth != null && isGymStaffFor(resource.data)
+                    && isGymStaffFor(request.resource.data);
+      allow delete: if request.auth != null && isGymStaffFor(resource.data);
 
-      // KI-Video-Analysen zum Gegner (Konzept §6, mode=opponent)
+      // KI-Video-Analysen zum Gegner (Konzept §6, mode=opponent) —
+      // Gym-Scope ueber das Eltern-Gegnerprofil.
       match /videoAnalyses/{analysisId} {
-        allow read, write: if request.auth != null && isTrainerOrAdmin();
+        allow read, write: if request.auth != null
+                           && (isAdmin()
+                               || (isTrainerOrAdmin()
+                                   && sameGym(get(/databases/$(database)/documents/opponents/$(opponentId)).data)));
       }
     }
 
-    // Laufende KI-Kosten-Summe + Budget (Guthaben-Anzeige der Video-Analyse)
+    // Laufende KI-Kosten-Summe + Budget (Guthaben-Anzeige der Video-Analyse).
+    // Pro-Gym-Kontingent folgt in Phase 3 (aiUsage/{gymId}).
     match /aiUsage/{docId} {
       allow read, write: if request.auth != null && isTrainerOrAdmin();
     }
 
-    // Trainer-zugewiesene Trainingsinhalte (gym-weites Curriculum) — bewusst
-    // fuer alle eingeloggten Mitglieder lesbar. Schreiben nur Trainer/Admin.
+    // Trainer-zugewiesene Trainingsinhalte (Curriculum) — bewusst fuer alle
+    // eingeloggten Mitglieder lesbar. Gym-Scoping folgt in Phase 3 mit dem
+    // Wochenplan-Mehrplan-Modell (gyms/{gymId}/schedulePlans).
     match /trainingSessions/{document=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && isTrainerOrAdmin();

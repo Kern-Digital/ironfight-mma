@@ -31,6 +31,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "./firebase";
 import type { ActionStat, CageZone, DnaSplit } from "./fight-stats";
@@ -492,10 +493,26 @@ export async function saveVideoAnalysis(
 export async function listVideoAnalyses(
   mode: AnalysisMode,
   targetId: string,
+  opts?: {
+    /**
+     * Nur freigegebene Auswertungen laden (mode=athlete, Kampfprofil des
+     * Schülers). PFLICHT, wenn der Athlet selbst lädt: die Firestore-Regeln
+     * erlauben dem Owner ausschließlich Dokumente mit
+     * `sharedWithAthlete == true` — eine ungefilterte Query würde komplett
+     * abgelehnt. Trainer/Admin laden weiterhin ungefiltert.
+     */
+    sharedOnly?: boolean;
+  },
 ): Promise<VideoAnalysis[]> {
-  const snap = await getDocs(
-    query(analysesCol(mode, targetId), orderBy("createdAt", "desc")),
-  );
+  const col = analysesCol(mode, targetId);
+  const q = opts?.sharedOnly
+    ? query(
+        col,
+        where("sharedWithAthlete", "==", true),
+        orderBy("createdAt", "desc"),
+      )
+    : query(col, orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
   return snap.docs.map((d) => decode(d.id, d.data() as VideoAnalysisDoc));
 }
 

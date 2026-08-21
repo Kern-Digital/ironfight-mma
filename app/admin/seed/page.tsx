@@ -5,6 +5,8 @@ import DashboardHero from "@/components/dashboard/DashboardHero";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
+import { useAuth } from "@/lib/auth-context";
+import { resolveGymId } from "@/lib/gym";
 import {
   clearDemoData,
   countDemoData,
@@ -280,6 +282,8 @@ function StudentSeedCard({
 }
 
 function SeedContent() {
+  const { profile } = useAuth();
+  const gymId = resolveGymId(profile);
   const [students, setStudents] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, DemoCount>>({});
@@ -295,7 +299,7 @@ function SeedContent() {
     setError(null);
     setStudents(null);
     try {
-      const data = await listAllStudents();
+      const data = await listAllStudents(gymId);
       setStudents(data);
       // Counts parallel laden
       const entries = await Promise.all(
@@ -322,7 +326,7 @@ function SeedContent() {
       setError(msg);
       setStudents([]);
     }
-  }, []);
+  }, [gymId]);
 
   useEffect(() => {
     loadStudents();

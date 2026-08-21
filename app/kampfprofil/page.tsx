@@ -82,8 +82,11 @@ function KampfprofilContent() {
     if (!user) return;
     const [fp, a, o] = await Promise.all([
       getFightProfile(user.uid).catch(() => null),
-      // Eigene Auswertungen: nur die vom Trainer freigegebenen anzeigen
-      listVideoAnalyses("athlete", user.uid)
+      // Eigene Auswertungen: nur die vom Trainer freigegebenen. sharedOnly
+      // ist PFLICHT — die Firestore-Regeln erlauben dem Athleten nur noch
+      // Dokumente mit sharedWithAthlete == true (Owner-Query ohne Filter
+      // würde abgelehnt); der Client-Filter bleibt als zweite Schicht.
+      listVideoAnalyses("athlete", user.uid, { sharedOnly: true })
         .then((list) => list.filter((x) => x.sharedWithAthlete))
         .catch(() => [] as VideoAnalysis[]),
       listOpponentsSharedWith(user.uid).catch(() => [] as Opponent[]),

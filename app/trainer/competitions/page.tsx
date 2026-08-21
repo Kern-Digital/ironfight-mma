@@ -75,8 +75,8 @@ function CompetitionsHubContent() {
     setCamps(null);
     try {
       const [allCamps, memberList, gymOpponents] = await Promise.all([
-        listAllFightCamps().catch(() => [] as FightCamp[]),
-        listAllMembers().catch(() => [] as StudentEntry[]),
+        listAllFightCamps(gymId).catch(() => [] as FightCamp[]),
+        listAllMembers(gymId).catch(() => [] as StudentEntry[]),
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));

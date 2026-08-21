@@ -97,9 +97,9 @@ export default function TrainerDashboardPage() {
     setMembers(null);
     try {
       const [allCamps, gymOpponents, memberList] = await Promise.all([
-        listAllFightCamps().catch(() => [] as FightCamp[]),
+        listAllFightCamps(gymId).catch(() => [] as FightCamp[]),
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
-        listAllMembers().catch(() => [] as StudentEntry[]),
+        listAllMembers(gymId).catch(() => [] as StudentEntry[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
       setOpponents(gymOpponents);

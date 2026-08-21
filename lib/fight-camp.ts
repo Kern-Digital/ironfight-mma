@@ -29,6 +29,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
@@ -420,20 +421,24 @@ function decodeGroupDoc(d: QueryDocumentSnapshot): FightCamp {
 }
 
 /**
- * Lädt ALLE Wettkämpfe gym-weit (über alle Schüler hinweg) für den zentralen
- * Wettkampfbereich — via collectionGroup-Query über `fightCamps`.
+ * Lädt ALLE Wettkämpfe des eigenen Gyms (über alle Schüler hinweg) für den
+ * zentralen Wettkampfbereich — via collectionGroup-Query über `fightCamps`.
  *
- * Single-Gym: liefert alle Camps zurück; die gym-Filterung erfolgt über
- * `belongsToGym` (lib/gym.ts) in der UI. Fehlt der Firestore-Index für die
- * Sortierung, wird unsortiert geladen und clientseitig sortiert.
+ * Die Query MUSS nach `gymId` filtern: die Firestore-Regeln erlauben
+ * Trainern nur Camps des eigenen Gyms, eine ungefilterte collectionGroup-
+ * Query würde komplett abgelehnt. Fehlt der Composite-Index für die
+ * Sortierung, wird unsortiert (nur gym-gefiltert) geladen und clientseitig
+ * sortiert.
  */
-export async function listAllFightCamps(): Promise<FightCamp[]> {
+export async function listAllFightCamps(gymId: string): Promise<FightCamp[]> {
   const cg = collectionGroup(getFirestoreDb(), "fightCamps");
   try {
-    const snap = await getDocs(query(cg, orderBy("competitionDate", "desc")));
+    const snap = await getDocs(
+      query(cg, where("gymId", "==", gymId), orderBy("competitionDate", "desc")),
+    );
     return snap.docs.map(decodeGroupDoc);
   } catch {
-    const snap = await getDocs(cg);
+    const snap = await getDocs(query(cg, where("gymId", "==", gymId)));
     const camps = snap.docs.map(decodeGroupDoc);
     camps.sort(
       (a, b) => b.competitionDate.getTime() - a.competitionDate.getTime(),

@@ -13,6 +13,7 @@ import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import DnaCompletenessRing from "@/components/trainer/DnaCompletenessRing";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
+import { resolveGymId } from "@/lib/gym";
 import {
   deleteOpponent,
   getOpponent,
@@ -122,7 +123,8 @@ function SharePanel({
   onSaved: () => Promise<void> | void;
   onClose: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const gymId = resolveGymId(profile);
   const [students, setStudents] = useState<StudentEntry[] | null>(null);
   const [draft, setDraft] = useState<Set<string>>(
     () => new Set(opponent.sharedWith),
@@ -131,10 +133,10 @@ function SharePanel({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listAllStudents()
+    listAllStudents(gymId)
       .then(setStudents)
       .catch(() => setError("Schülerliste konnte nicht geladen werden"));
-  }, []);
+  }, [gymId]);
 
   function toggle(uid: string) {
     setDraft((prev) => {

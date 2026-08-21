@@ -7,6 +7,7 @@ import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
+import { resolveGymId } from "@/lib/gym";
 import { useAuth } from "@/lib/auth-context";
 import { DISCIPLINE_LABEL } from "@/lib/types";
 
@@ -26,7 +27,8 @@ function initialsOf(s: StudentEntry): string {
  * zusätzlich vom Schülerprofil aus verlinkt.
  */
 export default function DeepFightAthletesPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const gymId = resolveGymId(profile);
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -35,11 +37,11 @@ export default function DeepFightAthletesPage() {
     setError(null);
     setMembers(null);
     try {
-      setMembers(await listAllMembers());
+      setMembers(await listAllMembers(gymId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
-  }, []);
+  }, [gymId]);
 
   useEffect(() => {
     load();

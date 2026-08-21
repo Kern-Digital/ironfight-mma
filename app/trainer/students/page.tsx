@@ -8,6 +8,8 @@ import {
   listAllStudents,
   type StudentEntry,
 } from "@/lib/admin";
+import { useAuth } from "@/lib/auth-context";
+import { resolveGymId } from "@/lib/gym";
 import {
   getStudentProgress,
   type StudentProgress,
@@ -395,6 +397,8 @@ function Row({ label, value }: { label: string; value: string }) {
 // ─── Hauptinhalt ──────────────────────────────────────────────────────────
 
 function StudentsContent() {
+  const { profile } = useAuth();
+  const gymId = resolveGymId(profile);
   const [students, setStudents] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -405,14 +409,14 @@ function StudentsContent() {
     setError(null);
     setStudents(null);
     try {
-      const data = await listAllStudents();
+      const data = await listAllStudents(gymId);
       setStudents(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
       setError(msg);
       setStudents([]);
     }
-  }, []);
+  }, [gymId]);
 
   useEffect(() => {
     load();

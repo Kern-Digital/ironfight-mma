@@ -7,6 +7,30 @@
         { "fieldPath": "gymId", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fightCamps",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "competitionDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "videoAnalyses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sharedWithAthlete", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

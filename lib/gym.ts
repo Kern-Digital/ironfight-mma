@@ -1,26 +1,27 @@
 /**
- * Gym-Zugehörigkeit — gym-übergreifendes Teilen von Gegner-DNA & Wettkämpfen.
+ * Gym-Zugehörigkeit — Mandanten-Trennung (Multi-Gym, Phase 1).
  *
- * Aktuelle Entscheidung: Die App betreibt genau EIN Gym ("Tidal Athletics").
- * Alle Trainer/Admins teilen sich denselben Gym-Datenraum. Das Datenmodell ist
- * jedoch bereits gym-fähig: jede Gegner-DNA und jeder Wettkampf trägt eine
- * `gymId`. Sobald echtes Multi-Gym gewünscht ist, genügt es,
- *   1) `resolveGymId` auf `profile.gymId` umzustellen (Default als Fallback),
- *   2) die Listen-Queries nach `gymId` zu filtern (Helfer `belongsToGym`),
- *   3) optional die Firestore-Regeln zu verschärfen.
- * Es sind KEINE Datenmigrationen nötig — `gymId` wird ab sofort geschrieben.
+ * Autoritativ ist der `gymId`-Custom-Claim (Auth-Token, nur Admin-SDK
+ * schreibbar); `auth-context.tsx` spiegelt ihn ins Profil. Fehlender Claim =
+ * Default-Gym (Bestand + Signups ohne Einladung — Phase 2 setzt Claims via
+ * Invite). Die Firestore-Regeln erzwingen die Trennung serverseitig; die
+ * Helfer hier sind nur die Client-Seite derselben Logik.
+ *
+ * Datensätze OHNE `gymId`-Feld gelten als Default-Gym — nach der Migration
+ * (scripts/migrate-multi-gym.mjs) existieren solche Altbestände nicht mehr;
+ * der Fallback bleibt als Sicherheitsnetz.
  */
 
 import type { UserProfile } from "./types";
 
-/** Default-Gym, solange die App single-tenant betrieben wird. */
+/** Gym des Bestands („Tidal Athletics") und Fallback für fehlende Claims. */
 export const DEFAULT_GYM_ID = "tidal-athletics";
 
 export const DEFAULT_GYM_LABEL = "Tidal Athletics";
 
 /**
- * Normalisiert einen frei eingegebenen Gym-Namen zu einem stabilen Slug.
- * Wird gebraucht, sobald Gyms aus dem `gymName`-Feld abgeleitet werden.
+ * Normalisiert einen frei eingegebenen Gym-Namen zu einem stabilen Slug
+ * (für das Anlegen neuer Gyms in der Admin-Konsole).
  */
 export function slugifyGym(name: string): string {
   // NFKD zerlegt Akzent-Zeichen in Basis + Markierung; der [^a-z0-9]-Filter
@@ -36,25 +37,21 @@ export function slugifyGym(name: string): string {
 }
 
 /**
- * Liefert die Gym-ID eines Nutzers. Heute immer das Default-Gym (single-gym),
- * respektiert aber bereits ein gesetztes `profile.gymId` für die Zukunft.
+ * Liefert die Gym-ID eines Nutzers. `profile.gymId` wird in auth-context aus
+ * dem Token-Claim gespeist; ohne Claim gilt das Default-Gym.
  */
 export function resolveGymId(profile: UserProfile | null | undefined): string {
   return profile?.gymId?.trim() || DEFAULT_GYM_ID;
 }
 
 /**
- * Sichtbarkeits-Check: Gehört ein Datensatz (mit `gymId`) zum Gym des Trainers?
- *
- * Single-Gym-Phase: Datensätze ohne `gymId` (Altbestände) sowie Datensätze des
- * Default-Gyms sind sichtbar. So gehen keine bestehenden Wettkämpfe verloren.
- * Multi-Gym später: strikt `record.gymId === viewerGymId` vergleichen.
+ * Sichtbarkeits-Check: Gehört ein Datensatz (mit `gymId`) zum Gym des
+ * Betrachters? STRIKT (seit Phase 1): fremde Gyms sind nie sichtbar;
+ * Datensätze ohne `gymId` zählen als Default-Gym (Altbestand-Sicherheitsnetz).
  */
 export function belongsToGym(
   recordGymId: string | null | undefined,
   viewerGymId: string,
 ): boolean {
-  if (!recordGymId) return true; // Altbestand ohne gymId — im Single-Gym sichtbar
-  if (viewerGymId === DEFAULT_GYM_ID) return true; // Single-Gym: alles sichtbar
-  return recordGymId === viewerGymId;
+  return (recordGymId || DEFAULT_GYM_ID) === viewerGymId;
 }

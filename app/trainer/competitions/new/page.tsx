@@ -196,7 +196,7 @@ function NewCompetitionContent() {
     setError(null);
     try {
       const [memberList, opponentList] = await Promise.all([
-        listAllMembers().catch(() => [] as StudentEntry[]),
+        listAllMembers(gymId).catch(() => [] as StudentEntry[]),
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
       ]);
       setMembers(memberList);

@@ -37,12 +37,20 @@ function assertRole(role) {
 async function setRole(uid, role) {
   const validatedRole = assertRole(role);
 
-  await getAuth().setCustomUserClaims(uid, { role: validatedRole });
+  // setCustomUserClaims ERSETZT alle Claims — bestehende (insb. gymId)
+  // muessen gemergt werden, sonst verliert der Nutzer sein Gym.
+  const existing = (await getAuth().getUser(uid)).customClaims ?? {};
+  const claims = {
+    ...existing,
+    role: validatedRole,
+    gymId: existing.gymId ?? "tidal-athletics",
+  };
+  await getAuth().setCustomUserClaims(uid, claims);
   await getFirestore()
     .doc(`users/${uid}`)
-    .set({ role: validatedRole }, { merge: true });
+    .set({ role: validatedRole, gymId: claims.gymId }, { merge: true });
 
-  console.log(`${uid}: role=${validatedRole}`);
+  console.log(`${uid}: role=${validatedRole} gymId=${claims.gymId}`);
 }
 
 async function backfillRoles() {

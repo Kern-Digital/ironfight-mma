@@ -14,6 +14,7 @@ import {
   orderBy,
   query,
   Timestamp,
+  where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import type { AthleteProfile, UserRole } from "./types";
@@ -97,7 +98,11 @@ export async function getStudentEntry(uid: string): Promise<StudentEntry | null>
   return decodeStudentEntry(snap.id, snap.data() as Record<string, unknown>);
 }
 
-/** Lädt alle registrierten Nutzer (absteigend nach Registrierungsdatum). */
+/**
+ * Lädt alle registrierten Nutzer (absteigend nach Registrierungsdatum).
+ * NUR für Plattform-Admins: die Firestore-Regeln erlauben die ungefilterte
+ * users-Query ausschließlich mit role=admin (gym-übergreifend).
+ */
 export async function listAllUsers(): Promise<AdminUserEntry[]> {
   const q = query(
     collection(getFirestoreDb(), "users"),
@@ -118,16 +123,19 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
 }
 
 /**
- * Lädt ALLE Mitglieder des Gyms inkl. Athleten-Profil — ohne Rollenfilter.
+ * Lädt ALLE Mitglieder des eigenen Gyms inkl. Athleten-Profil — ohne
+ * Rollenfilter. `gymId` = resolveGymId(profile); die Firestore-Regeln lassen
+ * Trainern ohnehin nur das eigene Gym (Query MUSS daher gym-gefiltert sein).
  *
  * Gedacht für Kontexte, in denen auch Trainer/Admins **Athleten** sind
  * (Wettkampf anlegen, DeepFight-Analysen): dort ist die Rolle nur ein Label,
  * kein Ausschlusskriterium. Wer eine reine Schülerliste braucht (Verwaltung,
  * Kurs-Abos, Fortschritt), nimmt `listAllStudents()`.
  */
-export async function listAllMembers(): Promise<StudentEntry[]> {
+export async function listAllMembers(gymId: string): Promise<StudentEntry[]> {
   const q = query(
     collection(getFirestoreDb(), "users"),
+    where("gymId", "==", gymId),
     orderBy("createdAt", "desc"),
   );
   const snap = await getDocs(q);
@@ -137,11 +145,10 @@ export async function listAllMembers(): Promise<StudentEntry[]> {
 }
 
 /**
- * Lädt alle Schüler/Mitglieder inkl. Athleten-Profil.
- * Trainer und Admins sehen die gesamte Mitgliederliste; Trainer-/Admin-Accounts
- * werden ausgefiltert, da der Fokus auf Schülern liegt.
+ * Lädt alle Schüler/Mitglieder des eigenen Gyms inkl. Athleten-Profil.
+ * Trainer-/Admin-Accounts werden ausgefiltert, da der Fokus auf Schülern liegt.
  */
-export async function listAllStudents(): Promise<StudentEntry[]> {
-  const members = await listAllMembers();
+export async function listAllStudents(gymId: string): Promise<StudentEntry[]> {
+  const members = await listAllMembers(gymId);
   return members.filter((u) => !isStaffEntry(u));
 }
