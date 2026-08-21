@@ -12,13 +12,10 @@ export default function Skeleton({
   width?: string | number;
   height?: string | number;
 }) {
-  const style: React.CSSProperties = {};
+  const style: React.CSSProperties = { background: "var(--surface-raised)" };
   if (width !== undefined) style.width = width;
   if (height !== undefined) style.height = height;
   return (
-    <div
-      style={style}
-      className={`animate-pulse rounded-sm bg-carbon-600/60 ${className}`}
-    />
+    <div style={style} className={`animate-pulse rounded-sm ${className}`} />
   );
 }

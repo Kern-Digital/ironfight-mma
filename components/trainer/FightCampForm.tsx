@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Select from "@/components/ui/Select";
 import {
   FIGHTER_STANCE_LABEL,
   FIGHT_STYLE_LABEL,
@@ -163,35 +164,27 @@ export default function FightCampForm({
             <span className="text-[10px] uppercase" style={labelStyle}>
               Stil
             </span>
-            <select
+            <Select
               value={oppStyle}
-              onChange={(e) => setOppStyle(e.target.value as FightStyle)}
-              className="rounded-lg px-3 py-2 text-sm"
-              style={fieldStyle}
-            >
-              {Object.entries(FIGHT_STYLE_LABEL).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setOppStyle(v as FightStyle)}
+              options={Object.entries(FIGHT_STYLE_LABEL).map(([v, l]) => ({
+                value: v,
+                label: l,
+              }))}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase" style={labelStyle}>
               Auslage
             </span>
-            <select
+            <Select
               value={oppStance}
-              onChange={(e) => setOppStance(e.target.value as FighterStance)}
-              className="rounded-lg px-3 py-2 text-sm"
-              style={fieldStyle}
-            >
-              {Object.entries(FIGHTER_STANCE_LABEL).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setOppStance(v as FighterStance)}
+              options={Object.entries(FIGHTER_STANCE_LABEL).map(([v, l]) => ({
+                value: v,
+                label: l,
+              }))}
+            />
           </label>
           <div className="grid grid-cols-3 gap-2">
             <label className="flex flex-col gap-1">

@@ -11,6 +11,7 @@ import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
 import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
 import GegnerDnaAccordion from "./GegnerDnaAccordion";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import Select from "@/components/ui/Select";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
 import FightInsights from "./FightInsights";
@@ -165,35 +166,27 @@ export default function OpponentEditor({
             <span className="text-[10px] uppercase" style={labelStyle}>
               Stil
             </span>
-            <select
+            <Select
               value={style}
-              onChange={(e) => setStyle(e.target.value as FightStyle)}
-              className="rounded-lg px-3 py-2 text-sm"
-              style={fieldStyle}
-            >
-              {Object.entries(FIGHT_STYLE_LABEL).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setStyle(v as FightStyle)}
+              options={Object.entries(FIGHT_STYLE_LABEL).map(([v, l]) => ({
+                value: v,
+                label: l,
+              }))}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] uppercase" style={labelStyle}>
               Auslage
             </span>
-            <select
+            <Select
               value={stance}
-              onChange={(e) => setStance(e.target.value as FighterStance)}
-              className="rounded-lg px-3 py-2 text-sm"
-              style={fieldStyle}
-            >
-              {Object.entries(FIGHTER_STANCE_LABEL).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setStance(v as FighterStance)}
+              options={Object.entries(FIGHTER_STANCE_LABEL).map(([v, l]) => ({
+                value: v,
+                label: l,
+              }))}
+            />
           </label>
           <div className="grid grid-cols-3 gap-2">
             <label className="flex flex-col gap-1">

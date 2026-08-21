@@ -22,7 +22,7 @@ import {
   type Opponent,
 } from "@/lib/opponents";
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
-import { DNA_CATEGORIES, answeredCount, totalAnswered } from "@/lib/gegner-dna";
+import { DNA_CATEGORIES, answeredCount, dnaCompleteness } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 
 type DetailTab = "uebersicht" | "dna" | "stats" | "videos";
@@ -364,7 +364,7 @@ function OpponentDetailContent({ id }: { id: string }) {
     );
   }
 
-  const answers = totalAnswered(opponent.dna);
+  const dnaPct = dnaCompleteness(opponent.dna);
   const coveredCategories = DNA_CATEGORIES.filter(
     (c) => answeredCount(c, opponent.dna) > 0,
   ).length;
@@ -439,7 +439,7 @@ function OpponentDetailContent({ id }: { id: string }) {
               >
                 <Icon name="calendar" size={13} />
                 <span>
-                  {answers} {answers === 1 ? "Eintrag" : "Einträge"}
+                  DNA {dnaPct} %
                   {measures.length > 0 && <> · {measures.join(" · ")}</>}
                 </span>
               </p>

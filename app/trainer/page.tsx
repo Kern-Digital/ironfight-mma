@@ -23,7 +23,7 @@ import {
 } from "@/lib/fight-camp";
 import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
-import { totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness } from "@/lib/gegner-dna";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
   if (!entry) return "Schüler";
@@ -41,7 +41,7 @@ function formatDate(d: Date): string {
 // ─── Bausteine ───────────────────────────────────────────────────────────────
 
 function OpponentMiniCard({ opponent }: { opponent: Opponent }) {
-  const dnaCount = totalAnswered(opponent.dna);
+  const dnaPct = dnaCompleteness(opponent.dna);
   return (
     <Link
       href={`/trainer/opponents/${opponent.id}`}
@@ -56,15 +56,19 @@ function OpponentMiniCard({ opponent }: { opponent: Opponent }) {
           {opponent.name}
         </div>
         <span
-          className="font-mono-ta shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase"
-          style={{
-            letterSpacing: "0.12em",
-            background: dnaCount > 0 ? "rgba(35,196,206,0.1)" : "var(--ink-4)",
-            border: `1px solid ${dnaCount > 0 ? "rgba(35,196,206,0.35)" : "var(--ink-5)"}`,
-            color: dnaCount > 0 ? "var(--ta-cyan)" : "var(--fg-4)",
-          }}
+          className={`font-mono-ta shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase${dnaPct > 0 ? " t-ai-badge" : ""}`}
+          style={
+            dnaPct > 0
+              ? { letterSpacing: "0.12em", color: "var(--ai-text)" }
+              : {
+                  letterSpacing: "0.12em",
+                  background: "var(--ink-4)",
+                  border: "1px solid var(--ink-5)",
+                  color: "var(--fg-4)",
+                }
+          }
         >
-          DNA {dnaCount}
+          DNA {dnaPct} %
         </span>
       </div>
       <div

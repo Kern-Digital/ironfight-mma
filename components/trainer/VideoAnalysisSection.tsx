@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
+import Select from "@/components/ui/Select";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import VideoAnalysisResult from "./VideoAnalysisResult";
 import AiBudgetGauge, { formatEur } from "./AiBudgetGauge";
@@ -1184,20 +1185,13 @@ export default function VideoAnalysisSection({
               />
             </Field>
             <Field label="Wann fand der Kampf statt?">
-              <select
+              <Select
                 value={recency}
-                onChange={(e) => setRecency(e.target.value as FightRecency)}
-                className="rounded-lg px-3 py-2 text-xs"
-                style={inputStyle}
-              >
-                {(
+                onChange={(v) => setRecency(v as FightRecency)}
+                options={(
                   ["unknown", "recent", "mid", "old", "ancient"] as FightRecency[]
-                ).map((r) => (
-                  <option key={r} value={r}>
-                    {FIGHT_RECENCY_LABEL[r]}
-                  </option>
-                ))}
-              </select>
+                ).map((r) => ({ value: r, label: FIGHT_RECENCY_LABEL[r] }))}
+              />
               <span className="mt-1 text-[10px]" style={{ color: "var(--fg-4)" }}>
                 Bestimmt mit, wie stark dieses Video das Profil gewichtet.
                 &bdquo;Unbekannt&ldquo; ist in Ordnung — es zählt fast voll.

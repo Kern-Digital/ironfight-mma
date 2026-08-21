@@ -30,6 +30,9 @@ import { TRAINING_BLOCKS } from "./schedule";
 import { ALL_TECHNIQUES } from "./techniques";
 import { EXERCISES } from "./exercises";
 import { updateAthleteProfile } from "./user-profile";
+import { getFightProfile, updateFightProfile } from "./fight-profile";
+import type { GegnerDnaAnswers } from "./gegner-dna";
+import type { ActionStat, DnaSplit } from "./fight-stats";
 import type {
   AthleteLevel,
   Category,
@@ -167,6 +170,108 @@ const PERSONA_CONFIGS: Record<DemoPersona, PersonaConfig> = {
     underTrainedAreas: ["takedown-defense", "guard", "escapes", "sweeps", "clinch"],
     sparringCount: 34,
     weightEntries: 52,
+  },
+};
+
+// ─── DeepFight-Beispielprofil (users/{uid}.fightProfile) ───────────────────
+// Als Demo markiert über updatedBy = DEMO_SEED_AUTHOR — clearDemoData setzt
+// NUR solche Profile zurück und tastet echte (Trainer-gepflegte) nie an.
+// Texte sind entwicklungsorientiert formuliert: der Athlet liest sein
+// eigenes Profil unter /kampfprofil.
+
+const DEMO_SEED_AUTHOR = "demo-seed";
+
+interface DemoFightProfile {
+  dna: GegnerDnaAnswers;
+  dnaSplit: DnaSplit;
+  dnaSplitWeight: number;
+  actionStats: ActionStat[];
+}
+
+const DEMO_FIGHT_PROFILE: Record<DemoPersona, DemoFightProfile> = {
+  beginner: {
+    dna: {
+      "real-habits_repeats": "Sucht nach dem Jab sofort die Distanz — bleibt selten in der Schlagfolge.",
+      "preferred-weapons_most-common": "Jab-Cross, sauber aber noch vorhersehbar getimt.",
+      "weaknesses_technical": "Deckung fällt beim Zurückweichen; Low-Kick-Defense noch ohne Check.",
+      "drills_preparation": "Jab-Cross-Hook am Sandsack, Partner-Drill: Check gegen Low Kicks.",
+    },
+    dnaSplit: { boxing: 52, kicking: 20, wrestling: 14, ground: 8, clinch: 6 },
+    dnaSplitWeight: 0.8,
+    actionStats: [
+      { id: "jab", attempted: 24, landed: 14, zone: "center" },
+      { id: "cross", attempted: 12, landed: 6 },
+      { id: "low-kick", attempted: 8, landed: 5 },
+      { id: "single-leg", attempted: 2, landed: 0 },
+    ],
+  },
+  intermediate: {
+    dna: {
+      "real-habits_repeats": "Startet fast jede Offensive mit dem Jab; nach Treffern sofort Winkelwechsel nach links.",
+      "real-habits_when-tired": "Ab Runde 3 sinkt die Führhand — dann kommen Gegentreffer über die Außenbahn.",
+      "entry-patterns_start": "Jab-Feint → Cross oder Level-Change; Entries werden variabler.",
+      "preferred-weapons_most-common": "Jab-Cross-Low-Kick als Standardkombination.",
+      "preferred-weapons_combo": "1-2 → Low Kick; gegen Southpaws 1-2-3.",
+      "defensive-reactions_pressure": "Weicht linear zurück statt im Winkel — daran arbeiten wir.",
+      "weaknesses_technical": "Takedown-Defense gegen Body Locks; Guard-Retention nach Sweeps.",
+      "gameplan_priority-techniques": "Distanz halten, Teep etablieren, Low Kicks konsequent mitnehmen.",
+    },
+    dnaSplit: { boxing: 34, kicking: 24, wrestling: 16, ground: 14, clinch: 12 },
+    dnaSplitWeight: 1.7,
+    actionStats: [
+      { id: "jab", attempted: 52, landed: 33, zone: "center" },
+      { id: "cross", attempted: 27, landed: 14, setup: "Nach Jab-Feint" },
+      { id: "hook", attempted: 15, landed: 8 },
+      { id: "low-kick", attempted: 21, landed: 15, setup: "Nach 1-2" },
+      { id: "body-kick", attempted: 9, landed: 5 },
+      { id: "front-kick", attempted: 11, landed: 7, zone: "center" },
+      { id: "double-leg", attempted: 5, landed: 2, zone: "cage" },
+      { id: "pass", attempted: 4, landed: 2 },
+    ],
+  },
+  competitor: {
+    dna: {
+      "real-habits_repeats": "Eröffnet konstant mit Jab-Druck und schneidet den Ring ab; nach eigenen Treffern sofort Nachfassen mit dem Cross.",
+      "real-habits_after-hit": "Bleibt nach Treffern ruhig, geht in den Clinch und arbeitet mit Knien weiter.",
+      "real-habits_when-tired": "Hände sinken ab Runde 3 leicht — Konditionsblock im Camp adressiert das bereits.",
+      "real-habits_after-td-attempt": "Nach abgewehrtem Takedown sofortiges Sprawl-and-Brawl — stark im Scramble.",
+      "entry-patterns_start": "Jab → Cross oder Jab → Low Kick; gelegentlich Feint-Level-Change als Setup für die Rechte.",
+      "entry-patterns_center-or-cage": "Dominiert das Center und drückt den Gegner ans Gitter, bevor der Angriff kommt.",
+      "entry-patterns_counter": "Anfällig für Teep-Konter beim Vorwärtsdruck — im Sparring gezielt üben.",
+      "preferred-weapons_most-common": "Der Jab — hohe Frequenz, kontrolliert die Distanz.",
+      "preferred-weapons_most-dangerous": "Rechter Cross über die Mitte, besonders als Konter.",
+      "preferred-weapons_combo": "1-2 → Low Kick; am Cage 1-2 → Body Lock.",
+      "preferred-weapons_finish": "Ground & Pound aus der Top-Position.",
+      "defensive-reactions_pressure": "Kontert unter Druck mit Check-Hook und Winkelwechsel — sehr stabil.",
+      "defensive-reactions_takedowns": "Starkes Sprawl-Timing; gegen Body Locks am Cage noch ausbaufähig.",
+      "cage-space_center-movement": "Kleine Schritte, gute Balance, schneidet Winkel statt zu jagen.",
+      "weaknesses_technical": "Bottom-Game: Guard-Retention und Escapes nach verlorenem Scramble sind die klare Baustelle.",
+      "weaknesses_bad-distance": "Clinch-Distanz gegen körperlich stärkere Gegner meiden.",
+      "gameplan_base-plan": "Kampf im Stand halten, Striking-Vorteil ausspielen, Takedowns früh abwehren.",
+      "gameplan_key-to-win": "Jab-Kontrolle plus Low-Kick-Investment — den Gegner in Runde 3 langsam machen.",
+      "drills_takedown-sequences": "Anti-Body-Lock am Cage, Guard-Retention-Zirkel, Wall-Walks.",
+      "drills_sparring-tasks": "Runden mit Startposition Unterlage — Escapes unter Druck automatisieren.",
+    },
+    dnaSplit: { boxing: 36, kicking: 26, wrestling: 12, ground: 12, clinch: 14 },
+    dnaSplitWeight: 2.6,
+    actionStats: [
+      { id: "jab", attempted: 86, landed: 58, zone: "center" },
+      { id: "cross", attempted: 41, landed: 22, setup: "Nach Jab" },
+      { id: "hook", attempted: 28, landed: 15, setup: "Als Check-Hook beim Rückwärtsgehen" },
+      { id: "uppercut", attempted: 9, landed: 4, zone: "cage" },
+      { id: "elbow", attempted: 6, landed: 4, zone: "cage" },
+      { id: "low-kick", attempted: 33, landed: 24, setup: "Nach 1-2" },
+      { id: "body-kick", attempted: 18, landed: 11 },
+      { id: "high-kick", attempted: 6, landed: 2 },
+      { id: "front-kick", attempted: 12, landed: 8, zone: "center" },
+      { id: "knee", attempted: 9, landed: 6, zone: "cage", setup: "Im Clinch nach Collar Tie" },
+      { id: "single-leg", attempted: 7, landed: 3, zone: "open" },
+      { id: "double-leg", attempted: 5, landed: 2, zone: "cage" },
+      { id: "body-lock", attempted: 3, landed: 2, zone: "cage" },
+      { id: "pass", attempted: 6, landed: 4 },
+      { id: "submission", attempted: 4, landed: 1 },
+      { id: "ground-strikes", attempted: 14, landed: 10 },
+    ],
   },
 };
 
@@ -750,6 +855,18 @@ export async function seedDemoStudent(
     nextCompetitionName: cfg.athlete.nextCompetitionName ?? null,
   });
 
+  // DeepFight-Beispielprofil (Split, DNA, Action-Stats) — läuft als
+  // Trainer/Admin über die normale fightProfile-Schreibregel und macht die
+  // Profilansicht unter /kampfprofil bzw. /trainer/deepfight demo-fähig.
+  const demoFp = DEMO_FIGHT_PROFILE[persona];
+  await updateFightProfile(uid, {
+    dna: demoFp.dna,
+    dnaSplit: demoFp.dnaSplit,
+    dnaSplitWeight: demoFp.dnaSplitWeight,
+    actionStats: demoFp.actionStats,
+    updatedBy: DEMO_SEED_AUTHOR,
+  });
+
   const db = getFirestoreDb();
 
   // Batches je ~400 Ops
@@ -946,6 +1063,22 @@ export async function clearDemoData(uid: string): Promise<{
   // Fight-Camps können auch Plan-Subdocs haben — die werden mit dem Hauptdoc verworfen,
   // da wir hier nur die Top-Level fightCamps zählen. Fight-Camp-Plans sind als Felder
   // im Hauptdokument gespeichert (siehe lib/fight-camp.ts), daher reicht das.
+
+  // DeepFight-Demo-Profil zurücksetzen — NUR wenn es der Seed geschrieben hat
+  // (updatedBy = DEMO_SEED_AUTHOR). Trainer-gepflegte Profile bleiben unberührt.
+  try {
+    const fp = await getFightProfile(uid);
+    if (fp.updatedBy === DEMO_SEED_AUTHOR) {
+      await updateFightProfile(uid, {
+        dna: {},
+        dnaSplit: null,
+        dnaSplitWeight: 0,
+        actionStats: [],
+      });
+    }
+  } catch {
+    // Kein Zugriff / kein Profil — ignorieren
+  }
 
   return {
     workouts: counts.workouts ?? 0,

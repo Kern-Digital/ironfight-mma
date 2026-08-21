@@ -26,7 +26,7 @@ import { analyzeTrainingHistory } from "@/lib/fight-camp-analysis";
 import { getRecentWorkouts } from "@/lib/workouts";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
-import { totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness } from "@/lib/gegner-dna";
 import { ATHLETE_LEVEL_LABEL, type TechniqueProgress } from "@/lib/types";
 
 function studentLabel(s: StudentEntry): string {
@@ -482,7 +482,7 @@ function NewCompetitionContent() {
                               className="font-mono-ta block truncate text-[9px] uppercase"
                               style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
                             >
-                              {FIGHT_STYLE_LABEL[o.style]} · DNA {totalAnswered(o.dna)}
+                              {FIGHT_STYLE_LABEL[o.style]} · DNA {dnaCompleteness(o.dna)} %
                             </span>
                           </button>
                         );

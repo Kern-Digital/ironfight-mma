@@ -228,6 +228,26 @@ export function isDnaEmpty(answers: GegnerDnaAnswers | undefined | null): boolea
 }
 
 /**
+ * DNA-Vollständigkeit in Prozent (0–100): beantwortete Fragen relativ zu
+ * ALLEN für dieses Profil möglichen Fragen.
+ *
+ * ANZEIGE-REGEL (Entscheidung Leon, 2026-08-21): Zusammenfassungen (Badges,
+ * Karten, Kopfzeilen) zeigen den DNA-Stand IMMER als Prozent; absolute
+ * Zahlen nur in Detail-Auflistungen/Zählungen, und dort ausschließlich als
+ * „n/gesamt" (siehe DnaCategoryGrid). Hintergrund: Profile bekommen später
+ * disziplinabhängige Fragenkataloge (reiner BJJ-Kämpfer ≠ MMA-Katalog) —
+ * eine absolute Zahl ist dann nicht mehr vergleichbar. Diese Funktion ist
+ * der EINZIGE Ort, der den Nenner kennt; heute ist das der globale Katalog
+ * (DNA_TOTAL_QUESTIONS), später der profilspezifische.
+ */
+export function dnaCompleteness(
+  answers: GegnerDnaAnswers | undefined | null,
+): number {
+  if (!answers || DNA_TOTAL_QUESTIONS === 0) return 0;
+  return Math.round((totalAnswered(answers) / DNA_TOTAL_QUESTIONS) * 100);
+}
+
+/**
  * Entfernt leere Antworten aus der Map — so landen keine leeren Strings in
  * Firestore und die gespeicherte DNA bleibt schlank.
  */

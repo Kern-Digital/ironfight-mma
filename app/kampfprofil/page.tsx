@@ -12,18 +12,23 @@
  * 2026-08-19) — entwicklungsorientiert formuliert; kuratiert wird es vom
  * Trainer. App-Einstellungen und Account-Daten bleiben unter /profile.
  * Ersetzt die frühere Seite „Mein DeepFight" (/deepfight → Redirect hierher).
+ *
+ * DeepFight-Kontext: Ambient-Schicht läuft über --ambient-fight, DeepFight-
+ * Akzente über --accent-2/--grad-fight (exklusiv diesen Elementen).
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import AthleteProfileForm from "@/components/AthleteProfileForm";
+import AthleteTabBar from "@/components/AthleteTabBar";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import VideoAnalysisResult from "@/components/trainer/VideoAnalysisResult";
 import Skeleton from "@/components/ui/Skeleton";
 import Icon from "@/components/ui/Icon";
 import { useAuth, useFighterName } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import {
   getFightProfile,
   isFightProfileEmpty,
@@ -33,7 +38,7 @@ import { listOpponentsSharedWith, type Opponent } from "@/lib/opponents";
 import { listVideoAnalyses, type VideoAnalysis } from "@/lib/video-analysis";
 import { DISCIPLINE_LABEL, WEIGHT_CLASS_LABEL } from "@/lib/types";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
-import { totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness, totalAnswered } from "@/lib/gegner-dna";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("de-DE", {
@@ -43,33 +48,81 @@ function formatDate(d: Date): string {
   });
 }
 
+// Versalien-Button-Typo (Muster der Referenzseite)
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+};
+
 function SectionHeader({
   title,
   subtitle,
+  brandCase,
 }: {
   title: React.ReactNode;
   subtitle: string;
+  /** true = keine Versalien (DeepFight-Wordmark bleibt unangetastet) */
+  brandCase?: boolean;
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-1">
       <h2
-        className="font-display-ta flex items-center font-black uppercase"
-        style={{ fontSize: "18px", letterSpacing: "0.06em" }}
+        style={{
+          font: "var(--type-h2)",
+          letterSpacing: brandCase ? undefined : "var(--ls-display)",
+          textTransform: brandCase ? undefined : "uppercase",
+        }}
       >
         {title}
       </h2>
-      <p
-        className="font-mono-ta mt-1 text-[10px]"
-        style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
-      >
-        {subtitle}
-      </p>
-    </>
+      <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>{subtitle}</p>
+    </div>
+  );
+}
+
+/** Kleine Info-Chips im Seitenkopf (nicht interaktiv). tone="fight" =
+ * KI-Hervorhebung mit laufendem Regenbogen-Rand (.t-ai-badge). */
+function HeaderChip({
+  tone,
+  children,
+}: {
+  tone: "accent" | "fight" | "neutral";
+  children: React.ReactNode;
+}) {
+  const style: React.CSSProperties = {
+    font: "var(--type-label)",
+    letterSpacing: "var(--ls-label)",
+    textTransform: "uppercase",
+  };
+  let aiClass = "";
+  if (tone === "accent") {
+    style.background = "var(--accent-subtle)";
+    style.color = "var(--accent-text)";
+  } else if (tone === "fight") {
+    aiClass = " t-ai-badge";
+    style.color = "var(--ai-text)";
+  } else {
+    style.background = "var(--surface-raised)";
+    style.border = "1px solid var(--line)";
+    style.color = "var(--text-2)";
+  }
+  return (
+    <span className={`rounded-badge px-2 py-1${aiClass}`} style={style}>
+      {children}
+    </span>
   );
 }
 
 function KampfprofilContent() {
   const { user, profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const fighterName = useFighterName();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
@@ -105,194 +158,173 @@ function KampfprofilContent() {
   const sharedOpponents = opponents ?? [];
   const profileEmpty = isFightProfileEmpty(fightProfile);
   const dnaEntries = fightProfile ? totalAnswered(fightProfile.dna) : 0;
+  const dnaPct = fightProfile ? dnaCompleteness(fightProfile.dna) : 0;
   const athlete = profile?.athlete;
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Kopf */}
-      <div
-        className="relative overflow-hidden border-b px-4 py-8 sm:px-6"
-        style={{
-          borderColor: "rgba(157,123,250,0.25)",
-          background:
-            "radial-gradient(500px 250px at 100% 50%, rgba(157,123,250,0.12), transparent 60%), linear-gradient(160deg, #0B0716, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-5xl">
-          <div
-            className="font-mono-ta text-[10px] font-bold uppercase"
-            style={{ letterSpacing: "0.25em", color: "#9D7BFA" }}
-          >
-            Kampfprofil
-          </div>
-          <h1
-            className="font-display-ta mt-1 font-black uppercase leading-none"
-            style={{
-              fontSize: "clamp(24px, 4vw, 36px)",
-              letterSpacing: "0.02em",
-              color: "#fff",
-            }}
-          >
-            {fighterName}
-          </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {athlete?.primaryDiscipline && (
-              <span
-                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                style={{
-                  letterSpacing: "0.12em",
-                  background: "rgba(157,123,250,0.1)",
-                  border: "1px solid rgba(157,123,250,0.3)",
-                  color: "#9D7BFA",
-                }}
-              >
-                {DISCIPLINE_LABEL[athlete.primaryDiscipline]}
-              </span>
-            )}
-            {athlete?.weightClass && (
-              <span
-                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                style={{
-                  letterSpacing: "0.12em",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  color: "rgba(255,255,255,0.7)",
-                }}
-              >
-                {WEIGHT_CLASS_LABEL[athlete.weightClass]}
-              </span>
-            )}
-            {dnaEntries > 0 && (
-              <span
-                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                style={{
-                  letterSpacing: "0.12em",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  color: "rgba(255,255,255,0.7)",
-                }}
-              >
-                {dnaEntries} DNA-{dnaEntries === 1 ? "Eintrag" : "Einträge"}
-              </span>
-            )}
-          </div>
-          {isTrainer && user && (
-            <Link
-              href="/trainer/deepfight/me"
-              className="font-mono-ta mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[10px] font-bold uppercase"
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* Kopfbereich mit Ambient-Schicht — DeepFight-Kontext, daher
+          --ambient-fight. Der Clip-Container umschließt NUR die Ambient-Ebene,
+          nie die ganze Sektion (Muster der Referenzseite). */}
+      <section className="relative">
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          <div data-ambient style={{ background: "var(--ambient-fight)" }} />
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-6 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-8">
+          <div className="flex flex-1 flex-col gap-1">
+            <span className="t-label">Kampfprofil</span>
+            <h1
               style={{
-                letterSpacing: "0.12em",
-                background: "var(--ta-violet)",
-                color: "#fff",
-                textDecoration: "none",
+                font: "800 clamp(30px, 7vw, 38px)/1.1 var(--font-archivo), system-ui, sans-serif",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
               }}
             >
-              <Icon name="video" size={14} /> Meine Analyse starten
-            </Link>
+              {fighterName}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {athlete?.primaryDiscipline && (
+                <HeaderChip tone="accent">
+                  {DISCIPLINE_LABEL[athlete.primaryDiscipline]}
+                </HeaderChip>
+              )}
+              {athlete?.weightClass && (
+                <HeaderChip tone="neutral">
+                  {WEIGHT_CLASS_LABEL[athlete.weightClass]}
+                </HeaderChip>
+              )}
+              {dnaEntries > 0 && (
+                <HeaderChip tone="fight">DNA {dnaPct} %</HeaderChip>
+              )}
+            </div>
+            {isTrainer && user && (
+              <Link
+                href="/trainer/deepfight/me"
+                className="t-interactive mt-4 inline-flex min-h-hit items-center justify-center gap-2 self-start rounded-field px-5"
+                style={{
+                  ...BTN_FONT,
+                  background: "var(--grad-fight)",
+                  color: "var(--on-accent)",
+                  textDecoration: "none",
+                }}
+              >
+                <Icon name="video" size={14} strokeWidth={2.4} />
+                Meine Analyse starten
+              </Link>
+            )}
+          </div>
+          {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
+          {!isTrainer && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
           )}
         </div>
-      </div>
+      </section>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div className="flex flex-col gap-10">
+      <div className="mx-auto w-full max-w-2xl px-4 pt-1 lg:max-w-5xl lg:px-6">
+        <div className="flex flex-col gap-8">
           {/* DeepFight-Profil */}
-          <section>
+          <section className="flex flex-col gap-3">
             <SectionHeader
               title={<DeepFightWordmark />}
               subtitle="Dein Kampf-Stil aus KI-Video-Analysen und Trainer-Beobachtungen"
+              brandCase
             />
-            <div className="mt-4">
-              {fightProfile === null && loading ? (
-                <Skeleton className="h-40 w-full rounded-2xl" />
-              ) : profileEmpty ? (
-                <div
-                  className="rounded-2xl p-8 text-center"
-                  style={{
-                    background: "var(--ink-2)",
-                    border: "1px dashed var(--ink-5)",
-                  }}
+            {fightProfile === null && loading ? (
+              <Skeleton className="h-40 w-full rounded-card" />
+            ) : profileEmpty ? (
+              <div
+                className="rounded-card p-6 text-center sm:p-8"
+                style={{
+                  background: "var(--surface-card)",
+                  border: "1px dashed var(--line-strong)",
+                }}
+              >
+                <p style={{ font: "var(--type-body-strong)" }}>
+                  Dein Kampfprofil ist noch leer.
+                </p>
+                <p
+                  className="mx-auto mt-1 max-w-md"
+                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                 >
-                  <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-                    Dein Kampfprofil ist noch leer.
-                  </p>
-                  <p
-                    className="mx-auto mt-1 max-w-md text-xs"
-                    style={{ color: "var(--fg-4)" }}
-                  >
-                    {isTrainer
-                      ? "Starte eine Video-Analyse zu dir selbst und übernimm die Befunde — dein Profil wächst mit jedem Video."
-                      : "Dein Trainer baut dein Kampfprofil Schritt für Schritt aus Video-Analysen und eigenen Beobachtungen auf — sobald erste Befunde übernommen sind, erscheinen sie hier."}
-                  </p>
-                </div>
-              ) : fightProfile ? (
-                <FightProfileView
-                  dna={fightProfile.dna}
-                  dnaSplit={fightProfile.dnaSplit}
-                  actionStats={fightProfile.actionStats}
-                />
-              ) : null}
-            </div>
+                  {isTrainer
+                    ? "Starte eine Video-Analyse zu dir selbst und übernimm die Befunde — dein Profil wächst mit jedem Video."
+                    : "Dein Trainer baut dein Kampfprofil Schritt für Schritt aus Video-Analysen und eigenen Beobachtungen auf — sobald erste Befunde übernommen sind, erscheinen sie hier."}
+                </p>
+              </div>
+            ) : fightProfile ? (
+              <FightProfileView
+                dna={fightProfile.dna}
+                dnaSplit={fightProfile.dnaSplit}
+                actionStats={fightProfile.actionStats}
+              />
+            ) : null}
           </section>
 
           {/* Freigegebene eigene Auswertungen */}
           {sharedAnalyses.length > 0 && (
-            <section>
+            <section className="flex flex-col gap-3">
               <SectionHeader
                 title="Deine Auswertungen"
                 subtitle="Vom Trainer freigegebene Analysen deiner Kampf-Videos"
               />
-              <div className="mt-4 flex flex-col gap-3">
-                {sharedAnalyses.map((a) => {
+              {/* Liste = EINE Karte mit Haarlinien-Trennern (eigene 1px-Elemente) */}
+              <div className="t-card px-3.5 py-0.5">
+                {sharedAnalyses.map((a, i) => {
                   const open = expandedId === a.id;
                   return (
-                    <div key={a.id}>
+                    <Fragment key={a.id}>
+                      {i > 0 && (
+                        <div
+                          aria-hidden
+                          style={{ height: "1px", background: "var(--line)" }}
+                        />
+                      )}
                       <button
+                        type="button"
                         onClick={() => setExpandedId(open ? null : a.id)}
-                        className="flex w-full items-center justify-between gap-2 rounded-xl px-4 py-3 text-left"
-                        style={{
-                          background: open
-                            ? "rgba(157,123,250,0.1)"
-                            : "var(--ink-2)",
-                          border: `1px solid ${open ? "rgba(157,123,250,0.4)" : "var(--ink-4)"}`,
-                        }}
+                        className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-badge py-3 text-left"
                       >
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <span style={{ color: "var(--accent-2)", flexShrink: 0 }}>
+                          <Icon name="video" size={18} />
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col gap-1">
                           <span
-                            style={{ color: "var(--ta-violet)", flexShrink: 0 }}
+                            className="truncate"
+                            style={{ font: "var(--type-body-strong)" }}
                           >
-                            <Icon name="video" size={16} />
+                            {a.sourceLabel}
                           </span>
-                          <div className="min-w-0">
-                            <div
-                              className="truncate text-xs font-bold"
-                              style={{ color: "var(--fg-2)" }}
-                            >
-                              {a.sourceLabel}
-                            </div>
-                            <div
-                              className="font-mono-ta text-[9px] uppercase"
-                              style={{
-                                letterSpacing: "0.1em",
-                                color: "var(--fg-4)",
-                              }}
-                            >
-                              {formatDate(a.createdAt)} · Auswertung deines Kampfs
-                            </div>
-                          </div>
-                        </div>
+                          <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                            {formatDate(a.createdAt)} · Auswertung deines Kampfs
+                          </span>
+                        </span>
                         <span
+                          className="shrink-0"
                           style={{
-                            color: "var(--fg-4)",
-                            transform: open ? "rotate(90deg)" : "none",
-                            transition: "transform 0.15s",
+                            color: "var(--text-3)",
+                            transform: open ? "rotate(180deg)" : "none",
+                            transition: "transform var(--dur-fast) var(--ease-out)",
                             lineHeight: 0,
                           }}
                         >
-                          <Icon name="arrow-right" size={13} />
+                          <Icon name="chevron-down" size={16} strokeWidth={2.4} />
                         </span>
                       </button>
                       {open && (
-                        <div className="mt-2">
+                        <div className="pb-3">
                           <VideoAnalysisResult
                             analysis={a}
                             mode="athlete"
@@ -300,7 +332,7 @@ function KampfprofilContent() {
                           />
                         </div>
                       )}
-                    </div>
+                    </Fragment>
                   );
                 })}
               </div>
@@ -309,48 +341,41 @@ function KampfprofilContent() {
 
           {/* Freigegebene Gegnerprofile */}
           {sharedOpponents.length > 0 && (
-            <section>
+            <section className="flex flex-col gap-3">
               <SectionHeader
                 title="Gegnerprofile"
                 subtitle="Vom Trainer für deine Vorbereitung freigegeben"
               />
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {sharedOpponents.map((o) => {
-                  const entries = totalAnswered(o.dna);
+                  const pct = dnaCompleteness(o.dna);
                   return (
                     <Link
                       key={o.id}
                       href={`/deepfight/opponents/${o.id}`}
-                      className="rounded-2xl p-4 transition-colors"
-                      style={{
-                        background: "var(--ink-2)",
-                        border: "1px solid var(--ink-4)",
-                        textDecoration: "none",
-                      }}
+                      className="t-card t-interactive flex flex-col gap-1.5 p-4"
+                      style={{ textDecoration: "none" }}
                     >
-                      <div
-                        className="font-display-ta truncate font-black uppercase"
+                      <span
+                        className="truncate"
                         style={{
-                          fontSize: "16px",
-                          letterSpacing: "0.04em",
-                          color: "var(--fg)",
+                          font: "var(--type-h3)",
+                          letterSpacing: "var(--ls-display)",
+                          textTransform: "uppercase",
                         }}
                       >
                         {o.name}
-                      </div>
-                      <div
-                        className="font-mono-ta mt-1 text-[10px] font-bold uppercase"
-                        style={{ letterSpacing: "0.14em", color: "#9D7BFA" }}
-                      >
+                      </span>
+                      <span style={{ ...META_FONT, color: "var(--accent-2)" }}>
                         {FIGHT_STYLE_LABEL[o.style]}
-                      </div>
-                      <div
-                        className="font-mono-ta mt-2 flex items-center gap-1.5 text-[10px]"
-                        style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        style={{ ...META_FONT, color: "var(--text-3)" }}
                       >
                         <Icon name="shield" size={12} />
-                        {entries} {entries === 1 ? "Eintrag" : "Einträge"}
-                      </div>
+                        DNA {pct} %
+                      </span>
                     </Link>
                   );
                 })}
@@ -359,17 +384,19 @@ function KampfprofilContent() {
           )}
 
           {/* Athleten-Daten (editierbar) */}
-          <section>
+          <section className="flex flex-col gap-3">
             <SectionHeader
               title="Athleten-Daten"
-              subtitle="Basics, Körperdaten, Gym & Coach, nächster Wettkampf"
+              subtitle="Basics, Körperdaten, Gym & Coach"
             />
-            <div className="mt-4 max-w-2xl">
+            <div className="t-card p-4 sm:p-6">
               <AthleteProfileForm />
             </div>
           </section>
         </div>
       </div>
+
+      {!isTrainer && <AthleteTabBar />}
     </main>
   );
 }

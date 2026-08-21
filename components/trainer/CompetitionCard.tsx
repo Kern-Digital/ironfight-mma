@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FIGHT_STYLE_LABEL, type FightCamp } from "@/lib/fight-camp";
 import { resolveCampOpponent, type Opponent } from "@/lib/opponents";
-import { totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness } from "@/lib/gegner-dna";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("de-DE", {
@@ -48,7 +48,7 @@ export default function CompetitionCard({
   const group = competitionGroup(camp);
   const accent = GROUP_ACCENT[group];
   const { profile, addedDnaCount } = resolveCampOpponent(camp.opponent, opponent);
-  const dnaCount = totalAnswered(profile.dna ?? {});
+  const dnaPct = dnaCompleteness(profile.dna);
   const days = Math.ceil(
     (camp.competitionDate.getTime() - Date.now()) / (24 * 3600 * 1000),
   );
@@ -108,15 +108,19 @@ export default function CompetitionCard({
           {FIGHT_STYLE_LABEL[camp.opponent.style]}
         </span>
         <span
-          className="rounded px-1.5 py-0.5"
-          title={`${dnaCount} beantwortete DeepFight-Fragen`}
-          style={{
-            background: dnaCount > 0 ? "rgba(35,196,206,0.1)" : "var(--ink-4)",
-            border: `1px solid ${dnaCount > 0 ? "rgba(35,196,206,0.35)" : "var(--ink-5)"}`,
-            color: dnaCount > 0 ? "var(--ta-cyan)" : "var(--fg-4)",
-          }}
+          className={`rounded px-1.5 py-0.5${dnaPct > 0 ? " t-ai-badge" : ""}`}
+          title={`${dnaPct} % des DeepFight-Fragenkatalogs beantwortet`}
+          style={
+            dnaPct > 0
+              ? { color: "var(--ai-text)" }
+              : {
+                  background: "var(--ink-4)",
+                  border: "1px solid var(--ink-5)",
+                  color: "var(--fg-4)",
+                }
+          }
         >
-          DNA {dnaCount}
+          DNA {dnaPct} %
         </span>
         {addedDnaCount > 0 && (
           <span

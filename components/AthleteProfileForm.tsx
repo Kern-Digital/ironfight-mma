@@ -7,6 +7,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import Icon from "@/components/ui/Icon";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import {
   ATHLETE_LEVEL_LABEL,
@@ -24,18 +26,26 @@ import {
 } from "@/lib/types";
 import { updateAthleteProfile } from "@/lib/user-profile";
 
-// ─── Hilfs-Komponenten (gleiche Optik wie die Account-Seite) ───────────────
+// ─── Hilfs-Komponenten (neues Token-System, Muster: Referenzseiten) ────────
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
 
 function Section({
   title,
   children,
+  className,
 }: {
   title: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="mt-8 first:mt-0">
-      <div className="text-xs font-bold uppercase tracking-widest text-blood">
+    <div className={className}>
+      <div className="t-label" style={{ color: "var(--accent-text)" }}>
         {title}
       </div>
       <div className="mt-4 space-y-4">{children}</div>
@@ -54,17 +64,27 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-widest text-foreground/60">
-        {label}
-      </span>
-      {hint && <p className="mt-1 text-xs text-foreground/50">{hint}</p>}
+      <span className="t-label">{label}</span>
+      {hint && (
+        <p className="mt-1" style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          {hint}
+        </p>
+      )}
       <div className="mt-2">{children}</div>
     </label>
   );
 }
 
-const inputClass =
-  "w-full rounded-sm border border-carbon-400 bg-carbon-800 px-3 py-2 text-sm focus:border-blood focus:outline-none";
+// Inputs/Selects: Fläche 1 Ebene über der Karte + Haarlinie, Touch ≥ 44px.
+// Fokus-Ring kommt aus .t-interactive (focus-visible, Akzent-Outline).
+const inputClass = "t-interactive w-full min-h-hit rounded-field px-3.5";
+const inputStyle: React.CSSProperties = {
+  font: "var(--type-body)",
+  background: "var(--surface-raised)",
+  border: "1px solid var(--line)",
+  color: "var(--text-body)",
+  outline: "none",
+};
 
 // ─── Form-State Helpers ────────────────────────────────────────────────────
 
@@ -81,8 +101,6 @@ type AthleteForm = {
   bjjBelt: BjjBelt | "";
   gymName: string;
   trainerName: string;
-  nextCompetitionDate: string;
-  nextCompetitionName: string;
 };
 
 function emptyForm(): AthleteForm {
@@ -99,8 +117,6 @@ function emptyForm(): AthleteForm {
     bjjBelt: "",
     gymName: "",
     trainerName: "",
-    nextCompetitionDate: "",
-    nextCompetitionName: "",
   };
 }
 
@@ -127,8 +143,6 @@ function formFromAthlete(a: AthleteProfile | undefined): AthleteForm {
   f.bjjBelt = a.bjjBelt ?? "";
   f.gymName = a.gymName ?? "";
   f.trainerName = a.trainerName ?? "";
-  f.nextCompetitionDate = dateToInputValue(a.nextCompetitionDate);
-  f.nextCompetitionName = a.nextCompetitionName ?? "";
   return f;
 }
 
@@ -158,10 +172,10 @@ function patchFromForm(form: AthleteForm): Partial<AthleteProfile> {
     bjjBelt: form.bjjBelt || null,
     gymName: form.gymName.trim() || null,
     trainerName: form.trainerName.trim() || null,
-    nextCompetitionDate: form.nextCompetitionDate
-      ? new Date(form.nextCompetitionDate)
-      : null,
-    nextCompetitionName: form.nextCompetitionName.trim() || null,
+    // „Nächster Wettkampf" wurde 2026-08-21 aus dem Formular entfernt —
+    // die Wettkampfplanung läuft über die Fight Camps des Trainers.
+    // Die Felder fehlen hier bewusst: updateAthleteProfile lässt
+    // nicht gepatchte Felder unangetastet (Bestandsdaten bleiben).
   };
 }
 
@@ -179,16 +193,23 @@ export default function AthleteProfileForm() {
     setForm(formFromAthlete(profile?.athlete));
   }, [profile?.athlete]);
 
-  // Trainings-Jahre live berechnen
-  const trainingYears = useMemo(() => {
-    if (!form.trainingStartDate) return null;
+  // Trainings-Dauer als lesbarer Hinweis-Satz (Dezimalkomma + korrekter
+  // Dativ — „seit 1,4 Jahren", „seit 8 Monaten", „seit einem Jahr")
+  const trainingHint = useMemo(() => {
+    if (!form.trainingStartDate) return undefined;
     const start = new Date(form.trainingStartDate);
-    if (Number.isNaN(start.getTime())) return null;
+    if (Number.isNaN(start.getTime())) return undefined;
     const months = (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
-    if (months < 1) return "Frisch dabei";
-    if (months < 12) return `${Math.round(months)} Monate`;
-    const years = months / 12;
-    return years >= 2 ? `${years.toFixed(1)} Jahre` : `${years.toFixed(1)} Jahr`;
+    if (months < 1) return "Frisch dabei — willkommen im Training.";
+    if (months < 12) {
+      const m = Math.round(months);
+      return `Du trainierst seit ${m} ${m === 1 ? "Monat" : "Monaten"}.`;
+    }
+    const years = Math.round((months / 12) * 10) / 10;
+    if (Number.isInteger(years)) {
+      return `Du trainierst seit ${years === 1 ? "einem Jahr" : `${years} Jahren`}.`;
+    }
+    return `Du trainierst seit ${years.toLocaleString("de-DE")} Jahren.`;
   }, [form.trainingStartDate]);
 
   // Auto-Gewichtsklasse Vorschau
@@ -220,66 +241,66 @@ export default function AthleteProfileForm() {
   }
 
   return (
-    <form onSubmit={handleSave}>
+    // Mobil: eine Spalte; Desktop: Sektionen nebeneinander (linkslastige
+    // Schmalspalte vermeiden), Gym & Coach + Fußzeile über volle Breite.
+    <form
+      onSubmit={handleSave}
+      className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10"
+    >
       <Section title="Athleten-Basics">
         <Field label="Hauptdisziplin">
-          <select
+          <Select
+            clearable
             value={form.primaryDiscipline}
-            onChange={(e) =>
-              update("primaryDiscipline", e.target.value as Discipline | "")
-            }
-            className={inputClass}
-          >
-            <option value="">— wählen —</option>
-            {(Object.keys(DISCIPLINE_LABEL) as Discipline[]).map((d) => (
-              <option key={d} value={d}>
-                {DISCIPLINE_LABEL[d]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update("primaryDiscipline", v as Discipline | "")}
+            options={[
+              { value: "", label: "— wählen —" },
+              ...(Object.keys(DISCIPLINE_LABEL) as Discipline[]).map((d) => ({
+                value: d,
+                label: DISCIPLINE_LABEL[d],
+              })),
+            ]}
+          />
         </Field>
 
         <Field label="Trainingslevel">
-          <select
+          <Select
+            clearable
             value={form.level}
-            onChange={(e) => update("level", e.target.value as AthleteLevel | "")}
-            className={inputClass}
-          >
-            <option value="">— wählen —</option>
-            {(Object.keys(ATHLETE_LEVEL_LABEL) as AthleteLevel[]).map((l) => (
-              <option key={l} value={l}>
-                {ATHLETE_LEVEL_LABEL[l]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update("level", v as AthleteLevel | "")}
+            options={[
+              { value: "", label: "— wählen —" },
+              ...(Object.keys(ATHLETE_LEVEL_LABEL) as AthleteLevel[]).map((l) => ({
+                value: l,
+                label: ATHLETE_LEVEL_LABEL[l],
+              })),
+            ]}
+          />
         </Field>
 
-        <Field
-          label="Trainingsbeginn"
-          hint={trainingYears ? `Du trainierst seit ${trainingYears}.` : undefined}
-        >
+        <Field label="Trainingsbeginn" hint={trainingHint}>
           <input
             type="date"
             value={form.trainingStartDate}
             onChange={(e) => update("trainingStartDate", e.target.value)}
-            className={inputClass}
+            className={inputClass} style={inputStyle}
           />
         </Field>
 
         {form.primaryDiscipline === "bjj" && (
           <Field label="BJJ-Gurt">
-            <select
+            <Select
+              clearable
               value={form.bjjBelt}
-              onChange={(e) => update("bjjBelt", e.target.value as BjjBelt | "")}
-              className={inputClass}
-            >
-              <option value="">— wählen —</option>
-              {(Object.keys(BJJ_BELT_LABEL) as BjjBelt[]).map((b) => (
-                <option key={b} value={b}>
-                  {BJJ_BELT_LABEL[b]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update("bjjBelt", v as BjjBelt | "")}
+              options={[
+                { value: "", label: "— wählen —" },
+                ...(Object.keys(BJJ_BELT_LABEL) as BjjBelt[]).map((b) => ({
+                  value: b,
+                  label: BJJ_BELT_LABEL[b],
+                })),
+              ]}
+            />
           </Field>
         )}
       </Section>
@@ -294,7 +315,7 @@ export default function AthleteProfileForm() {
               max="250"
               value={form.weightKg}
               onChange={(e) => update("weightKg", e.target.value)}
-              className={inputClass}
+              className={inputClass} style={inputStyle}
             />
           </Field>
           <Field label="Größe (cm)">
@@ -305,7 +326,7 @@ export default function AthleteProfileForm() {
               max="250"
               value={form.heightCm}
               onChange={(e) => update("heightCm", e.target.value)}
-              className={inputClass}
+              className={inputClass} style={inputStyle}
             />
           </Field>
         </div>
@@ -319,41 +340,43 @@ export default function AthleteProfileForm() {
               max="250"
               value={form.reachCm}
               onChange={(e) => update("reachCm", e.target.value)}
-              className={inputClass}
+              className={inputClass} style={inputStyle}
             />
           </Field>
           <Field label="Auslage">
-            <select
+            <Select
+              clearable
               value={form.stance}
-              onChange={(e) =>
-                update("stance", e.target.value as FighterStance | "")
-              }
-              className={inputClass}
-            >
-              <option value="">— wählen —</option>
-              {(Object.keys(FIGHTER_STANCE_LABEL) as FighterStance[]).map((s) => (
-                <option key={s} value={s}>
-                  {FIGHTER_STANCE_LABEL[s]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update("stance", v as FighterStance | "")}
+              options={[
+                { value: "", label: "— wählen —" },
+                ...(Object.keys(FIGHTER_STANCE_LABEL) as FighterStance[]).map(
+                  (s) => ({ value: s, label: FIGHTER_STANCE_LABEL[s] }),
+                ),
+              ]}
+            />
           </Field>
         </div>
 
         <Field label="Gewichtsklasse">
           <div className="space-y-2">
-            <div className="flex gap-3 text-xs">
-              <label className="flex items-center gap-1.5">
+            <div
+              className="flex flex-wrap gap-x-4 gap-y-1"
+              style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+            >
+              <label className="flex min-h-hit items-center gap-1.5">
                 <input
                   type="radio"
+                  style={{ accentColor: "var(--accent)" }}
                   checked={form.weightClassMode === "auto"}
                   onChange={() => update("weightClassMode", "auto")}
                 />
                 Automatisch (aus Gewicht)
               </label>
-              <label className="flex items-center gap-1.5">
+              <label className="flex min-h-hit items-center gap-1.5">
                 <input
                   type="radio"
+                  style={{ accentColor: "var(--accent)" }}
                   checked={form.weightClassMode === "manual"}
                   onChange={() => update("weightClassMode", "manual")}
                 />
@@ -361,99 +384,107 @@ export default function AthleteProfileForm() {
               </label>
             </div>
             {form.weightClassMode === "auto" ? (
-              <div className="rounded-sm border border-carbon-500 bg-carbon-800 px-3 py-2 text-sm">
+              <div
+                className="flex min-h-hit items-center rounded-field px-3.5"
+                style={{
+                  font: "var(--type-body)",
+                  background: "var(--surface-raised)",
+                  border: "1px solid var(--line)",
+                }}
+              >
                 {autoWeightClass ? (
-                  <span className="text-blood">
+                  <span style={{ color: "var(--accent-text)" }}>
                     {WEIGHT_CLASS_LABEL[autoWeightClass]}
                   </span>
                 ) : (
-                  <span className="text-foreground/50">
+                  <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                     Trag dein Gewicht ein, dann wird die Klasse automatisch
                     ermittelt.
                   </span>
                 )}
               </div>
             ) : (
-              <select
+              <Select
+                clearable
                 value={form.weightClass}
-                onChange={(e) =>
-                  update("weightClass", e.target.value as WeightClass | "")
-                }
-                className={inputClass}
-              >
-                <option value="">— wählen —</option>
-                {(Object.keys(WEIGHT_CLASS_LABEL) as WeightClass[]).map((w) => (
-                  <option key={w} value={w}>
-                    {WEIGHT_CLASS_LABEL[w]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => update("weightClass", v as WeightClass | "")}
+                options={[
+                  { value: "", label: "— wählen —" },
+                  ...(Object.keys(WEIGHT_CLASS_LABEL) as WeightClass[]).map(
+                    (w) => ({ value: w, label: WEIGHT_CLASS_LABEL[w] }),
+                  ),
+                ]}
+              />
             )}
           </div>
         </Field>
       </Section>
 
-      <Section title="Gym & Coach">
-        <Field label="Gym / Verein">
-          <input
-            type="text"
-            maxLength={60}
-            value={form.gymName}
-            onChange={(e) => update("gymName", e.target.value)}
-            placeholder="z. B. Iron Fight Club"
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Hauptcoach">
-          <input
-            type="text"
-            maxLength={60}
-            value={form.trainerName}
-            onChange={(e) => update("trainerName", e.target.value)}
-            placeholder="z. B. Coach Mike"
-            className={inputClass}
-          />
-        </Field>
+      <Section title="Gym & Coach" className="lg:col-span-2">
+        <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-10">
+          <Field label="Gym / Verein">
+            <input
+              type="text"
+              maxLength={60}
+              value={form.gymName}
+              onChange={(e) => update("gymName", e.target.value)}
+              placeholder="z. B. Iron Fight Club"
+              className={inputClass} style={inputStyle}
+            />
+          </Field>
+          <Field label="Hauptcoach">
+            <input
+              type="text"
+              maxLength={60}
+              value={form.trainerName}
+              onChange={(e) => update("trainerName", e.target.value)}
+              placeholder="z. B. Coach Mike"
+              className={inputClass} style={inputStyle}
+            />
+          </Field>
+        </div>
       </Section>
 
-      <Section title="Nächster Wettkampf">
-        <Field label="Datum">
-          <input
-            type="date"
-            value={form.nextCompetitionDate}
-            onChange={(e) => update("nextCompetitionDate", e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Event-Name (optional)">
-          <input
-            type="text"
-            maxLength={80}
-            value={form.nextCompetitionName}
-            onChange={(e) => update("nextCompetitionName", e.target.value)}
-            placeholder="z. B. Bavarian Open"
-            className={inputClass}
-          />
-        </Field>
-      </Section>
-
-      <div className="mt-8">
+      <div className="lg:col-span-2">
         {error && (
-          <div className="mb-3 rounded-sm border border-blood/40 bg-blood/10 px-3 py-2 text-sm text-blood">
+          <div
+            className="mb-3 rounded-field px-3.5 py-2.5"
+            style={{
+              font: "var(--type-sub)",
+              background: "color-mix(in oklab, var(--negative) 12%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--negative) 40%, transparent)",
+              color: "var(--negative)",
+            }}
+          >
             {error}
           </div>
         )}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="submit"
             disabled={saving}
-            className="btn-primary disabled:opacity-50"
+            className="t-interactive flex min-h-hit items-center justify-center rounded-field px-5 disabled:opacity-60"
+            style={{
+              ...BTN_FONT,
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
+            }}
           >
             {saving ? "Speichere…" : "Athleten-Profil speichern"}
           </button>
           {saved && (
-            <span className="text-xs uppercase tracking-widest text-green-400">
-              Gespeichert ✓
+            <span
+              className="inline-flex items-center gap-1.5"
+              style={{
+                font: "600 11px/1.2 var(--font-archivo), system-ui, sans-serif",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--positive)",
+              }}
+            >
+              <Icon name="check" size={14} strokeWidth={2.6} />
+              Gespeichert
             </span>
           )}
         </div>

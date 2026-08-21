@@ -336,6 +336,16 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Abnahme-Checkliste. Jede Design-Session startet mit dieser Datei.
 
 ## Backlog (offen)
+- [ ] Gewichtsklassen pro Disziplin/Verband: Die App-weite Klassenliste
+      (`lib/types.ts`, `WEIGHT_CLASS_LABEL` + `weightClassForKg`) ist die
+      vereinheitlichte MMA-Skala (UFC, kg-gerundet) für ALLE Sportarten.
+      Real hat jede Disziplin ein eigenes Raster (Boxen 17 Profi-Klassen,
+      K-1/WAKO eigene, IBJJF eigene inkl. Gi-Wiegen, Ringen olympisch) —
+      teils gleiche Namen mit anderen Grenzen (Welterweight: Boxen ≈66,7 kg
+      vs. MMA 77 kg). Bei der Wettkampf-/Multi-Gym-Arbeit: Klassensatz
+      abhängig von Hauptdisziplin (ggf. Verband) wählen; betrifft
+      AthleteProfileForm, MatchupBlock/Tale-of-the-Tape, FightCampForm.
+      (Notiert 2026-08-21.)
 - [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
       Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,

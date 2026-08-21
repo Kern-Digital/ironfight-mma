@@ -11,7 +11,7 @@ import {
   deriveSuggestions,
   deriveTendencies,
 } from "@/lib/fight-stats";
-import { totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness } from "@/lib/gegner-dna";
 import { resolveCampOpponent, type Opponent } from "@/lib/opponents";
 
 // ─── Helfer ──────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ export default function MatchupBlock({
   const stats = opp.actionStats ?? [];
   const tendencies = deriveTendencies(stats).slice(0, 3);
   const suggestions = deriveSuggestions(opp.dnaSplit, stats).slice(0, 3);
-  const dnaCount = totalAnswered(opp.dna ?? {});
+  const dnaPct = dnaCompleteness(opp.dna);
 
   const days = Math.ceil(
     (camp.competitionDate.getTime() - Date.now()) / (24 * 3600 * 1000),
@@ -296,7 +296,7 @@ export default function MatchupBlock({
           className="font-mono-ta ml-auto text-[9px] uppercase"
           style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
         >
-          DNA {dnaCount} {dnaCount === 1 ? "Eintrag" : "Einträge"} ·{" "}
+          DNA {dnaPct} % ·{" "}
           {linked
             ? addedDnaCount > 0
               ? `Profil verknüpft (+${addedDnaCount})`

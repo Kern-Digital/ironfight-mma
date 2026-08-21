@@ -112,6 +112,9 @@
    bestehen und wird danach entfernt.
    ════════════════════════════════════════════════════════════════════════════ */
 :root, [data-theme="dark"] {
+  /* Native Controls (Datums-Picker, Scrollbars, restliche Selects) folgen
+     dem Theme — vorgezogen aus dem Rollout-Abschluss (2026-08-21). */
+  color-scheme: dark;
   --accent-h: 197; --accent-c: 0.14;  /* Logo-Cyan #00f7ff */
   /* Violett ist BEWUSST keine Ableitung (Hue-Shift würde z. B. bei einem
      roten Gym ein grünes Verlaufsende erzeugen), sondern feste Brand-
@@ -155,6 +158,19 @@
   --cat-mixed: oklch(0.90 0.01 300);   /* MMA = alles → starkes Neutral */
   --cat-neutral: oklch(0.71 0.02 250); /* Self-Defense/Wing Tsung */
 
+  /* KI-Regenbogen (feste Hues, keine Gym-Ableitung) — AUSSCHLIESSLICH für
+     .t-ai-badge (Hervorhebung besonderer KI-Anzeigen, z. B. „DNA 33 %").
+     Letzter Stopp = erster Stopp, sonst ruckelt der Loop sichtbar. */
+  --ai-1: oklch(0.70 0.19 25);
+  --ai-2: oklch(0.80 0.15 90);
+  --ai-3: oklch(0.76 0.17 150);
+  --ai-4: oklch(0.76 0.13 210);
+  --ai-5: oklch(0.65 0.18 305);
+  --grad-ai: linear-gradient(90deg, var(--ai-1), var(--ai-2), var(--ai-3), var(--ai-4), var(--ai-5), var(--ai-1));
+  /* Abgeschwächtes Violett für Text IN der KI-Hervorhebung — volles
+     --accent-2 würde gegen den Regenbogen-Rand kämpfen. */
+  --ai-text: color-mix(in oklab, var(--accent-2) 55%, var(--text-2));
+
   /* Liquid Glass */
   --glass-bg: oklch(0.22 calc(var(--accent-c)*0.08) var(--accent-h) / 0.42);
   --glass-border: oklch(1 0 0 / 0.12);
@@ -188,6 +204,7 @@
   --text-label: var(--text-3);
 }
 [data-theme="light"] {
+  color-scheme: light;
   --card-border: oklch(0.88 calc(var(--accent-c)*0.08) var(--accent-h)); /* Light: 1px Rahmen */
   --bg-0: oklch(0.975 calc(var(--accent-c)*0.03) var(--accent-h));
   --bg-1: oklch(0.995 calc(var(--accent-c)*0.015) var(--accent-h));
@@ -215,6 +232,11 @@
   --cat-5: oklch(0.55 0.15 148);
   --cat-mixed: oklch(0.35 0.01 300);
   --cat-neutral: oklch(0.50 0.02 250);
+  --ai-1: oklch(0.58 0.19 25);
+  --ai-2: oklch(0.65 0.13 90);
+  --ai-3: oklch(0.60 0.15 150);
+  --ai-4: oklch(0.60 0.12 210);
+  --ai-5: oklch(0.52 0.17 305);
   --glass-bg: oklch(0.98 calc(var(--accent-c)*0.03) var(--accent-h) / 0.45);
   --glass-border: oklch(0.2 0.02 var(--accent-h) / 0.10);
   --glass-highlight: oklch(1 0 0 / 0.65);
@@ -340,9 +362,81 @@
   .t-interactive:hover { background-color: var(--surface-raised); }
   .t-interactive:active { transform: scale(0.98); }
   .t-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Aufklapp-Panel des gestylten Selects (components/ui/Select.tsx):
+     kleines Entfalten von der Feld-Unterkante aus — nur transform/opacity. */
+  .t-select-panel {
+    transform-origin: top;
+    animation: t-select-open var(--dur-med) var(--ease-out);
+  }
+  /* Optionen gleiten gestaffelt minimal nach unten (Delay pro Zeile inline
+     via animationDelay). fill-mode backwards statt both: nach Animationsende
+     darf kein Transform hängen bleiben, sonst wäre :active-scale blockiert. */
+  .t-select-option {
+    animation: t-select-item 320ms var(--ease-out) backwards;
+  }
+  /* KI-Hervorhebung (Entscheidung 2026-08-22): besondere KI-Anzeigen
+     (DeepFight-Badges wie „DNA 33 %") tragen einen DURCHGEHEND von links
+     nach rechts laufenden Regenbogen-Streifen an der UNTERKANTE + weichen
+     Glow darunter. Der Streifen ist ein eigenes ::after-Element und endet
+     VOR den Ecken-Rundungen — er läuft bewusst NICHT über den Rand, sonst
+     blitzt der Verlauf in der unteren Ecken-Kurve seitlich auf.
+     background-position wandert von 200% auf 0% (= Lauf nach RECHTS,
+     Größe 200%). Textfarbe dazu: var(--ai-text). */
+  .t-ai-badge {
+    position: relative;
+    isolation: isolate;
+    background: var(--surface-raised);
+  }
+  .t-ai-badge::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 0;
+    height: 1px;
+    background: var(--grad-ai);
+    background-size: 200% 100%;
+    animation: t-ai-flow 3s linear infinite;
+    /* Enden laufen fein aus statt hart abzuschneiden */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  }
+  .t-ai-badge::before {
+    content: "";
+    position: absolute;
+    left: 16%;
+    right: 16%;
+    bottom: -14%;
+    height: 30%;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--grad-ai);
+    background-size: 200% 100%;
+    animation: t-ai-flow 3s linear infinite;
+    filter: blur(7px);
+    opacity: 0.25;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  }
   @media (prefers-reduced-motion: reduce) {
     .t-interactive:active { transform: none; }
+    .t-select-panel, .t-select-option { animation: none; }
+    .t-ai-badge, .t-ai-badge::before, .t-ai-badge::after { animation: none; }
   }
+}
+/* Position sinkt 200% → 0% = der Verlauf wandert nach rechts (Vorgabe:
+   links nach rechts — Umkehrung der Referenz-Animation). */
+@keyframes t-ai-flow {
+  from { background-position: 200% 50%; }
+  to   { background-position: 0% 50%; }
+}
+@keyframes t-select-open {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes t-select-item {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
