@@ -49,6 +49,16 @@
 - Die Gym-Akzentfarbe als EIN austauschbarer Token von Anfang an
   (Secure-by-Design-Denkweise für die Optik: Variabilität in die Struktur
   legen, nicht nachrüsten).
+- **Ambient-Hintergrund-Schicht** (beschlossen 2026-08-21): weiche, stark
+  geblurte Glows HINTER dem Inhalt — eigenes Token (`--ambient`), abgeleitet
+  nur aus der Gym-Akzentfarbe (DeepFight-Bereiche zusätzlich Brand-Violett).
+  Nur hinter Hero-/Kopfbereichen und leeren Flächen, NIE hinter
+  Listen/Tabellen; Lesbarkeit (WCAG) unangetastet; Dark UND Light.
+  Animation optional: langsame Drift 20–40 s, nur transform/opacity
+  (akku-schonend, native-ready), stoppt bei `prefers-reduced-motion`.
+  Kein Canvas/WebGL für Hintergründe. Die Regel „Verlauf nie als
+  Flächenfüllung" gilt weiter für UI-Elemente (Karten, Buttons, Text) —
+  Ambient ist eine separate Schicht dahinter.
 
 ## 4. Arbeitsmodus (Reihenfolge ist Pflicht)
 
