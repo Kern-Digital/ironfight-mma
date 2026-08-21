@@ -39,7 +39,7 @@ import {
 } from "@/lib/fight-camp";
 import { getSessionCountForWeek } from "@/lib/training-sessions";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
 function formatRelative(d: Date) {
   const diffMs = Date.now() - d.getTime();
@@ -508,15 +508,16 @@ function DashboardContent() {
               { href: "/timer", icon: "timer" as const, title: "Timer", sub: "Runden & Pausen" },
               { href: "/techniques", icon: "book" as const, title: "Techniken", sub: "Bibliothek" },
             ].map((a, i) => (
+              <Fragment key={a.href}>
+              {/* Trennlinie als eigenes Element — border-top auf der gerundeten
+                  Zeile würde die Linienenden mitrunden */}
+              {i > 0 && (
+                <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
+              )}
               <Link
-                key={a.href}
                 href={a.href}
                 className="t-interactive flex min-h-hit items-center gap-3 rounded-badge py-3"
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  ...(i > 0 ? { borderTop: "1px solid var(--line)" } : {}),
-                }}
+                style={{ textDecoration: "none", color: "inherit" }}
               >
                 <span style={{ color: "var(--accent-text)" }}>
                   <Icon name={a.icon} size={20} />
@@ -526,6 +527,7 @@ function DashboardContent() {
                   <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>{a.sub}</span>
                 </div>
               </Link>
+              </Fragment>
             ))}
           </div>
         </section>

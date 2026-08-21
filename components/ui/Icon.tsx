@@ -46,7 +46,8 @@ export type IconName =
   | "video"
   | "edit"
   | "user"
-  | "sun";
+  | "sun"
+  | "chevron-down";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -218,6 +219,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  "chevron-down": <path d="m6 9 6 6 6-6" />,
   warn: (
     <>
       <path d="M12 4 2.8 19.5h18.4L12 4Z" />

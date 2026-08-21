@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
  * Die Routen-Liste wächst mit dem Rollout; am Ende wird daraus die
  * endgültige App-Shell-Weiche.
  */
-const ATHLETE_SHELL_ROUTES = ["/dashboard"];
+const ATHLETE_SHELL_ROUTES = ["/dashboard", "/schedule"];
 
 export default function AthleteChromeGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

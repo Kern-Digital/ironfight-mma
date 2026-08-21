@@ -79,8 +79,8 @@ export default function TechniqueDetailPage({
                     className="rounded-sm border px-3 py-1 text-xs font-bold uppercase tracking-wider"
                     style={{
                       color: DISCIPLINE_COLOR[d],
-                      borderColor: `${DISCIPLINE_COLOR[d]}66`,
-                      background: `${DISCIPLINE_COLOR[d]}1A`,
+                      borderColor: `color-mix(in oklab, ${DISCIPLINE_COLOR[d]} 40%, transparent)`,
+                      background: `color-mix(in oklab, ${DISCIPLINE_COLOR[d]} 10%, transparent)`,
                     }}
                   >
                     {DISCIPLINE_LABEL[d]}

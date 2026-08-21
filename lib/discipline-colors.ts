@@ -7,12 +7,19 @@
  *   auf der Startseite, in der Bibliothek, im Stundenplan, in Workout-Plänen
  *   und in allen Trainer-Charts (Fight-DNA-Split, Technik-Statistik).
  *
+ * Seit dem Redesign (2026-08) sind die Werte CSS-Variablen (--cat-* in
+ * app/globals.css) statt Hex: Dark und Light bekommen so automatisch die
+ * passende Abstufung, und Multi-Gym Phase 3 kann die Slots später frei
+ * konfigurierten Gym-Rubriken zuweisen. KONSEQUENZ: Transparenz-Varianten
+ * NIE per Hex-Alpha-Anhang (`${color}66`) bilden, sondern mit
+ * `color-mix(in oklab, ${color} 40%, transparent)`.
+ *
  * Die 5 Kampf-Familien:
  *   Schläge/Boxen = Cyan · Kicks (Muay Thai, Kickboxen, Karate) = Violett ·
  *   Wrestling/Takedowns/Würfe = Pink · Boden/BJJ = Amber · Clinch = Mint
  *
  * WICHTIG: Innerhalb EINES Charts dürfen nie zwei ähnliche Töne stehen —
- * deshalb ist #9D7BFA (Hell-Violett, KI-Akzent) hier bewusst NICHT vergeben.
+ * deshalb ist das helle KI-Violett (--accent-2) hier bewusst NICHT vergeben.
  * Neue Farbzuordnungen immer hier ergänzen, nie lokal in Komponenten.
  */
 
@@ -21,20 +28,20 @@ import type { Category, Discipline } from "@/lib/types";
 /** Grundfarben der 5 Kampf-Familien. */
 export const FIGHT_FAMILY_COLOR = {
   /** Schläge / Boxen */
-  striking: "#23C4CE",
+  striking: "var(--cat-1)",
   /** Kicks / Muay Thai / Kickboxen / Karate */
-  kicks: "#8A63E8",
+  kicks: "var(--cat-2)",
   /** Wrestling / Takedowns / Würfe */
-  wrestling: "#FF4FA8",
+  wrestling: "var(--cat-3)",
   /** Boden / BJJ */
-  ground: "#FFB648",
+  ground: "var(--cat-4)",
   /** Clinch */
-  clinch: "#3EE06B",
+  clinch: "var(--cat-5)",
 } as const;
 
 /** Neutralfarben für Misch- bzw. Sonderdisziplinen (keine Kampf-Familie). */
-export const MIXED_DISCIPLINE_COLOR = "#F0EEF9"; // MMA = alles → neutral hell
-export const NEUTRAL_DISCIPLINE_COLOR = "#9CA3AF"; // Self-Defense/Wing Tsung
+export const MIXED_DISCIPLINE_COLOR = "var(--cat-mixed)"; // MMA = alles → neutral
+export const NEUTRAL_DISCIPLINE_COLOR = "var(--cat-neutral)"; // Self-Defense/Wing Tsung
 
 /** Hauptkategorien (Startseite, Workouts, Bibliothek, Stundenplan). */
 export const CATEGORY_COLOR: Record<Category, string> = {

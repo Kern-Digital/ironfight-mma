@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import AthleteTabBar from "@/components/AthleteTabBar";
+import Icon from "@/components/ui/Icon";
 import {
-  TRAINING_BLOCKS,
   WEEKDAY_LABELS,
-  WEEKDAY_SHORT,
   getBlocksForDay,
   getCurrentWeekday,
   getWeekIdentifier,
@@ -36,12 +37,12 @@ import TrainerHint from "@/components/TrainerHint";
 
 // ─── Visuelle Hilfskonstanten ──────────────────────────────────────────────
 
-const LEVEL_STYLE: Record<string, { label: string; color: string }> = {
-  kids:     { label: "Kids",     color: "#FF4FA8" },
-  teens:    { label: "Teens",    color: "#8A63E8" },
-  adult:    { label: "Adult",    color: "#23C4CE" },
-  advanced: { label: "Advanced", color: "#F3F4F6" },
-  mixed:    { label: "Mixed",    color: "#9D7BFA" },
+const LEVEL_LABEL: Record<string, string> = {
+  kids: "Kids",
+  teens: "Teens",
+  adult: "Adult",
+  advanced: "Advanced",
+  mixed: "Mixed",
 };
 
 // Farben zentral aus lib/discipline-colors.ts — eine Rubrik = app-weit eine Farbe.
@@ -65,13 +66,55 @@ const DISCIPLINE_LABEL: Record<string, string> = {
   "self-defense":    "Self-Defense",
 };
 
+// Technik-Level laufen über die Semantik-Tokens (keine eigenen Farbwerte)
 const TECHNIQUE_LEVEL_COLOR: Record<string, string> = {
-  anfaenger:     "#4ade80",
-  aufbau:        "#60a5fa",
-  fortgeschritten: "#f59e0b",
-  advanced:      "#f97316",
-  pro:           "#ef4444",
+  anfaenger:       "var(--positive)",
+  aufbau:          "var(--accent-text)",
+  fortgeschritten: "var(--warning)",
+  advanced:        "var(--accent-2)",
+  pro:             "var(--negative)",
 };
+
+// Versalien-Button-Typo (Muster der Referenzseite)
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+};
+
+const MONO_TIME: React.CSSProperties = {
+  font: "600 13px/1.2 var(--font-mono), ui-monospace, monospace",
+};
+
+/**
+ * Meta-Zeile eines Kurses + Farbpunkt der Disziplin. Der Text trägt die
+ * Information, die Farbe verstärkt nur (Multi-Gym: Rubriken sind später frei
+ * konfigurierbar). Gezeigt wird NUR, was der Kurstitel nicht schon selbst
+ * sagt — Titel wie „Kickboxen Adult" bekommen keine Echo-Unterzeile.
+ */
+function blockMeta(block: TrainingBlock): { dotColor: string; meta: string } {
+  const catStyle = block.category ? CATEGORY_STYLE[block.category] : null;
+  const dotColor =
+    (block.discipline ? DISCIPLINE_COLOR[block.discipline] : null) ??
+    catStyle?.color ??
+    "var(--text-3)";
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9äöüß]/g, "");
+  const title = norm(block.title);
+  const levelLabel = block.level ? LEVEL_LABEL[block.level] ?? block.level : null;
+  const disciplineLabel = block.discipline
+    ? DISCIPLINE_LABEL[block.discipline] ?? block.discipline
+    : catStyle?.label ?? null;
+  const meta = [levelLabel, disciplineLabel]
+    .filter((part): part is string => Boolean(part && !title.includes(norm(part))))
+    .join(" · ");
+  return { dotColor, meta };
+}
 
 // ─── Struktur-Hilfsfunktionen ──────────────────────────────────────────────
 
@@ -186,6 +229,7 @@ const TRAINER_BLOCK_DESCRIPTION =
 
 export default function SchedulePage() {
   const { user, profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const todayWeekday = getCurrentWeekday();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
@@ -334,37 +378,55 @@ export default function SchedulePage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Header */}
-      <div
-        className="border-b px-4 py-8 sm:px-6"
-        style={{ borderColor: "var(--ink-4)" }}
-      >
-        <div className="mx-auto max-w-7xl">
-          <p
-            className="mb-1 font-mono-ta text-xs uppercase"
-            style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}
-          >
-            Diese Woche
-          </p>
-          <h1
-            className="font-display-ta text-3xl font-black uppercase sm:text-4xl"
-            style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}
-          >
-            Stundenplan
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--fg-3)" }}>
-            {isTrainer
-              ? "Klicke auf einen Kurs, um Details zu öffnen und Techniken für diese Woche hinzuzufügen."
-              : "Klicke auf ein Training um teilzunehmen und Techniken in deine Bibliothek zu übernehmen."}
-          </p>
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* Kopfbereich mit Ambient-Schicht — der Clip-Container umschließt NUR
+          die Ambient-Ebene, nie die ganze Sektion (Muster der Referenzseite). */}
+      <section className="relative">
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          <div data-ambient style={{ background: "var(--ambient)" }} />
         </div>
-      </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-6 lg:max-w-7xl lg:px-6 lg:pb-7 lg:pt-8">
+          <div className="flex flex-1 flex-col gap-1">
+            <span className="t-label">Diese Woche</span>
+            <h1
+              style={{
+                font: "800 clamp(30px, 7vw, 38px)/1.1 var(--font-archivo), system-ui, sans-serif",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              Kursplan
+            </h1>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+              {isTrainer
+                ? "Klicke auf einen Kurs, um Details zu öffnen und Techniken für diese Woche hinzuzufügen."
+                : "Klicke auf ein Training um teilzunehmen und Techniken in deine Bibliothek zu übernehmen."}
+            </p>
+          </div>
+          {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
+          {!isTrainer && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
+          )}
+        </div>
+      </section>
 
       {/* Trainer-Hinweis: Übersicht (nur einmal pro Browser) */}
       {isTrainer && (
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
-          <TrainerHint id="schedule-overview" title="Stundenplan">
+        <div className="mx-auto w-full max-w-2xl px-4 lg:max-w-7xl lg:px-6">
+          <TrainerHint id="schedule-overview" title="Kursplan">
             Klicke auf einen Kurs, um Details zu sehen und Techniken für diese
             Woche hinzuzufügen — sie landen automatisch in den Bibliotheken
             deiner Schüler.
@@ -373,35 +435,29 @@ export default function SchedulePage() {
       )}
 
       {/* Wochengitter */}
-      <div className="mx-auto max-w-7xl px-2 py-6 sm:px-4">
-        <div className="hidden gap-2 lg:grid lg:grid-cols-7">
-          {Array.from({ length: 7 }, (_, i) => (
-            <DayColumn key={i} weekday={i} blocks={getBlocksForDay(i)} isToday={i === todayWeekday} onBlockClick={openBlock} label={WEEKDAY_LABELS[i]} short={WEEKDAY_SHORT[i]} />
-          ))}
-        </div>
-        <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:hidden">
-          {Array.from({ length: 7 }, (_, i) => (
-            <DayColumn key={i} weekday={i} blocks={getBlocksForDay(i)} isToday={i === todayWeekday} onBlockClick={openBlock} label={WEEKDAY_LABELS[i]} short={WEEKDAY_SHORT[i]} />
-          ))}
-        </div>
-        <div className="flex flex-col gap-3 sm:hidden">
-          {Array.from({ length: 7 }, (_, i) => (
-            <DayColumn key={i} weekday={i} blocks={getBlocksForDay(i)} isToday={i === todayWeekday} onBlockClick={openBlock} label={WEEKDAY_LABELS[i]} short={WEEKDAY_SHORT[i]} />
-          ))}
-        </div>
+      <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-5 px-4 pt-1 sm:grid-cols-2 lg:max-w-7xl lg:grid-cols-7 lg:gap-2.5 lg:px-6">
+        {Array.from({ length: 7 }, (_, i) => (
+          <DayColumn
+            key={i}
+            blocks={getBlocksForDay(i)}
+            isToday={i === todayWeekday}
+            onBlockClick={openBlock}
+            label={WEEKDAY_LABELS[i]}
+          />
+        ))}
       </div>
 
       {/* Modal */}
       {modal.phase !== "idle" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "var(--modal-backdrop)" }}
+          style={{ background: "var(--overlay)" }}
           onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
           <div
             ref={modalRef}
-            className="w-full max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-xl"
-            style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
+            className="t-card max-h-[90vh] w-full overflow-y-auto rounded-modal sm:max-w-xl"
+            style={{ boxShadow: "var(--glass-shadow)" }}
           >
             {modal.phase === "loading" && (
               <ModalSkeleton block={modal.block} onClose={closeModal} />
@@ -436,6 +492,8 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+
+      {!isTrainer && <AthleteTabBar />}
     </main>
   );
 }
@@ -443,102 +501,104 @@ export default function SchedulePage() {
 // ─── DayColumn ────────────────────────────────────────────────────────────
 
 function DayColumn({
-  weekday,
   blocks,
   isToday,
   onBlockClick,
   label,
-  short: _short,
 }: {
-  weekday: number;
   blocks: TrainingBlock[];
   isToday: boolean;
   onBlockClick: (b: TrainingBlock) => void;
   label: string;
-  short: string;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div
-        className="rounded-lg px-2 py-1.5 text-center text-xs font-black uppercase"
-        style={{
-          fontFamily: "var(--font-mono)",
-          letterSpacing: "0.12em",
-          background: isToday ? "rgba(35,196,206,.12)" : "var(--ink-3)",
-          border: `1px solid ${isToday ? "rgba(35,196,206,.4)" : "var(--ink-4)"}`,
-          color: isToday ? "var(--ta-cyan)" : "var(--fg-3)",
-        }}
-      >
-        {label}
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <span
+          className="t-label"
+          style={isToday ? { color: "var(--accent-text)" } : undefined}
+        >
+          {label}
+        </span>
         {isToday && (
           <span
-            className="ml-1 inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: "var(--ta-cyan)", verticalAlign: "middle" }}
+            className="h-[5px] w-[5px] rounded-full"
+            style={{ background: "var(--accent)" }}
+            aria-hidden
           />
         )}
       </div>
-      {blocks.length === 0 ? (
-        <div
-          className="flex flex-1 items-center justify-center rounded-lg py-4 text-xs"
-          style={{ color: "var(--fg-4)", background: "var(--ink-2)" }}
-        >
-          —
-        </div>
-      ) : (
-        blocks.map((block) => (
-          <BlockCard key={block.id} block={block} isToday={isToday} onClick={() => onBlockClick(block)} />
-        ))
-      )}
-    </div>
+      <div className="t-card flex-1 px-3.5 py-0.5">
+        {blocks.length === 0 ? (
+          <div
+            className="flex items-center justify-center py-5"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+          >
+            Frei
+          </div>
+        ) : (
+          blocks.map((block, i) => (
+            <Fragment key={block.id}>
+              {/* Trennlinie als eigenes Element — läge sie als border-top auf
+                  der gerundeten Zeile, würden ihre Enden mitgerundet */}
+              {i > 0 && (
+                <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
+              )}
+              <BlockRow block={block} onClick={() => onBlockClick(block)} />
+            </Fragment>
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
-// ─── BlockCard ────────────────────────────────────────────────────────────
+// ─── BlockRow ─────────────────────────────────────────────────────────────
 
-function BlockCard({ block, isToday, onClick }: { block: TrainingBlock; isToday: boolean; onClick: () => void }) {
-  const levelStyle = block.level ? LEVEL_STYLE[block.level] : null;
-  const catStyle = block.category ? CATEGORY_STYLE[block.category] : null;
-  // Farbkante = Disziplin-Familie (zentrale Map); Kickboxen wird so violett
-  // statt Boxen-Cyan. Level-Farbe nur als letzter Fallback.
-  const accentColor =
-    (block.discipline ? DISCIPLINE_COLOR[block.discipline] : null) ??
-    catStyle?.color ??
-    levelStyle?.color ??
-    "var(--fg-4)";
+function BlockRow({
+  block,
+  onClick,
+}: {
+  block: TrainingBlock;
+  onClick: () => void;
+}) {
+  const { dotColor, meta } = blockMeta(block);
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full rounded-lg p-2 text-left transition-all"
-      style={{
-        background: "var(--ink-3)",
-        border: `1px solid ${isToday ? "rgba(35,196,206,.2)" : "var(--ink-4)"}`,
-        borderLeft: `3px solid ${accentColor}`,
-        cursor: "pointer",
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--ink-4)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--ink-3)"; }}
+      className="t-interactive flex min-h-hit w-full items-start gap-3 rounded-badge py-3 text-left"
     >
-      <div className="mb-0.5 font-mono-ta text-[10px]" style={{ color: "var(--fg-4)", letterSpacing: "0.08em" }}>
-        {block.startTime}–{block.endTime}
+      <div className="flex w-11 shrink-0 flex-col gap-0.5">
+        <span style={{ ...MONO_TIME, color: "var(--accent-text)" }}>
+          {block.startTime}
+        </span>
+        <span
+          style={{
+            font: "500 11px/1.2 var(--font-mono), ui-monospace, monospace",
+            color: "var(--text-3)",
+          }}
+        >
+          {block.endTime}
+        </span>
       </div>
-      <div className="text-xs font-bold leading-tight" style={{ color: "var(--fg-1)" }}>
-        {block.title}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span style={{ font: "var(--type-body-strong)" }}>{block.title}</span>
+        {meta && (
+          <span
+            className="inline-flex items-center gap-1.5"
+            style={{ ...META_FONT, color: "var(--text-3)" }}
+          >
+            <span
+              className="h-[5px] w-[5px] shrink-0 rounded-full"
+              style={{ background: dotColor }}
+              aria-hidden
+            />
+            {meta}
+          </span>
+        )}
       </div>
-      {(levelStyle || catStyle) && (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {levelStyle && (
-            <span className="rounded px-1 py-0.5 text-[9px] font-bold uppercase" style={{ background: `${levelStyle.color}22`, color: levelStyle.color, letterSpacing: "0.08em" }}>
-              {levelStyle.label}
-            </span>
-          )}
-          {catStyle && (
-            <span className="rounded px-1 py-0.5 text-[9px] font-bold uppercase" style={{ background: `${catStyle.color}22`, color: catStyle.color, letterSpacing: "0.08em" }}>
-              {catStyle.label}
-            </span>
-          )}
-        </div>
-      )}
     </button>
   );
 }
@@ -549,9 +609,13 @@ function ModalSkeleton({ block, onClose }: { block: TrainingBlock; onClose: () =
   return (
     <div className="p-5">
       <ModalHeader block={block} onClose={onClose} />
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 flex flex-col gap-2">
         {[1, 2, 3].map((n) => (
-          <div key={n} className="h-10 animate-pulse rounded-lg" style={{ background: "var(--ink-4)" }} />
+          <div
+            key={n}
+            className="h-10 animate-pulse rounded-badge"
+            style={{ background: "var(--surface-raised)" }}
+          />
         ))}
       </div>
     </div>
@@ -651,18 +715,14 @@ function ModalReady({
         <>
           {isTrainer && (
             <div
-              className="mt-4 rounded-xl px-3 py-2.5 text-xs"
+              className="mt-4 rounded-field px-3.5 py-3"
               style={{
-                background: "rgba(35,196,206,0.06)",
-                border: "1px solid rgba(35,196,206,0.25)",
-                color: "var(--fg-2)",
-                lineHeight: 1.5,
+                background: "var(--accent-subtle)",
+                font: "var(--type-sub)",
+                color: "var(--text-2)",
               }}
             >
-              <span
-                className="mr-1.5 font-mono-ta font-bold uppercase"
-                style={{ letterSpacing: "0.15em", color: "var(--ta-cyan)" }}
-              >
+              <span className="t-label mr-1.5" style={{ color: "var(--accent-text)" }}>
                 Trainer-Aktion:
               </span>
               {TRAINER_BLOCK_DESCRIPTION}
@@ -678,19 +738,25 @@ function ModalReady({
 
           <div className="mt-4">
             {techniques.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--fg-4)" }}>
+              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                 {isTrainer
                   ? "Noch keine Techniken für diese Einheit hinterlegt — füge sie über den Button unten hinzu."
                   : "Für diese Einheit wurden noch keine Techniken hinterlegt."}
               </p>
             ) : (
-              <div className="space-y-2">
-                <p className="mb-2 text-xs font-bold uppercase" style={{ color: "var(--fg-3)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
+              <div className="flex flex-col gap-2">
+                <span className="t-label">
                   Techniken dieser Einheit ({techniques.length})
-                </p>
-                {techniques.map((t) => (
-                  <TechniqueRow key={t.id} technique={t} />
-                ))}
+                </span>
+                {/* Liste = EINE Fläche mit Haarlinien-Trennern */}
+                <div
+                  className="rounded-card px-3.5 py-0.5"
+                  style={{ background: "var(--surface-raised)" }}
+                >
+                  {techniques.map((t, i) => (
+                    <TechniqueRow key={t.id} technique={t} first={i === 0} />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -699,22 +765,23 @@ function ModalReady({
             {/* Schüler-Funktion: Kurs-Abo (nur für Nicht-Trainer) */}
             {isLoggedIn && !isTrainer && (
               <button
+                type="button"
                 onClick={onToggleSubscribe}
                 disabled={subscribing}
-                className="w-full rounded-xl py-2.5 text-xs font-bold uppercase transition-colors disabled:opacity-50"
+                className="t-interactive flex min-h-hit w-full items-center justify-center gap-2 rounded-field px-4 disabled:opacity-50"
                 style={
                   subscribed
                     ? {
-                        background: "rgba(35,196,206,0.08)",
-                        border: "1px solid rgba(35,196,206,0.3)",
-                        color: "var(--ta-cyan)",
-                        letterSpacing: "0.1em",
+                        ...BTN_FONT,
+                        background: "var(--accent-subtle)",
+                        border: "1px solid var(--accent)",
+                        color: "var(--accent-text)",
                       }
                     : {
-                        background: "var(--ink-4)",
-                        border: "1px solid var(--ink-5)",
-                        color: "var(--fg-2)",
-                        letterSpacing: "0.1em",
+                        ...BTN_FONT,
+                        background: "var(--surface-raised)",
+                        border: "1px solid var(--line)",
+                        color: "var(--text-2)",
                       }
                 }
                 title={
@@ -723,48 +790,84 @@ function ModalReady({
                     : "Folge diesem Kurs — neue Techniken landen automatisch in deiner Bibliothek"
                 }
               >
+                <Icon name="star" size={14} strokeWidth={2.4} />
                 {subscribing
                   ? "…"
                   : subscribed
-                    ? "★ Kurs abonniert — Auto-Sync aktiv"
-                    : "☆ Kurs abonnieren (Auto-Sync)"}
+                    ? "Kurs abonniert — Auto-Sync aktiv"
+                    : "Kurs abonnieren (Auto-Sync)"}
               </button>
             )}
 
             {isTrainer && (
               <button
+                type="button"
                 onClick={onStartEdit}
-                className="w-full rounded-xl py-2.5 text-xs font-bold uppercase transition-colors"
-                style={{ background: "var(--ink-4)", border: "1px solid var(--ta-cyan)", color: "var(--ta-cyan)", letterSpacing: "0.1em" }}
+                className="t-interactive flex min-h-hit w-full items-center justify-center gap-2 rounded-field px-4"
+                style={{
+                  ...BTN_FONT,
+                  background: "transparent",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent-text)",
+                }}
               >
+                <Icon name="edit" size={14} strokeWidth={2.4} />
                 Techniken bearbeiten
               </button>
             )}
 
             {/* Schüler-Funktion: Teilnahme (nur für Nicht-Trainer) */}
-            {!isTrainer && (
-              isLoggedIn ? (
+            {!isTrainer &&
+              (isLoggedIn ? (
                 participated ? (
                   <div
-                    className="rounded-xl py-2.5 text-center text-xs font-bold uppercase"
-                    style={{ background: "rgba(35,196,206,.08)", border: "1px solid rgba(35,196,206,.3)", color: "var(--ta-cyan)", letterSpacing: "0.1em" }}
+                    className="flex min-h-hit w-full flex-wrap items-center justify-center gap-1.5 rounded-field px-4 py-2.5 text-center"
+                    style={{
+                      ...BTN_FONT,
+                      background: "var(--accent-subtle)",
+                      color: "var(--accent-text)",
+                    }}
                   >
-                    ✓ Teilgenommen
+                    <Icon name="check" size={14} strokeWidth={2.6} />
+                    Teilgenommen
                     {attendResult !== null && attendResult > 0 && (
-                      <span style={{ color: "var(--fg-3)" }}>
-                        {" "}— {attendResult} Technik{attendResult !== 1 ? "en" : ""} zur Bibliothek hinzugefügt
+                      <span
+                        style={{
+                          font: "var(--type-sub)",
+                          letterSpacing: 0,
+                          textTransform: "none",
+                          color: "var(--text-2)",
+                        }}
+                      >
+                        — {attendResult} Technik{attendResult !== 1 ? "en" : ""} zur
+                        Bibliothek hinzugefügt
                       </span>
                     )}
                     {attendResult === 0 && (
-                      <span style={{ color: "var(--fg-4)" }}>{" "}(alle bereits in deiner Bibliothek)</span>
+                      <span
+                        style={{
+                          font: "var(--type-sub)",
+                          letterSpacing: 0,
+                          textTransform: "none",
+                          color: "var(--text-3)",
+                        }}
+                      >
+                        (alle bereits in deiner Bibliothek)
+                      </span>
                     )}
                   </div>
                 ) : (
                   <button
+                    type="button"
                     onClick={onAttend}
                     disabled={attending}
-                    className="w-full rounded-xl py-2.5 text-xs font-bold uppercase transition-opacity"
-                    style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em", opacity: attending ? 0.6 : 1 }}
+                    className="t-interactive flex min-h-hit w-full items-center justify-center rounded-field px-4 disabled:opacity-60"
+                    style={{
+                      ...BTN_FONT,
+                      background: "var(--accent)",
+                      color: "var(--on-accent)",
+                      boxShadow: "var(--accent-glow)",
+                    }}
                   >
                     {attending
                       ? "Wird gespeichert…"
@@ -776,14 +879,19 @@ function ModalReady({
               ) : (
                 <Link
                   href="/login"
-                  className="block w-full rounded-xl py-2.5 text-center text-xs font-bold uppercase"
-                  style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em", textDecoration: "none" }}
+                  className="t-interactive flex min-h-hit w-full items-center justify-center rounded-field px-4"
+                  style={{
+                    ...BTN_FONT,
+                    background: "var(--accent)",
+                    color: "var(--on-accent)",
+                    boxShadow: "var(--accent-glow)",
+                    textDecoration: "none",
+                  }}
                   onClick={onClose}
                 >
                   Anmelden zum Teilnehmen
                 </Link>
-              )
-            )}
+              ))}
           </div>
         </>
       )}
@@ -827,17 +935,19 @@ function TechniquePicker({
       <div className="mb-3 flex flex-wrap gap-1.5">
         {relevantDisciplines.map((d) => {
           const active = d === activeDiscipline;
-          const color = DISCIPLINE_COLOR[d] ?? "var(--ta-cyan)";
           return (
             <button
               key={d}
+              type="button"
               onClick={() => onDisciplineChange(d)}
-              className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
+              className="t-interactive min-h-hit rounded-pill px-3.5"
               style={{
-                background: active ? `${color}22` : "var(--ink-3)",
-                border: `1px solid ${active ? color : "var(--ink-5)"}`,
-                color: active ? color : "var(--fg-3)",
+                font: "600 11px/1.2 var(--font-archivo), system-ui, sans-serif",
                 letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                background: active ? "var(--accent-subtle)" : "transparent",
+                border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
+                color: active ? "var(--accent-text)" : "var(--text-3)",
               }}
             >
               {DISCIPLINE_LABEL[d] ?? d}
@@ -852,17 +962,23 @@ function TechniquePicker({
         placeholder="Technik suchen…"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
-        className="mb-3 w-full rounded-lg px-3 py-2 text-sm"
-        style={{ background: "var(--ink-3)", border: "1px solid var(--ink-5)", color: "var(--fg-1)", outline: "none" }}
+        className="t-interactive mb-3 min-h-hit w-full rounded-field px-3.5"
+        style={{
+          font: "var(--type-body)",
+          background: "var(--surface-raised)",
+          border: "1px solid var(--line)",
+          color: "var(--text-body)",
+          outline: "none",
+        }}
         autoFocus
       />
 
       {/* Status-Zeile */}
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase" style={{ color: "var(--ta-cyan)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="t-label" style={{ color: "var(--accent-text)" }}>
           {selectedIds.length} gewählt
         </span>
-        <span className="text-[11px]" style={{ color: "var(--fg-4)" }}>
+        <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
           {totalVisible} Techniken
         </span>
       </div>
@@ -873,7 +989,10 @@ function TechniquePicker({
         style={{ scrollbarWidth: "thin" }}
       >
         {groups.length === 0 ? (
-          <p className="py-4 text-center text-sm" style={{ color: "var(--fg-4)" }}>
+          <p
+            className="py-4 text-center"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+          >
             Keine Techniken gefunden.
           </p>
         ) : (
@@ -890,22 +1009,26 @@ function TechniquePicker({
 
       {/* Aktuelle Auswahl-Chips */}
       {selectedIds.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-[10px] font-bold uppercase" style={{ color: "var(--fg-4)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
-            Auswahl
-          </p>
+        <div className="mt-3 flex flex-col gap-1.5">
+          <span className="t-label">Auswahl</span>
           <div className="flex flex-wrap gap-1.5">
             {selectedIds.map((id) => {
               const t = getTechniqueById(id);
               return (
                 <button
                   key={id}
+                  type="button"
                   onClick={() => onToggle(id)}
-                  className="rounded-lg px-2 py-1 text-[11px] transition-opacity hover:opacity-70"
-                  style={{ background: "rgba(35,196,206,.1)", border: "1px solid rgba(35,196,206,.3)", color: "var(--ta-cyan)" }}
+                  className="t-interactive inline-flex min-h-hit items-center gap-1.5 rounded-pill px-3.5"
+                  style={{
+                    font: "var(--type-sub)",
+                    background: "var(--accent-subtle)",
+                    color: "var(--accent-text)",
+                  }}
                   title="Entfernen"
                 >
-                  {t?.name ?? id} ✕
+                  {t?.name ?? id}
+                  <Icon name="x" size={12} strokeWidth={2.4} />
                 </button>
               );
             })}
@@ -916,17 +1039,28 @@ function TechniquePicker({
       {/* Speichern / Abbrechen */}
       <div className="mt-4 flex gap-2">
         <button
+          type="button"
           onClick={onSave}
           disabled={saving}
-          className="flex-1 rounded-xl py-2.5 text-xs font-bold uppercase transition-opacity"
-          style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em", opacity: saving ? 0.6 : 1 }}
+          className="t-interactive flex min-h-hit flex-1 items-center justify-center rounded-field px-4 disabled:opacity-60"
+          style={{
+            ...BTN_FONT,
+            background: "var(--accent)",
+            color: "var(--on-accent)",
+            boxShadow: "var(--accent-glow)",
+          }}
         >
           {saving ? "Speichern…" : `Speichern (${selectedIds.length})`}
         </button>
         <button
+          type="button"
           onClick={onCancel}
-          className="rounded-xl px-4 py-2.5 text-xs font-bold uppercase"
-          style={{ background: "var(--ink-4)", color: "var(--fg-3)", letterSpacing: "0.1em" }}
+          className="t-interactive flex min-h-hit items-center justify-center rounded-field px-4"
+          style={{
+            ...BTN_FONT,
+            background: "var(--surface-raised)",
+            color: "var(--text-2)",
+          }}
         >
           Abbrechen
         </button>
@@ -953,29 +1087,37 @@ function TechniqueGroup({
     <div>
       {/* Gruppen-Header */}
       <button
+        type="button"
         onClick={() => setCollapsed((v) => !v)}
-        className="flex w-full items-center gap-2 py-1"
+        className="t-interactive flex min-h-hit w-full items-center gap-2 rounded-badge"
       >
-        <span
-          className="text-[11px] font-bold uppercase"
-          style={{ color: "var(--fg-3)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}
-        >
-          {group.label}
-        </span>
+        <span className="t-label">{group.label}</span>
         <span
           className="flex-1"
-          style={{ height: "1px", background: "var(--ink-4)" }}
+          style={{ height: "1px", background: "var(--line)" }}
+          aria-hidden
         />
         {selectedInGroup > 0 && (
           <span
-            className="rounded px-1.5 py-0.5 text-[10px] font-bold"
-            style={{ background: "rgba(35,196,206,.15)", color: "var(--ta-cyan)" }}
+            className="rounded-badge px-1.5 py-0.5"
+            style={{
+              font: "var(--type-num)",
+              fontVariantNumeric: "tabular-nums",
+              background: "var(--accent-subtle)",
+              color: "var(--accent-text)",
+            }}
           >
             {selectedInGroup}
           </span>
         )}
-        <span className="text-[10px]" style={{ color: "var(--fg-4)" }}>
-          {collapsed ? "▶" : "▼"}
+        <span
+          style={{
+            color: "var(--text-3)",
+            transform: collapsed ? "rotate(-90deg)" : "none",
+            transition: "transform var(--dur-fast) var(--ease-out)",
+          }}
+        >
+          <Icon name="chevron-down" size={14} strokeWidth={2.4} />
         </span>
       </button>
 
@@ -984,38 +1126,42 @@ function TechniqueGroup({
         <div className="space-y-0.5">
           {group.techniques.map((t) => {
             const selected = selectedIds.includes(t.id);
-            const levelColor = TECHNIQUE_LEVEL_COLOR[t.level ?? ""] ?? "var(--fg-4)";
+            const levelColor = TECHNIQUE_LEVEL_COLOR[t.level ?? ""] ?? "var(--text-3)";
             return (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => onToggle(t.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors"
+                className="t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-badge px-2 py-1.5 text-left"
                 style={{
-                  background: selected ? "rgba(35,196,206,.1)" : "transparent",
-                  border: `1px solid ${selected ? "rgba(35,196,206,.3)" : "transparent"}`,
+                  background: selected ? "var(--accent-subtle)" : "transparent",
                 }}
               >
                 {/* Checkbox */}
                 <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px]"
+                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded"
                   style={{
-                    background: selected ? "var(--ta-cyan)" : "var(--ink-4)",
-                    color: selected ? "var(--ink-1)" : "transparent",
+                    background: selected ? "var(--accent)" : "var(--surface-raised)",
+                    border: selected ? "none" : "1px solid var(--line)",
+                    color: selected ? "var(--on-accent)" : "transparent",
                   }}
                 >
-                  {selected ? "✓" : ""}
+                  {selected && <Icon name="check" size={12} strokeWidth={3} />}
                 </span>
 
                 {/* Name */}
-                <span className="flex-1 truncate text-sm" style={{ color: "var(--fg-1)" }}>
+                <span
+                  className="min-w-0 flex-1 truncate"
+                  style={{ font: "var(--type-body)" }}
+                >
                   {t.name}
                 </span>
 
                 {/* Level-Badge */}
                 {t.level && (
                   <span
-                    className="shrink-0 text-[9px] font-bold uppercase"
-                    style={{ color: levelColor, letterSpacing: "0.06em" }}
+                    className="shrink-0"
+                    style={{ ...META_FONT, letterSpacing: "0.06em", color: levelColor }}
                   >
                     {TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}
                   </span>
@@ -1032,39 +1178,43 @@ function TechniqueGroup({
 // ─── ModalHeader ──────────────────────────────────────────────────────────
 
 function ModalHeader({ block, onClose }: { block: TrainingBlock; onClose: () => void }) {
-  const levelStyle = block.level ? LEVEL_STYLE[block.level] : null;
-  const catStyle = block.category ? CATEGORY_STYLE[block.category] : null;
+  const { dotColor, meta } = blockMeta(block);
 
   return (
     <div className="flex items-start justify-between gap-3">
-      <div className="flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {levelStyle && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ background: `${levelStyle.color}22`, color: levelStyle.color, letterSpacing: "0.08em" }}>
-              {levelStyle.label}
-            </span>
-          )}
-          {catStyle && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ background: `${catStyle.color}22`, color: catStyle.color, letterSpacing: "0.08em" }}>
-              {catStyle.label}
-            </span>
-          )}
-        </div>
-        <h2 className="mt-1 font-display-ta text-xl font-black uppercase leading-tight" style={{ color: "var(--fg-1)", letterSpacing: "0.04em" }}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {meta && (
+          <span className="t-label inline-flex items-center gap-1.5">
+            <span
+              className="h-[5px] w-[5px] shrink-0 rounded-full"
+              style={{ background: dotColor }}
+              aria-hidden
+            />
+            {meta}
+          </span>
+        )}
+        <h2
+          style={{
+            font: "var(--type-h2)",
+            letterSpacing: "var(--ls-display)",
+            textTransform: "uppercase",
+          }}
+        >
           {block.title}
         </h2>
-        <p className="mt-0.5 font-mono-ta text-sm" style={{ color: "var(--fg-3)", letterSpacing: "0.08em" }}>
+        <p style={{ ...MONO_TIME, color: "var(--text-2)" }}>
           {block.startTime}–{block.endTime} Uhr
-          <span className="ml-2" style={{ color: "var(--fg-4)" }}>· Diese Woche</span>
+          <span style={{ color: "var(--text-3)" }}> · Diese Woche</span>
         </p>
       </div>
       <button
+        type="button"
         onClick={onClose}
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm transition-colors"
-        style={{ background: "var(--ink-4)", color: "var(--fg-3)", border: "1px solid var(--ink-5)" }}
+        className="t-interactive flex h-11 w-11 shrink-0 items-center justify-center rounded-field"
+        style={{ background: "var(--surface-raised)", color: "var(--text-2)" }}
         aria-label="Schließen"
       >
-        ✕
+        <Icon name="x" size={18} />
       </button>
     </div>
   );
@@ -1072,33 +1222,33 @@ function ModalHeader({ block, onClose }: { block: TrainingBlock; onClose: () => 
 
 // ─── TechniqueRow ─────────────────────────────────────────────────────────
 
-function TechniqueRow({ technique }: { technique: Technique }) {
+function TechniqueRow({ technique, first }: { technique: Technique; first: boolean }) {
   const catStyle = CATEGORY_STYLE[technique.category] ?? null;
-  const levelColor = TECHNIQUE_LEVEL_COLOR[technique.level ?? ""] ?? "var(--fg-4)";
+  const levelColor = TECHNIQUE_LEVEL_COLOR[technique.level ?? ""] ?? "var(--text-3)";
 
   return (
     <div
-      className="flex items-center gap-3 rounded-lg px-3 py-2"
-      style={{ background: "var(--ink-3)", border: "1px solid var(--ink-4)", borderLeft: `3px solid ${catStyle?.color ?? "var(--fg-4)"}` }}
+      className="flex min-h-hit items-center gap-2.5 py-2.5"
+      style={first ? undefined : { borderTop: "1px solid var(--line)" }}
     >
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium" style={{ color: "var(--fg-1)" }}>
-          {technique.name}
-        </span>
-      </div>
+      <span
+        className="h-[5px] w-[5px] shrink-0 rounded-full"
+        style={{ background: catStyle?.color ?? "var(--text-3)" }}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate" style={{ font: "var(--type-body)" }}>
+        {technique.name}
+      </span>
       {technique.level && (
         <span
-          className="shrink-0 text-[10px] font-bold uppercase"
-          style={{ color: levelColor, fontFamily: "var(--font-mono)", letterSpacing: "0.08em" }}
+          className="shrink-0"
+          style={{ ...META_FONT, letterSpacing: "0.06em", color: levelColor }}
         >
           {TECHNIQUE_LEVEL_LABEL[technique.level] ?? technique.level}
         </span>
       )}
       {catStyle && (
-        <span
-          className="shrink-0 text-[9px] font-bold uppercase"
-          style={{ color: catStyle.color, fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}
-        >
+        <span className="shrink-0" style={{ ...META_FONT, color: "var(--text-3)" }}>
           {catStyle.label}
         </span>
       )}

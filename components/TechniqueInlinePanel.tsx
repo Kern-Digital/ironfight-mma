@@ -84,8 +84,8 @@ export default function TechniqueInlinePanel({
             className="rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
             style={{
               color: CATEGORY_COLOR[t.category],
-              borderColor: `${CATEGORY_COLOR[t.category]}66`,
-              background: `${CATEGORY_COLOR[t.category]}1A`,
+              borderColor: `color-mix(in oklab, ${CATEGORY_COLOR[t.category]} 40%, transparent)`,
+              background: `color-mix(in oklab, ${CATEGORY_COLOR[t.category]} 10%, transparent)`,
             }}
           >
             {CATEGORY_LABEL[t.category]}
@@ -96,8 +96,8 @@ export default function TechniqueInlinePanel({
               className="rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
               style={{
                 color: DISCIPLINE_COLOR[d],
-                borderColor: `${DISCIPLINE_COLOR[d]}4D`,
-                background: `${DISCIPLINE_COLOR[d]}14`,
+                borderColor: `color-mix(in oklab, ${DISCIPLINE_COLOR[d]} 30%, transparent)`,
+                background: `color-mix(in oklab, ${DISCIPLINE_COLOR[d]} 8%, transparent)`,
               }}
             >
               {DISCIPLINE_LABEL[d]}

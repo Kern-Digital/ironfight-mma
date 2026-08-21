@@ -315,7 +315,9 @@ function LibraryContent() {
                       onClick={() => setBrowseDiscipline(d.id)}
                       className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
                       style={{
-                        background: active ? `${color}22` : "var(--ink-3)",
+                        background: active
+                          ? `color-mix(in oklab, ${color} 13%, transparent)`
+                          : "var(--ink-3)",
                         border: `1px solid ${active ? color : "var(--ink-5)"}`,
                         color: active ? color : "var(--fg-3)",
                         letterSpacing: "0.08em",

@@ -141,6 +141,20 @@
   --negative: oklch(0.72 0.16 25);
   --warning: oklch(0.82 0.13 90);
 
+  /* Kategorische Daten-Farben (Rubriken/Disziplinen + Charts).
+     EINZIGER Verbraucher ist die Registry lib/discipline-colors.ts —
+     Komponenten greifen nie direkt auf --cat-* zu. Feste Hues, keine
+     Gym-Ableitung; Multi-Gym Phase 3 vergibt diese Slots automatisch an
+     die frei konfigurierten Gym-Rubriken. Transparenzen via color-mix(),
+     nie als Hex-Alpha-Anhang. */
+  --cat-1: oklch(0.74 0.11 197);  /* Cyan — Schläge/Boxen */
+  --cat-2: oklch(0.58 0.17 290);  /* Violett — Kicks */
+  --cat-3: oklch(0.68 0.20 356);  /* Pink — Wrestling/Takedowns */
+  --cat-4: oklch(0.82 0.14 70);   /* Amber — Boden/BJJ */
+  --cat-5: oklch(0.79 0.19 148);  /* Mint — Clinch */
+  --cat-mixed: oklch(0.90 0.01 300);   /* MMA = alles → starkes Neutral */
+  --cat-neutral: oklch(0.71 0.02 250); /* Self-Defense/Wing Tsung */
+
   /* Liquid Glass */
   --glass-bg: oklch(0.22 calc(var(--accent-c)*0.08) var(--accent-h) / 0.42);
   --glass-border: oklch(1 0 0 / 0.12);
@@ -148,6 +162,8 @@
   --glass-blur: 24px;
   --glass-shadow: 0 12px 40px oklch(0 0 0 / 0.35);
   --accent-glow: 0 0 14px oklch(0.78 var(--accent-c) var(--accent-h) / 0.16);
+  /* Abdunkelung hinter Modals/Sheets */
+  --overlay: oklch(0.08 calc(var(--accent-c)*0.05) var(--accent-h) / 0.68);
 
   /* Ambient-Schicht: weiche, stark geblurte Glows HINTER dem Inhalt.
      Nur Gym-Akzent; --ambient-fight zusätzlich Brand-Violett (NUR DeepFight).
@@ -192,11 +208,19 @@
   --positive: oklch(0.55 0.13 150);
   --negative: oklch(0.55 0.18 25);
   --warning: oklch(0.60 0.12 90);
+  --cat-1: oklch(0.54 0.11 197);
+  --cat-2: oklch(0.50 0.17 290);
+  --cat-3: oklch(0.55 0.19 356);
+  --cat-4: oklch(0.58 0.13 70);
+  --cat-5: oklch(0.55 0.15 148);
+  --cat-mixed: oklch(0.35 0.01 300);
+  --cat-neutral: oklch(0.50 0.02 250);
   --glass-bg: oklch(0.98 calc(var(--accent-c)*0.03) var(--accent-h) / 0.45);
   --glass-border: oklch(0.2 0.02 var(--accent-h) / 0.10);
   --glass-highlight: oklch(1 0 0 / 0.65);
   --glass-shadow: 0 12px 40px oklch(0.3 0.03 var(--accent-h) / 0.16);
   --accent-glow: 0 0 14px oklch(0.50 var(--accent-c) var(--accent-h) / 0.12);
+  --overlay: oklch(0.30 calc(var(--accent-c)*0.10) var(--accent-h) / 0.45);
   --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0.42), oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0) 62%);
   --ambient-fight: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(60% 55% at 2% 96%, oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0.46), oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0) 62%);
   --grad-progress: linear-gradient(90deg, oklch(0.40 var(--accent-c) var(--accent-h)), oklch(0.58 var(--accent-c) var(--accent-h)));

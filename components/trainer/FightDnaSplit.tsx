@@ -75,7 +75,7 @@ export default function FightDnaSplit({
               className="h-[3px] w-8 rounded-full"
               style={{
                 background: DNA_SPLIT_META[k].color,
-                boxShadow: `0 0 8px ${DNA_SPLIT_META[k].color}66`,
+                boxShadow: `0 0 8px color-mix(in oklab, ${DNA_SPLIT_META[k].color} 40%, transparent)`,
               }}
             />
             <span
@@ -101,7 +101,7 @@ function StackedBar({ norm }: { norm: Record<DnaSplitKey, number> }) {
           className="h-full"
           style={{
             width: `${norm[k]}%`,
-            background: `linear-gradient(180deg, ${DNA_SPLIT_META[k].color}, ${DNA_SPLIT_META[k].color}CC)`,
+            background: `linear-gradient(180deg, ${DNA_SPLIT_META[k].color}, color-mix(in oklab, ${DNA_SPLIT_META[k].color} 80%, transparent))`,
             borderRadius:
               i === 0
                 ? "12px 5px 5px 12px"
