@@ -1,6 +1,7 @@
 "use client";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AthleteTabBar from "@/components/AthleteTabBar";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
@@ -11,6 +12,7 @@ import QuickAction from "@/components/dashboard/QuickAction";
 import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import { greetingFor, trainerGreetingFor } from "@/lib/greeting";
 import { CATEGORY_LABEL } from "@/lib/techniques";
 import { getTopTechniques, type TechniqueStatEntry } from "@/lib/technique-analytics";
@@ -27,7 +29,14 @@ import {
   getCurrentWeekday,
   getWeekIdentifier,
   WEEKDAY_LABELS,
+  WEEKDAY_SHORT,
 } from "@/lib/schedule";
+import type { TrainingBlock } from "@/lib/types";
+import {
+  listFightCamps,
+  fightCampProgress,
+  type FightCamp,
+} from "@/lib/fight-camp";
 import { getSessionCountForWeek } from "@/lib/training-sessions";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -56,10 +65,9 @@ function formatHours(seconds: number) {
   return `${h}h ${m}m`;
 }
 
-// ─── Streak-Kalender (Schüler-Dashboard) ─────────────────────────────────────
+// ─── Streak-Kalender (Schüler-Dashboard, neues Token-System) ─────────────────
 
 function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
-  const days = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
   const today = new Date();
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
@@ -67,32 +75,24 @@ function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
     return d;
   });
 
-  const sessionDays = new Set(
-    sessions.map((s) => s.completedAt.toDateString())
-  );
+  const sessionDays = new Set(sessions.map((s) => s.completedAt.toDateString()));
 
   return (
-    <div className="mt-4 flex gap-1.5">
+    <div className="mt-1 flex gap-1.5">
       {weekDays.map((d, i) => {
         const isToday = d.toDateString() === today.toDateString();
         const done = sessionDays.has(d.toDateString());
         return (
           <div
             key={i}
-            className={`rise-${Math.min(i + 1, 6)} flex flex-1 flex-col items-center gap-1 rounded-xl py-2 font-mono-ta text-[9px] uppercase`}
+            className="flex flex-1 flex-col items-center gap-1 rounded-badge py-2"
             style={{
+              font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
               letterSpacing: "0.1em",
-              background: isToday
-                ? "rgba(255,79,168,.14)"
-                : done
-                ? "rgba(35,196,206,.12)"
-                : "rgba(255,255,255,.03)",
-              border: isToday
-                ? "1px solid rgba(255,79,168,.45)"
-                : done
-                ? "1px solid rgba(35,196,206,.4)"
-                : "1px solid var(--ink-4)",
-              color: isToday ? "var(--ta-pink)" : done ? "var(--ta-cyan)" : "var(--fg-4)",
+              textTransform: "uppercase",
+              background: done ? "var(--accent-subtle)" : "var(--surface-raised)",
+              border: isToday ? "1px solid var(--accent)" : "1px solid transparent",
+              color: done ? "var(--accent-text)" : "var(--text-3)",
             }}
           >
             {done ? (
@@ -103,7 +103,7 @@ function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
                 style={{ border: "1.5px solid currentColor", opacity: 0.4 }}
               />
             )}
-            {days[(d.getDay() + 6) % 7]}
+            {WEEKDAY_SHORT[(d.getDay() + 6) % 7]}
           </div>
         );
       })}
@@ -111,14 +111,78 @@ function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
   );
 }
 
-// ─── Schüler-Dashboard ────────────────────────────────────────────────────────
+// ─── Bausteine (neues Token-System) ──────────────────────────────────────────
+
+function StatTile({
+  label,
+  value,
+  unit,
+  sub,
+  subColor,
+}: {
+  label: string;
+  value: string | null;
+  unit?: string;
+  sub?: string;
+  subColor?: string;
+}) {
+  return (
+    <div className="t-card flex flex-col gap-1 p-3.5">
+      <span className="t-label">{label}</span>
+      {value === null ? (
+        <Skeleton className="h-8 w-16" />
+      ) : (
+        <span style={{ font: "var(--type-num-xl)", fontVariantNumeric: "tabular-nums" }}>
+          {value}
+          {unit && (
+            <span style={{ font: "var(--type-h3)", color: "var(--text-3)" }}> {unit}</span>
+          )}
+        </span>
+      )}
+      {sub && (
+        <span style={{ font: "var(--type-sub)", color: subColor ?? "var(--text-3)" }}>{sub}</span>
+      )}
+    </div>
+  );
+}
+
+const LEVEL_LABEL: Record<string, string> = {
+  kids: "Kids",
+  teens: "Teens",
+  adult: "Adult",
+  mixed: "Mixed",
+  advanced: "Advanced",
+};
+
+/** Nächste Kurse ab jetzt: heute ab Uhrzeit, danach die folgenden Tage. */
+function upcomingBlocks(count: number): { block: TrainingBlock; dayShort: string }[] {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const result: { block: TrainingBlock; dayShort: string }[] = [];
+  for (let offset = 0; offset < 7 && result.length < count; offset++) {
+    const weekday = (getCurrentWeekday() + offset) % 7;
+    for (const block of getBlocksForDay(weekday)) {
+      if (offset === 0) {
+        const [h, m] = block.startTime.split(":").map(Number);
+        if (h * 60 + m < nowMinutes) continue;
+      }
+      result.push({ block, dayShort: WEEKDAY_SHORT[weekday] });
+      if (result.length >= count) break;
+    }
+  }
+  return result;
+}
+
+// ─── Schüler-Dashboard — Referenzseite des Redesigns (DESIGN-BRIEF §4.2) ─────
 
 function DashboardContent() {
   const { user, profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const greeting = greetingFor(profile?.displayName);
 
   const [sessions, setSessions] = useState<WorkoutSession[] | null>(null);
   const [stats, setStats] = useState<WorkoutStats | null>(null);
+  const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(() => {
@@ -156,303 +220,415 @@ function DashboardContent() {
     fetchData();
   }, [fetchData]);
 
-  const todayLabel = new Date().toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  useEffect(() => {
+    if (!user) return;
+    listFightCamps(user.uid)
+      .then(setCamps)
+      .catch(() => setCamps([]));
+  }, [user]);
+
+  const todayLabel = new Date()
+    .toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })
+    .replace(",", " ·");
+
+  const nextCamp =
+    camps
+      ?.filter((c) => c.status === "active" && c.competitionDate.getTime() > Date.now())
+      .sort((a, b) => a.competitionDate.getTime() - b.competitionDate.getTime())[0] ?? null;
+  const campInfo = nextCamp ? fightCampProgress(nextCamp) : null;
+  const campPct = campInfo ? Math.round(campInfo.ratio * 100) : 0;
+
+  // Wochenlast (letzte 7 Tage) + Vergleich zur Vorwoche
+  const nowMs = Date.now();
+  const weekAgo = nowMs - 7 * 24 * 3600 * 1000;
+  const twoWeeksAgo = nowMs - 14 * 24 * 3600 * 1000;
+  const weekSeconds = sessions
+    ? sessions
+        .filter((s) => s.completedAt.getTime() >= weekAgo)
+        .reduce((sum, s) => sum + (s.totalWorkSeconds || 0), 0)
+    : null;
+  const prevWeekSeconds = sessions
+    ? sessions
+        .filter((s) => {
+          const t = s.completedAt.getTime();
+          return t >= twoWeeksAgo && t < weekAgo;
+        })
+        .reduce((sum, s) => sum + (s.totalWorkSeconds || 0), 0)
+    : 0;
+  const weekDelta =
+    weekSeconds !== null && prevWeekSeconds > 0
+      ? Math.round(((weekSeconds - prevWeekSeconds) / prevWeekSeconds) * 100)
+      : null;
+
+  const nextBlocks = upcomingBlocks(4);
 
   return (
-    <main className="min-h-screen">
-      <DashboardHero
-        badges={[{ label: "Athlet", accent: "cyan", icon: "wave" }]}
-        accent="cyan"
-        title={greeting}
-        subtitle={`Mein Training · ${todayLabel}`}
-      />
-
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-        {error && (
-          <div className="mb-6">
-            <ErrorState
-              title="Daten konnten nicht geladen werden"
-              message={error}
-              hint={
-                error.includes("permission")
-                  ? "Firestore-Berechtigungen prüfen — oder erneut einloggen."
-                  : "Prüfe deine Internetverbindung und lade die Seite neu."
-              }
-              onRetry={fetchData}
-            />
-          </div>
-        )}
-
-        {/* Streak-Hero + Schnell-Start */}
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Reveal className="lg:col-span-2">
-            <div
-              className="card-glass relative h-full overflow-hidden"
-              style={{ borderColor: "rgba(35,196,206,.18)" }}
-            >
-              <div
-                className="pointer-events-none absolute right-[-30px] top-[-30px] h-56 w-56 rounded-full"
+    <main
+      className="min-h-screen pb-32"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* Kopfbereich mit Ambient-Schicht (nur hier — nie hinter Listen).
+          Der Clip-Container umschließt NUR die Ambient-Ebene — läge er auf der
+          Sektion, würde er den weichen Glass-Schatten der Hero-Karte an der
+          Sektionskante hart abschneiden. */}
+      <section className="relative">
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          <div data-ambient style={{ background: "var(--ambient)" }} />
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pb-5 pt-6 lg:max-w-5xl lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:px-6 lg:pb-7 lg:pt-8">
+          <div className="flex items-start gap-3 lg:flex-1">
+            <div className="flex flex-1 flex-col gap-1">
+              <span className="t-label">{todayLabel}</span>
+              <h1
                 style={{
-                  background:
-                    "radial-gradient(circle, rgba(35,196,206,.14), transparent 60%)",
+                  font: "800 24px/1.15 var(--font-archivo), system-ui, sans-serif",
+                  letterSpacing: "0.01em",
                 }}
-              />
-              <div className="flex items-center gap-2">
-                <span style={{ color: "var(--ta-cyan)" }}>
-                  <Icon name="flame" size={16} />
+              >
+                {greeting}
+              </h1>
+            </div>
+            {/* Mobil: Umschalter rechts, oben an der Datumszeile, Liquid Glass.
+                Desktop: sitzt stattdessen in der Bottom-Tab-Bar. */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
+          </div>
+
+          <div className="lg:w-[400px] lg:shrink-0">
+          {camps === null ? (
+            <div className="t-glass p-4">
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : nextCamp && campInfo ? (
+            <div className="t-glass flex flex-col gap-2.5 p-4">
+              <span className="t-label">{nextCamp.competitionName}</span>
+              <div className="flex items-baseline gap-2">
+                <span style={{ font: "var(--type-num-xl)", fontVariantNumeric: "tabular-nums" }}>
+                  {campInfo.daysRemaining}
                 </span>
-                <span
-                  className="font-mono-ta text-[10px] uppercase"
-                  style={{ letterSpacing: "0.25em", color: "var(--fg-3)" }}
-                >
-                  Trainings-Streak
+                <span style={{ font: "var(--type-h3)", color: "var(--text-2)" }}>
+                  {campInfo.daysRemaining === 1 ? "Tag" : "Tage"} bis zum Kampf
                 </span>
               </div>
-              {stats === null ? (
-                <Skeleton className="mt-2 h-16 w-24" />
-              ) : (
-                <div
-                  className="font-display-ta mt-1 font-black leading-none"
-                  style={{
-                    fontSize: "68px",
-                    color: "var(--ta-cyan)",
-                    textShadow: "0 0 24px rgba(35,196,206,.35)",
-                  }}
-                >
-                  {stats.streak}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="t-label">Camp-Fortschritt</span>
                   <span
-                    className="font-mono-ta ml-2 text-base"
-                    style={{ color: "var(--fg-3)", letterSpacing: "0.2em" }}
+                    style={{
+                      font: "var(--type-num)",
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-2)",
+                    }}
                   >
-                    {stats.streak === 1 ? "Tag" : "Tage"}
+                    {campPct} %
+                  </span>
+                </div>
+                <div className="t-progress">
+                  <span style={{ width: `${campPct}%` }} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="t-glass flex flex-col gap-2.5 p-4">
+              <span className="t-label">Trainings-Streak</span>
+              {stats === null ? (
+                <Skeleton className="h-9 w-24" />
+              ) : (
+                <div className="flex items-baseline gap-2">
+                  <span style={{ font: "var(--type-num-xl)", fontVariantNumeric: "tabular-nums" }}>
+                    {stats.streak}
+                  </span>
+                  <span style={{ font: "var(--type-h3)", color: "var(--text-2)" }}>
+                    {stats.streak === 1 ? "Tag" : "Tage"} in Folge
                   </span>
                 </div>
               )}
               {sessions !== null && <StreakCalendar sessions={sessions} />}
             </div>
-          </Reveal>
-
-          <Reveal delay={0.08}>
-            <SectionCard
-              title="Schnell-Start"
-              icon="spark"
-              accent="var(--ta-pink)"
-              className="h-full"
-            >
-              <div className="flex flex-col gap-2">
-                <QuickAction
-                  href="/workout/generator"
-                  icon="spark"
-                  title="Auto-Workout"
-                  sub="Generator"
-                  accent="var(--ta-cyan)"
-                />
-                <QuickAction
-                  href="/timer"
-                  icon="timer"
-                  title="Timer"
-                  sub="Runden & Pausen"
-                  accent="var(--ta-pink)"
-                />
-                <QuickAction
-                  href="/techniques"
-                  icon="book"
-                  title="Techniken"
-                  sub="Bibliothek"
-                  accent="var(--ta-cyan)"
-                />
-              </div>
-            </SectionCard>
-          </Reveal>
-        </div>
-
-        {/* Statistiken */}
-        <Reveal delay={0.05}>
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard
-              label="Diese Woche"
-              icon="calendar"
-              value={stats ? String(stats.thisWeek) : null}
-              hint="Einheiten"
-            />
-            <StatCard
-              label="Streak"
-              icon="flame"
-              accent="var(--ta-pink)"
-              value={
-                stats
-                  ? `${stats.streak} ${stats.streak === 1 ? "Tag" : "Tage"}`
-                  : null
-              }
-            />
-            <StatCard
-              label="Workouts gesamt"
-              icon="chart"
-              value={stats ? String(stats.total) : null}
-            />
-            <StatCard
-              label="Trainingszeit"
-              icon="timer"
-              accent="var(--ta-pink)"
-              value={stats ? formatHours(stats.totalSeconds) : null}
-            />
+          )}
           </div>
-        </Reveal>
+        </div>
+      </section>
 
-        {/* Lieblings-Disziplin + Verlauf */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          <Reveal>
-            <SectionCard
-              title="Lieblings-Disziplin"
-              icon="target"
-              accent="var(--ta-cyan)"
-              className="h-full"
-            >
-              {stats === null ? (
-                <Skeleton className="h-8 w-32" />
-              ) : stats.topCategory ? (
-                <div>
-                  <div
-                    className="font-display-ta font-black uppercase"
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-1 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-6 lg:px-6">
+        {error && (
+          <div className="lg:col-span-2">
+          <ErrorState
+            title="Daten konnten nicht geladen werden"
+            message={error}
+            hint={
+              error.includes("permission")
+                ? "Firestore-Berechtigungen prüfen — oder erneut einloggen."
+                : "Prüfe deine Internetverbindung und lade die Seite neu."
+            }
+            onRetry={fetchData}
+          />
+          </div>
+        )}
+
+        {/* Kursplan */}
+        <section className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <span className="t-label">Kursplan</span>
+            <Link href="/schedule" style={{ font: "var(--type-sub)", color: "var(--accent-text)" }}>
+              Alle ansehen
+            </Link>
+          </div>
+          <div className="t-card px-3.5 py-0.5">
+            {nextBlocks.map(({ block, dayShort }, i) => (
+              <div
+                key={block.id}
+                className="flex min-h-hit items-center gap-3 py-3"
+                style={i > 0 ? { borderTop: "1px solid var(--line)" } : undefined}
+              >
+                <div className="flex w-16 shrink-0 flex-col gap-0.5">
+                  <span className="t-label" style={{ fontSize: "9px", color: "var(--accent-text)" }}>
+                    {dayShort}
+                  </span>
+                  <span
                     style={{
-                      fontSize: "24px",
-                      color: "var(--ta-cyan)",
-                      letterSpacing: "0.04em",
+                      font: "600 13px/1.2 var(--font-mono), ui-monospace, monospace",
+                      color: "var(--accent-text)",
                     }}
                   >
-                    {CATEGORY_LABEL[stats.topCategory.category]}
-                  </div>
-                  <div
-                    className="font-mono-ta mt-1 text-[10px]"
-                    style={{ letterSpacing: "0.15em", color: "var(--fg-3)" }}
+                    {block.startTime}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate" style={{ font: "var(--type-body-strong)" }}>
+                    {block.title}
+                  </span>
+                  <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                    {block.startTime}–{block.endTime}
+                  </span>
+                </div>
+                {block.level && (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1.5"
+                    style={{
+                      font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "var(--text-3)",
+                    }}
                   >
-                    {stats.topCategory.count} Sessions
+                    <span
+                      className="h-[5px] w-[5px] rounded-full"
+                      style={{ background: "currentColor" }}
+                    />
+                    {LEVEL_LABEL[block.level] ?? block.level}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Trainingsfortschritt */}
+        <section className="flex flex-col gap-2">
+          <span className="t-label">Trainingsfortschritt</span>
+          <div className="grid grid-cols-2 gap-2.5">
+            <StatTile
+              label="Wochenlast"
+              value={
+                weekSeconds === null
+                  ? null
+                  : (weekSeconds / 3600).toLocaleString("de-DE", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })
+              }
+              unit="h"
+              sub={
+                weekDelta === null
+                  ? "letzte 7 Tage"
+                  : `${weekDelta >= 0 ? "+" : ""}${weekDelta} % ggü. Vorwoche`
+              }
+              subColor={
+                weekDelta === null
+                  ? undefined
+                  : weekDelta >= 0
+                  ? "var(--positive)"
+                  : "var(--negative)"
+              }
+            />
+            <StatTile
+              label="Sessions"
+              value={stats ? String(stats.thisWeek) : null}
+              sub="letzte 7 Tage"
+            />
+            <StatTile label="Workouts gesamt" value={stats ? String(stats.total) : null} />
+            <StatTile
+              label="Trainingszeit"
+              value={stats ? formatHours(stats.totalSeconds) : null}
+              sub="gesamt"
+            />
+          </div>
+          {nextCamp && (
+            <div className="t-card flex flex-col gap-2 p-3.5">
+              <div className="flex items-baseline justify-between">
+                <span className="t-label">Trainings-Streak</span>
+                {stats !== null && (
+                  <span
+                    style={{
+                      font: "var(--type-num)",
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    {stats.streak} {stats.streak === 1 ? "Tag" : "Tage"}
+                  </span>
+                )}
+              </div>
+              {sessions !== null && <StreakCalendar sessions={sessions} />}
+            </div>
+          )}
+        </section>
+
+        {/* Schnell-Start */}
+        <section className="flex flex-col gap-2">
+          <span className="t-label">Schnell-Start</span>
+          <div className="t-card px-3.5 py-0.5">
+            {[
+              {
+                href: "/workout/generator",
+                icon: "spark" as const,
+                title: "Auto-Workout",
+                sub: "Generator",
+              },
+              { href: "/timer", icon: "timer" as const, title: "Timer", sub: "Runden & Pausen" },
+              { href: "/techniques", icon: "book" as const, title: "Techniken", sub: "Bibliothek" },
+            ].map((a, i) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="t-interactive flex min-h-hit items-center gap-3 rounded-badge py-3"
+                style={{
+                  textDecoration: "none",
+                  color: "inherit",
+                  ...(i > 0 ? { borderTop: "1px solid var(--line)" } : {}),
+                }}
+              >
+                <span style={{ color: "var(--accent-text)" }}>
+                  <Icon name={a.icon} size={20} />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span style={{ font: "var(--type-body-strong)" }}>{a.title}</span>
+                  <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>{a.sub}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Letzte Trainings */}
+        <section className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <span className="t-label">Letzte Trainings</span>
+            <Link
+              href="/workout/generator"
+              style={{ font: "var(--type-sub)", color: "var(--accent-text)" }}
+            >
+              Neue Session
+            </Link>
+          </div>
+          <div className="t-card px-3.5 py-0.5">
+            {sessions === null && !error && (
+              <div className="flex flex-col gap-2 py-3">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            )}
+            {sessions && sessions.length === 0 && !error && (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span style={{ font: "var(--type-body-strong)" }}>Noch keine Sessions.</span>
+                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  Starte dein erstes Training über den Generator oder die Trainingspläne.
+                </span>
+                <Link
+                  href="/workout/generator"
+                  className="t-interactive mt-2 inline-flex min-h-hit items-center justify-center rounded-field px-5"
+                  style={{
+                    background: "var(--accent)",
+                    color: "var(--on-accent)",
+                    boxShadow: "var(--accent-glow)",
+                    font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    textDecoration: "none",
+                  }}
+                >
+                  Workout starten
+                </Link>
+              </div>
+            )}
+            {sessions &&
+              sessions.length > 0 &&
+              sessions.slice(0, 6).map((s, i) => (
+                <div
+                  key={s.id}
+                  className="flex min-h-hit items-center gap-3 py-3"
+                  style={i > 0 ? { borderTop: "1px solid var(--line)" } : undefined}
+                >
+                  <div className="w-11 shrink-0 text-center leading-tight">
+                    <span
+                      className="block"
+                      style={{
+                        font: "700 18px/1.1 var(--font-archivo), system-ui, sans-serif",
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--accent-text)",
+                      }}
+                    >
+                      {s.completedAt.getDate()}
+                    </span>
+                    <span className="t-label" style={{ fontSize: "9px" }}>
+                      {s.completedAt.toLocaleDateString("de-DE", { month: "short" })}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate" style={{ font: "var(--type-body-strong)" }}>
+                      {s.label ?? "Freies Workout"}
+                    </span>
+                    <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                      {s.category ? CATEGORY_LABEL[s.category] : "—"} · {s.rounds}×{" "}
+                      {Math.round(s.workSeconds / 60)} min
+                      {s.status === "aborted" && (
+                        <span style={{ color: "var(--negative)" }}> · abgebrochen</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span
+                      className="block"
+                      style={{
+                        font: "var(--type-num)",
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--text-2)",
+                      }}
+                    >
+                      {formatMinutes(s.totalWorkSeconds)}
+                    </span>
+                    <span style={{ font: "var(--type-sub)", fontSize: "11px", color: "var(--text-3)" }}>
+                      {formatRelative(s.completedAt)}
+                    </span>
                   </div>
                 </div>
-              ) : (
-                <EmptyState
-                  icon="target"
-                  title="Noch keine Daten"
-                  hint="Starte dein erstes Workout, um Statistiken zu sammeln."
-                />
-              )}
-            </SectionCard>
-          </Reveal>
-
-          {/* Session history */}
-          <Reveal delay={0.06} className="lg:col-span-2">
-            <SectionCard
-              title="Letzte Trainings"
-              icon="chart"
-              accent="var(--ta-pink)"
-              moreHref="/workout/generator"
-              moreLabel="Neue Session"
-              className="h-full"
-            >
-              {sessions === null && !error && (
-                <div className="flex flex-col gap-2">
-                  {[0, 1, 2].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              )}
-
-              {sessions && sessions.length === 0 && !error && (
-                <EmptyState
-                  icon="glove"
-                  title="Noch keine Sessions."
-                  hint="Starte dein erstes Training über den Generator oder die Trainingspläne."
-                >
-                  <Link href="/workout/generator" className="btn-primary px-4 py-2 text-xs">
-                    Workout starten
-                  </Link>
-                </EmptyState>
-              )}
-
-              {sessions && sessions.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {sessions.slice(0, 10).map((s, idx) => (
-                    <div
-                      key={s.id}
-                      className={`rise-${Math.min(idx + 1, 6)} flex items-center gap-3 py-2`}
-                    >
-                      {/* Date block */}
-                      <div className="font-display-ta min-w-[44px] text-center leading-tight">
-                        <span
-                          className="block"
-                          style={{ fontSize: "22px", color: "var(--ta-cyan)", lineHeight: 1 }}
-                        >
-                          {s.completedAt.getDate()}
-                        </span>
-                        <span
-                          className="font-mono-ta text-[9px] uppercase"
-                          style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
-                        >
-                          {s.completedAt.toLocaleDateString("de-DE", { month: "short" })}
-                        </span>
-                      </div>
-                      {/* Divider */}
-                      <div
-                        className="h-10 w-px flex-shrink-0"
-                        style={{ background: "var(--ink-5)" }}
-                      />
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className="font-display-ta font-bold uppercase truncate"
-                          style={{ fontSize: "14px", letterSpacing: "0.04em" }}
-                        >
-                          {s.label ?? "Freies Workout"}
-                          {s.status === "aborted" && (
-                            <span
-                              className="ml-2 rounded px-1.5 py-0.5 text-[9px] uppercase"
-                              style={{
-                                border: "1px solid rgba(255,79,168,.3)",
-                                background: "rgba(255,79,168,.08)",
-                                color: "var(--ta-pink)",
-                                letterSpacing: "0.15em",
-                              }}
-                            >
-                              abgebrochen
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          className="font-mono-ta mt-0.5 text-[9px] uppercase"
-                          style={{ letterSpacing: "0.15em", color: "var(--fg-3)" }}
-                        >
-                          {s.category ? CATEGORY_LABEL[s.category] : "—"} ·{" "}
-                          {s.rounds}× {Math.round(s.workSeconds / 60)} min · Pause{" "}
-                          {s.restSeconds}s
-                        </div>
-                      </div>
-                      {/* Duration + time */}
-                      <div className="text-right flex-shrink-0">
-                        <div
-                          className="font-display-ta font-bold"
-                          style={{ fontSize: "16px", color: "var(--ta-pink)" }}
-                        >
-                          {formatMinutes(s.totalWorkSeconds)}
-                        </div>
-                        <div
-                          className="font-mono-ta text-[9px] uppercase"
-                          style={{ letterSpacing: "0.15em", color: "var(--fg-4)" }}
-                        >
-                          {formatRelative(s.completedAt)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-          </Reveal>
-        </div>
+              ))}
+          </div>
+        </section>
       </div>
+
+      <AthleteTabBar />
     </main>
   );
 }

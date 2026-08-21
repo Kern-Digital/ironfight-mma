@@ -36,7 +36,8 @@
   --background: var(--ink-0);
   --foreground: var(--fg);
   --primary: var(--ta-cyan);
-  --accent:  var(--ta-pink);
+  /* --accent gehört jetzt dem NEUEN Token-System (s.u.) — das alte
+     Pink-Alias war app-weit unbenutzt und wurde entfernt. */
 
   /* Glow shadows */
   --glow-cyan: 0 0 0 1px rgba(35,196,206,.4), 0 0 24px rgba(35,196,206,.35), 0 0 60px rgba(35,196,206,.15);
@@ -97,6 +98,227 @@
   --modal-backdrop:       rgba(0,0,0,0.35);
   --modal-shadow:         0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(19,147,156,0.15);
   --pwa-shadow:           0 -4px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(19,147,156,0.15);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NEUES TOKEN-SYSTEM — Redesign 2026-08 (Quelle: design-handoff/export)
+   Verbindlich: docs/DESIGN-BRIEF.md. ALLES leitet sich aus 2 Eingaben ab:
+   --accent-h/--accent-c (Gym-Akzent, Default Riptide-Teal) und
+   --accent2-h/--accent2-c (Brand-Violett „Jazz-Lila" — FIX, keine Ableitung).
+   Gym-Theming (Branding-Kit): NUR --accent-h/--accent-c überschreiben.
+   Wer die Eingaben auf einem Unter-Element überschreibt, setzt dort zusätzlich
+   data-theme="dark"/"light", damit die Ableitungen neu berechnet werden.
+   Das ALTE System (--ink-*, --ta-*, --fg-*) bleibt bis zum Rollout parallel
+   bestehen und wird danach entfernt.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root, [data-theme="dark"] {
+  --accent-h: 197; --accent-c: 0.14;  /* Logo-Cyan #00f7ff */
+  /* Violett ist BEWUSST keine Ableitung (Hue-Shift würde z. B. bei einem
+     roten Gym ein grünes Verlaufsende erzeugen), sondern feste Brand-
+     Konstante. In --grad-fight folgt nur der erste Stopp dem Gym-Akzent. */
+  --accent2-h: 305; --accent2-c: 0.15;
+
+  /* DARK = DEFAULT */
+  --bg-0: oklch(0.15 calc(var(--accent-c)*0.06) var(--accent-h));
+  --bg-1: oklch(0.19 calc(var(--accent-c)*0.07) var(--accent-h));
+  --bg-2: oklch(0.235 calc(var(--accent-c)*0.08) var(--accent-h));
+  --line: oklch(0.30 calc(var(--accent-c)*0.08) var(--accent-h));
+  --line-strong: oklch(0.38 calc(var(--accent-c)*0.08) var(--accent-h));
+  --text-1: oklch(0.96 calc(var(--accent-c)*0.04) var(--accent-h));
+  --text-2: oklch(0.76 calc(var(--accent-c)*0.07) var(--accent-h));
+  --text-3: oklch(0.60 calc(var(--accent-c)*0.09) var(--accent-h));
+  --accent: oklch(0.78 var(--accent-c) var(--accent-h));
+  --accent-hover: oklch(0.84 calc(var(--accent-c)*0.85) var(--accent-h));
+  --accent-press: oklch(0.72 var(--accent-c) var(--accent-h));
+  --accent-subtle: oklch(0.26 calc(var(--accent-c)*0.38) var(--accent-h));
+  --accent-text: oklch(0.80 calc(var(--accent-c)*0.85) var(--accent-h));
+  --on-accent: oklch(0.16 calc(var(--accent-c)*0.3) var(--accent-h));
+  --accent-2: oklch(0.70 var(--accent2-c) var(--accent2-h));
+  --accent-2-subtle: oklch(0.27 calc(var(--accent2-c)*0.38) var(--accent2-h));
+
+  /* Semantik (feste Hues, keine Gym-Ableitung) */
+  --positive: oklch(0.78 0.13 150);
+  --negative: oklch(0.72 0.16 25);
+  --warning: oklch(0.82 0.13 90);
+
+  /* Liquid Glass */
+  --glass-bg: oklch(0.22 calc(var(--accent-c)*0.08) var(--accent-h) / 0.42);
+  --glass-border: oklch(1 0 0 / 0.12);
+  --glass-highlight: oklch(1 0 0 / 0.07);
+  --glass-blur: 24px;
+  --glass-shadow: 0 12px 40px oklch(0 0 0 / 0.35);
+  --accent-glow: 0 0 14px oklch(0.78 var(--accent-c) var(--accent-h) / 0.16);
+
+  /* Ambient-Schicht: weiche, stark geblurte Glows HINTER dem Inhalt.
+     Nur Gym-Akzent; --ambient-fight zusätzlich Brand-Violett (NUR DeepFight).
+     Nur hinter Hero-/Kopfbereichen und leeren Flächen — NIE hinter
+     Listen/Tabellen. */
+  --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.62 var(--accent-c) var(--accent-h) / 0.46), oklch(0.62 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.50 calc(var(--accent-c)*0.85) var(--accent-h) / 0.32), oklch(0.50 calc(var(--accent-c)*0.85) var(--accent-h) / 0) 62%);
+  --ambient-fight: radial-gradient(70% 65% at 80% 4%, oklch(0.62 var(--accent-c) var(--accent-h) / 0.46), oklch(0.62 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(60% 55% at 2% 96%, oklch(0.55 calc(var(--accent2-c)*0.9) var(--accent2-h) / 0.38), oklch(0.55 calc(var(--accent2-c)*0.9) var(--accent2-h) / 0) 62%);
+  /* Tonaler Verlauf NUR aus dem Gym-Akzent — für ALLE generischen Balken */
+  --grad-progress: linear-gradient(90deg, oklch(0.62 calc(var(--accent-c)*0.95) var(--accent-h)), oklch(0.82 calc(var(--accent-c)*0.9) var(--accent-h)));
+  /* Jazz-Verlauf (Akzent → Brand-Violett) — AUSSCHLIESSLICH DeepFight */
+  --grad-fight: linear-gradient(120deg, var(--accent), var(--accent-2));
+  /* Alt-Token aus der Designphase — in neuem Code NICHT verwenden (Ambient nutzen) */
+  --grad-bg: radial-gradient(120% 90% at 80% -10%, oklch(0.22 calc(var(--accent-c)*0.35) var(--accent-h) / 0.4), transparent 60%), radial-gradient(100% 80% at -10% 110%, oklch(0.21 calc(var(--accent2-c)*0.4) var(--accent2-h) / 0.35), transparent 55%);
+
+  /* Aliases */
+  --surface-page: var(--bg-0);
+  --surface-card: var(--bg-1);
+  --surface-raised: var(--bg-2);
+  --card-border: transparent; /* Dark: Karten rahmenlos — die Ebene trennt */
+  --text-body: var(--text-1);
+  --text-muted: var(--text-2);
+  --text-label: var(--text-3);
+}
+[data-theme="light"] {
+  --card-border: oklch(0.88 calc(var(--accent-c)*0.08) var(--accent-h)); /* Light: 1px Rahmen */
+  --bg-0: oklch(0.975 calc(var(--accent-c)*0.03) var(--accent-h));
+  --bg-1: oklch(0.995 calc(var(--accent-c)*0.015) var(--accent-h));
+  --bg-2: oklch(0.94 calc(var(--accent-c)*0.06) var(--accent-h));
+  --line: oklch(0.88 calc(var(--accent-c)*0.08) var(--accent-h));
+  --line-strong: oklch(0.80 calc(var(--accent-c)*0.08) var(--accent-h));
+  --text-1: oklch(0.21 calc(var(--accent-c)*0.15) var(--accent-h));
+  --text-2: oklch(0.44 calc(var(--accent-c)*0.15) var(--accent-h));
+  --text-3: oklch(0.57 calc(var(--accent-c)*0.15) var(--accent-h));
+  --accent: oklch(0.50 var(--accent-c) var(--accent-h));
+  --accent-hover: oklch(0.44 var(--accent-c) var(--accent-h));
+  --accent-press: oklch(0.40 var(--accent-c) var(--accent-h));
+  --accent-subtle: oklch(0.93 calc(var(--accent-c)*0.25) var(--accent-h));
+  --accent-text: oklch(0.46 var(--accent-c) var(--accent-h));
+  --on-accent: oklch(0.99 calc(var(--accent-c)*0.02) var(--accent-h));
+  --accent-2: oklch(0.50 var(--accent2-c) var(--accent2-h));
+  --accent-2-subtle: oklch(0.93 calc(var(--accent2-c)*0.25) var(--accent2-h));
+  --positive: oklch(0.55 0.13 150);
+  --negative: oklch(0.55 0.18 25);
+  --warning: oklch(0.60 0.12 90);
+  --glass-bg: oklch(0.98 calc(var(--accent-c)*0.03) var(--accent-h) / 0.45);
+  --glass-border: oklch(0.2 0.02 var(--accent-h) / 0.10);
+  --glass-highlight: oklch(1 0 0 / 0.65);
+  --glass-shadow: 0 12px 40px oklch(0.3 0.03 var(--accent-h) / 0.16);
+  --accent-glow: 0 0 14px oklch(0.50 var(--accent-c) var(--accent-h) / 0.12);
+  --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0.42), oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0) 62%);
+  --ambient-fight: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(60% 55% at 2% 96%, oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0.46), oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0) 62%);
+  --grad-progress: linear-gradient(90deg, oklch(0.40 var(--accent-c) var(--accent-h)), oklch(0.58 var(--accent-c) var(--accent-h)));
+  --grad-bg: radial-gradient(120% 90% at 80% -10%, oklch(0.90 calc(var(--accent-c)*0.4) var(--accent-h) / 0.7), transparent 60%), radial-gradient(100% 80% at -10% 110%, oklch(0.92 calc(var(--accent2-c)*0.4) var(--accent2-h) / 0.6), transparent 55%);
+}
+
+/* ─── Neues Token-System: Typografie ─────────────────────────────────────────
+   Archivo (Display UND Body) kommt via next/font (layout.tsx, --font-archivo).
+   Die alten Fonts (--font-display Barlow, --font-sans Inter) bleiben bis zum
+   Rollout; danach werden sie entfernt. Mono bleibt JetBrains (--font-mono). */
+:root {
+  --font-body: var(--font-archivo), system-ui, sans-serif;
+
+  /* Skala (px, min. 15px Fließtext für Smartphone) */
+  --type-display: 800 28px/1.15 var(--font-body);      /* +ls .04em, caps */
+  --type-h2: 700 20px/1.2 var(--font-body);            /* +ls .04em, caps */
+  --type-h3: 700 16px/1.3 var(--font-body);
+  --type-body: 400 15px/1.5 var(--font-body);
+  --type-body-strong: 600 15px/1.5 var(--font-body);
+  --type-sub: 400 13px/1.45 var(--font-body);
+  --type-label: 600 11px/1.2 var(--font-body);         /* +ls .12em, caps */
+  --type-num-xl: 700 30px/1.1 var(--font-body);        /* tabular-nums */
+  --type-num: 600 13px/1.2 var(--font-mono), ui-monospace, monospace; /* Messwerte */
+  --ls-display: 0.04em;
+  --ls-label: 0.12em;
+
+  /* Spacing (4px-Raster), Radien, Motion */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+  --hit-min: 44px; /* Mindest-Touchziel */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms; --dur-med: 220ms;
+}
+
+/* ─── Neues Token-System: Ambient-Mechanik ───────────────────────────────────
+   Separate Ebene HINTER dem Inhalt, in einem position:relative +
+   overflow:hidden Container. Zwei Nutzungen:
+   a) Fläche (Hero/Kopf):  <div data-ambient style="background:var(--ambient)">
+   b) Glow-Formen (Karten): <div data-ambient> mit 1–2 <span data-glow>-Kindern
+      (radiale, geblurte Glows; Farben = oklch-Rezepte der Ambient-Tokens),
+      ragen über die Kartenkante hinaus, Container clippt. Kartenfläche selbst
+      bleibt normale Surface — nie Verlauf als Flächenfüllung.
+   Drift 28–36 s, NUR transform/opacity (Blur statisch, nie animiert). */
+@keyframes ambient-drift {
+  0%   { transform: translate3d(-15%,-9%,0) scale(1.05); opacity: 0.45; }
+  50%  { transform: translate3d(6%,4%,0) scale(1.35); opacity: 1; }
+  100% { transform: translate3d(15%,10%,0) scale(1.15); opacity: 0.5; }
+}
+[data-ambient] {
+  /* inset größer als die maximale Drift-Auslenkung, sonst wandert die
+     Elementkante ins Bild. */
+  position: absolute; inset: -22%; pointer-events: none;
+  /* Negativer Delay: startet mitten in der Bewegung statt am
+     ease-in-out-Stillstandspunkt (sonst wirkt sie beim Laden „kaputt"). */
+  animation: ambient-drift 20s ease-in-out -7s infinite alternate;
+}
+[data-ambient]:has([data-glow]) { inset: 0; animation: none; }
+/* Flächen-Ambient (Hero/Kopf) läuft unten weich aus, statt an der
+   Sektionskante hart abgeschnitten zu werden. Gilt NICHT für Karten-Glows
+   ([data-glow]) — deren Violett am Kartenrand darf nicht verschluckt werden. */
+[data-ambient]:not(:has([data-glow])) {
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 95%);
+  mask-image: linear-gradient(to bottom, black 55%, transparent 95%);
+}
+[data-ambient] [data-glow] {
+  position: absolute; border-radius: 50%; filter: blur(72px);
+  animation: ambient-drift 28s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ambient], [data-ambient] [data-glow] { animation: none; }
+}
+
+/* ─── Neues Token-System: Basis-Bausteine ────────────────────────────────────
+   Wiederverwendbare Klassen für den Rollout (Referenz: design-handoff).
+   Listen: EINE Karte mit Haarlinien-Trennern (--line), nie Karten-Stapel. */
+@layer components {
+  .t-label {
+    font: var(--type-label);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--text-label);
+  }
+  .t-card {
+    background: var(--surface-card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--r-lg);
+  }
+  .t-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    border-radius: var(--r-lg);
+  }
+  .t-progress {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-raised);
+    overflow: hidden;
+  }
+  .t-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--grad-progress);
+  }
+  /* Interaktion (Handoff-Regel): Hover = Fläche 1 Ebene heller,
+     Press = scale(0.98), Motion 120 ms --ease-out. */
+  .t-interactive {
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .t-interactive:hover { background-color: var(--surface-raised); }
+  .t-interactive:active { transform: scale(0.98); }
+  .t-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .t-interactive:active { transform: none; }
+  }
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */

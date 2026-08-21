@@ -1,0 +1,41 @@
+/* Ambient-Schicht: separate Ebene HINTER dem Inhalt, in einem
+   position:relative + overflow:hidden Container. Zwei Nutzungen:
+   a) Fläche (Hero-/Kopfbereiche): <div data-ambient style="background:var(--ambient)"></div>
+      WICHTIG: Der Clip-Container umschließt NUR die Ambient-Ebene (eigene
+      absolute Hülle mit overflow:hidden) — nie die ganze Sektion, sonst
+      werden Glass-Schatten von Karten an der Sektionskante abgeschnitten.
+   b) Glow-Formen (Karten): <div data-ambient> mit 1-2 <span data-glow>-Kindern —
+      radiale, stark geblurte Glows (blur 72px, niedrige Alpha; Farben = die
+      oklch-Rezepte der Ambient-Tokens), organisch platziert, ragen über die
+      Kartenkante hinaus und werden vom Container geclippt. Die Kartenfläche
+      selbst bleibt normale Surface (--bg-1) — nie Verlauf als Flächenfüllung.
+   Drift 20-36 s (Fläche 20 s, Karten-Glows 28-36 s), NUR transform/opacity
+   (Blur statisch, nie animiert), stoppt komplett bei prefers-reduced-motion. */
+@keyframes ambient-drift {
+  0%   { transform: translate3d(-15%,-9%,0) scale(1.05); opacity: 0.45; }
+  50%  { transform: translate3d(6%,4%,0) scale(1.35); opacity: 1; }
+  100% { transform: translate3d(15%,10%,0) scale(1.15); opacity: 0.5; }
+}
+[data-ambient] {
+  /* inset größer als die maximale Drift-Auslenkung, sonst wandert die
+     Elementkante ins Bild. */
+  position: absolute; inset: -22%; pointer-events: none;
+  /* Negativer Delay: startet mitten in der Bewegung statt am
+     ease-in-out-Stillstandspunkt. */
+  animation: ambient-drift 20s ease-in-out -7s infinite alternate;
+}
+[data-ambient]:has([data-glow]) { inset: 0; animation: none; }
+/* Flächen-Ambient (Hero/Kopf) läuft unten weich aus, statt an der
+   Sektionskante hart abgeschnitten zu werden. Gilt NICHT für Karten-Glows
+   ([data-glow]) — deren Violett am Kartenrand darf nicht verschluckt werden. */
+[data-ambient]:not(:has([data-glow])) {
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 95%);
+  mask-image: linear-gradient(to bottom, black 55%, transparent 95%);
+}
+[data-ambient] [data-glow] {
+  position: absolute; border-radius: 50%; filter: blur(72px);
+  animation: ambient-drift 28s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ambient], [data-ambient] [data-glow] { animation: none; }
+}

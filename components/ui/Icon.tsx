@@ -44,7 +44,9 @@ export type IconName =
   | "plus"
   | "wave"
   | "video"
-  | "edit";
+  | "edit"
+  | "user"
+  | "sun";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -99,6 +101,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   moon: <path d="M19 14.5A7.5 7.5 0 0 1 9.5 5 7.5 7.5 0 1 0 19 14.5Z" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
+    </>
+  ),
   phone: (
     <>
       <rect x="7" y="3.5" width="10" height="17" rx="2" />
@@ -202,6 +210,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="M4.5 12.5 10 18 19.5 6.5" />,
+  // Einzelperson (Profil)
+  user: (
+    <>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+    </>
+  ),
   x: <path d="M6 6l12 12M18 6 6 18" />,
   warn: (
     <>

@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/google";
+import { Archivo, Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AthleteChromeGate from "@/components/AthleteChromeGate";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import PwaRegister from "@/components/PwaRegister";
@@ -28,6 +29,15 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-mono",
+  display: "swap",
+});
+
+// Neues Token-System (Redesign): Archivo für Display UND Body.
+// Barlow/Inter bleiben bis zum Rollout-Ende für Altseiten.
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
@@ -69,15 +79,19 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('ta-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}` }} />
       </head>
       <body
-        className={`${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} flex min-h-screen flex-col antialiased`}
+        className={`${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${archivo.variable} flex min-h-screen flex-col antialiased`}
       >
         <ThemeProvider>
           <AuthProvider>
             <PwaRegister />
             <PwaInstallPrompt />
-            <Navbar />
+            <AthleteChromeGate>
+              <Navbar />
+            </AthleteChromeGate>
             <main className="flex-1">{children}</main>
-            <Footer />
+            <AthleteChromeGate>
+              <Footer />
+            </AthleteChromeGate>
             <FighterNameModal />
             <TrainerOnboardingModal />
             <SubscriptionAutoSync />

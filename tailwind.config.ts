@@ -11,6 +11,40 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // ── NEUES TOKEN-SYSTEM (Redesign 2026-08, docs/DESIGN-BRIEF.md) ──
+        // Alle Werte leben als CSS-Variablen in app/globals.css und leiten
+        // sich aus --accent-h/--accent-c ab. Nie Hex hier eintragen.
+        accent: {
+          DEFAULT: "var(--accent)",
+          hover: "var(--accent-hover)",
+          press: "var(--accent-press)",
+          subtle: "var(--accent-subtle)",
+          text: "var(--accent-text)",
+          on: "var(--on-accent)",
+        },
+        // Brand-Violett — AUSSCHLIESSLICH DeepFight-Kontexte
+        fight: {
+          DEFAULT: "var(--accent-2)",
+          subtle: "var(--accent-2-subtle)",
+        },
+        surface: {
+          page: "var(--surface-page)",
+          card: "var(--surface-card)",
+          raised: "var(--surface-raised)",
+        },
+        line: {
+          DEFAULT: "var(--line)",
+          strong: "var(--line-strong)",
+        },
+        content: {
+          1: "var(--text-1)",
+          2: "var(--text-2)",
+          3: "var(--text-3)",
+        },
+        positive: "var(--positive)",
+        negative: "var(--negative)",
+        warning: "var(--warning)",
+        // ── ALTES SYSTEM (bis Rollout-Ende, danach entfernen) ──
         // Tidal Athletics — cyan primary
         cyan: {
           DEFAULT: "#23C4CE",
@@ -63,8 +97,34 @@ const config: Config = {
         display: ["var(--font-display)", "Barlow Condensed", "Impact", "sans-serif"],
         sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
+        // Neues System: Archivo für Display UND Body (Rollout ersetzt display/sans)
+        archivo: ["var(--font-archivo)", "system-ui", "sans-serif"],
+      },
+      borderRadius: {
+        // Neues System (semantisch statt Größenleiter)
+        card: "var(--r-lg)",   // 16px — Karten
+        field: "var(--r-md)",  // 12px — Buttons/Inputs
+        modal: "var(--r-xl)",  // 22px — Modals
+        badge: "var(--r-sm)",  // 8px — kleine Elemente
+        pill: "var(--r-pill)",
+      },
+      spacing: {
+        hit: "var(--hit-min)", // 44px Mindest-Touchziel
+      },
+      transitionTimingFunction: {
+        tok: "var(--ease-out)",
+      },
+      transitionDuration: {
+        fast: "120ms",
+        med: "220ms",
       },
       backgroundImage: {
+        // Neues System — Nutzung nur gemäß Token-Regeln (DESIGN-BRIEF)
+        ambient: "var(--ambient)",
+        "ambient-fight": "var(--ambient-fight)",
+        "grad-fight": "var(--grad-fight)",       // NUR DeepFight
+        "grad-progress": "var(--grad-progress)", // generische Fortschrittsbalken
+        // Altes System (bis Rollout-Ende)
         "grid-pattern":
           "linear-gradient(rgba(35,196,206,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(35,196,206,0.06) 1px, transparent 1px)",
         "radial-fade":
@@ -91,6 +151,10 @@ const config: Config = {
         },
       },
       boxShadow: {
+        // Neues System
+        glass: "var(--glass-shadow)",
+        "accent-glow": "var(--accent-glow)", // NUR Primär-Button/aktive Zustände
+        // Altes System (bis Rollout-Ende)
         "glow-cyan": "0 0 0 1px rgba(35,196,206,.4), 0 0 24px rgba(35,196,206,.35), 0 0 60px rgba(35,196,206,.15)",
         "glow-pink": "0 0 0 1px rgba(255,79,168,.4), 0 0 24px rgba(255,79,168,.35)",
         "glow-cyan-sm": "0 0 12px rgba(35,196,206,.5)",
