@@ -345,7 +345,12 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       vs. MMA 77 kg). Bei der Wettkampf-/Multi-Gym-Arbeit: Klassensatz
       abhängig von Hauptdisziplin (ggf. Verband) wählen; betrifft
       AthleteProfileForm, MatchupBlock/Tale-of-the-Tape, FightCampForm.
-      (Notiert 2026-08-21.)
+      (Notiert 2026-08-21.) Dazu gehört das Geschlecht: `athlete.gender`
+      existiert seit 2026-08-22 (User-Eingabe im Kampfprofil, optional mit
+      Warnhinweis bei fehlender Angabe) — Frauen-Divisionen sind ein eigenes
+      Raster, und das Feld soll als Kontext in die KI-Video-Analyse-Prompts
+      und Gegner-Vergleiche (Regression-Regel wie beim recency-Feld: ohne
+      Angabe zeichengleicher Prompt); Gegner brauchen das Feld dann auch.
 - [ ] Käfig-Karte („Wo passiert die Aktion") disziplinabhängig darstellen:
       Zonen-IDs `center|open|cage` bleiben stabil (semantisch Mitte/freier
       Raum/Begrenzung, KEINE Migration) — nur Darstellung per Arena-Preset:

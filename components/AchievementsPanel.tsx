@@ -1,6 +1,14 @@
 "use client";
 
+/**
+ * Achievements-Übersicht (Account-Seite): Workout-Stats, freigeschaltete
+ * Meilensteine und die nächsten Ziele. Neues Token-System (Rollout Etappe 3);
+ * der umgebende Karten-Rahmen + Sektions-Titel kommen von der Seite —
+ * die Komponente rendert nur den Karten-INHALT.
+ */
+
 import { useEffect, useState } from "react";
+import Skeleton from "@/components/ui/Skeleton";
 import { computeStats, getRecentWorkouts, type WorkoutStats } from "@/lib/workouts";
 import { getLibrary } from "@/lib/training-sessions";
 
@@ -100,13 +108,9 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
 
   if (achievements === null) {
     return (
-      <div className="card animate-pulse">
-        <div className="mb-3 h-4 w-32 bg-carbon-600" />
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="h-16 bg-carbon-600" />
-          ))}
-        </div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-16 w-full rounded-badge" />
+        <Skeleton className="h-24 w-full rounded-badge" />
       </div>
     );
   }
@@ -118,55 +122,68 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
     .slice(0, 3);
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs font-bold uppercase tracking-widest text-blood">
-          Achievements
-        </div>
-        <div className="text-xs text-foreground/60">
+    <div className="flex flex-col gap-5">
+      {/* Stats-Summary + Zähler */}
+      <div className="flex items-start justify-between gap-3">
+        {stats && (
+          <div className="flex flex-1 flex-wrap gap-x-6 gap-y-2">
+            {(
+              [
+                { value: stats.total, label: "Workouts", accent: false },
+                { value: stats.streak, label: "Streak", accent: true },
+                { value: stats.thisWeek, label: "Diese Woche", accent: false },
+              ] as const
+            ).map((s) => (
+              <div key={s.label} className="flex flex-col gap-1">
+                <span
+                  style={{
+                    font: "var(--type-num-xl)",
+                    fontVariantNumeric: "tabular-nums",
+                    color: s.accent ? "var(--accent-text)" : "var(--text-body)",
+                  }}
+                >
+                  {s.value}
+                </span>
+                <span className="t-label">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <span
+          className="shrink-0"
+          style={{
+            font: "var(--type-num)",
+            fontVariantNumeric: "tabular-nums",
+            color: "var(--text-3)",
+          }}
+        >
           {unlocked.length} / {achievements.length}
-        </div>
+        </span>
       </div>
-
-      {/* Stats-Summary */}
-      {stats && (
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div className="py-2">
-            <div className="text-lg font-black text-foreground">{stats.total}</div>
-            <div className="text-[10px] uppercase tracking-widest text-foreground/60">
-              Workouts
-            </div>
-          </div>
-          <div className="py-2">
-            <div className="text-lg font-black text-blood">{stats.streak}</div>
-            <div className="text-[10px] uppercase tracking-widest text-foreground/60">
-              Streak
-            </div>
-          </div>
-          <div className="py-2">
-            <div className="text-lg font-black text-foreground">{stats.thisWeek}</div>
-            <div className="text-[10px] uppercase tracking-widest text-foreground/60">
-              Diese Woche
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Freigeschaltete Badges */}
       {unlocked.length > 0 && (
-        <div className="mt-5">
-          <div className="mb-2 text-xs uppercase tracking-widest text-foreground/60">
-            Freigeschaltet
-          </div>
+        <div className="flex flex-col gap-2">
+          <span className="t-label">Freigeschaltet</span>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {unlocked.map((a) => (
               <div
                 key={a.id}
-                className="rounded-sm border border-blood/50 bg-blood/10 px-3 py-2"
+                className="flex flex-col gap-0.5 rounded-badge px-3 py-2"
+                style={{ background: "var(--accent-subtle)" }}
                 title={a.description}
               >
-                <div className="text-xs font-bold text-blood">{a.label}</div>
-                <div className="text-[10px] text-foreground/60">{a.description}</div>
+                <span
+                  style={{
+                    font: "600 12px/1.3 var(--font-archivo), system-ui, sans-serif",
+                    color: "var(--accent-text)",
+                  }}
+                >
+                  {a.label}
+                </span>
+                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  {a.description}
+                </span>
               </div>
             ))}
           </div>
@@ -175,26 +192,29 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
 
       {/* Nächste Ziele */}
       {upcoming.length > 0 && (
-        <div className="mt-5">
-          <div className="mb-2 text-xs uppercase tracking-widest text-foreground/60">
-            Als Nächstes
-          </div>
-          <div className="space-y-2">
+        <div className="flex flex-col gap-2">
+          <span className="t-label">Als Nächstes</span>
+          <div className="flex flex-col gap-3">
             {upcoming.map((a) => (
-              <div key={a.id} className="py-1">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold">{a.label}</div>
-                  <div className="text-[10px] text-foreground/50">
-                    {Math.round((a.progress ?? 0) * 100)}%
-                  </div>
+              <div key={a.id} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span style={{ font: "var(--type-body-strong)" }}>{a.label}</span>
+                  <span
+                    style={{
+                      font: "var(--type-num)",
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-2)",
+                    }}
+                  >
+                    {Math.round((a.progress ?? 0) * 100)} %
+                  </span>
                 </div>
-                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-carbon-800">
-                  <div
-                    className="h-full bg-blood"
-                    style={{ width: `${(a.progress ?? 0) * 100}%` }}
-                  />
+                <div className="t-progress">
+                  <span style={{ width: `${(a.progress ?? 0) * 100}%` }} />
                 </div>
-                <div className="mt-1 text-[10px] text-foreground/60">{a.description}</div>
+                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  {a.description}
+                </span>
               </div>
             ))}
           </div>
@@ -202,8 +222,8 @@ export default function AchievementsPanel({ uid }: { uid: string }) {
       )}
 
       {unlocked.length === 0 && upcoming.length === 0 && (
-        <p className="mt-4 text-sm text-foreground/60">
-          Starte dein erstes Workout um Achievements freizuschalten.
+        <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          Starte dein erstes Workout, um Achievements freizuschalten.
         </p>
       )}
     </div>

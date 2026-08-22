@@ -363,6 +363,21 @@ export function weightClassForKg(kg: number): WeightClass {
   return "heavyweight";
 }
 
+/**
+ * Geschlecht des Athleten — vom User selbst angegeben (2026-08-22).
+ * Fachlich relevant, nicht nur Grammatik: bestimmt später das
+ * Gewichtsklassen-Raster (Frauen-Divisionen) und geht als Kontext in die
+ * KI-Video-Analyse und Gegner-Vergleiche (siehe Backlog „Gewichtsklassen
+ * pro Disziplin/Verband"). Keine Angabe ist erlaubt, macht die Analyse
+ * aber ungenauer — die UI weist darauf hin.
+ */
+export type Gender = "male" | "female";
+
+export const GENDER_LABEL: Record<Gender, string> = {
+  male: "Männlich",
+  female: "Weiblich",
+};
+
 export type AthleteLevel = "beginner" | "intermediate" | "advanced" | "competitor";
 
 export const ATHLETE_LEVEL_LABEL: Record<AthleteLevel, string> = {
@@ -397,6 +412,8 @@ export const FIGHTER_STANCE_LABEL: Record<FighterStance, string> = {
 export interface AthleteProfile {
   /** Hauptdisziplin */
   primaryDiscipline?: Discipline | null;
+  /** Geschlecht (Gewichtsklassen-Raster + KI-Analyse-Kontext) */
+  gender?: Gender | null;
   /** Selbsteinschätzung */
   level?: AthleteLevel | null;
   /** Trainingsbeginn — für "Trainingsjahre"-Anzeige */

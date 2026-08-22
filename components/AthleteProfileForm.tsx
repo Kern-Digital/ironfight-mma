@@ -19,12 +19,14 @@ import {
   BJJ_BELT_LABEL,
   DISCIPLINE_LABEL,
   FIGHTER_STANCE_LABEL,
+  GENDER_LABEL,
   WEIGHT_CLASS_LABEL,
   type AthleteLevel,
   type AthleteProfile,
   type BjjBelt,
   type Discipline,
   type FighterStance,
+  type Gender,
   type WeightClass,
   weightClassForKg,
 } from "@/lib/types";
@@ -94,6 +96,7 @@ const inputStyle: React.CSSProperties = {
 
 type AthleteForm = {
   primaryDiscipline: Discipline | "";
+  gender: Gender | "";
   level: AthleteLevel | "";
   trainingStartDate: string; // YYYY-MM-DD
   weightKg: string;
@@ -110,6 +113,7 @@ type AthleteForm = {
 function emptyForm(): AthleteForm {
   return {
     primaryDiscipline: "",
+    gender: "",
     level: "",
     trainingStartDate: "",
     weightKg: "",
@@ -136,6 +140,7 @@ function formFromAthlete(a: AthleteProfile | undefined): AthleteForm {
   const f = emptyForm();
   if (!a) return f;
   f.primaryDiscipline = a.primaryDiscipline ?? "";
+  f.gender = a.gender ?? "";
   f.level = a.level ?? "";
   f.trainingStartDate = dateToInputValue(a.trainingStartDate);
   f.weightKg = a.weightKg != null ? String(a.weightKg) : "";
@@ -164,6 +169,7 @@ function patchFromForm(form: AthleteForm): Partial<AthleteProfile> {
 
   return {
     primaryDiscipline: form.primaryDiscipline || null,
+    gender: form.gender || null,
     level: form.level || null,
     trainingStartDate: form.trainingStartDate
       ? new Date(form.trainingStartDate)
@@ -310,6 +316,44 @@ export default function AthleteProfileForm() {
               })),
             ]}
           />
+        </Field>
+
+        <Field label="Geschlecht">
+          <div className="space-y-2">
+            <Select
+              clearable
+              value={form.gender}
+              onChange={(v) => update("gender", v as Gender | "")}
+              options={[
+                { value: "", label: "— wählen —" },
+                ...(Object.keys(GENDER_LABEL) as Gender[]).map((g) => ({
+                  value: g,
+                  label: GENDER_LABEL[g],
+                })),
+              ]}
+            />
+            {/* Fehlende Angabe kostet Analyse-Qualität (Physis-Einordnung,
+                Gegner-Vergleiche, Gewichtsklassen-Raster) — deshalb ein
+                sichtbarer Hinweis, solange nichts gewählt ist. */}
+            {!form.gender && (
+              <div
+                className="flex items-start gap-2 rounded-field px-3.5 py-2.5"
+                style={{
+                  font: "var(--type-sub)",
+                  background: "color-mix(in oklab, var(--warning) 12%, transparent)",
+                  border: "1px solid color-mix(in oklab, var(--warning) 40%, transparent)",
+                  color: "var(--warning)",
+                }}
+              >
+                <span className="mt-0.5 shrink-0">
+                  <Icon name="warn" size={14} strokeWidth={2.2} />
+                </span>
+                Ohne Angabe kann die KI-Analyse Physis und Gegner-Vergleiche
+                schlechter einordnen — mit Angabe werden deine Auswertungen
+                präziser.
+              </div>
+            )}
+          </div>
         </Field>
 
         <Field label="Trainingslevel">

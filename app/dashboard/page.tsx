@@ -13,7 +13,7 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { greetingFor, trainerGreetingFor } from "@/lib/greeting";
+import { dashboardGreetingFor, trainerGreetingFor } from "@/lib/greeting";
 import { CATEGORY_LABEL } from "@/lib/techniques";
 import { getTopTechniques, type TechniqueStatEntry } from "@/lib/technique-analytics";
 import { getTechniqueById } from "@/lib/techniques";
@@ -39,7 +39,7 @@ import {
 } from "@/lib/fight-camp";
 import { getSessionCountForWeek } from "@/lib/training-sessions";
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 function formatRelative(d: Date) {
   const diffMs = Date.now() - d.getTime();
@@ -178,7 +178,10 @@ function upcomingBlocks(count: number): { block: TrainingBlock; dayShort: string
 function DashboardContent() {
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const greeting = greetingFor(profile?.displayName);
+  // Seed einmal pro Seitenaufruf würfeln — der Spruch bleibt bei Re-Renders
+  // stabil, wechselt aber von Besuch zu Besuch.
+  const greetingSeed = useRef(Math.random());
+  const greeting = dashboardGreetingFor(profile?.displayName, greetingSeed.current);
 
   const [sessions, setSessions] = useState<WorkoutSession[] | null>(null);
   const [stats, setStats] = useState<WorkoutStats | null>(null);

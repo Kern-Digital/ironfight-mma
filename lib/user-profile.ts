@@ -19,6 +19,7 @@ import {
 /** Firestore-Repräsentation des Athleten-Profils (Date → Timestamp) */
 type AthleteDoc = {
   primaryDiscipline?: AthleteProfile["primaryDiscipline"];
+  gender?: AthleteProfile["gender"];
   level?: AthleteProfile["level"];
   trainingStartDate?: Timestamp | null;
   weightKg?: number | null;
@@ -37,6 +38,7 @@ function athleteFromDoc(data?: AthleteDoc | null): AthleteProfile | undefined {
   if (!data) return undefined;
   return {
     primaryDiscipline: data.primaryDiscipline ?? null,
+    gender: data.gender ?? null,
     level: data.level ?? null,
     trainingStartDate: data.trainingStartDate?.toDate() ?? null,
     weightKg: data.weightKg ?? null,
@@ -198,6 +200,7 @@ export async function updateAthleteProfile(
   // Date-Felder zu Timestamp konvertieren, undefined → existing, null → null (clear)
   const next: AthleteDoc = { ...current };
   if (patch.primaryDiscipline !== undefined) next.primaryDiscipline = patch.primaryDiscipline;
+  if (patch.gender !== undefined) next.gender = patch.gender;
   if (patch.level !== undefined) next.level = patch.level;
   if (patch.trainingStartDate !== undefined) {
     next.trainingStartDate = patch.trainingStartDate
