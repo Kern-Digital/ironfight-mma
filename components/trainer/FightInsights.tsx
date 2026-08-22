@@ -37,8 +37,9 @@ const CARD_STYLE: React.CSSProperties = {
 };
 
 /**
- * Heat-Prinzip der Käfig-Karte: EINE Farbe (Cyan), Deckkraft = Anteil —
- * „kräftiger = mehr" braucht keine Legende. 0 % bleibt bewusst ungefüllt.
+ * Heat-Prinzip der Käfig-Karte: EINE Farbe (Cyan), Deckkraft streng nach
+ * RANG der Anteile (hellste Zone = größter Anteil) — „kräftiger = mehr"
+ * braucht keine Legende. 0 % bleibt bewusst ungefüllt.
  */
 const HEAT_RGB = "35,196,206"; // --ta-cyan
 
@@ -64,9 +65,17 @@ function InfoDot({ text }: { text: string }) {
 export default function FightInsights({
   split,
   stats,
+  frameless,
+  only,
 }: {
   split: DnaSplit | null | undefined;
   stats: ActionStat[];
+  /** true = ohne eigene Karten-Flächen/Kopfzeile — der Rahmen kommt vom
+   * Akkordeon in FightProfileView (neues Token-System). */
+  frameless?: boolean;
+  /** Nur einen Teil rendern: "insights" (§3+§4) bzw. "zones" (§5 Käfig-Karte)
+   * — FightProfileView platziert die Käfig-Karte separat als festen Block. */
+  only?: "insights" | "zones";
 }) {
   const tendencies = deriveTendencies(stats);
   const suggestions = deriveSuggestions(split, stats);
@@ -76,27 +85,40 @@ export default function FightInsights({
   if (tendencies.length === 0 && suggestions.length === 0 && zoneTotal === 0)
     return null;
 
+  const showInsights = only !== "zones";
+  const showZones = only !== "insights";
+  const hasInsightCard =
+    showInsights && (tendencies.length > 0 || suggestions.length > 0);
+
   return (
     <div className="flex flex-col gap-4">
       {/* §3 Auto-Insights — Icon-Badges mit Glow, Trennlinien zwischen den Zeilen */}
-      {(tendencies.length > 0 || suggestions.length > 0) && (
-        <div className="rounded-2xl p-4 sm:p-5" style={CARD_STYLE}>
-          <div className="mb-1 flex items-center justify-between">
-            <div
-              className="font-mono-ta text-[11px] font-bold uppercase"
-              style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
-            >
-              Auto-Insights
+      {hasInsightCard && (
+        <div
+          className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
+          style={frameless ? undefined : CARD_STYLE}
+        >
+          {!frameless && (
+            <div className="mb-1 flex items-center justify-between">
+              <div
+                className="font-mono-ta text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
+              >
+                Auto-Insights
+              </div>
+              <InfoDot text="Automatisch abgeleitet aus Fight-DNA-Split und Technik-Statistik." />
             </div>
-            <InfoDot text="Automatisch abgeleitet aus Fight-DNA-Split und Technik-Statistik." />
-          </div>
+          )}
 
           {tendencies.map((t, i) => (
             <div
               key={t.id}
               className="flex items-center gap-3.5 py-3"
               style={{
-                borderTop: i > 0 ? "1px dashed rgba(255,255,255,0.10)" : "none",
+                borderTop:
+                  i > 0
+                    ? `1px dashed ${frameless ? "var(--line)" : "rgba(255,255,255,0.10)"}`
+                    : "none",
               }}
             >
               <span
@@ -121,7 +143,7 @@ export default function FightInsights({
           {suggestions.length > 0 && (
             <div
               className={tendencies.length > 0 ? "mt-2 border-t pt-3" : ""}
-              style={{ borderColor: "var(--ink-4)" }}
+              style={{ borderColor: frameless ? "var(--line)" : "var(--ink-4)" }}
             >
               <div
                 className="font-mono-ta mb-2 text-[10px] uppercase"
@@ -160,8 +182,15 @@ export default function FightInsights({
         </div>
       )}
 
+      {/* Haarlinie zwischen Insights und Käfig-Karte, wenn beide rahmenlos
+          in derselben Akkordeon-Fläche liegen */}
+      {frameless && hasInsightCard && showZones && zoneTotal > 0 && (
+        <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
+      )}
+
       {/* §5 Käfig-Karte — Hero-Zahl mit Glow + Neon-Octagon */}
-      {zoneTotal > 0 &&
+      {showZones &&
+        zoneTotal > 0 &&
         (() => {
           const order = (["cage", "open", "center"] as CageZone[]).sort(
             (a, b) => zones[b] - zones[a],
@@ -169,14 +198,19 @@ export default function FightInsights({
           const dom = order[0];
           const domPct = Math.round((zones[dom] / zoneTotal) * 100);
           return (
-            <div className="rounded-2xl p-4 sm:p-5" style={CARD_STYLE}>
-              <div
-                className="font-mono-ta text-[12px] font-bold uppercase"
-                style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
-              >
-                Wo passiert die Aktion
-              </div>
-              <div className="mt-3 flex items-center gap-4">
+            <div
+              className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
+              style={frameless ? undefined : CARD_STYLE}
+            >
+              {!frameless && (
+                <div
+                  className="font-mono-ta text-[12px] font-bold uppercase"
+                  style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
+                >
+                  Wo passiert die Aktion
+                </div>
+              )}
+              <div className={frameless ? "flex items-center gap-4" : "mt-3 flex items-center gap-4"}>
                 <div className="relative min-w-0 flex-1">
                   {/* Speed-Lines hinter der Hero-Zahl */}
                   <span
@@ -213,7 +247,7 @@ export default function FightInsights({
                     {CAGE_ZONE_PHRASE[dom]}
                   </div>
                   <div className="mt-3 flex flex-col gap-1.5">
-                    {order.slice(1).map((z) => (
+                    {order.slice(1).map((z, i) => (
                       <div
                         key={z}
                         className="flex items-center gap-2"
@@ -222,9 +256,10 @@ export default function FightInsights({
                         <span
                           className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{
+                            // Rang-Leiter wie im Octagon: Platz 2 heller als Platz 3
                             background:
                               zones[z] > 0
-                                ? `rgba(${HEAT_RGB},${0.25 + 0.6 * (zones[z] / zoneTotal)})`
+                                ? `rgba(${HEAT_RGB},${i === 0 ? 0.6 : 0.3})`
                                 : "rgba(255,255,255,0.10)",
                           }}
                           aria-hidden
@@ -263,6 +298,11 @@ function octagon(r: number): string {
   return pts.join(" ");
 }
 
+/** Octagon als Pfad-Subpath — für Ring-Füllungen (außen minus innen). */
+function octagonPathD(r: number): string {
+  return `M${octagon(r).split(" ").join("L")}Z`;
+}
+
 function CageHeatmap({
   zones,
   total,
@@ -270,17 +310,21 @@ function CageHeatmap({
   zones: Record<CageZone, number>;
   total: number;
 }) {
-  // Neon-Look: Füllungen bleiben zurückhaltend (Deckkraft = Anteil), die
-  // dominante Zone trägt die glühende Cyan-Kontur. Prozente stehen direkt
-  // an den Zonen; der Cage-Wert sitzt über dem äußeren Ring.
+  // Neon-Look: Deckkraft streng nach RANG — hellster Ring = größter Anteil,
+  // zweithellster = zweitgrößter, schwächster = kleinster (0 % bleibt leer).
+  // Die Ringe sind echte Ringe (Pfad mit Loch), damit sich die Flächen nicht
+  // stapeln und die wahrgenommene Helligkeit wirklich der Rangfolge folgt.
+  // Die dominante Zone trägt zusätzlich die glühende Cyan-Kontur.
   const share = (z: CageZone) => (total > 0 ? zones[z] / total : 0);
-  const fill = (z: CageZone) =>
-    share(z) > 0
-      ? `rgba(${HEAT_RGB},${(0.08 + 0.3 * share(z)).toFixed(3)})`
-      : "none";
-  const dominant = (["cage", "open", "center"] as CageZone[]).reduce((a, b) =>
-    zones[b] > zones[a] ? b : a,
+  const ranked = (["cage", "open", "center"] as CageZone[]).sort(
+    (a, b) => zones[b] - zones[a],
   );
+  const RANK_ALPHA = [0.5, 0.2, 0.08];
+  const fill = (z: CageZone) =>
+    zones[z] > 0
+      ? `rgba(${HEAT_RGB},${RANK_ALPHA[ranked.indexOf(z)]})`
+      : "none";
+  const dominant = ranked[0];
   const isDom = (z: CageZone) => z === dominant && zones[z] > 0;
   const outline = (z: CageZone) =>
     isDom(z)
@@ -322,10 +366,18 @@ function CageHeatmap({
       aria-label="Käfig-Karte: Verteilung der Aktionen nach Zone"
       style={{ overflow: "visible", flexShrink: 0 }}
     >
-      {/* Cage-Ring (äußerste Zone) */}
-      <polygon points={octagon(44)} fill={fill("cage")} />
+      {/* Cage-Ring (äußerste Zone) — Ring mit Loch, keine Stapelung */}
+      <path
+        d={`${octagonPathD(44)} ${octagonPathD(30)}`}
+        fillRule="evenodd"
+        fill={fill("cage")}
+      />
       {/* Open-Ring */}
-      <polygon points={octagon(30)} fill={fill("open")} />
+      <path
+        d={`${octagonPathD(30)} ${octagonPathD(15)}`}
+        fillRule="evenodd"
+        fill={fill("open")}
+      />
       {/* Center */}
       <polygon points={octagon(15)} fill={fill("center")} />
       {/* Konturen — die dominante Zone glüht */}

@@ -20,18 +20,28 @@ import {
  * manuelle Tally-Eingabe wurde 2026-08-20 bewusst entfernt. Korrektur
  * falscher Zählungen: siehe Backlog "Neuberechnung aus allen Analysen".
  */
-export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
+export default function FightStatsBlock({
+  stats,
+  frameless,
+}: {
+  stats: ActionStat[];
+  /** true = ohne eigene Kopfzeile — Titel liefert das Akkordeon in
+   * FightProfileView (neues Token-System). */
+  frameless?: boolean;
+}) {
   const grouped = statsByGroup(stats);
   if (grouped.length === 0) return null;
 
   return (
     <div>
-      <div
-        className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
-        style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
-      >
-        Technik-Statistik
-      </div>
+      {!frameless && (
+        <div
+          className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
+        >
+          Technik-Statistik
+        </div>
+      )}
       <div className="flex flex-col gap-4">
         {grouped.map(({ group, stats: gs }) => {
           const meta = ACTION_GROUP_META[group];
@@ -61,7 +71,12 @@ export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
                   .filter(hasActionData)
                   .sort((a, b) => b.attempted - a.attempted)
                   .map((s) => (
-                    <StatRow key={s.id} stat={s} color={meta.color} />
+                    <StatRow
+                      key={s.id}
+                      stat={s}
+                      color={meta.color}
+                      frameless={frameless}
+                    />
                   ))}
               </div>
             </div>
@@ -72,7 +87,15 @@ export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
   );
 }
 
-function StatRow({ stat, color }: { stat: ActionStat; color: string }) {
+function StatRow({
+  stat,
+  color,
+  frameless,
+}: {
+  stat: ActionStat;
+  color: string;
+  frameless?: boolean;
+}) {
   const rate = successRate(stat);
   const meta: string[] = [];
   if (stat.zone) meta.push(CAGE_ZONE_LABEL[stat.zone]);
@@ -94,7 +117,7 @@ function StatRow({ stat, color }: { stat: ActionStat; color: string }) {
       </div>
       <div
         className="mt-1 h-1.5 w-full overflow-hidden rounded-full"
-        style={{ background: "var(--ink-4)" }}
+        style={{ background: frameless ? "var(--surface-raised)" : "var(--ink-4)" }}
       >
         <div
           style={{

@@ -331,6 +331,23 @@
     border: 1px solid var(--card-border);
     border-radius: var(--r-lg);
   }
+  /* DeepFight-Karte — dezente Feature-Hervorhebung: 1px-Verlaufsrand
+     (Gym-Akzent → Brand-Violett, stark mit --line abgeschwächt) + feiner
+     violetter Außen-Glow. Fläche bleibt normale Surface (keine Glows hinter
+     Listen). Violett ist Brand-Konstante → bleibt auch bei Gym-Branding. */
+  .t-card-fight {
+    background:
+      linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+      linear-gradient(
+          120deg,
+          color-mix(in oklab, var(--accent) 38%, var(--line)),
+          color-mix(in oklab, var(--accent-2) 50%, var(--line))
+        )
+        border-box;
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    box-shadow: 0 0 24px -8px color-mix(in oklab, var(--accent-2) 35%, transparent);
+  }
   .t-glass {
     background: var(--glass-bg);
     backdrop-filter: blur(var(--glass-blur));

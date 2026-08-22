@@ -346,6 +346,36 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       abhängig von Hauptdisziplin (ggf. Verband) wählen; betrifft
       AthleteProfileForm, MatchupBlock/Tale-of-the-Tape, FightCampForm.
       (Notiert 2026-08-21.)
+- [ ] Käfig-Karte („Wo passiert die Aktion") disziplinabhängig darstellen:
+      Zonen-IDs `center|open|cage` bleiben stabil (semantisch Mitte/freier
+      Raum/Begrenzung, KEINE Migration) — nur Darstellung per Arena-Preset:
+      cage=Octagon „Am Cage" (MMA, Default), ring=Quadrat „In den Seilen"
+      (Boxen/Kickboxen/K-1/Muay Thai), matte=Kreis „Am Mattenrand"
+      (BJJ/Ringen/Grappling). Betrifft: Preset-Registry + PHRASE-Sätze in
+      lib/fight-stats.ts (deriveTendencies braucht Preset-Parameter),
+      `arena`-Prop durch FightProfileView/FightInsights/OpponentProfileView,
+      CageHeatmap-Geometrie, KI-Prompts textlich generalisieren („Begrenzung:
+      Käfig/Ringseile/Mattenrand", Zone-Enum unverändert). Disziplin-Quelle:
+      Athlet = athlete.primaryDiscipline; Gegner haben KEINE Disziplin →
+      Feld im OpponentEditor oder Disziplin des verknüpften Wettkampfs.
+      Zusammen mit dem Gewichtsklassen-Punkt oben lösen (gleiche
+      „Hauptdisziplin bestimmt Raster"-Quelle). (Notiert 2026-08-22.)
+      Dazu KI-Sportarten-Erkennung als KONTROLLE, nicht als Quelle
+      (Entscheidung 2026-08-22): Disziplin wird VOR der Analyse als
+      vorbelegtes Select im Analyse-Formular gesetzt (Athlet:
+      athlete.primaryDiscipline, Gegner: Wettkampf/Feld, sonst leer) und geht
+      additiv in beide Prompts — Regression-Regel wie beim recency-Feld:
+      ohne Angabe zeichengleicher Prompt. Gemini gibt zusätzlich
+      meta.detectedSport + meta.detectedArena (+ Konfidenz) in der
+      Beobachtung aus (getrennt erkennen: Sportart ≠ Austragungsort, z. B.
+      MMA im Ring, Sparring auf der Matte); bei Abweichung von der Vorgabe
+      Warnung im Ergebnis-Review („falsches Video?") — KEIN blockierendes
+      Popup mitten in der Pipeline (Analyse muss unbeaufsichtigt
+      durchlaufen), KEIN Freitext für Korrekturen (immer Disziplin-Enum +
+      ui/Select). Ohne Vorgabe fällt die Anzeige auf die Erkennung zurück,
+      markiert als „automatisch erkannt". Achtung: Schema-Erweiterung der
+      Beobachtung invalidiert einmalig gespeicherte
+      pendingObservation-Fingerprints (Resume startet Gemini neu — ok).
 - [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
       Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,

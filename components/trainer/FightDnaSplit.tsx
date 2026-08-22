@@ -19,8 +19,12 @@ import {
  */
 export default function FightDnaSplit({
   split,
+  frameless,
 }: {
   split: DnaSplit | null | undefined;
+  /** true = ohne eigene Karten-Fläche/Kopfzeile — der Rahmen kommt vom
+   * Akkordeon in FightProfileView (neues Token-System). */
+  frameless?: boolean;
 }) {
   if (!split || isDnaSplitEmpty(split)) return null;
   const norm = normalizeDnaSplit(split);
@@ -28,27 +32,33 @@ export default function FightDnaSplit({
 
   return (
     <div
-      className="rounded-2xl p-4 sm:p-5"
-      style={{
-        background: "linear-gradient(180deg, var(--ink-2), var(--ink-1))",
-        border: "1px solid var(--ink-4)",
-      }}
+      className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
+      style={
+        frameless
+          ? undefined
+          : {
+              background: "linear-gradient(180deg, var(--ink-2), var(--ink-1))",
+              border: "1px solid var(--ink-4)",
+            }
+      }
     >
-      <div className="mb-4 flex items-center justify-between">
-        <div
-          className="font-mono-ta text-[11px] font-bold uppercase"
-          style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
-        >
-          Fight DNA
+      {!frameless && (
+        <div className="mb-4 flex items-center justify-between">
+          <div
+            className="font-mono-ta text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
+          >
+            Fight DNA
+          </div>
+          <span
+            className="font-mono-ta flex h-5 w-5 items-center justify-center rounded-full text-[10px]"
+            title="Prozentuale Verteilung der Kampfbereiche — automatisch aus der KI-Video-Analyse berechnet."
+            style={{ border: "1px solid var(--ink-6)", color: "var(--fg-4)" }}
+          >
+            i
+          </span>
         </div>
-        <span
-          className="font-mono-ta flex h-5 w-5 items-center justify-center rounded-full text-[10px]"
-          title="Prozentuale Verteilung der Kampfbereiche — automatisch aus der KI-Video-Analyse berechnet."
-          style={{ border: "1px solid var(--ink-6)", color: "var(--fg-4)" }}
-        >
-          i
-        </span>
-      </div>
+      )}
       <StackedBar norm={norm} />
       <div className="mt-4 flex">
         {activeKeys.map((k, i) => (
@@ -56,7 +66,10 @@ export default function FightDnaSplit({
             key={k}
             className="flex flex-1 flex-col items-center gap-1.5 px-1 text-center"
             style={{
-              borderLeft: i > 0 ? "1px solid var(--ink-4)" : "none",
+              borderLeft:
+                i > 0
+                  ? `1px solid ${frameless ? "var(--line)" : "var(--ink-4)"}`
+                  : "none",
             }}
           >
             <span

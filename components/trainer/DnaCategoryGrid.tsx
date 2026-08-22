@@ -17,7 +17,15 @@ import DnaCategoryIcon from "./DnaCategoryIcon";
  * darunter. Leere Kategorien bleiben sichtbar (gedimmt) — Scouting-Lücken
  * sollen auffallen, nicht verschwinden.
  */
-export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers }) {
+export default function DnaCategoryGrid({
+  answers,
+  frameless,
+}: {
+  answers: GegnerDnaAnswers;
+  /** true = Flächen im neuen Token-System (Akkordeon in FightProfileView
+   * liefert die Karte); false = alter Ink-Look für die Scouting-Ansichten. */
+  frameless?: boolean;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -64,11 +72,23 @@ export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers
               aria-expanded={active}
               className="flex flex-col rounded-2xl p-3.5 text-left transition-colors"
               style={{
-                background: active
-                  ? "linear-gradient(180deg, var(--ink-4), var(--ink-3))"
-                  : "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+                background: frameless
+                  ? active
+                    ? "var(--surface-raised)"
+                    : "transparent"
+                  : active
+                    ? "linear-gradient(180deg, var(--ink-4), var(--ink-3))"
+                    : "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
                 border: `1px solid ${
-                  active ? category.accent : isEmpty ? "var(--ink-4)" : "var(--ink-5)"
+                  active
+                    ? category.accent
+                    : frameless
+                      ? isEmpty
+                        ? "var(--line)"
+                        : "var(--line-strong)"
+                      : isEmpty
+                        ? "var(--ink-4)"
+                        : "var(--ink-5)"
                 }`,
                 opacity: isEmpty ? 0.6 : 1,
               }}
@@ -77,8 +97,14 @@ export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                   style={{
-                    background: "var(--ink-4)",
-                    border: `1px solid ${isEmpty ? "var(--ink-5)" : category.accent}`,
+                    background: frameless ? "var(--surface-raised)" : "var(--ink-4)",
+                    border: `1px solid ${
+                      isEmpty
+                        ? frameless
+                          ? "var(--line)"
+                          : "var(--ink-5)"
+                        : category.accent
+                    }`,
                     color: isEmpty ? "var(--fg-4)" : category.accent,
                   }}
                   aria-hidden
@@ -110,7 +136,9 @@ export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers
               {/* Fortschritt */}
               <span
                 className="mt-1.5 block h-1 w-full overflow-hidden rounded-full"
-                style={{ background: "var(--ink-4)" }}
+                style={{
+                  background: frameless ? "var(--surface-raised)" : "var(--ink-4)",
+                }}
                 aria-hidden
               >
                 <span
@@ -147,15 +175,21 @@ export default function DnaCategoryGrid({ answers }: { answers: GegnerDnaAnswers
           ref={panelRef}
           className="mt-3 rounded-2xl p-4 sm:p-5"
           style={{
-            background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-            border: `1px solid ${selected.accent}`,
+            background: frameless
+              ? "var(--surface-raised)"
+              : "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+            border: `1px solid ${
+              frameless
+                ? `color-mix(in oklab, ${selected.accent} 45%, transparent)`
+                : selected.accent
+            }`,
           }}
         >
           <div className="mb-3 flex items-center gap-3">
             <span
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
               style={{
-                background: "var(--ink-4)",
+                background: frameless ? "transparent" : "var(--ink-4)",
                 border: `1px solid ${selected.accent}`,
                 color: selected.accent,
               }}

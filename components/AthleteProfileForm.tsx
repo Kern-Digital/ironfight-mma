@@ -1,12 +1,16 @@
 "use client";
 
 /**
- * Editierbares Athleten-Profil (Basics, Körperdaten, Gym & Coach, nächster
- * Wettkampf) — aus der Account-Seite extrahiert und Teil des Kampfprofils
- * (/kampfprofil). Schreibt nach users/{uid}.athlete.
+ * Editierbares Athleten-Profil (Basics, Körperdaten, Gym & Coach) — aus der
+ * Account-Seite extrahiert und Teil des Kampfprofils (/kampfprofil).
+ * Schreibt nach users/{uid}.athlete — seit 2026-08-22 AUTOMATISCH (debounced
+ * 800 ms nach der letzten Änderung, kein Speichern-Button). Nach der ersten
+ * eigenen Eingabe wird das Formular nie mehr aus dem Profil überschrieben,
+ * damit der refreshProfile() nach dem Speichern keine laufende Eingabe
+ * wegwirft.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
@@ -28,9 +32,9 @@ import { updateAthleteProfile } from "@/lib/user-profile";
 
 // ─── Hilfs-Komponenten (neues Token-System, Muster: Referenzseiten) ────────
 
-const BTN_FONT: React.CSSProperties = {
-  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.08em",
+const STATUS_FONT: React.CSSProperties = {
+  font: "600 11px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.12em",
   textTransform: "uppercase",
 };
 
@@ -189,7 +193,21 @@ export default function AthleteProfileForm() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-Speichern: dirty = ungespeicherte Änderung (steuert den Debounce),
+  // edited = je selbst editiert (stoppt den Profil→Form-Sync dauerhaft),
+  // inFlight/pending serialisieren überlappende Speichervorgänge.
+  const dirtyRef = useRef(false);
+  const editedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef(false);
+  const formRef = useRef(form);
+  formRef.current = form;
+
   useEffect(() => {
+    // Nur solange synchronisieren, bis der User selbst etwas eingegeben hat —
+    // danach ist das Formular die Quelle der Wahrheit (sonst würde der
+    // refreshProfile() nach jedem Auto-Save laufende Eingaben überschreiben).
+    if (editedRef.current) return;
     setForm(formFromAthlete(profile?.athlete));
   }, [profile?.athlete]);
 
@@ -219,24 +237,55 @@ export default function AthleteProfileForm() {
     return weightClassForKg(kg);
   }, [form.weightKg]);
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  const persist = useCallback(async () => {
     if (!user) return;
+    if (inFlightRef.current) {
+      // Läuft schon ein Save, danach mit dem dann aktuellen Stand erneut
+      pendingRef.current = true;
+      return;
+    }
+    inFlightRef.current = true;
+    dirtyRef.current = false;
     setError(null);
     setSaving(true);
     try {
-      await updateAthleteProfile(user.uid, patchFromForm(form));
+      await updateAthleteProfile(user.uid, patchFromForm(formRef.current));
       await refreshProfile();
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
     } catch (err) {
+      dirtyRef.current = true; // nächste Eingabe versucht es erneut
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
       setSaving(false);
+      inFlightRef.current = false;
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        void persist();
+      }
     }
-  }
+  }, [user, refreshProfile]);
+
+  // Debounce: 800 ms nach der letzten Änderung automatisch speichern
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    const t = setTimeout(() => void persist(), 800);
+    return () => clearTimeout(t);
+  }, [form, persist]);
+
+  // Flush beim Unmount: Wer innerhalb der Debounce-Zeit wegnavigiert, verlöre
+  // sonst die letzte Eingabe (SPA-Navigation — der Firestore-Write läuft nach
+  // dem Unmount normal weiter).
+  useEffect(
+    () => () => {
+      if (dirtyRef.current) void persist();
+    },
+    [persist],
+  );
 
   function update<K extends keyof AthleteForm>(key: K, value: AthleteForm[K]) {
+    editedRef.current = true;
+    dirtyRef.current = true;
+    setSaved(false);
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -244,7 +293,7 @@ export default function AthleteProfileForm() {
     // Mobil: eine Spalte; Desktop: Sektionen nebeneinander (linkslastige
     // Schmalspalte vermeiden), Gym & Coach + Fußzeile über volle Breite.
     <form
-      onSubmit={handleSave}
+      onSubmit={(e) => e.preventDefault()}
       className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10"
     >
       <Section title="Athleten-Basics">
@@ -460,33 +509,26 @@ export default function AthleteProfileForm() {
           </div>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="t-interactive flex min-h-hit items-center justify-center rounded-field px-5 disabled:opacity-60"
-            style={{
-              ...BTN_FONT,
-              background: "var(--accent)",
-              color: "var(--on-accent)",
-              boxShadow: "var(--accent-glow)",
-            }}
-          >
-            {saving ? "Speichere…" : "Athleten-Profil speichern"}
-          </button>
-          {saved && (
+          <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+            Änderungen werden automatisch gespeichert.
+          </span>
+          {saving ? (
             <span
               className="inline-flex items-center gap-1.5"
-              style={{
-                font: "600 11px/1.2 var(--font-archivo), system-ui, sans-serif",
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--positive)",
-              }}
+              style={{ ...STATUS_FONT, color: "var(--text-3)" }}
+            >
+              <Icon name="refresh" size={14} strokeWidth={2.2} />
+              Speichere…
+            </span>
+          ) : saved ? (
+            <span
+              className="inline-flex items-center gap-1.5"
+              style={{ ...STATUS_FONT, color: "var(--positive)" }}
             >
               <Icon name="check" size={14} strokeWidth={2.6} />
               Gespeichert
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </form>
