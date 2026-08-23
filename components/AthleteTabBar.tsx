@@ -31,9 +31,11 @@ export default function AthleteTabBar() {
     >
       <div className="t-glass mx-auto flex w-full max-w-2xl">
         {TABS.map((tab) => {
+          // „Training" deckt das Dashboard UND alle Workout-Routen ab — so
+          // bleibt die Orientierung auch auf Unterseiten (Pläne, Runner).
           const active =
             tab.href === "/dashboard"
-              ? pathname === "/dashboard"
+              ? pathname === "/dashboard" || pathname.startsWith("/workout")
               : pathname.startsWith(tab.activePrefix ?? tab.href);
           return (
             <Link

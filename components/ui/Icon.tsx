@@ -47,7 +47,9 @@ export type IconName =
   | "edit"
   | "user"
   | "sun"
-  | "chevron-down";
+  | "chevron-down"
+  | "play"
+  | "pause";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -273,6 +275,9 @@ const PATHS: Record<IconName, React.ReactNode> = {
   "arrow-right": <path d="M4 12h16M14 6l6 6-6 6" />,
   "arrow-left": <path d="M20 12H4m6-6-6 6 6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  // Timer-Steuerung (Workout-Runner/Session)
+  play: <path d="M8 5.5v13l11-6.5-11-6.5Z" />,
+  pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
   // Welle — Tidal-Markenmotiv
   wave: (
     <>

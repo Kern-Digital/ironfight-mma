@@ -157,6 +157,12 @@
   --cat-5: oklch(0.79 0.19 148);  /* Mint — Clinch */
   --cat-mixed: oklch(0.90 0.01 300);   /* MMA = alles → starkes Neutral */
   --cat-neutral: oklch(0.71 0.02 250); /* Self-Defense/Wing Tsung */
+  /* Stärke des Rubrik-Scheins auf Karten/Köpfen (data-glow mit --cat-*):
+     Light braucht deutlich mehr, weil der Schein auf hellem Grund versinkt. */
+  --cat-glow-mix: 58%;
+  /* Sättigungs-Boost der Glow-Formen ([data-glow]) — Neon-Charakter;
+     Light braucht mehr, weil Blur auf hellem Grund entsättigt wirkt. */
+  --glow-sat: 1.25;
 
   /* KI-Regenbogen (feste Hues, keine Gym-Ableitung) — AUSSCHLIESSLICH für
      .t-ai-badge (Hervorhebung besonderer KI-Anzeigen, z. B. „DNA 33 %").
@@ -232,6 +238,8 @@
   --cat-5: oklch(0.55 0.15 148);
   --cat-mixed: oklch(0.35 0.01 300);
   --cat-neutral: oklch(0.50 0.02 250);
+  --cat-glow-mix: 100%;
+  --glow-sat: 1.7;
   --ai-1: oklch(0.58 0.19 25);
   --ai-2: oklch(0.65 0.13 90);
   --ai-3: oklch(0.60 0.15 150);
@@ -309,7 +317,8 @@
   mask-image: linear-gradient(to bottom, black 55%, transparent 95%);
 }
 [data-ambient] [data-glow] {
-  position: absolute; border-radius: 50%; filter: blur(72px);
+  position: absolute; border-radius: 50%;
+  filter: blur(72px) saturate(var(--glow-sat, 1));
   animation: ambient-drift 28s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce) {

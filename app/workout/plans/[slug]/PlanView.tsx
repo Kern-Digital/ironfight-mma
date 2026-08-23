@@ -1,0 +1,225 @@
+"use client";
+
+/**
+ * Client-Ansicht der Trainingsplan-Seite (neues Token-System, Etappe 4).
+ * Die Seite selbst bleibt Server-Komponente (generateStaticParams/-Metadata);
+ * hier lebt alles, was die Athleten-Shell braucht (Rolle, Theme, Tab-Bar).
+ */
+
+import AthleteTabBar from "@/components/AthleteTabBar";
+import Icon from "@/components/ui/Icon";
+import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import { CATEGORY_COLOR } from "@/lib/discipline-colors";
+import { planDurationSeconds, type DisciplinePlan } from "@/lib/training-plans";
+import Link from "next/link";
+import { Fragment } from "react";
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+};
+
+function Hairline() {
+  return <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />;
+}
+
+function formatDuration(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s} s`;
+  if (s === 0) return `${m} min`;
+  return `${m} min ${s} s`;
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="t-label">{label}</span>
+      <span
+        className="tabular-nums"
+        style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+export default function PlanView({ plan }: { plan: DisciplinePlan }) {
+  const { profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+
+  const totalExercises = plan.blocks.reduce(
+    (sum, b) => sum + b.exercises.length,
+    0,
+  );
+
+  const timerHref = `/timer?rounds=${plan.preset.rounds}&work=${plan.preset.workSeconds}&rest=${plan.preset.restSeconds}&prep=${plan.preset.prepSeconds}&label=${encodeURIComponent(plan.name)}`;
+
+  return (
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* Kopfbereich mit Ambient-Schicht */}
+      <section className="relative">
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          <div data-ambient style={{ background: "var(--ambient)" }} />
+          {/* Rubrik-Farbe als Schein von links — gleiche Sprache wie die
+              Plan-Karten im Hub (kein Farbpunkt) */}
+          <div data-ambient>
+            <span
+              data-glow
+              style={{
+                left: "-12%",
+                top: "-30%",
+                width: "55%",
+                height: "160%",
+                background: `color-mix(in oklab, ${CATEGORY_COLOR[plan.slug]} var(--cat-glow-mix), transparent)`,
+              }}
+            />
+          </div>
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
+          <div className="flex flex-1 flex-col gap-1">
+            {/* Zurück-Weg: Unterseite des Training-Tabs, Orientierung bleibt */}
+            <Link
+              href="/workout/generator"
+              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
+              style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
+            >
+              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
+              Workout
+            </Link>
+            <span className="t-label">
+              Trainingsplan · ≈ {Math.round(planDurationSeconds(plan) / 60)} min
+            </span>
+            <h1
+              style={{
+                font: "var(--type-display)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              {plan.name}
+            </h1>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              {plan.description}
+            </p>
+          </div>
+          {!isTrainer && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark"
+                  ? "Helles Design aktivieren"
+                  : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
+          )}
+        </div>
+      </section>
+
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-1 lg:max-w-5xl lg:px-6">
+        {/* Eckdaten + Start */}
+        <section className="flex flex-col gap-5">
+          <div className="t-card grid grid-cols-2 gap-4 p-4 sm:grid-cols-4 sm:p-5">
+            <Stat label="Runden" value={`${plan.preset.rounds}×`} />
+            <Stat label="Kampfzeit" value={formatDuration(plan.preset.workSeconds)} />
+            <Stat label="Pause" value={formatDuration(plan.preset.restSeconds)} />
+            <Stat label="Übungen" value={String(totalExercises)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={timerHref}
+              className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
+              style={{
+                ...BTN_FONT,
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+                textDecoration: "none",
+              }}
+            >
+              <Icon name="play" size={13} strokeWidth={2.2} />
+              Workout starten
+            </Link>
+          </div>
+        </section>
+
+        {/* Blöcke — pro Block EINE Karte mit Haarlinien-Trennern */}
+        <div className="flex flex-col gap-8">
+          {plan.blocks.map((block, idx) => (
+            <section key={block.title} className="flex flex-col gap-3">
+              <div className="flex items-baseline gap-3">
+                <span
+                  className="tabular-nums"
+                  style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
+                >
+                  {String(idx + 1).padStart(2, "0")}
+                </span>
+                <h2
+                  style={{
+                    font: "var(--type-h2)",
+                    letterSpacing: "var(--ls-display)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {block.title}
+                </h2>
+              </div>
+              <div className="t-card px-3.5 py-0.5">
+                {block.exercises.map((ex, i) => (
+                  <Fragment key={ex.name}>
+                    {i > 0 && <Hairline />}
+                    <div className="flex min-h-hit flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span style={{ font: "var(--type-body-strong)" }}>
+                          {ex.name}
+                        </span>
+                        {ex.notes && (
+                          <span
+                            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                          >
+                            {ex.notes}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className="shrink-0 self-start rounded-badge px-2 py-1 sm:self-center"
+                        style={{
+                          ...META_FONT,
+                          background: "var(--surface-raised)",
+                          border: "1px solid var(--line)",
+                          color: "var(--accent-text)",
+                        }}
+                      >
+                        {ex.format}
+                      </span>
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+
+      {!isTrainer && <AthleteTabBar />}
+    </main>
+  );
+}

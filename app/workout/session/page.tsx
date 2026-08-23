@@ -1,7 +1,5 @@
 "use client";
 
-import Icon, { type IconName } from "@/components/ui/Icon";
-
 /**
  * Workout Session — Geführter Trainings-Modus
  *
@@ -11,9 +9,16 @@ import Icon, { type IconName } from "@/components/ui/Icon";
  *  - Sprachansagen (Web Speech API, Deutsch)
  *  - Minimal-UI: nur Pause + Skip
  *  - Gleicher URL-Parameter ?payload=... wie /workout
+ *
+ * Neues Token-System (Rollout Etappe 4). Bewusst OHNE Tab-Bar: der Modus ist
+ * ein immersiver Player — Verlassen nur gezielt über „Beenden" (mit
+ * Bestätigung), nicht per versehentlichem Navigations-Tap.
+ * Phasenfarben = Semantik-Tokens (prep=warning, work=accent, rest=neutral,
+ * done=positive), Glows via color-mix aus denselben Tokens.
  */
 
 import ExerciseAnimation from "@/components/ExerciseAnimation";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { getExerciseById } from "@/lib/exercises";
@@ -56,38 +61,45 @@ function parseWorkout(payload: string | null): WorkoutDefinition | null {
   }
 }
 
-// ─── Phase-Styling ────────────────────────────────────────────────────────────
+// ─── Phase-Styling (Semantik-Tokens statt fester Farben) ──────────────────────
 
 const PHASE_LABEL: Record<Phase, string> = {
-  idle:  "Bereit",
-  prep:  "Vorbereitung",
-  work:  "Übung",
-  rest:  "Pause",
-  done:  "Fertig",
+  idle: "Bereit",
+  prep: "Vorbereitung",
+  work: "Übung",
+  rest: "Pause",
+  done: "Fertig",
 };
 
 const PHASE_COLOR: Record<Phase, string> = {
-  idle:  "text-fg-3",
-  prep:  "text-yellow-400",
-  work:  "text-blood",
-  rest:  "text-blue-400",
-  done:  "text-green-400",
+  idle: "var(--text-3)",
+  prep: "var(--warning)",
+  work: "var(--accent-text)",
+  rest: "var(--text-2)",
+  done: "var(--positive)",
 };
 
-const PHASE_BG: Record<Phase, string> = {
-  idle:  "bg-fg-3",
-  prep:  "bg-yellow-500",
-  work:  "bg-blood",
-  rest:  "bg-blue-500",
-  done:  "bg-green-500",
-};
-
+// Weicher Schein hinter Countdown/Übungsname — aus demselben Token gemischt
 const PHASE_GLOW: Record<Phase, string> = {
-  idle:  "",
-  prep:  "drop-shadow(0 0 20px rgba(234,179,8,.5))",
-  work:  "drop-shadow(0 0 28px rgba(35,196,206,.6))",
-  rest:  "drop-shadow(0 0 20px rgba(59,130,246,.5))",
-  done:  "drop-shadow(0 0 20px rgba(34,197,94,.5))",
+  idle: "none",
+  prep: "drop-shadow(0 0 20px color-mix(in oklab, var(--warning) 50%, transparent))",
+  work: "drop-shadow(0 0 28px color-mix(in oklab, var(--accent) 55%, transparent))",
+  rest: "none",
+  done: "drop-shadow(0 0 20px color-mix(in oklab, var(--positive) 50%, transparent))",
+};
+
+// ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
 };
 
 // ─── Kern-Komponente ──────────────────────────────────────────────────────────
@@ -239,9 +251,24 @@ function SessionRunner() {
 
   if (!workout) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 text-center">
-        <p className="text-lg font-bold text-fg-3">Kein Workout geladen.</p>
-        <Link href="/workout/generator" className="btn-primary">
+      <div
+        className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 text-center"
+        style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+      >
+        <p style={{ font: "var(--type-body-strong)", color: "var(--text-3)" }}>
+          Kein Workout geladen.
+        </p>
+        <Link
+          href="/workout/generator"
+          className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
+          style={{
+            ...BTN_FONT,
+            background: "var(--accent)",
+            color: "var(--on-accent)",
+            boxShadow: "var(--accent-glow)",
+            textDecoration: "none",
+          }}
+        >
           Zum Workout-Generator
         </Link>
       </div>
@@ -255,51 +282,67 @@ function SessionRunner() {
   const phaseProgress   = t.totalForPhase > 0
     ? Math.min(100, ((t.totalForPhase - t.remaining) / t.totalForPhase) * 100)
     : 0;
+  const phaseColor = PHASE_COLOR[t.phase];
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-0 px-4 pb-8 pt-3 sm:px-6">
+    <main
+      className="min-h-screen"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+    <div
+      className="mx-auto flex max-w-lg flex-col gap-0 px-4 pt-3 sm:px-6"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
+    >
 
       {/* ── Top-Bar ──────────────────────────────────────────────────────────── */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <button
+          type="button"
           onClick={handleAbort}
-          className="flex items-center gap-1.5 rounded-lg border border-carbon-400 bg-carbon-700/60 px-3 py-2 text-xs font-bold uppercase tracking-widest text-fg-3 transition-colors hover:border-pink hover:text-pink"
           aria-label="Session beenden"
+          className="t-interactive flex min-h-hit items-center gap-1.5 rounded-field px-3"
+          style={{
+            ...BTN_FONT,
+            background: "var(--surface-raised)",
+            border: "1px solid var(--line)",
+            color: "var(--text-3)",
+          }}
         >
-          <span aria-hidden="true">✕</span>
+          <Icon name="x" size={13} strokeWidth={2.2} />
           <span>Beenden</span>
         </button>
 
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-widest text-fg-4">
+          <div style={{ ...META_FONT, color: "var(--text-3)" }}>
             {CATEGORY_LABEL[workout.category]}
           </div>
-          <div className="text-xs font-bold text-fg-2">
+          <div style={{ font: "var(--type-sub)", fontWeight: 600 }}>
             Übung {Math.min(exerciseIndex + 1, totalExercises)}/{totalExercises}
           </div>
         </div>
 
-        {/* Gesamt-Fortschrittsbalken */}
+        {/* Gesamt-Fortschritt */}
         <div className="flex flex-col items-end gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-fg-4">
+          <span style={{ ...META_FONT, color: "var(--text-3)" }}>
             {Math.round(progress)}%
           </span>
-          <div className="h-1 w-20 overflow-hidden rounded-full bg-ink-4">
-            <div
-              className="h-full bg-blood transition-all duration-500"
-              style={{ width: `${progress}%` }}
+          <div className="t-progress w-20" style={{ height: "4px" }}>
+            <span
+              style={{ width: `${progress}%`, transition: "width 500ms var(--ease-out)" }}
             />
           </div>
         </div>
       </div>
 
       {/* ── Phase-Label ──────────────────────────────────────────────────────── */}
-      <div className={`mb-2 text-center text-xs font-black uppercase tracking-[0.2em] ${PHASE_COLOR[t.phase]}`}>
-        {PHASE_LABEL[t.phase]}
+      <div className="mb-2 text-center">
+        <span className="t-label" style={{ color: phaseColor }}>
+          {PHASE_LABEL[t.phase]}
+        </span>
         {t.phase === "work" && t.config.rounds > 1 && (
-          <span className="ml-2 font-normal text-fg-4">
+          <span className="ml-2" style={{ ...META_FONT, color: "var(--text-3)" }}>
             Runde {Math.min(t.round, t.config.rounds)}/{t.config.rounds}
           </span>
         )}
@@ -318,9 +361,12 @@ function SessionRunner() {
       {currentExercise && !allDone && (
         <div className="mb-1 text-center">
           <h1
-            className={`font-display font-black uppercase leading-tight tracking-tight ${PHASE_COLOR[t.phase]}`}
             style={{
+              font: "800 28px/1.15 var(--font-archivo), system-ui, sans-serif",
               fontSize: "clamp(1.7rem, 7vw, 2.8rem)",
+              letterSpacing: "var(--ls-display)",
+              textTransform: "uppercase",
+              color: phaseColor,
               filter: PHASE_GLOW[t.phase],
             }}
           >
@@ -328,7 +374,10 @@ function SessionRunner() {
           </h1>
 
           {currentExercise.cues && currentExercise.cues.length > 0 && (
-            <p className="mt-1 text-xs text-fg-4">
+            <p
+              className="mt-1"
+              style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+            >
               {currentExercise.cues.slice(0, 2).join(" · ")}
             </p>
           )}
@@ -338,11 +387,12 @@ function SessionRunner() {
       {/* ── Countdown ────────────────────────────────────────────────────────── */}
       {!allDone && (
         <div
-          className={`my-2 text-center font-display font-black tabular-nums leading-none ${PHASE_COLOR[t.phase]}`}
+          className="my-2 text-center tabular-nums"
           style={{
-            fontSize:  "clamp(5rem, 22vw, 9rem)",
-            filter:    PHASE_GLOW[t.phase],
-            lineHeight: 1,
+            font: "800 96px/1 var(--font-archivo), system-ui, sans-serif",
+            fontSize: "clamp(5rem, 22vw, 9rem)",
+            color: phaseColor,
+            filter: PHASE_GLOW[t.phase],
           }}
           aria-live="polite"
           aria-label={`${t.remaining} Sekunden verbleibend`}
@@ -353,10 +403,13 @@ function SessionRunner() {
 
       {/* ── Phasen-Fortschrittsbalken ─────────────────────────────────────────── */}
       {!allDone && (
-        <div className="mb-3 h-2 overflow-hidden rounded-full bg-ink-4">
-          <div
-            className={`h-full transition-all duration-200 ${PHASE_BG[t.phase]}`}
-            style={{ width: `${phaseProgress}%` }}
+        <div className="t-progress mb-3">
+          <span
+            style={{
+              width: `${phaseProgress}%`,
+              background: t.phase === "work" ? "var(--grad-progress)" : phaseColor,
+              transition: "width 200ms var(--ease-out)",
+            }}
           />
         </div>
       )}
@@ -364,12 +417,19 @@ function SessionRunner() {
       {/* ── Nächste Übung ────────────────────────────────────────────────────── */}
       {nextExercise && !allDone && (
         <div className="mb-4 flex items-center gap-2">
-          <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-fg-4">
+          <span className="shrink-0" style={{ ...META_FONT, color: "var(--text-3)" }}>
             Als Nächstes
           </span>
-          <span className="mx-1 text-fg-4">→</span>
-          <span className="text-sm font-bold text-fg-2">{nextExercise.name}</span>
-          <span className="ml-auto shrink-0 text-[10px] text-fg-4">
+          <span aria-hidden className="shrink-0" style={{ color: "var(--text-3)", lineHeight: 0 }}>
+            <Icon name="arrow-right" size={13} strokeWidth={2.2} />
+          </span>
+          <span className="truncate" style={{ font: "var(--type-body-strong)", color: "var(--text-2)" }}>
+            {nextExercise.name}
+          </span>
+          <span
+            className="ml-auto shrink-0"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+          >
             {nextExercise.defaultRounds}× {nextExercise.durationSeconds}s
           </span>
         </div>
@@ -377,28 +437,71 @@ function SessionRunner() {
 
       {/* ── Fertig-Banner ─────────────────────────────────────────────────────── */}
       {allDone && (
-        <div className="my-8 rounded-2xl border border-green-500/30 bg-green-500/10 px-6 py-10 text-center">
+        <div
+          className="my-8 rounded-modal px-6 py-10 text-center"
+          style={{
+            background: "color-mix(in oklab, var(--positive) 10%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--positive) 40%, transparent)",
+          }}
+        >
           <div
-            className="font-display font-black text-green-400"
-            style={{ fontSize: "clamp(2rem, 8vw, 3.5rem)" }}
+            style={{
+              font: "800 40px/1.1 var(--font-archivo), system-ui, sans-serif",
+              fontSize: "clamp(2rem, 8vw, 3.5rem)",
+              letterSpacing: "var(--ls-display)",
+              textTransform: "uppercase",
+              color: "var(--positive)",
+            }}
           >
             Workout fertig!
           </div>
-          <div className="mt-2 flex justify-center text-amber"><Icon name="trophy" size={36} /></div>
+          <div className="mt-3 flex justify-center" style={{ color: "var(--positive)" }}>
+            <Icon name="trophy" size={36} />
+          </div>
           {logState === "saving" && (
-            <p className="mt-4 text-xs text-fg-4">Speichere Session…</p>
+            <p className="mt-4" style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Speichere Session…
+            </p>
           )}
           {logState === "saved" && (
-            <p className="mt-4 text-xs text-green-300">Im Dashboard gespeichert ✓</p>
+            <p
+              className="mt-4 inline-flex items-center gap-1.5"
+              style={{ font: "var(--type-sub)", color: "var(--positive)" }}
+            >
+              <Icon name="check" size={14} strokeWidth={2.6} />
+              Im Dashboard gespeichert
+            </p>
           )}
           {logState === "error" && (
-            <p className="mt-4 text-xs text-pink">Speichern fehlgeschlagen</p>
+            <p className="mt-4" style={{ font: "var(--type-sub)", color: "var(--negative)" }}>
+              Speichern fehlgeschlagen
+            </p>
           )}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/dashboard" className="btn-secondary text-sm">
+            <Link
+              href="/dashboard"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4"
+              style={{
+                ...BTN_FONT,
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
+                textDecoration: "none",
+              }}
+            >
               Mein Training
             </Link>
-            <Link href="/workout/generator" className="btn-primary text-sm">
+            <Link
+              href="/workout/generator"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4"
+              style={{
+                ...BTN_FONT,
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+                textDecoration: "none",
+              }}
+            >
               Neues Workout
             </Link>
           </div>
@@ -409,40 +512,72 @@ function SessionRunner() {
       {!allDone && (
         <div className="grid grid-cols-2 gap-3">
           <button
+            type="button"
             onClick={t.running ? t.pause : handleStart}
-            className="btn-primary col-span-2 py-5 text-lg"
+            className="t-interactive col-span-2 inline-flex items-center justify-center gap-2 rounded-field py-4"
+            style={{
+              ...BTN_FONT,
+              fontSize: "15px",
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
+            }}
           >
+            <Icon name={t.running ? "pause" : "play"} size={15} strokeWidth={2.2} />
             {t.running
-              ? "⏸ Pause"
+              ? "Pause"
               : t.phase === "idle" || t.phase === "done"
-              ? "▶ Start"
-              : "▶ Weiter"}
+              ? "Start"
+              : "Weiter"}
           </button>
 
           <button
+            type="button"
             onClick={t.skip}
             disabled={t.phase === "idle" || t.phase === "done"}
-            className="btn-secondary py-4 text-sm disabled:opacity-30"
+            className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field py-3.5 disabled:opacity-40"
+            style={{
+              ...BTN_FONT,
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-2)",
+            }}
           >
-            Phase skip →
+            Phase skip
           </button>
 
           <button
+            type="button"
             onClick={() => {
               t.reset();
               if (nextExerciseId) setExerciseIndex((i) => i + 1);
             }}
             disabled={!nextExerciseId}
-            className="btn-secondary py-4 text-sm disabled:opacity-30"
+            className="t-interactive inline-flex min-h-hit items-center justify-center gap-1.5 rounded-field py-3.5 disabled:opacity-40"
+            style={{
+              ...BTN_FONT,
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-2)",
+            }}
           >
-            Nächste Übung →
+            Nächste Übung
+            <Icon name="arrow-right" size={13} strokeWidth={2.2} />
           </button>
         </div>
       )}
 
       {/* ── Sound-Hinweis ─────────────────────────────────────────────────────── */}
       {!audioUnlocked && !t.running && !allDone && (
-        <div className="mt-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-center text-xs text-yellow-200">
+        <div
+          className="mt-3 rounded-field px-4 py-2.5 text-center"
+          style={{
+            font: "var(--type-sub)",
+            background: "color-mix(in oklab, var(--warning) 12%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--warning) 40%, transparent)",
+            color: "var(--warning)",
+          }}
+        >
           Tippe <strong>Start</strong>, damit Sound auf deinem Gerät funktioniert.
         </div>
       )}
@@ -467,12 +602,15 @@ function SessionRunner() {
       <div className="mt-6 text-center">
         <Link
           href={`/workout?payload=${params.get("payload") ?? ""}`}
-          className="text-xs uppercase tracking-widest text-fg-4 transition-colors hover:text-blood"
+          className="t-interactive inline-flex min-h-hit items-center justify-center gap-1.5 rounded-field px-4"
+          style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
         >
-          Zur Detailansicht →
+          Zur Detailansicht
+          <Icon name="arrow-right" size={13} strokeWidth={2.2} />
         </Link>
       </div>
     </div>
+    </main>
   );
 }
 
@@ -485,15 +623,21 @@ function ToggleChip({
 }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!value)}
-      className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all ${
-        value
-          ? "border-blood/60 bg-blood/10 text-blood"
-          : "border-carbon-400 bg-carbon-700/40 text-fg-4"
-      }`}
+      role="switch"
+      aria-checked={value}
+      aria-label={label}
+      className="t-interactive flex min-h-hit flex-col items-center justify-center gap-1 rounded-field px-2 py-2.5"
+      style={{
+        background: value ? "var(--accent-subtle)" : "var(--surface-card)",
+        border: "1px solid",
+        borderColor: value ? "var(--accent)" : "var(--line)",
+        color: value ? "var(--accent-text)" : "var(--text-3)",
+      }}
     >
       <Icon name={icon} size={18} />
-      <span>{label}</span>
+      <span style={META_FONT}>{label}</span>
     </button>
   );
 }
@@ -504,7 +648,14 @@ export default function SessionPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[60vh] items-center justify-center text-sm uppercase tracking-widest text-fg-4">
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{
+            font: "var(--type-sub)",
+            color: "var(--text-3)",
+            background: "var(--surface-page)",
+          }}
+        >
           Lade Session…
         </div>
       }

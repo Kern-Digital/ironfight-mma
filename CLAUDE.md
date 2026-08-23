@@ -336,6 +336,27 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Abnahme-Checkliste. Jede Design-Session startet mit dieser Datei.
 
 ## Backlog (offen)
+- [ ] **Workout-Pläne — eigene Etappe DIREKT NACH Redesign-Etappe 4, VOR
+      /timer** (Entscheidung 2026-08-23): Die vier strukturierten Pläne
+      (`lib/training-plans.ts`) sind reine Textlisten (Übung = name/format/
+      notes, Timer nutzt nur das Preset) und werden ERSETZT, nicht migriert.
+      Zielbild: (1) Datenmodell auf `WorkoutDefinition`-Basis (Übungs-IDs
+      aus der Übungs-DB, Pause pro Block als Feld, Gesamtdauer berechnet)
+      mit `gymId` + `discipline` + `difficulty`; Pläne werden Gym-Inhalt in
+      Firestore (Trainer pflegen), nicht Code. (2) Drei Ebenen im
+      Training-Tab: Disziplinen (Karten mit Bild `public/plans/*.webp`,
+      Farbpunkt aus discipline-colors, später nur die Rubriken des Gyms) →
+      Disziplin-Seite mit Level-Segment (Anfänger/Fortgeschritten/Pro) und
+      Planliste (Dauer, Übungszahl, Equipment) → Plan-Detail. Jede Ebene
+      mit „← Zurück"-Kopf; Training-Tab bleibt für `/workout/*` aktiv.
+      (3) Persönliche Kopien: `users/{uid}/workoutPlans` + Firestore-Regel,
+      Sektion „Eigene Workoutpläne" als ERSTER Block im Hub, Auto-Save-
+      Muster. (4) App-weit standardisierte Listen-Gesten als Komponente:
+      Links wischen = Löschen (Undo-Leiste statt Popup), langes Halten =
+      Verschieben, „+ Übung hinzufügen" unter jeder Rubrik mit Übungs-Picker
+      (ui/Select-Stil, Filter Disziplin/Equipment); danach auch im Runner und
+      in der Bibliothek einsetzen. (5) Inhalt: Start-Pläne pro Disziplin ×
+      Level werden per KI ausgearbeitet, Trainer prüfen nur (Leons Vorgabe).
 - [ ] Gewichtsklassen pro Disziplin/Verband: Die App-weite Klassenliste
       (`lib/types.ts`, `WEIGHT_CLASS_LABEL` + `weightClassForKg`) ist die
       vereinheitlichte MMA-Skala (UFC, kg-gerundet) für ALLE Sportarten.
