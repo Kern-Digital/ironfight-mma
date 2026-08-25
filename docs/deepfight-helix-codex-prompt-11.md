@@ -22,11 +22,15 @@ aktuellen Code lesen.
   erhalten und behalten diese Defaults. Die Shader-Kalibrierung, die
   `grainEdgeSharpness = 0` exakt dem Zustand vor der Formänderung gleichsetzt
   (weicher Ausklang ab 0,18, keine Alpha-Kompensation), bleibt ebenfalls.
-- **Neu im Dev-Panel: die Sektion „Werte übernehmen"** mit einem Knopf, der
-  alle aktuellen Reglerstellungen als Liste ausgibt und in die Zwischenablage
-  kopiert (`copySettings`, `settingsDump`, CSS-Klasse `.settings-dump`).
-  **Diese Sektion erhalten** — sie ist das Werkzeug, mit dem der Nutzer
-  abgestimmte Werte an das Projekt zurückgibt.
+- **Neu: `scripts/smoke.mjs` und `npm run smoke`** — siehe §6. Dafür wurde
+  `package.json` um **genau einen Script-Eintrag** erweitert; die Dependencies
+  sind unverändert. Die Abnahme-Regel „keine neuen Dependencies" gilt
+  unverändert, der SHA-256-Vergleich von `package.json` entfällt zugunsten
+  eines Vergleichs des `dependencies`- und `devDependencies`-Blocks.
+- **Neu im Dev-Panel: die Sektion „Werte übernehmen"** (`copySettings`,
+  `settingsDump`, CSS-Klasse `.settings-dump`) — der Knopf gibt alle aktuellen
+  Reglerstellungen als Liste aus und kopiert sie in die Zwischenablage. **Diese
+  Sektion erhalten**; sie ist der Rückkanal für abgestimmte Werte.
 - Die klappbaren `ControlSection`-Gruppen, das sticky Panel und das kompakte
   `.tuning-grid` (Labels ≤ 14 Zeichen) bleiben wie sie sind.
 
@@ -105,7 +109,7 @@ nicht schwächer werden.**
 Helixlänge etwa gleich stark vertreten sind — plus die gemessenen Chroma- und
 Luminanzwerte an je einer Stelle im cyanen und im violetten Abschnitt.
 
-## 5. Budget und Konsistenz
+## 5a. Budget und Konsistenz
 
 - **≤ 8 Draw Calls, ≤ 45.000 Punkte, max. 4 `Points`-Objekte**, keine
   Mesh-Draws, `dpr={[1, 2]}`.
@@ -113,18 +117,80 @@ Luminanzwerte an je einer Stelle im cyanen und im violetten Abschnitt.
 - Alle Schutzpfade (Viewport, Visibility, Kontextverlust → Glyph,
   reduced-motion → Glyph) erhalten und erneut testen; alles `dispose()`-en.
 
-## 6. Dev-Seite
+## 6. QA-Vorgehen — verbindlich
+
+In der letzten Runde ging die meiste Zeit nicht für Codeänderungen drauf,
+sondern für die visuelle Prüfschleife: Headless-Aufnahmen unter SwiftShader,
+zeitlich verfehlte Pulsserien, eine große Zustandsmatrix, die durch spätere
+Shaderänderungen ungültig wurde, und ein **GLSL-Fehler, den weder `tsc` noch
+`next build` sehen konnten** (ein im Fragment-Shader nicht deklariertes
+Uniform), der erst durch ein leeres Bild auffiel. Diese Runde arbeitet deshalb
+nach folgendem Vorgehen:
+
+### 6.1 Smoke-Test zuerst — er existiert bereits
+`npm run smoke` (`scripts/smoke.mjs`) startet Chrome headless, lädt die Szene
+und prüft in etwa 20 Sekunden: Canvas vorhanden, WebGL-Kontext intakt, **keine
+Shader-/GLSL-Meldungen in der Konsole**, Draw Calls im Budget, Punktzahl
+plausibel, Canvas nicht leer, keine reinweißen Pixel. Er endet mit
+`SMOKE-TEST BESTANDEN` oder listet die Gründe auf und liefert Exit-Code 1.
+
+- **Nach jeder Shaderänderung ausführen, bevor du irgendetwas aufnimmst.**
+- Er ersetzt keine Bildbeurteilung, fängt aber genau die Klasse von Fehlern ab,
+  die in der letzten Runde einen kompletten Aufnahme- und Build-Zyklus gekostet
+  hat.
+- **Ein Hinweis aus dem Bau des Skripts:** Den Canvas-Inhalt **nicht** über
+  `drawImage(canvas)` auslesen — der WebGL-Kontext läuft ohne
+  `preserveDrawingBuffer`, sein Puffer ist außerhalb des Render-Frames leer und
+  das ergibt fälschlich „0 sichtbare Pixel". Der Smoke-Test nutzt deshalb
+  `Page.captureScreenshot`. Denselben Fehler bitte auch in den Capture-Skripten
+  vermeiden.
+- Ebenso: Ein **einzelnes** Stats-Sample kann aus einer Ruhephase des
+  Demand-Renderloops stammen und 0 Draw Calls zeigen, obwohl alles läuft — über
+  mehrere Messungen das Maximum nehmen.
+
+### 6.2 Deterministischer Puls statt Bildserien
+Bau einen **einfrierbaren QA-Zustand** ein, zum Beispiel `?qaPulse=0.5`: Der
+Puls steht damit fest auf halbem Weg und die Zeit ist angehalten. Dann genügt
+**ein** Screenshot statt einer 24-Frame-Serie, und das Bild trifft garantiert
+den Peak. Dasselbe für den Lichtblitz und die Wanderfunken. Das ist der größte
+einzelne Zeithebel — unter SwiftShader kostet jede Aufnahme mehrere Sekunden,
+und zeitgesteuerte Effekte liegen dort regelmäßig neben dem Moment, den man
+zeigen wollte.
+
+### 6.3 Stufenweise prüfen, nicht alles auf einmal
+1. `npm run typecheck`
+2. `npm run build`
+3. `npm run smoke`
+4. **nur die geänderten Zustände** aufnehmen
+5. die vollständige Zustandsmatrix **erst ganz am Ende**, wenn keine
+   Shaderänderung mehr folgt
+
+Eine Korrektur im Dark-Split macht keine neue Light-, Fokus-, Lava- oder
+Mobile-Serie nötig. Und Dokumentation sowie Capture-Skripte erst **nach** dem
+letzten produktiven Build anfassen — das spart einen kompletten Durchlauf.
+
+### 6.4 Gleichheit programmatisch prüfen
+Wo zwei Zustände identisch sein sollen (etwa Athlet und Gegner im Split, §2 aus
+Runde 10), nicht per Auge vergleichen: mit eingefrorener Zeit, identischem Seed
+und identischer Kamera rendern und einen **Pixel-Diff** erwarten. Das ist
+schneller und beweiskräftiger als zwei Screenshots nebeneinander.
+
+## 7. Dev-Seite
 
 - Falls für §2 oder §3 neue Regler nötig sind: in die **bestehenden** Gruppen
   einsortieren, Labels ≤ 14 Zeichen.
 - **Die Sektion „Werte übernehmen" bleibt** (§0.1).
 - Final gewählte Werte werden Defaults (im Bericht nennen).
 
-## 7. Abnahme & Bericht
+## 8. Abnahme & Bericht
 
-- `npm run typecheck` + `npm run build` fehlerfrei; Farb-/Import-Scan sauber;
-  Spiegel-Dateien per SHA-256 byte-identisch; `package.json` unverändert;
+- `npm run typecheck`, `npm run build` und **`npm run smoke`** fehlerfrei;
+  Farb-/Import-Scan sauber; Spiegel-Dateien per SHA-256 byte-identisch;
+  `dependencies`/`devDependencies` in `package.json` unverändert;
   `git -C D:\Tidal-Athletics\Tidal-Athletics-App status --short` leer.
+- **Im Bericht festhalten**, wie viele Aufnahmen der neue QA-Weg gespart hat
+  und ob der eingefrorene Pulszustand (§6.2) funktioniert — das ist die
+  Grundlage für die nächsten Runden.
 - Messwerte wie gehabt in allen vier Kombinationen aus Variante und Theme:
   hellstes und dunkelstes Korn, Median, Kontrast gegen den Grund, Zahl
   reinweißer Pixel (Ziel 0), Punkte, Draw Calls, FPS.
