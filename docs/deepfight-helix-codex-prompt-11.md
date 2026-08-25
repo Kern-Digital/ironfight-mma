@@ -13,10 +13,15 @@ ergänzen, Mobile-/Fallback-Mechanik erhalten). Danach `REPORT.md` und den
 aktuellen Code lesen.
 
 ### 0.1 Änderungen von außen — NICHT zurückdrehen
-- **`strandElongation = 1`, `grainEdgeSharpness = 0`, `grainNoiseAmount = 0`.**
-  Die längliche Kornform ist vom Nutzer **abgelehnt**. Die Mechanik bleibt im
-  Code, die Defaults bleiben rund und weich. Auch die Shader-Kalibrierung, die
-  `grainEdgeSharpness = 0` exakt dem Zustand davor gleichsetzt, bleibt.
+- **Die längliche Kornform (`strandElongation` / „Streckung k") ist vom Nutzer
+  endgültig abgelehnt und wurde vollständig ENTFERNT** — Prop, Uniform,
+  Varyings, die Tangentenprojektion in beiden Vertex-Shadern und die
+  elliptische Maske im Fragment-Shader. Die Körner sind wieder runde,
+  achsparallele Sprites. **Bau das nicht wieder ein**, in keiner Form.
+- **`grainEdgeSharpness = 0` und `grainNoiseAmount = 0`** bleiben als Regler
+  erhalten und behalten diese Defaults. Die Shader-Kalibrierung, die
+  `grainEdgeSharpness = 0` exakt dem Zustand vor der Formänderung gleichsetzt
+  (weicher Ausklang ab 0,18, keine Alpha-Kompensation), bleibt ebenfalls.
 - **Neu im Dev-Panel: die Sektion „Werte übernehmen"** mit einem Knopf, der
   alle aktuellen Reglerstellungen als Liste ausgibt und in die Zwischenablage
   kopiert (`copySettings`, `settingsDump`, CSS-Klasse `.settings-dump`).
