@@ -109,7 +109,7 @@ nicht schwächer werden.**
 Helixlänge etwa gleich stark vertreten sind — plus die gemessenen Chroma- und
 Luminanzwerte an je einer Stelle im cyanen und im violetten Abschnitt.
 
-## 5a. Budget und Konsistenz
+## 5. Budget und Konsistenz
 
 - **≤ 8 Draw Calls, ≤ 45.000 Punkte, max. 4 `Points`-Objekte**, keine
   Mesh-Draws, `dpr={[1, 2]}`.
