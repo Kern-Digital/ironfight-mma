@@ -44,6 +44,12 @@ Lava-Block bringt sein `<style>` selbst mit.
 
 ## 3. Harte Regeln
 
+- **Die Split-Legende gibt es nicht mehr.** Das Band „FIGHT DNA" mit den fünf
+  Farbbalken (früher unten rechts im Canvas) wurde auf Nutzerwunsch **restlos
+  entfernt** — Prop `showLegend`, Rendering und Dev-Toggle. Sie darf **nie**
+  wieder auftauchen, auch nicht als Option. Die Farbaufschlüsselung leistet
+  `FightDnaSplit` an anderer Stelle.
+
 - **R3F bleibt auf v8, drei auf v9, React auf 18.** Kein Upgrade (steht so in
   `CLAUDE.md`). Alle drei Pakete sind in Tidal bereits installiert und bisher
   ungenutzt.
@@ -85,10 +91,24 @@ passt exakt auf beide Seiten.
 ### Etappe A — Fundament + der eine Hero-Platz
 1. Die fünf Dateien aus §2 übernehmen, `npm run typecheck` und `npm run build`
    grün bekommen.
-2. **`/kampfprofil`** (`app/kampfprofil/page.tsx`): Helix in der DeepFight-
-   Sektion **über** der `FightProfileView`-Karte einhängen (zwischen dem
-   `SectionHeader` mit dem `DeepFightWordmark` und der Karte, um Zeile 244/245).
-   `size="lg"`, `variant="athlete"`. Das ist der Hero-Platz der App.
+2. **`/kampfprofil`** (`app/kampfprofil/page.tsx`), DeepFight-Sektion,
+   `variant="athlete"` — das ist der Hero-Platz der App.
+
+   **Layout (Vorgabe des Nutzers):**
+   - **Desktop:** Die Helix steht **links neben der kompletten Fight-DNA-Box**
+     (der `FightProfileView`-Karte), also zweispaltig — nicht darüber. Die
+     Spalten stehen nebeneinander, die Helix links, die Karte rechts.
+   - **Darunter geht es auf voller Breite weiter:** „Deine Auswertungen",
+     „Gegnerprofile", „Athleten-Daten" bleiben einspaltig über die ganze
+     Containerbreite. Die Zweispaltigkeit gilt **nur** für die DeepFight-Sektion.
+   - **Mobil:** wie gehabt untereinander — Helix oben, Karte darunter.
+   - Der Container ist `max-w-2xl` / `lg:max-w-5xl`. Prüfe, ob die Helix in der
+     halben Breite mit `size="lg"` (620 px hoch) noch stimmig wirkt oder ob
+     `size="md"` besser passt; die Karte daneben ist ein Akkordeon mit
+     wechselnder Höhe. Wenn die Karte deutlich höher wird als die Helix, ist
+     eine oben ausgerichtete Spalte (`items-start`) das richtige Verhalten,
+     keine gestreckte Helix.
+
    **Wichtig:** Der `profileEmpty`-Zweig (Z. 247–266) rendert statt der Karte
    einen Leerzustand. Die Helix gehört **außerhalb** dieses Ternärs — ein leeres
    Profil zeigt dank der Bauplan-Sprossen gerade dann etwas Sinnvolles.
@@ -162,6 +182,10 @@ ein.
   0 reinweiße Pixel
 - Farbscan: keine Hex-/`rgb(`-Literale in den neuen Dateien
 - Beide Themes, Mobil (390 px), 16:9 und 9:16 geprüft
+- Auf einem **echten Handy** (nicht im schmalen Desktop-Fenster) die Seite
+  öffnen: Scrollen bleibt flüssig, das Gerät wird nicht spürbar warm.
+  Hakt es doch, Reihenfolge zum Gegensteuern: erst Lava, dann
+  Partikeldichte, erst zuletzt die Helix selbst (§10).
 - Fallbacks getestet: reduced-motion, `forceRenderer="svg"`, Kontextverlust
 - **Kein Regressionsschaden:** Die Seiten funktionieren ohne WebGL genauso wie
   vorher
@@ -195,3 +219,26 @@ Daraus folgt für diesen Auftrag:
 - Nur wenn eine Stelle so schlecht wirkt, dass sie den Eindruck der Helix
   beschädigt, ist „diese Stelle später einbauen" die richtige Entscheidung —
   dann im Bericht benennen, damit sie beim Redesign mitgedacht wird.
+
+## 10. Mobil-Performance (Nachtrag Leon, 2026-08-26 — in Etappe A umgesetzt)
+
+Die Szene wurde nie auf echter Mobilhardware gemessen — alle FPS-Werte
+stammen aus Desktop-Browsern oder Software-Rendering. Zwei vorbeugende
+Maßnahmen sind seit Etappe A eingebaut und dürfen von Folge-Etappen NICHT
+zurückgedreht werden:
+
+1. **Wirksame Mobil-Deckel:** Unter 620 px Breite drosselt
+   `FightDnaHelix.tsx` auf `strandParticleDensity` max. **18** und
+   `rungParticleDensity` max. **110** (vorher 30/150 — bei den abgenommenen
+   Defaults 28/160 faktisch wirkungslos). Die Desktop-Defaults bleiben
+   unangetastet. Gemessen: 26.264 statt 37.664 Punkte bei 390 px.
+2. **Lava ohne Formanimation auf schmalen Viewports:** `border-radius`-
+   Morphing erzwingt Repaint + Blur pro Frame und ist teurer als die
+   Partikel. Unter 620 px bekommt die Sektion die Klasse
+   `deepfight-helix--compact`; die vier Blobs laufen dann auf
+   `deepfight-lava-*-compact`-Keyframes (nur Drift + Deckkraft, Form friert
+   auf dem 0%-Keyframe ein).
+
+Falls es auf einem echten Gerät trotzdem hakt, Reihenfolge zum
+Gegensteuern: erst Lava (ganz abschalten), dann Partikeldichte weiter
+senken, erst zuletzt an der Helix selbst drehen.
