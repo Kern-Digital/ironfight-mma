@@ -23,6 +23,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import AthleteProfileForm from "@/components/AthleteProfileForm";
 import AthleteTabBar from "@/components/AthleteTabBar";
+import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import VideoAnalysisResult from "@/components/trainer/VideoAnalysisResult";
 import Skeleton from "@/components/ui/Skeleton";
@@ -242,35 +243,50 @@ function KampfprofilContent() {
               subtitle="Dein Kampf-Stil aus KI-Video-Analysen und Trainer-Beobachtungen"
               brandCase
             />
-            {fightProfile === null && loading ? (
-              <Skeleton className="h-40 w-full rounded-card" />
-            ) : profileEmpty ? (
-              <div
-                className="rounded-card p-6 text-center sm:p-8"
-                style={{
-                  background: "var(--surface-card)",
-                  border: "1px dashed var(--line-strong)",
-                }}
-              >
-                <p style={{ font: "var(--type-body-strong)" }}>
-                  Dein Kampfprofil ist noch leer.
-                </p>
-                <p
-                  className="mx-auto mt-1 max-w-md"
-                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+            {/* Zweispaltigkeit gilt NUR für diese Sektion: Helix links, Karte
+                rechts; mobil untereinander (Helix oben). items-start, weil die
+                Karte ein Akkordeon mit wechselnder Höhe ist — die Helix darf
+                nicht mitgestreckt werden. Die Helix lebt AUSSERHALB des
+                profileEmpty-Ternärs: ein leeres Profil zeigt dank der
+                Bauplan-Sprossen trotzdem etwas. */}
+            <div className={fightProfile ? "grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-6" : undefined}>
+              {fightProfile && (
+                <FightDnaHelix
+                  profile={fightProfile}
+                  variant="athlete"
+                  size="lg"
+                />
+              )}
+              {fightProfile === null && loading ? (
+                <Skeleton className="h-40 w-full rounded-card" />
+              ) : profileEmpty ? (
+                <div
+                  className="rounded-card p-6 text-center sm:p-8"
+                  style={{
+                    background: "var(--surface-card)",
+                    border: "1px dashed var(--line-strong)",
+                  }}
                 >
-                  {isTrainer
-                    ? "Starte eine Video-Analyse zu dir selbst und übernimm die Befunde — dein Profil wächst mit jedem Video."
-                    : "Dein Trainer baut dein Kampfprofil Schritt für Schritt aus Video-Analysen und eigenen Beobachtungen auf — sobald erste Befunde übernommen sind, erscheinen sie hier."}
-                </p>
-              </div>
-            ) : fightProfile ? (
-              <FightProfileView
-                dna={fightProfile.dna}
-                dnaSplit={fightProfile.dnaSplit}
-                actionStats={fightProfile.actionStats}
-              />
-            ) : null}
+                  <p style={{ font: "var(--type-body-strong)" }}>
+                    Dein Kampfprofil ist noch leer.
+                  </p>
+                  <p
+                    className="mx-auto mt-1 max-w-md"
+                    style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                  >
+                    {isTrainer
+                      ? "Starte eine Video-Analyse zu dir selbst und übernimm die Befunde — dein Profil wächst mit jedem Video."
+                      : "Dein Trainer baut dein Kampfprofil Schritt für Schritt aus Video-Analysen und eigenen Beobachtungen auf — sobald erste Befunde übernommen sind, erscheinen sie hier."}
+                  </p>
+                </div>
+              ) : fightProfile ? (
+                <FightProfileView
+                  dna={fightProfile.dna}
+                  dnaSplit={fightProfile.dnaSplit}
+                  actionStats={fightProfile.actionStats}
+                />
+              ) : null}
+            </div>
           </section>
 
           {/* Freigegebene eigene Auswertungen */}

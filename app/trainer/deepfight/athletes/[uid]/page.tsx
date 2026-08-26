@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import { getStudentEntry, type StudentEntry } from "@/lib/admin";
+import { buildHelixModel, diffHelixModels } from "@/lib/fight-dna-helix";
 import {
   getFightProfile,
   isFightProfileEmpty,
@@ -41,13 +43,26 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   const { user } = useAuth();
   const [entry, setEntry] = useState<StudentEntry | null>(null);
   const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
+  const [grownQuestionIds, setGrownQuestionIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const previousProfileRef = useRef<FightProfile | null>(null);
 
   const isSelf = user?.uid === uid;
 
   const loadFightProfile = useCallback(async () => {
     try {
-      setFightProfile(await getFightProfile(uid));
+      const next = await getFightProfile(uid);
+      // Wachstums-Moment: läuft dieser Reload NACH einem Übernehmen (voriger
+      // Stand bekannt), wachsen die neu beantworteten Sprossen sichtbar ein.
+      // Beim Initial-Load (voriger Stand null) wächst nichts.
+      const previous = previousProfileRef.current;
+      if (previous) {
+        setGrownQuestionIds(
+          diffHelixModels(buildHelixModel(previous), buildHelixModel(next)).grown,
+        );
+      }
+      previousProfileRef.current = next;
+      setFightProfile(next);
     } catch {
       /* Profil-Anzeige ist optional — Analyse-Werkzeug bleibt nutzbar */
     }
@@ -56,6 +71,8 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   const load = useCallback(async () => {
     setError(null);
     setEntry(null);
+    previousProfileRef.current = null;
+    setGrownQuestionIds([]);
     try {
       const e = await getStudentEntry(uid);
       if (!e) throw new Error("Athlet nicht gefunden");
@@ -229,7 +246,16 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                 >
                   Gemergter Stand aus allen übernommenen Analysen
                 </p>
-                <div className="mt-4">
+                {/* Zweispaltig wie auf /kampfprofil (Leon, 2026-08-26): Helix
+                    links, Fight-DNA-Karte rechts; mobil untereinander. items-start,
+                    weil die Karte ein Akkordeon mit wechselnder Höhe ist. */}
+                <div className="mt-4 grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-6">
+                  <FightDnaHelix
+                    profile={fightProfile}
+                    variant="athlete"
+                    size="lg"
+                    grownQuestionIds={grownQuestionIds}
+                  />
                   <FightProfileView
                     dna={fightProfile.dna}
                     dnaSplit={fightProfile.dnaSplit}
