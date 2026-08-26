@@ -141,8 +141,11 @@ ein.
 3. **Zwei Token-Systeme parallel:** Alle DeepFight-Bestandskomponenten außer
    `FightProfileView`/`.t-card-fight` laufen noch auf den Alt-Tokens
    (`--ink-*`, `--ta-*`). Die Helix nutzt ausschließlich das neue OKLCH-Set und
-   wirkt in Alt-Umgebungen sichtbar anders. `OpponentProfileView` ist davon am
-   stärksten betroffen — dort ggf. bis zum Redesign warten.
+   wirkt in Alt-Umgebungen sichtbar anders — `OpponentProfileView` am stärksten.
+   **Die Helix bleibt trotzdem beim neuen Token-Set.** Sie nicht an die
+   Alt-Farben angleichen, keine `--ta-*`/`--ink-*`-Tokens einbauen und keine
+   Sonderfälle für Alt-Umgebungen bauen: Leon überarbeitet diese Bereiche
+   ohnehin noch, danach passt es von selbst zusammen (siehe §9).
 4. **Toter 3D-Code:** `components/HeroScene.tsx` und `components/Hero3D.tsx`
    werden nirgends importiert. `Hero3D.tsx` ist ein brauchbares Muster für das
    `dynamic(..., { ssr: false })`-Wrapping; danach dürfen beide gelöscht werden
@@ -173,11 +176,21 @@ ein.
 - Nicht alle Etappen in einem Rutsch durchziehen. Nach Etappe A anhalten und
   zeigen.
 
-## 9. Hinweis zur Reihenfolge im Projekt
+## 9. Reihenfolge im Projekt — bewusst so entschieden
 
-Im Projekt-Memory stand ursprünglich, die Integration solle erst **nach**
-Redesign-Etappe 6 erfolgen, damit nichts doppelt gestylt wird. Leon hat
-entschieden, sie **jetzt** zu machen. Das ist bewusst so — aber es heißt: In
-Alt-Token-Umgebungen (vor allem `OpponentProfileView`) wird die Helix zunächst
-etwas fremd wirken. Wenn eine Stelle deswegen schlecht aussieht, ist „diese
-Stelle später" eine legitime Antwort.
+Ursprünglich sollte die Integration erst **nach** Redesign-Etappe 6 kommen,
+damit nichts doppelt gestylt wird. Leon zieht sie vor und hat dazu klar gesagt:
+**„Später überarbeite ich auch die schon vorhandenen Bereiche."**
+
+Daraus folgt für diesen Auftrag:
+
+- Die Helix ist der **neue Standard**, nicht der Gast. Die Umgebung zieht
+  später nach, nicht umgekehrt.
+- Wenn eine Seite mit Alt-Tokens neben der Helix unstimmig aussieht, ist das
+  ein **erwarteter Zwischenzustand** — kein Fehler und kein Grund, an der Helix
+  zu drehen.
+- Die umliegenden Alt-Komponenten in diesem Auftrag **nicht** mitredesignen.
+  Das ist eine eigene Etappe und Leons Aufgabe.
+- Nur wenn eine Stelle so schlecht wirkt, dass sie den Eindruck der Helix
+  beschädigt, ist „diese Stelle später einbauen" die richtige Entscheidung —
+  dann im Bericht benennen, damit sie beim Redesign mitgedacht wird.
