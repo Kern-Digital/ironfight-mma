@@ -179,8 +179,9 @@ ein.
 ## 9. Reihenfolge im Projekt — bewusst so entschieden
 
 Ursprünglich sollte die Integration erst **nach** Redesign-Etappe 6 kommen,
-damit nichts doppelt gestylt wird. Leon zieht sie vor und hat dazu klar gesagt:
-**„Später überarbeite ich auch die schon vorhandenen Bereiche."**
+damit nichts doppelt gestylt wird. Leon zieht sie vor. Die Überarbeitung der
+Altbereiche (Redesign-Etappe „DeepFight-Seiten") bleibt danach als eigene
+Etappe bestehen — die Reihenfolge dreht sich also nur um.
 
 Daraus folgt für diesen Auftrag:
 
