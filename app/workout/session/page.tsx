@@ -4,10 +4,16 @@
  * Workout Session — Geführter Trainings-Modus
  *
  * Vollbild-Ansicht für mobile Nutzung während eines echten Workouts:
- *  - Übungsanimation prominent
- *  - Großer Countdown
- *  - Sprachansagen (Web Speech API, Deutsch)
- *  - Minimal-UI: nur Pause + Skip
+ *  - Übungsanimation prominent, großer Countdown, Sprachansagen
+ *  - Player füllt den Bildschirm (100dvh), Steuerung unten angepinnt
+ *  - Steuerung (Leons Vorgaben 2026-08-27): Weiter/Pause (3/4) + Phasen-Skip
+ *    als reines Vorspul-Symbol (1/4), darunter „Detail" in voller Breite;
+ *    Übungswechsel NUR per Wischgeste (rechts = nächste, links = zurück)
+ *  - Hochziehen öffnet die Übungsliste der Einheit; Tap auf eine Übung
+ *    springt hin und startet mit 3-2-1. Die Geste wird per Coach-Mark
+ *    angedeutet — einmal pro Session-Start, max. 2× pro GERÄT (localStorage)
+ *  - Sound/Vibration/Display-Toggles bewusst entfernt — wird später
+ *    app-weit gesteuert
  *  - Gleicher URL-Parameter ?payload=... wie /workout
  *
  * Neues Token-System (Rollout Etappe 4). Bewusst OHNE Tab-Bar: der Modus ist
@@ -18,7 +24,7 @@
  */
 
 import ExerciseAnimation from "@/components/ExerciseAnimation";
-import Icon, { type IconName } from "@/components/ui/Icon";
+import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { getExerciseById } from "@/lib/exercises";
@@ -88,6 +94,14 @@ const PHASE_GLOW: Record<Phase, string> = {
   done: "drop-shadow(0 0 20px color-mix(in oklab, var(--positive) 50%, transparent))",
 };
 
+// Block-Überschriften der Übungsliste (gleiches Mapping wie /workout)
+const BLOCK_LABEL: Record<string, string> = {
+  warmup: "Aufwärmen",
+  main: "Hauptteil",
+  conditioning: "Konditionierung",
+  cooldown: "Cooldown",
+};
+
 // ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
 
 const BTN_FONT: React.CSSProperties = {
@@ -98,7 +112,7 @@ const BTN_FONT: React.CSSProperties = {
 
 const META_FONT: React.CSSProperties = {
   font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.12em",
+  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 
@@ -108,7 +122,9 @@ function SessionRunner() {
   const params   = useSearchParams();
   const workout  = useMemo(() => parseWorkout(params.get("payload")), [params]);
   const { user } = useAuth();
-  const { settings, setSoundOn, setVibrate, setWakeLock } = useTimerSettings();
+  // Nur noch lesen — die Toggle-UI (Sound/Vibration/Display) ist raus,
+  // gesteuert wird das später app-weit (Leons Vorgabe 2026-08-27)
+  const { settings } = useTimerSettings();
 
   // Übungs-Sequenz
   const exerciseSequence = useMemo(
@@ -116,6 +132,43 @@ function SessionRunner() {
     [workout],
   );
   const [exerciseIndex, setExerciseIndex] = useState(0);
+
+  // Hochziehbare Übungsliste + Autostart nach Sprung daraus
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const autoStartRef = useRef(false);
+  const [autoStartTick, setAutoStartTick] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Wisch-Hinweis (Coach-Mark) statt sichtbarem Listen-Button: einmal pro
+  // Session-Start kurz einblenden, insgesamt max. 2× — die Regel ist
+  // GERÄTE-gebunden (localStorage, nicht Firestore; Leons Vorgabe 2026-08-27)
+  const [hintVisible, setHintVisible] = useState(false);
+  useEffect(() => {
+    if (!workout) return;
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem("ta-session-swipe-hint")) || 0;
+    } catch {}
+    if (seen >= 2) return;
+    try {
+      localStorage.setItem("ta-session-swipe-hint", String(seen + 1));
+    } catch {}
+    setHintVisible(true);
+    const id = setTimeout(() => setHintVisible(false), 7000);
+    return () => clearTimeout(id);
+  }, [workout]);
+
+  // Zeilen der Übungsliste: Blöcke der Einheit → globale Übungs-Indizes
+  const sheetBlocks = useMemo(() => {
+    let i = 0;
+    return (workout?.blocks ?? []).map((b) => ({
+      phase: b.phase,
+      items: b.exerciseIds.map((id) => ({
+        index: i++,
+        exercise: getExerciseById(id),
+      })),
+    }));
+  }, [workout]);
   const currentExerciseId = exerciseSequence[exerciseIndex];
   const currentExercise   = currentExerciseId ? getExerciseById(currentExerciseId) : null;
   const nextExerciseId    = exerciseSequence[exerciseIndex + 1];
@@ -137,12 +190,25 @@ function SessionRunner() {
   const t = useWorkoutTimer(timerConfig);
   useWakeLock(settings.wakeLock && t.running);
 
-  // Config + Reset bei Übungswechsel
+  // Config + Reset bei Übungswechsel. Nach einem Sprung aus der Übungsliste:
+  // 3-2-1-Countdown + Autostart — der Start läuft über autoStartTick in einem
+  // Folge-Effekt, weil t.start() erst NACH dem Config-Render die neue
+  // Konfiguration sieht (enterPhase hängt am config-State).
   useEffect(() => {
-    t.setConfig(timerConfig);
+    const jumped = autoStartRef.current;
+    autoStartRef.current = false;
+    t.setConfig(jumped ? { ...timerConfig, prepSeconds: 3 } : timerConfig);
     t.reset();
+    if (jumped) setAutoStartTick((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exerciseIndex]);
+
+  // Autostart nach Sprung — feuert erst, wenn die neue Config durchgerendert ist
+  useEffect(() => {
+    if (autoStartTick === 0) return;
+    t.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartTick]);
 
   // Auto-Advance zur nächsten Übung
   useEffect(() => {
@@ -247,6 +313,55 @@ function SessionRunner() {
     window.location.href = "/dashboard";
   }
 
+  // ─── Übungs-Navigation (Wischgesten + Übungsliste) ───────────────────────────
+
+  // Übungswechsel NUR per Wischgeste — der frühere „Nächste Übung"-Button
+  // ist entfernt (Leons Vorgabe 2026-08-27: rechts = nächste, links = zurück)
+  function goToExercise(idx: number) {
+    if (idx < 0 || idx >= exerciseSequence.length || idx === exerciseIndex) return;
+    t.reset();
+    setExerciseIndex(idx);
+  }
+
+  // Sprung aus der Übungsliste: Ziel-Übung startet automatisch mit 3-2-1
+  function jumpToExercise(idx: number) {
+    setSheetOpen(false);
+    if (!audioUnlocked) {
+      // noch innerhalb der User-Geste — Audio direkt mit freischalten
+      unlockAudio().then((ok) => setAudioUnlocked(ok));
+    }
+    if (idx === exerciseIndex) {
+      t.setConfig({ ...timerConfig, prepSeconds: 3 });
+      t.reset();
+      setAutoStartTick((n) => n + 1);
+    } else {
+      autoStartRef.current = true;
+      setExerciseIndex(idx);
+    }
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    const p = e.touches[0];
+    touchStartRef.current = { x: p.clientX, y: p.clientY };
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || allDone) return;
+    const p = e.changedTouches[0];
+    const dx = p.clientX - start.x;
+    const dy = p.clientY - start.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // horizontal: rechts = nächste, links = zurück
+      goToExercise(exerciseIndex + (dx > 0 ? 1 : -1));
+    } else if (dy < -60 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+      // hochziehen: Übungsliste der Einheit; Geste verstanden → Hinweis weg
+      setHintVisible(false);
+      setSheetOpen(true);
+    }
+  }
+
   // ─── Kein Workout ─────────────────────────────────────────────────────────────
 
   if (!workout) {
@@ -287,13 +402,21 @@ function SessionRunner() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
+    // Player deckt den ganzen Bildschirm ab: h-screen als Fallback, 100dvh
+    // überschreibt inline, wo Browser dynamische Viewport-Höhen kennen
     <main
-      className="min-h-screen"
-      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+      className="relative flex h-screen flex-col overflow-hidden"
+      style={{
+        background: "var(--surface-page)",
+        color: "var(--text-body)",
+        height: "100dvh",
+      }}
     >
     <div
-      className="mx-auto flex max-w-lg flex-col gap-0 px-4 pt-3 sm:px-6"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
+      className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-0 overflow-y-auto px-4 pt-3 sm:px-6"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
 
       {/* ── Top-Bar ──────────────────────────────────────────────────────────── */}
@@ -397,7 +520,9 @@ function SessionRunner() {
           aria-live="polite"
           aria-label={`${t.remaining} Sekunden verbleibend`}
         >
-          {formatTime(t.remaining)}
+          {/* Vorbereitung zählt als nackte Zahl runter (…3, 2, 1) —
+              erst Übung/Pause laufen im mm:ss-Format */}
+          {t.phase === "prep" ? t.remaining : formatTime(t.remaining)}
         </div>
       )}
 
@@ -414,23 +539,19 @@ function SessionRunner() {
         </div>
       )}
 
-      {/* ── Nächste Übung ────────────────────────────────────────────────────── */}
+      {/* ── Nächste Übung — Label oben, Übung in der Zeile darunter ──────────── */}
       {nextExercise && !allDone && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="shrink-0" style={{ ...META_FONT, color: "var(--text-3)" }}>
+        <div className="mb-4 mt-1 flex flex-col items-center gap-0.5 text-center">
+          <span style={{ ...META_FONT, color: "var(--text-3)" }}>
             Als Nächstes
           </span>
-          <span aria-hidden className="shrink-0" style={{ color: "var(--text-3)", lineHeight: 0 }}>
-            <Icon name="arrow-right" size={13} strokeWidth={2.2} />
-          </span>
-          <span className="truncate" style={{ font: "var(--type-body-strong)", color: "var(--text-2)" }}>
-            {nextExercise.name}
-          </span>
-          <span
-            className="ml-auto shrink-0"
-            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
-          >
-            {nextExercise.defaultRounds}× {nextExercise.durationSeconds}s
+          <span className="max-w-full truncate px-2">
+            <span style={{ font: "var(--type-body-strong)", color: "var(--text-2)" }}>
+              {nextExercise.name}
+            </span>
+            <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              {" "}· {nextExercise.defaultRounds}× {nextExercise.durationSeconds}s
+            </span>
           </span>
         </div>
       )}
@@ -508,65 +629,6 @@ function SessionRunner() {
         </div>
       )}
 
-      {/* ── Haupt-Steuerung ───────────────────────────────────────────────────── */}
-      {!allDone && (
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={t.running ? t.pause : handleStart}
-            className="t-interactive col-span-2 inline-flex items-center justify-center gap-2 rounded-field py-4"
-            style={{
-              ...BTN_FONT,
-              fontSize: "15px",
-              background: "var(--accent)",
-              color: "var(--on-accent)",
-              boxShadow: "var(--accent-glow)",
-            }}
-          >
-            <Icon name={t.running ? "pause" : "play"} size={15} strokeWidth={2.2} />
-            {t.running
-              ? "Pause"
-              : t.phase === "idle" || t.phase === "done"
-              ? "Start"
-              : "Weiter"}
-          </button>
-
-          <button
-            type="button"
-            onClick={t.skip}
-            disabled={t.phase === "idle" || t.phase === "done"}
-            className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field py-3.5 disabled:opacity-40"
-            style={{
-              ...BTN_FONT,
-              background: "var(--surface-raised)",
-              border: "1px solid var(--line)",
-              color: "var(--text-2)",
-            }}
-          >
-            Phase skip
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              t.reset();
-              if (nextExerciseId) setExerciseIndex((i) => i + 1);
-            }}
-            disabled={!nextExerciseId}
-            className="t-interactive inline-flex min-h-hit items-center justify-center gap-1.5 rounded-field py-3.5 disabled:opacity-40"
-            style={{
-              ...BTN_FONT,
-              background: "var(--surface-raised)",
-              border: "1px solid var(--line)",
-              color: "var(--text-2)",
-            }}
-          >
-            Nächste Übung
-            <Icon name="arrow-right" size={13} strokeWidth={2.2} />
-          </button>
-        </div>
-      )}
-
       {/* ── Sound-Hinweis ─────────────────────────────────────────────────────── */}
       {!audioUnlocked && !t.running && !allDone && (
         <div
@@ -582,63 +644,200 @@ function SessionRunner() {
         </div>
       )}
 
-      {/* ── Einstellungen ─────────────────────────────────────────────────────── */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <ToggleChip
-          icon="bell" label="Sound"
-          value={settings.soundOn} onChange={setSoundOn}
-        />
-        <ToggleChip
-          icon="vibrate" label="Vibration"
-          value={settings.vibrate} onChange={setVibrate}
-        />
-        <ToggleChip
-          icon="moon" label="Display"
-          value={settings.wakeLock} onChange={setWakeLock}
-        />
-      </div>
+      {/* ── Steuerung — unten angepinnt (mt-auto) ─────────────────────────────── */}
+      {!allDone && (
+        <div className="mt-auto flex flex-col gap-3 pt-4">
+          {/* Weiter (3/4 Breite) + Phasen-Skip (1/4, nur Vorspul-Symbol) */}
+          <div className="grid grid-cols-4 gap-3">
+            <button
+              type="button"
+              onClick={t.running ? t.pause : handleStart}
+              className="t-interactive col-span-3 inline-flex items-center justify-center gap-2 rounded-field py-4"
+              style={{
+                ...BTN_FONT,
+                fontSize: "15px",
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+              }}
+            >
+              <Icon name={t.running ? "pause" : "play"} size={15} strokeWidth={2.2} />
+              {t.running
+                ? "Pause"
+                : t.phase === "idle" || t.phase === "done"
+                ? "Start"
+                : "Weiter"}
+            </button>
+            <button
+              type="button"
+              onClick={t.skip}
+              disabled={t.phase === "idle" || t.phase === "done"}
+              aria-label="Phase überspringen"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field py-3.5 disabled:opacity-40"
+              style={{
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Icon name="fast-forward" size={18} strokeWidth={2} />
+            </button>
+          </div>
 
-      {/* ── Zur Detail-Ansicht ─────────────────────────────────────────────────── */}
-      <div className="mt-6 text-center">
-        <Link
-          href={`/workout?payload=${params.get("payload") ?? ""}`}
-          className="t-interactive inline-flex min-h-hit items-center justify-center gap-1.5 rounded-field px-4"
-          style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
-        >
-          Zur Detailansicht
-          <Icon name="arrow-right" size={13} strokeWidth={2.2} />
-        </Link>
-      </div>
+          {/* Detail-Ansicht — volle Breite */}
+          <Link
+            href={`/workout?payload=${params.get("payload") ?? ""}`}
+            className="t-interactive inline-flex min-h-hit w-full items-center justify-center rounded-field py-3"
+            style={{
+              ...BTN_FONT,
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-2)",
+              textDecoration: "none",
+            }}
+          >
+            Detail
+          </Link>
+        </div>
+      )}
     </div>
+
+    {/* ── Wisch-Hinweis (Coach-Mark) — nur die ersten 2 Session-Starts ───────── */}
+    {hintVisible && !sheetOpen && !allDone && (
+      <div
+        aria-hidden
+        className="animate-fade-in pointer-events-none absolute inset-x-0 z-30 flex justify-center"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 172px)" }}
+      >
+        <div
+          className="flex flex-col items-center gap-0.5 rounded-field px-5 py-3"
+          style={{
+            background: "color-mix(in oklab, var(--surface-raised) 85%, transparent)",
+            border: "1px solid var(--line)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          <span className="animate-swipe-hint" style={{ color: "var(--accent-text)", lineHeight: 0 }}>
+            <Icon name="chevron-up" size={22} strokeWidth={2.2} />
+          </span>
+          <span style={{ ...META_FONT, color: "var(--text-2)" }}>
+            Nach oben wischen — alle Übungen
+          </span>
+        </div>
+      </div>
+    )}
+
+    {/* ── Übungsliste — hochziehbares Sheet ──────────────────────────────────── */}
+    {sheetOpen && (
+      <div
+        className="fixed inset-0 z-50 flex flex-col justify-end"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Alle Übungen dieser Einheit"
+      >
+        <button
+          type="button"
+          aria-label="Übungsliste schließen"
+          className="absolute inset-0"
+          style={{
+            background: "var(--overlay)",
+            animation: "fade-in 0.2s ease-out both",
+          }}
+          onClick={() => setSheetOpen(false)}
+        />
+        <div
+          className="animate-slide-up relative flex max-h-[75vh] flex-col overflow-hidden"
+          style={{
+            maxHeight: "75dvh",
+            background: "var(--surface-card)",
+            borderRadius: "var(--r-xl) var(--r-xl) 0 0",
+            boxShadow: "var(--glass-shadow)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-3 px-5 pt-3">
+            <div className="flex flex-col items-start">
+              <div
+                aria-hidden
+                className="mb-2 h-1 w-10 rounded-full"
+                style={{ background: "var(--line-strong)" }}
+              />
+              <span className="t-label">Alle Übungen</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              aria-label="Schließen"
+              className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
+              style={{ color: "var(--text-3)" }}
+            >
+              <Icon name="x" size={16} strokeWidth={2.2} />
+            </button>
+          </div>
+          <div
+            className="overflow-y-auto px-3 pt-1"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+          >
+            {sheetBlocks.map((block, bi) => (
+              <div key={`${block.phase}-${bi}`} className="mb-2">
+                <div
+                  className="px-2.5 pb-1 pt-2"
+                  style={{ ...META_FONT, color: "var(--text-3)" }}
+                >
+                  {BLOCK_LABEL[block.phase] ?? block.phase}
+                </div>
+                {block.items.map(({ index, exercise }) =>
+                  exercise ? (
+                    <button
+                      key={`${exercise.id}-${index}`}
+                      type="button"
+                      onClick={() => jumpToExercise(index)}
+                      className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2 text-left"
+                      style={{
+                        background:
+                          index === exerciseIndex
+                            ? "var(--accent-subtle)"
+                            : undefined,
+                        color:
+                          index === exerciseIndex
+                            ? "var(--accent-text)"
+                            : "var(--text-body)",
+                      }}
+                    >
+                      <span
+                        className="w-6 shrink-0 text-right tabular-nums"
+                        style={{
+                          font: "var(--type-num)",
+                          color:
+                            index === exerciseIndex
+                              ? "var(--accent-text)"
+                              : "var(--text-3)",
+                        }}
+                      >
+                        {index + 1}
+                      </span>
+                      <span
+                        className="min-w-0 flex-1 truncate"
+                        style={{ font: "var(--type-body-strong)" }}
+                      >
+                        {exercise.name}
+                      </span>
+                      <span
+                        className="shrink-0"
+                        style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                      >
+                        {exercise.defaultRounds}× {exercise.durationSeconds}s
+                      </span>
+                    </button>
+                  ) : null,
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
     </main>
-  );
-}
-
-// ─── Kleines Setting-Toggle ───────────────────────────────────────────────────
-
-function ToggleChip({
-  icon, label, value, onChange,
-}: {
-  icon: IconName; label: string; value: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      role="switch"
-      aria-checked={value}
-      aria-label={label}
-      className="t-interactive flex min-h-hit flex-col items-center justify-center gap-1 rounded-field px-2 py-2.5"
-      style={{
-        background: value ? "var(--accent-subtle)" : "var(--surface-card)",
-        border: "1px solid",
-        borderColor: value ? "var(--accent)" : "var(--line)",
-        color: value ? "var(--accent-text)" : "var(--text-3)",
-      }}
-    >
-      <Icon name={icon} size={18} />
-      <span style={META_FONT}>{label}</span>
-    </button>
   );
 }
 

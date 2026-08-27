@@ -48,8 +48,10 @@ export type IconName =
   | "user"
   | "sun"
   | "chevron-down"
+  | "chevron-up"
   | "play"
-  | "pause";
+  | "pause"
+  | "fast-forward";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -222,6 +224,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   x: <path d="M6 6l12 12M18 6 6 18" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
+  "chevron-up": <path d="m6 15 6-6 6 6" />,
   warn: (
     <>
       <path d="M12 4 2.8 19.5h18.4L12 4Z" />
@@ -278,6 +281,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
   // Timer-Steuerung (Workout-Runner/Session)
   play: <path d="M8 5.5v13l11-6.5-11-6.5Z" />,
   pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
+  // Vorspulen — Doppel-Dreieck wie am CD-/Kassetten-Player
+  "fast-forward": (
+    <>
+      <path d="M4.5 6.5v11L12 12 4.5 6.5Z" />
+      <path d="M12.5 6.5v11L20 12l-7.5-5.5Z" />
+    </>
+  ),
   // Welle — Tidal-Markenmotiv
   wave: (
     <>

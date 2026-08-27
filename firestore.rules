@@ -115,6 +115,19 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (isAdmin() || userGymId() == gymId);
       allow write: if request.auth != null && isAdmin();
+
+      // Gym-Workoutplaene (Etappe Workout-Plaene): Gym-Scope liegt im PFAD —
+      // Mitglieder lesen die Plaene ihres Gyms, Trainer desselben Gyms
+      // pflegen sie; Admin gym-uebergreifend. Persoenliche Kopien liegen in
+      // users/{uid}/workoutPlans und laufen dort ueber die generische
+      // Subcollection-Regel (Owner read/write).
+      match /workoutPlans/{planId} {
+        allow read: if request.auth != null
+                    && (isAdmin() || userGymId() == gymId);
+        allow write: if request.auth != null
+                     && (isAdmin()
+                         || (isTrainerOrAdmin() && userGymId() == gymId));
+      }
     }
 
     // Gegner-DNA-Bibliothek — pro Gym. Trainer sehen/pflegen nur die

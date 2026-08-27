@@ -791,6 +791,15 @@ body {
 }
 .animate-float { animation: float-soft 5s ease-in-out infinite; }
 
+/* Wisch-Hinweis (Coach-Mark): Chevron steigt wiederholt auf und verblasst —
+   deutet die Nach-oben-Geste an (Session-Runner, max. 2× pro Gerät) */
+@keyframes swipe-hint {
+  0%        { opacity: 0; transform: translateY(10px); }
+  30%, 55%  { opacity: 1; }
+  85%, 100% { opacity: 0; transform: translateY(-14px); }
+}
+.animate-swipe-hint { animation: swipe-hint 1.8s ease-out infinite; }
+
 /* Shimmer für Lade-/Highlight-Flächen */
 @keyframes shimmer {
   from { background-position: -200% 0; }

@@ -1,7 +1,10 @@
 "use client";
 
 /**
- * Client-Ansicht der Trainingsplan-Seite (neues Token-System, Etappe 4).
+ * Client-Ansicht der Trainingsplan-Seite (neues Token-System, Etappe 4;
+ * seit der Workout-Pläne-Etappe auf dem WorkoutPlan-Modell: Übungen kommen
+ * als IDs aus lib/exercises, die Pause ist ein Feld pro Block, die
+ * Gesamtdauer wird berechnet).
  * Die Seite selbst bleibt Server-Komponente (generateStaticParams/-Metadata);
  * hier lebt alles, was die Athleten-Shell braucht (Rolle, Theme, Tab-Bar).
  */
@@ -10,10 +13,16 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { CATEGORY_COLOR } from "@/lib/discipline-colors";
-import { planDurationSeconds, type DisciplinePlan } from "@/lib/training-plans";
+import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
+import {
+  blockExercises,
+  planDurationSeconds,
+  planExerciseCount,
+  planToWorkoutDefinition,
+  type WorkoutPlan,
+} from "@/lib/workout-plans";
 import Link from "next/link";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -23,7 +32,7 @@ const BTN_FONT: React.CSSProperties = {
 
 const META_FONT: React.CSSProperties = {
   font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.12em",
+  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 
@@ -39,31 +48,60 @@ function formatDuration(seconds: number) {
   return `${m} min ${s} s`;
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/**
+ * Eckdaten-Kachel: Zahl in num-xl, Präfix/Einheit eine Stufe kleiner
+ * (Muster der Trainingsdauer-Anzeige im Generator) — bleibt dadurch
+ * IMMER einzeilig, auch „≈ 68 min" in der 3-Spalten-Karte auf 360px.
+ */
+function Stat({
+  label,
+  value,
+  unit,
+  prefix,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  prefix?: string;
+}) {
+  const smallFont: React.CSSProperties = {
+    font: "var(--type-body-strong)",
+    color: "var(--text-3)",
+  };
   return (
     <div className="flex flex-col gap-1">
       <span className="t-label">{label}</span>
       <span
-        className="tabular-nums"
+        className="whitespace-nowrap tabular-nums"
         style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
       >
+        {prefix && <span style={smallFont}>{prefix} </span>}
         {value}
+        {unit && <span style={smallFont}> {unit}</span>}
       </span>
     </div>
   );
 }
 
-export default function PlanView({ plan }: { plan: DisciplinePlan }) {
+export default function PlanView({ plan }: { plan: WorkoutPlan }) {
   const { profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
-  const totalExercises = plan.blocks.reduce(
-    (sum, b) => sum + b.exercises.length,
-    0,
-  );
+  const totalExercises = planExerciseCount(plan);
+  const totalMinutes = Math.round(planDurationSeconds(plan) / 60);
 
-  const timerHref = `/timer?rounds=${plan.preset.rounds}&work=${plan.preset.workSeconds}&rest=${plan.preset.restSeconds}&prep=${plan.preset.prepSeconds}&label=${encodeURIComponent(plan.name)}`;
+  // Gleiches Payload-Muster wie der Generator — der geführte Runner
+  // (/workout/session) läuft bis zu seiner Umstellung (Schritt 4) über die
+  // WorkoutDefinition-Brücke.
+  const sessionHref = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set(
+      "payload",
+      encodeURIComponent(JSON.stringify(planToWorkoutDefinition(plan))),
+    );
+    return `/workout/session?${p.toString()}`;
+  }, [plan]);
 
   return (
     <main
@@ -72,7 +110,18 @@ export default function PlanView({ plan }: { plan: DisciplinePlan }) {
     >
       {/* Kopfbereich mit Ambient-Schicht */}
       <section className="relative">
-        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+        {/* Maske statt harter Kante: Schein + Ambient laufen zur Unterkante
+            des Kopfbereichs weich aus (Leon-Feedback 2026-08-27) */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          aria-hidden
+          style={{
+            maskImage:
+              "linear-gradient(to bottom, black 55%, transparent 100%)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, black 55%, transparent 100%)",
+          }}
+        >
           <div data-ambient style={{ background: "var(--ambient)" }} />
           {/* Rubrik-Farbe als Schein von links — gleiche Sprache wie die
               Plan-Karten im Hub (kein Farbpunkt) */}
@@ -84,7 +133,7 @@ export default function PlanView({ plan }: { plan: DisciplinePlan }) {
                 top: "-30%",
                 width: "55%",
                 height: "160%",
-                background: `color-mix(in oklab, ${CATEGORY_COLOR[plan.slug]} var(--cat-glow-mix), transparent)`,
+                background: `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} var(--cat-glow-mix), transparent)`,
               }}
             />
           </div>
@@ -100,9 +149,6 @@ export default function PlanView({ plan }: { plan: DisciplinePlan }) {
               <Icon name="arrow-left" size={14} strokeWidth={2.2} />
               Workout
             </Link>
-            <span className="t-label">
-              Trainingsplan · ≈ {Math.round(planDurationSeconds(plan) / 60)} min
-            </span>
             <h1
               style={{
                 font: "var(--type-display)",
@@ -137,15 +183,14 @@ export default function PlanView({ plan }: { plan: DisciplinePlan }) {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-1 lg:max-w-5xl lg:px-6">
         {/* Eckdaten + Start */}
         <section className="flex flex-col gap-5">
-          <div className="t-card grid grid-cols-2 gap-4 p-4 sm:grid-cols-4 sm:p-5">
-            <Stat label="Runden" value={`${plan.preset.rounds}×`} />
-            <Stat label="Kampfzeit" value={formatDuration(plan.preset.workSeconds)} />
-            <Stat label="Pause" value={formatDuration(plan.preset.restSeconds)} />
+          <div className="t-card grid grid-cols-3 gap-4 p-4 sm:p-5">
+            <Stat label="Dauer" value={String(totalMinutes)} prefix="≈" unit="min" />
             <Stat label="Übungen" value={String(totalExercises)} />
+            <Stat label="Blöcke" value={String(plan.blocks.length)} />
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              href={timerHref}
+              href={sessionHref}
               className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
               style={{
                 ...BTN_FONT,
@@ -163,59 +208,69 @@ export default function PlanView({ plan }: { plan: DisciplinePlan }) {
 
         {/* Blöcke — pro Block EINE Karte mit Haarlinien-Trennern */}
         <div className="flex flex-col gap-8">
-          {plan.blocks.map((block, idx) => (
-            <section key={block.title} className="flex flex-col gap-3">
-              <div className="flex items-baseline gap-3">
-                <span
-                  className="tabular-nums"
-                  style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
-                >
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <h2
-                  style={{
-                    font: "var(--type-h2)",
-                    letterSpacing: "var(--ls-display)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {block.title}
-                </h2>
-              </div>
-              <div className="t-card px-3.5 py-0.5">
-                {block.exercises.map((ex, i) => (
-                  <Fragment key={ex.name}>
-                    {i > 0 && <Hairline />}
-                    <div className="flex min-h-hit flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span style={{ font: "var(--type-body-strong)" }}>
-                          {ex.name}
-                        </span>
-                        {ex.notes && (
-                          <span
-                            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
-                          >
-                            {ex.notes}
+          {plan.blocks.map((block, idx) => {
+            const exercises = blockExercises(block);
+            return (
+              <section key={`${block.title}-${idx}`} className="flex flex-col gap-3">
+                <div className="flex items-baseline gap-3">
+                  <span
+                    className="tabular-nums"
+                    style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
+                  >
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <h2
+                    style={{
+                      font: "var(--type-h2)",
+                      letterSpacing: "var(--ls-display)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {block.title}
+                  </h2>
+                  {/* Blockpause — das neue, später editierbare Feld */}
+                  <span
+                    className="ml-auto"
+                    style={{ ...META_FONT, color: "var(--text-3)" }}
+                  >
+                    Pause {formatDuration(block.restSeconds)}
+                  </span>
+                </div>
+                <div className="t-card px-3.5 py-0.5">
+                  {exercises.map((ex, i) => (
+                    <Fragment key={ex.id}>
+                      {i > 0 && <Hairline />}
+                      <div className="flex min-h-hit flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span style={{ font: "var(--type-body-strong)" }}>
+                            {ex.name}
                           </span>
-                        )}
+                          {ex.focus.length > 0 && (
+                            <span
+                              style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                            >
+                              {ex.focus.join(" · ")}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className="shrink-0 self-start rounded-badge px-2 py-1 sm:self-center"
+                          style={{
+                            ...META_FONT,
+                            background: "var(--surface-raised)",
+                            border: "1px solid var(--line)",
+                            color: "var(--accent-text)",
+                          }}
+                        >
+                          {ex.defaultRounds} × {formatDuration(ex.durationSeconds)}
+                        </span>
                       </div>
-                      <span
-                        className="shrink-0 self-start rounded-badge px-2 py-1 sm:self-center"
-                        style={{
-                          ...META_FONT,
-                          background: "var(--surface-raised)",
-                          border: "1px solid var(--line)",
-                          color: "var(--accent-text)",
-                        }}
-                      >
-                        {ex.format}
-                      </span>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </section>
-          ))}
+                    </Fragment>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
 

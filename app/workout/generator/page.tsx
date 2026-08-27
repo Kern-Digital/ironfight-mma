@@ -10,12 +10,14 @@
 
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { ALL_EQUIPMENT, defaultEquipmentForCategory, EQUIPMENT } from "@/lib/equipment";
+import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
 import { generateWorkout } from "@/lib/workout-generator";
-import { TRAINING_PLANS, planDurationSeconds } from "@/lib/training-plans";
-import { CATEGORY_COLOR } from "@/lib/discipline-colors";
+import { planDurationSeconds, planExerciseCount } from "@/lib/workout-plans";
+import { DEFAULT_WORKOUT_PLANS } from "@/lib/workout-plan-defaults";
+import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
   type Category,
@@ -26,7 +28,7 @@ import { CATEGORY_LABEL } from "@/lib/techniques";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 const CATEGORIES: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
@@ -41,7 +43,7 @@ const BTN_FONT: React.CSSProperties = {
 
 const META_FONT: React.CSSProperties = {
   font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.12em",
+  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 
@@ -106,18 +108,25 @@ export default function WorkoutHubPage() {
 
   const [category, setCategory] = useState<Category>("boxing");
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
-  const [equipment, setEquipment] = useState<EquipmentId[]>([]);
+  // Equipment-Logik (Leon-Feedback 2026-08-27): `gear` hält NUR echte Geräte.
+  // „Keine Geräte" (bodyweight) ist kein Listenmitglied, sondern der
+  // Leerzustand: Button leuchtet, solange kein Gerät gewählt ist, und
+  // erlischt automatisch mit dem ersten Gerät. Bodyweight-Übungen fließen
+  // in die Generierung IMMER ein (siehe buildPayload) — der Button-Zustand
+  // ist reine Verständlichkeit für den User. Standard: nichts gewählt.
+  const [gear, setGear] = useState<EquipmentId[]>([]);
   const [duration, setDuration] = useState<number>(30);
 
-  useEffect(() => {
-    if (equipment.length === 0) {
-      setEquipment(defaultEquipmentForCategory(category));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  const noGear = gear.length === 0;
 
-  function toggleEquipment(id: EquipmentId) {
-    setEquipment((prev) =>
+  function toggleGear(id: EquipmentId) {
+    if (id === "bodyweight") {
+      // „Keine Geräte" wählt alle Geräte ab — abwählen kann man ihn nicht,
+      // ohne ein Gerät zu wählen (Bodyweight ist immer Teil des Workouts)
+      setGear([]);
+      return;
+    }
+    setGear((prev) =>
       prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id],
     );
   }
@@ -126,7 +135,8 @@ export default function WorkoutHubPage() {
     const workout = generateWorkout({
       category,
       difficulty,
-      equipment,
+      // Bodyweight immer dabei + zusätzlich die gewählten Geräte
+      equipment: ["bodyweight", ...gear],
       durationMinutes: duration,
     });
     const p = new URLSearchParams();
@@ -135,12 +145,14 @@ export default function WorkoutHubPage() {
   }
 
   const stats = useMemo(() => {
-    const equipmentLabels = equipment
-      .map((id) => EQUIPMENT[id]?.label)
-      .filter(Boolean)
-      .join(" · ");
-    return { equipmentLabels: equipmentLabels || "—" };
-  }, [equipment]);
+    const equipmentLabels = noGear
+      ? EQUIPMENT.bodyweight.label
+      : gear
+          .map((id) => EQUIPMENT[id]?.label)
+          .filter(Boolean)
+          .join(" · ");
+    return { equipmentLabels };
+  }, [gear, noGear]);
 
   return (
     <main
@@ -195,11 +207,8 @@ export default function WorkoutHubPage() {
             subtitle="Vorgefertigte Pläne für jede Disziplin — sofort startklar"
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            {TRAINING_PLANS.map((plan) => {
-              const exercises = plan.blocks.reduce(
-                (sum, b) => sum + b.exercises.length,
-                0,
-              );
+            {DEFAULT_WORKOUT_PLANS.map((plan) => {
+              const exercises = planExerciseCount(plan);
               const minutes = Math.round(planDurationSeconds(plan) / 60);
               return (
                 // Ganze Karte = Link (keine Buttons mehr, Entscheidung 2026-08-23).
@@ -224,7 +233,7 @@ export default function WorkoutHubPage() {
                         top: "-25%",
                         width: "78%",
                         height: "150%",
-                        background: `color-mix(in oklab, ${CATEGORY_COLOR[plan.slug]} var(--cat-glow-mix), transparent)`,
+                        background: `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} var(--cat-glow-mix), transparent)`,
                       }}
                     />
                   </div>
@@ -239,7 +248,7 @@ export default function WorkoutHubPage() {
                     }}
                   >
                     <Image
-                      src={`/plans/${plan.slug}.webp`}
+                      src={`/plans/${plan.discipline}.webp`}
                       alt=""
                       fill
                       sizes="(min-width: 640px) 300px, 60vw"
@@ -269,6 +278,13 @@ export default function WorkoutHubPage() {
                         font: "800 26px/1.1 var(--font-archivo), system-ui, sans-serif",
                         letterSpacing: "var(--ls-display)",
                         textTransform: "uppercase",
+                        // Light: reines Schwarz wirkt hart auf der pastelligen
+                        // Glow-Fläche (Leon-Feedback 2026-08-27) — stattdessen
+                        // tiefe Tinte aus der Rubrik-Farbe. Dark bleibt weiß.
+                        color:
+                          theme === "light"
+                            ? `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} 55%, var(--text-body))`
+                            : undefined,
                       }}
                     >
                       {/* Wörter mit Bindestrich („Jiu-Jitsu") bleiben zusammen */}
@@ -312,22 +328,19 @@ export default function WorkoutHubPage() {
             subtitle="Sag uns, was du hast und wie viel Zeit — wir bauen dir das passende Workout"
           />
 
-          {/* Disziplin */}
+          {/* Disziplin — Aufklapp-Menü (ui/Select-Standard) statt Button-Reihe.
+              Die Geräte-Auswahl bleibt beim Wechsel erhalten: was der User
+              da hat, hängt nicht von der Disziplin ab. */}
           <div className="flex flex-col gap-3">
             <span className="t-label">Disziplin</span>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CATEGORIES.map((c) => (
-                <ChoiceButton
-                  key={c}
-                  label={CATEGORY_LABEL[c]}
-                  active={category === c}
-                  onClick={() => {
-                    setCategory(c);
-                    setEquipment(defaultEquipmentForCategory(c));
-                  }}
-                />
-              ))}
-            </div>
+            <Select
+              value={category}
+              options={CATEGORIES.map((c) => ({
+                value: c,
+                label: CATEGORY_LABEL[c],
+              }))}
+              onChange={(v) => setCategory(v as Category)}
+            />
           </div>
 
           {/* Schwierigkeit */}
@@ -350,18 +363,19 @@ export default function WorkoutHubPage() {
             <div className="flex flex-col gap-1">
               <span className="t-label">Equipment</span>
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                Wähle, was du gerade da hast — Übungen mit fehlendem Equipment
-                werden ausgeschlossen.
+                Übungen ohne Geräte sind immer dabei — wähle zusätzlich, was
+                du gerade da hast.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {ALL_EQUIPMENT.map((eq) => {
-                const active = equipment.includes(eq.id);
+                const active =
+                  eq.id === "bodyweight" ? noGear : gear.includes(eq.id);
                 return (
                   <button
                     key={eq.id}
                     type="button"
-                    onClick={() => toggleEquipment(eq.id)}
+                    onClick={() => toggleGear(eq.id)}
                     aria-pressed={active}
                     className="t-interactive flex min-h-hit items-center gap-3 rounded-field px-3.5 py-2.5 text-left"
                     style={{
@@ -442,58 +456,25 @@ export default function WorkoutHubPage() {
               <span>Equipment: {stats.equipmentLabels}</span>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {/* Training-Modus: geführt, Animation, Sprachansagen */}
+            {/* EIN Startweg (Leon-Feedback 2026-08-27): der geführte Runner —
+                die Wahl Training-Modus/Detail-Ansicht ist entfallen. Gleicher
+                Button wie auf der Plan-Detail-Seite. */}
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => router.push(`/workout/session?${buildPayload()}`)}
-                disabled={equipment.length === 0}
-                className="t-interactive flex min-h-hit flex-col gap-1 rounded-field px-4 py-3.5 text-left disabled:opacity-40"
+                className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
                 style={{
+                  ...BTN_FONT,
                   background: "var(--accent)",
                   color: "var(--on-accent)",
                   boxShadow: "var(--accent-glow)",
                 }}
               >
-                <span className="inline-flex items-center gap-2" style={BTN_FONT}>
-                  <Icon name="play" size={13} strokeWidth={2.2} />
-                  Training-Modus
-                </span>
-                <span style={{ font: "var(--type-sub)", opacity: 0.8 }}>
-                  Geführt · Animation · Sprachansagen
-                </span>
-              </button>
-
-              {/* Detail-Ansicht: klassisch mit allen Infos */}
-              <button
-                type="button"
-                onClick={() => router.push(`/workout?${buildPayload()}`)}
-                disabled={equipment.length === 0}
-                className="t-interactive flex min-h-hit flex-col gap-1 rounded-field px-4 py-3.5 text-left disabled:opacity-40"
-                style={{
-                  background: "var(--surface-raised)",
-                  border: "1px solid var(--line)",
-                }}
-              >
-                <span
-                  className="inline-flex items-center gap-2"
-                  style={{ ...BTN_FONT, color: "var(--text-body)" }}
-                >
-                  Detail-Ansicht
-                  <Icon name="arrow-right" size={13} strokeWidth={2.2} />
-                </span>
-                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  Alle Infos · Technik-Links · Accordion
-                </span>
+                <Icon name="play" size={13} strokeWidth={2.2} />
+                Workout starten
               </button>
             </div>
-
-            {equipment.length === 0 && (
-              <p style={{ font: "var(--type-sub)", color: "var(--warning)" }}>
-                Wähle mindestens ein Equipment (oder „Keine Geräte" für
-                Bodyweight).
-              </p>
-            )}
           </div>
         </section>
       </div>
