@@ -42,7 +42,9 @@ export default function AthleteTabBar() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}
-              className="t-interactive flex min-h-[56px] flex-1 flex-col items-center justify-center gap-[3px] rounded-card"
+              // Desktop eine Stufe größer (Leon 2026-08-27: Leiste lesbarer):
+              // mehr Höhe, Icon 20→22, Label 9→11px — mobil bleibt abgenommen.
+              className="t-interactive flex min-h-[56px] flex-1 flex-col items-center justify-center gap-[3px] rounded-card lg:min-h-[64px] lg:gap-1 lg:[&_svg]:h-[22px] lg:[&_svg]:w-[22px]"
               style={{
                 color: active ? "var(--accent-text)" : "var(--text-3)",
                 textDecoration: "none",
@@ -50,8 +52,10 @@ export default function AthleteTabBar() {
             >
               <Icon name={tab.icon} size={20} strokeWidth={2} />
               <span
+                className="text-[9px] leading-[1.2] lg:text-[11px]"
                 style={{
-                  font: "600 9px/1.2 var(--font-archivo), system-ui, sans-serif",
+                  fontFamily: "var(--font-archivo), system-ui, sans-serif",
+                  fontWeight: 600,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}
@@ -69,7 +73,7 @@ export default function AthleteTabBar() {
           aria-label={
             theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
           }
-          className="t-interactive hidden min-h-[56px] w-16 flex-none items-center justify-center rounded-card lg:flex"
+          className="t-interactive hidden min-h-[56px] w-16 flex-none items-center justify-center rounded-card lg:flex lg:min-h-[64px] lg:[&_svg]:h-[22px] lg:[&_svg]:w-[22px]"
           style={{ color: "var(--text-3)", borderLeft: "1px solid var(--line)" }}
         >
           <Icon name={theme === "dark" ? "sun" : "moon"} size={20} strokeWidth={2} />

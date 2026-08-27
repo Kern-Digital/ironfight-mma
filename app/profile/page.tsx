@@ -42,7 +42,8 @@ const STATUS_FONT: React.CSSProperties = {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex flex-col gap-1">
+    // Kein Gap Titel↔Untertitel (Leon 2026-08-27) — Durchschuss reicht.
+    <div className="flex flex-col">
       <h2
         style={{
           font: "var(--type-h2)",

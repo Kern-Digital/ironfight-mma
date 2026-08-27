@@ -393,7 +393,7 @@ export default function SchedulePage() {
             <span className="t-label">Diese Woche</span>
             <h1
               style={{
-                font: "800 clamp(30px, 7vw, 38px)/1.1 var(--font-archivo), system-ui, sans-serif",
+                font: "var(--type-display)",
                 letterSpacing: "var(--ls-display)",
                 textTransform: "uppercase",
               }}

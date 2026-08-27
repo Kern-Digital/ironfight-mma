@@ -14,6 +14,7 @@ import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
+import { getWorkoutDiscipline } from "@/lib/workout-plan-defaults";
 import {
   blockExercises,
   planDurationSeconds,
@@ -83,13 +84,28 @@ function Stat({
   );
 }
 
-export default function PlanView({ plan }: { plan: WorkoutPlan }) {
+export default function PlanView({
+  plan,
+  sessionPayload,
+  backHref,
+  backLabel,
+}: {
+  plan: WorkoutPlan;
+  /** Original-Payload einer laufenden Session (Detail-Ansicht /workout):
+      hält beim Wiedereinstieg die exakten Timerwerte, statt sie aus dem
+      Plan neu abzuleiten */
+  sessionPayload?: string;
+  /** Zurück-Ziel überschreiben (Detail-Ansicht generierter Workouts) */
+  backHref?: string;
+  backLabel?: string;
+}) {
   const { profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
   const totalExercises = planExerciseCount(plan);
   const totalMinutes = Math.round(planDurationSeconds(plan) / 60);
+  const disciplineInfo = getWorkoutDiscipline(plan.discipline);
 
   // Gleiches Payload-Muster wie der Generator — der geführte Runner
   // (/workout/session) läuft bis zu seiner Umstellung (Schritt 4) über die
@@ -98,10 +114,11 @@ export default function PlanView({ plan }: { plan: WorkoutPlan }) {
     const p = new URLSearchParams();
     p.set(
       "payload",
-      encodeURIComponent(JSON.stringify(planToWorkoutDefinition(plan))),
+      sessionPayload ??
+        encodeURIComponent(JSON.stringify(planToWorkoutDefinition(plan))),
     );
     return `/workout/session?${p.toString()}`;
-  }, [plan]);
+  }, [plan, sessionPayload]);
 
   return (
     <main
@@ -140,14 +157,20 @@ export default function PlanView({ plan }: { plan: WorkoutPlan }) {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            {/* Zurück-Weg: Unterseite des Training-Tabs, Orientierung bleibt */}
+            {/* Zurück-Weg: eine Ebene hoch zur Disziplin-Seite (Ebene 2);
+                unbekannte Disziplin (künftige Gym-Pläne) fällt auf den Hub */}
             <Link
-              href="/workout/generator"
+              href={
+                backHref ??
+                (disciplineInfo
+                  ? `/workout/disziplin/${plan.discipline}`
+                  : "/workout/generator")
+              }
               className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
               style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
             >
               <Icon name="arrow-left" size={14} strokeWidth={2.2} />
-              Workout
+              {backLabel ?? disciplineInfo?.name ?? "Workout"}
             </Link>
             <h1
               style={{
@@ -180,7 +203,7 @@ export default function PlanView({ plan }: { plan: WorkoutPlan }) {
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-1 lg:max-w-5xl lg:px-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
         {/* Eckdaten + Start */}
         <section className="flex flex-col gap-5">
           <div className="t-card grid grid-cols-3 gap-4 p-4 sm:p-5">

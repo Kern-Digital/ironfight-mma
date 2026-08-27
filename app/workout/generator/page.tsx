@@ -15,8 +15,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
 import { generateWorkout } from "@/lib/workout-generator";
-import { planDurationSeconds, planExerciseCount } from "@/lib/workout-plans";
-import { DEFAULT_WORKOUT_PLANS } from "@/lib/workout-plan-defaults";
+import {
+  DEFAULT_WORKOUT_PLANS,
+  WORKOUT_DISCIPLINES,
+} from "@/lib/workout-plan-defaults";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
@@ -49,7 +51,9 @@ const META_FONT: React.CSSProperties = {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="flex flex-col gap-1">
+    // Kein Gap zwischen Titel und Untertitel (Leon 2026-08-27: weniger
+    // Luft) — der Zeilen-Durchschuss der beiden Schriften reicht als Abstand.
+    <div className="flex flex-col">
       <h2
         style={{
           font: "var(--type-h2)",
@@ -199,25 +203,28 @@ export default function WorkoutHubPage() {
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pt-1 lg:max-w-5xl lg:px-6">
-        {/* ── Strukturierte Pläne ── */}
+      {/* pt-4/5: sichtbare Abgrenzung Kopf → erste Sektion (Leon 2026-08-27) */}
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
+        {/* ── Disziplinen (Ebene 1: Disziplin → Level → Plan) ── */}
         <section className="flex flex-col gap-4">
           <SectionHeader
-            title="Strukturierte Pläne"
-            subtitle="Vorgefertigte Pläne für jede Disziplin — sofort startklar"
+            title="Disziplinen"
+            subtitle="Strukturierte Pläne nach Level — wähle deine Disziplin"
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            {DEFAULT_WORKOUT_PLANS.map((plan) => {
-              const exercises = planExerciseCount(plan);
-              const minutes = Math.round(planDurationSeconds(plan) / 60);
+            {WORKOUT_DISCIPLINES.map((d) => {
+              const plans = DEFAULT_WORKOUT_PLANS.filter(
+                (p) => p.discipline === d.discipline,
+              );
+              const levels = new Set(plans.map((p) => p.difficulty)).size;
               return (
                 // Ganze Karte = Link (keine Buttons mehr, Entscheidung 2026-08-23).
                 // Bild oben rechts klar, läuft nach links/unten in die
                 // Kartenfläche aus (Maske + Token-Verlauf), damit der Text
                 // in beiden Themes lesbar bleibt.
                 <Link
-                  key={plan.slug}
-                  href={`/workout/plans/${plan.slug}`}
+                  key={d.discipline}
+                  href={`/workout/disziplin/${d.discipline}`}
                   className="t-card t-interactive relative flex min-h-[10.5rem] flex-col gap-2 overflow-hidden p-4 sm:p-5"
                   style={{ textDecoration: "none", color: "var(--text-body)" }}
                 >
@@ -233,7 +240,7 @@ export default function WorkoutHubPage() {
                         top: "-25%",
                         width: "78%",
                         height: "150%",
-                        background: `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} var(--cat-glow-mix), transparent)`,
+                        background: `color-mix(in oklab, ${DISCIPLINE_COLOR[d.discipline]} var(--cat-glow-mix), transparent)`,
                       }}
                     />
                   </div>
@@ -248,7 +255,7 @@ export default function WorkoutHubPage() {
                     }}
                   >
                     <Image
-                      src={`/plans/${plan.discipline}.webp`}
+                      src={`/plans/${d.discipline}.webp`}
                       alt=""
                       fill
                       sizes="(min-width: 640px) 300px, 60vw"
@@ -283,12 +290,12 @@ export default function WorkoutHubPage() {
                         // tiefe Tinte aus der Rubrik-Farbe. Dark bleibt weiß.
                         color:
                           theme === "light"
-                            ? `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} 55%, var(--text-body))`
+                            ? `color-mix(in oklab, ${DISCIPLINE_COLOR[d.discipline]} 55%, var(--text-body))`
                             : undefined,
                       }}
                     >
                       {/* Wörter mit Bindestrich („Jiu-Jitsu") bleiben zusammen */}
-                      {plan.name.split(" ").map((word, i) => (
+                      {d.name.split(" ").map((word, i) => (
                         <Fragment key={i}>
                           {i > 0 && " "}
                           <span className="whitespace-nowrap">{word}</span>
@@ -299,13 +306,13 @@ export default function WorkoutHubPage() {
                       className="pr-[38%]"
                       style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                     >
-                      {plan.short}
+                      {d.short}
                     </p>
                   </div>
 
                   <div className="relative mt-auto pt-2">
                     <span style={{ ...META_FONT, color: "var(--text-2)" }}>
-                      ≈ {minutes} min · {exercises} Übungen
+                      {plans.length} Pläne · {levels} Level
                     </span>
                   </div>
                 </Link>

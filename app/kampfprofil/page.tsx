@@ -73,7 +73,8 @@ function SectionHeader({
   brandCase?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    // Kein Gap Titel↔Untertitel (Leon 2026-08-27) — Durchschuss reicht.
+    <div className="flex flex-col">
       <h2
         style={{
           font: "var(--type-h2)",
@@ -179,7 +180,7 @@ function KampfprofilContent() {
             <span className="t-label">Kampfprofil</span>
             <h1
               style={{
-                font: "800 clamp(30px, 7vw, 38px)/1.1 var(--font-archivo), system-ui, sans-serif",
+                font: "var(--type-display)",
                 letterSpacing: "var(--ls-display)",
                 textTransform: "uppercase",
               }}

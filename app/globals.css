@@ -274,7 +274,10 @@
      Variablen auf <html> liegen (layout.tsx) — auf <body> allein wäre die
      var()-Kette auf :root ungültig und alle Heading-Tokens fielen still auf
      den Preflight zurück (der Bug bis 2026-08-26). */
-  --type-display: 800 28px/1.15 var(--font-body);      /* +ls .04em, caps */
+  /* Display kräftig über der Skala (Leon 2026-08-27: Seiten-H1 markanter) —
+     gilt auch für Schedule/Kampfprofil, die vorher eigene clamp()-Größen
+     trugen und jetzt dieses Token nutzen. */
+  --type-display: 800 36px/1.1 var(--font-body);       /* +ls .04em, caps */
   --type-h2: 700 20px/1.2 var(--font-body);            /* +ls .04em, caps */
   --type-h3: 700 17px/1.3 var(--font-body);
   --type-body: 400 16px/1.5 var(--font-body);
@@ -300,7 +303,7 @@
    Stufe rauf. Media-Query NUR hier auf den Tokens, nie in Komponenten. */
 @media (max-width: 640px) {
   :root {
-    --type-display: 800 30px/1.15 var(--font-body);
+    --type-display: 800 38px/1.1 var(--font-body);
     --type-h2: 700 22px/1.2 var(--font-body);
     --type-h3: 700 18px/1.3 var(--font-body);
     --type-body: 400 17px/1.5 var(--font-body);

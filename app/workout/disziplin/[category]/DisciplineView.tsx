@@ -1,0 +1,231 @@
+"use client";
+
+/**
+ * Client-Ansicht der Disziplin-Seite (Ebene 2 des Training-Tabs):
+ * Level-Segment (Anfänger/Fortgeschritten/Pro) + Planliste mit Dauer,
+ * Übungszahl und Equipment. Kopf mit Rubrik-Schein in der abgenommenen
+ * Optik der Plan-Detail-Seite (Maske, Schein läuft nach unten aus).
+ *
+ * Datenquelle sind die eingebauten Start-Pläne — die Firestore-Gym-Pläne
+ * übernehmen ab Etappen-Schritt 5 (Seeden), gleiche Filterlogik.
+ */
+
+import AthleteTabBar from "@/components/AthleteTabBar";
+import Icon from "@/components/ui/Icon";
+import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
+import { EQUIPMENT } from "@/lib/equipment";
+import {
+  defaultPlansForDiscipline,
+  type WorkoutDisciplineInfo,
+} from "@/lib/workout-plan-defaults";
+import {
+  planDurationSeconds,
+  planEquipment,
+  planExerciseCount,
+  type WorkoutPlan,
+} from "@/lib/workout-plans";
+import { DIFFICULTY_LABEL, type Difficulty } from "@/lib/types";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
+/** „Keine Geräte" wenn leer, sonst die Equipment-Labels. */
+function equipmentLine(plan: WorkoutPlan): string {
+  const ids = planEquipment(plan);
+  if (ids.length === 0) return "Keine Geräte";
+  return ids
+    .map((id) => EQUIPMENT[id]?.label)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export default function DisciplineView({
+  info,
+}: {
+  info: WorkoutDisciplineInfo;
+}) {
+  const { profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+
+  const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
+
+  const allPlans = useMemo(
+    () => defaultPlansForDiscipline(info.discipline),
+    [info.discipline],
+  );
+  const plans = allPlans.filter((p) => p.difficulty === difficulty);
+
+  return (
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* Kopfbereich — gleiche Sprache wie die Plan-Detail-Seite */}
+      <section className="relative">
+        <div
+          className="absolute inset-0 overflow-hidden"
+          aria-hidden
+          style={{
+            maskImage:
+              "linear-gradient(to bottom, black 55%, transparent 100%)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, black 55%, transparent 100%)",
+          }}
+        >
+          <div data-ambient style={{ background: "var(--ambient)" }} />
+          <div data-ambient>
+            <span
+              data-glow
+              style={{
+                left: "-12%",
+                top: "-30%",
+                width: "55%",
+                height: "160%",
+                background: `color-mix(in oklab, ${DISCIPLINE_COLOR[info.discipline]} var(--cat-glow-mix), transparent)`,
+              }}
+            />
+          </div>
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
+          <div className="flex flex-1 flex-col gap-1">
+            <Link
+              href="/workout/generator"
+              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
+              style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
+            >
+              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
+              Workout
+            </Link>
+            <h1
+              style={{
+                font: "var(--type-display)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              {info.name}
+            </h1>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              {info.short}
+            </p>
+          </div>
+          {!isTrainer && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark"
+                  ? "Helles Design aktivieren"
+                  : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
+          )}
+        </div>
+      </section>
+
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
+        {/* Level-Segment */}
+        <div className="flex flex-wrap gap-2">
+          {DIFFICULTIES.map((d) => {
+            const active = difficulty === d;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDifficulty(d)}
+                aria-pressed={active}
+                className="t-interactive min-h-hit flex-1 whitespace-nowrap rounded-field px-3"
+                style={{
+                  ...BTN_FONT,
+                  background: active ? "var(--accent-subtle)" : "var(--surface-raised)",
+                  border: "1px solid",
+                  borderColor: active ? "var(--accent)" : "var(--line)",
+                  color: active ? "var(--accent-text)" : "var(--text-2)",
+                }}
+              >
+                {DIFFICULTY_LABEL[d]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Planliste */}
+        {plans.length === 0 ? (
+          <p
+            className="py-8 text-center"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+          >
+            Für dieses Level gibt es noch keine Pläne.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {plans.map((plan) => {
+              const minutes = Math.round(planDurationSeconds(plan) / 60);
+              const exercises = planExerciseCount(plan);
+              return (
+                <Link
+                  key={plan.slug}
+                  href={`/workout/plans/${plan.slug}`}
+                  className="t-card t-interactive flex items-center gap-4 p-4 sm:p-5"
+                  style={{ textDecoration: "none", color: "var(--text-body)" }}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <h3
+                      style={{
+                        font: "var(--type-h2)",
+                        letterSpacing: "var(--ls-display)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {plan.name}
+                    </h3>
+                    <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                      {plan.short}
+                    </p>
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      <span style={{ ...META_FONT, color: "var(--text-2)" }}>
+                        ≈ {minutes} min · {exercises} Übungen
+                      </span>
+                      <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                        {equipmentLine(plan)}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    aria-hidden
+                    className="shrink-0"
+                    style={{ color: "var(--text-3)", lineHeight: 0 }}
+                  >
+                    <Icon name="arrow-right" size={18} strokeWidth={2} />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {!isTrainer && <AthleteTabBar />}
+    </main>
+  );
+}
