@@ -6,7 +6,6 @@ import Footer from "@/components/Footer";
 import AthleteChromeGate from "@/components/AthleteChromeGate";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
-import PwaRegister from "@/components/PwaRegister";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import FighterNameModal from "@/components/auth/FighterNameModal";
 import TrainerOnboardingModal from "@/components/auth/TrainerOnboardingModal";
@@ -73,17 +72,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="dark" suppressHydrationWarning>
+    // Font-Variablen MÜSSEN auf <html> liegen, nicht auf <body> (Fix
+    // 2026-08-26): Die Typo-Tokens in globals.css (--type-* auf :root)
+    // referenzieren var(--font-archivo)&Co. — liegen die Variablen nur auf
+    // <body>, schlägt die Substitution auf :root fehl, die Tokens vererben
+    // sich als "guaranteed-invalid" und JEDES font: var(--type-*) fällt
+    // still auf den Preflight zurück (16px/400).
+    <html
+      lang="de"
+      className={`dark ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${archivo.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Prevents flash of wrong theme on reload */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('ta-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}` }} />
       </head>
-      <body
-        className={`${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${archivo.variable} flex min-h-screen flex-col antialiased`}
-      >
+      <body className="flex min-h-screen flex-col antialiased">
         <ThemeProvider>
           <AuthProvider>
-            <PwaRegister />
+            {/* PwaRegister (Service Worker) ist bewusst RAUS (2026-08-26):
+                der alte Cache-First-SW servierte dauerhaft veraltete Stände.
+                public/sw.js bleibt als Kill-Switch für Bestandsclients. */}
             <PwaInstallPrompt />
             <AthleteChromeGate>
               <Navbar />
