@@ -26,6 +26,7 @@
 import ExerciseAnimation from "@/components/ExerciseAnimation";
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
 import { getExerciseById } from "@/lib/exercises";
 import {
@@ -122,6 +123,7 @@ function SessionRunner() {
   const params   = useSearchParams();
   const workout  = useMemo(() => parseWorkout(params.get("payload")), [params]);
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   // Nur noch lesen — die Toggle-UI (Sound/Vibration/Display) ist raus,
   // gesteuert wird das später app-weit (Leons Vorgabe 2026-08-27)
   const { settings } = useTimerSettings();
@@ -446,16 +448,33 @@ function SessionRunner() {
           </div>
         </div>
 
-        {/* Gesamt-Fortschritt */}
-        <div className="flex flex-col items-end gap-1">
-          <span style={{ ...META_FONT, color: "var(--text-3)" }}>
-            {Math.round(progress)}%
-          </span>
-          <div className="t-progress w-20" style={{ height: "4px" }}>
-            <span
-              style={{ width: `${progress}%`, transition: "width 500ms var(--ease-out)" }}
-            />
+        <div className="flex items-center gap-2.5">
+          {/* Gesamt-Fortschritt */}
+          <div className="flex flex-col items-end gap-1">
+            <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+              {Math.round(progress)}%
+            </span>
+            <div className="t-progress w-20" style={{ height: "4px" }}>
+              <span
+                style={{ width: `${progress}%`, transition: "width 500ms var(--ease-out)" }}
+              />
+            </div>
           </div>
+          {/* Theme-Umschalter — der Runner hat weder Tab-Bar noch den
+              Toggle der anderen Seiten (Leons Vorgabe 2026-08-27) */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "dark"
+                ? "Helles Design aktivieren"
+                : "Dunkles Design aktivieren"
+            }
+            className="t-glass t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
+            style={{ color: "var(--text-2)" }}
+          >
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
+          </button>
         </div>
       </div>
 
@@ -626,21 +645,6 @@ function SessionRunner() {
               Neues Workout
             </Link>
           </div>
-        </div>
-      )}
-
-      {/* ── Sound-Hinweis ─────────────────────────────────────────────────────── */}
-      {!audioUnlocked && !t.running && !allDone && (
-        <div
-          className="mt-3 rounded-field px-4 py-2.5 text-center"
-          style={{
-            font: "var(--type-sub)",
-            background: "color-mix(in oklab, var(--warning) 12%, transparent)",
-            border: "1px solid color-mix(in oklab, var(--warning) 40%, transparent)",
-            color: "var(--warning)",
-          }}
-        >
-          Tippe <strong>Start</strong>, damit Sound auf deinem Gerät funktioniert.
         </div>
       )}
 
