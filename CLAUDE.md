@@ -357,6 +357,52 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       (ui/Select-Stil, Filter Disziplin/Equipment); danach auch im Runner und
       in der Bibliothek einsetzen. (5) Inhalt: Start-Pläne pro Disziplin ×
       Level werden per KI ausgearbeitet, Trainer prüfen nur (Leons Vorgabe).
+- [ ] **Workout-Pläne AUSBAU — nach den Teilschritten der Etappe (Leons
+      Ansage 2026-08-27):** Drei aufeinander aufbauende Stufen.
+      (1) **Trainer-Pläne mit Freigabe:** Trainer erstellen Pläne manuell
+      (denselben Editor wiederverwenden wie für persönliche Kopien —
+      Listen-Gesten + Übungs-Picker aus Spec-Punkt 4) und geben sie an
+      ausgewählte Kurse ODER einzelne Schüler frei; sichtbar für die
+      Athleten unter „Strukturierte Pläne" im Hub (eigene Sektion „Vom
+      Trainer für dich") und in der Disziplin→Level-Navigation. ACHTUNG
+      Sicherheitsmodell: Sichtbarkeit MUSS serverseitig in den Firestore-
+      Regeln liegen (NICHT Client-Filter wie sharedWithAthlete heute) —
+      rules-tauglich ist eine beim Freigeben materialisierte
+      audienceUids-Liste im Plan-Dokument (Kurs→Mitglieder auflösen);
+      echte Kurs-Mitgliedschaft kommt erst mit Multi-Gym Phase 2
+      (Einladungen/Mitglieder), bis dahin explizite Schüler-Auswahl.
+      Persönliche Kopien bleiben Snapshots — ein Trainer-Edit synct nicht
+      in bestehende Kopien.
+      (2) **KI-Plan individuell (Athlet):** ab ≥3 übernommenen Analysen in
+      einer Rubrik erzeugt KI aus fightProfile + Zeit + Equipment
+      (Generator-Eingaben existieren) einen persönlichen Plan → landet als
+      persönliche Kopie in users/{uid}/workoutPlans und ist dort editierbar
+      wie jede andere. Grenze beachten: das Profil beschreibt den KAMPFSTIL
+      (Schwächen, DNA-Split), nicht Kondition/Kraft → Schwierigkeitsgrad
+      bleibt User-/Trainer-Eingabe. Structured Output zwingend: nur
+      Übungs-IDs aus der Übungs-DB + Schema-Validierung gegen
+      WorkoutDefinition; Kosten-Limit pro Nutzer (z. B. 1 Neu-Generierung/
+      Woche, aiUsage-Tracking).
+      (3) **KI-Plan pro Kurs (Trainer):** wenn genug der GEWÄHLTEN Athleten
+      ein belastbares Profil haben (Schwelle konfigurierbar, Default ~80 %;
+      „belastbar" = ≥3 übernommene Analysen in der Rubrik + Recency),
+      erzeugt KI einen Kursplan unter Berücksichtigung der individuellen
+      Schwächen. Basis ist eine Athleten-AUSWAHL, nicht zwingend der ganze
+      Kurs (Leons Beispiel: von 30 kommen 10 regelmäßig → Plan auf
+      Gesamtkurs-Basis wäre unrealistisch). Dabei beachten:
+      (a) Aggregation VOR dem Prompt in Code (Schwächen-Histogramm,
+      DNA-Mittel, Level-Verteilung) statt 30 Rohprofile — spart Kosten und
+      dämpft Ausreißer (Einzel-Schwäche ≠ Kurs-Fokus, nach Häufigkeit
+      gewichten); (b) Privacy: der generierte Plan darf KEINE Namen oder
+      Einzel-Schwächen nennen (Prompt-Regel + Review), Trainer-Review VOR
+      der Freigabe an den Kurs ist Pflicht — der Inhalt geht an viele;
+      (c) Level-Streuung im Kurs → Skalierungs-Option pro Übung
+      (leichter/schwerer) statt Einheitsplan; (d) Coverage transparent
+      machen: „12 von 15 Gewählten haben ein belastbares Profil" + wer
+      fehlt (motiviert fehlende Analysen); (e) Gewichtung/Recency aus der
+      bestehenden Merge-Logik (appliedStats) wiederverwenden, nicht neu
+      erfinden. Reihenfolge: (1) → (2) → (3); (3) hängt zusätzlich an der
+      Phase-2-Mitgliedschaft und an serverseitigen Regeln aus (1).
 - [ ] Gewichtsklassen pro Disziplin/Verband: Die App-weite Klassenliste
       (`lib/types.ts`, `WEIGHT_CLASS_LABEL` + `weightClassForKg`) ist die
       vereinheitlichte MMA-Skala (UFC, kg-gerundet) für ALLE Sportarten.
