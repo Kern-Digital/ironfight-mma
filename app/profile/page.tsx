@@ -36,7 +36,7 @@ const BTN_FONT: React.CSSProperties = {
 
 const STATUS_FONT: React.CSSProperties = {
   font: "600 11px/1.2 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.12em",
+  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 
@@ -315,7 +315,7 @@ function SubscriptionsCard({ uid }: { uid: string }) {
                   <span
                     style={{
                       font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-                      letterSpacing: "0.12em",
+                      letterSpacing: "var(--ls-label)",
                       textTransform: "uppercase",
                       color: "var(--text-3)",
                     }}

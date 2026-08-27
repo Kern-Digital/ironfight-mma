@@ -70,7 +70,7 @@ const BTN_FONT: React.CSSProperties = {
 
 const META_FONT: React.CSSProperties = {
   font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.12em",
+  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 

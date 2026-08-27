@@ -207,7 +207,12 @@
   --card-border: transparent; /* Dark: Karten rahmenlos — die Ebene trennt */
   --text-body: var(--text-1);
   --text-muted: var(--text-2);
-  --text-label: var(--text-3);
+  /* Labels/Eyebrows: eigener Ton statt --text-3 — Rubrik-Labels müssen sich
+     vom gedimmten Text darunter abheben (Leon-Feedback 2026-08-26, galt für
+     Dark UND Light). Formel-Ableitung: --text-2-Helligkeit + Akzent-Stich;
+     folgt in beiden Themes automatisch, weil beide Quell-Tokens
+     theme-gescoped sind. */
+  --text-label: color-mix(in oklab, var(--accent-text) 40%, var(--text-2));
 }
 [data-theme="light"] {
   color-scheme: light;
@@ -264,18 +269,22 @@
 :root {
   --font-body: var(--font-archivo), system-ui, sans-serif;
 
-  /* Skala (px, min. 15px Fließtext für Smartphone) */
+  /* Skala (px, min. 16px Fließtext — Leon 2026-08-26: mobil eine Stufe rauf) */
+  /* ACHTUNG: Diese font-Shorthands funktionieren NUR, weil die next/font-
+     Variablen auf <html> liegen (layout.tsx) — auf <body> allein wäre die
+     var()-Kette auf :root ungültig und alle Heading-Tokens fielen still auf
+     den Preflight zurück (der Bug bis 2026-08-26). */
   --type-display: 800 28px/1.15 var(--font-body);      /* +ls .04em, caps */
   --type-h2: 700 20px/1.2 var(--font-body);            /* +ls .04em, caps */
-  --type-h3: 700 16px/1.3 var(--font-body);
-  --type-body: 400 15px/1.5 var(--font-body);
-  --type-body-strong: 600 15px/1.5 var(--font-body);
-  --type-sub: 400 13px/1.45 var(--font-body);
-  --type-label: 600 11px/1.2 var(--font-body);         /* +ls .12em, caps */
+  --type-h3: 700 17px/1.3 var(--font-body);
+  --type-body: 400 16px/1.5 var(--font-body);
+  --type-body-strong: 600 16px/1.5 var(--font-body);
+  --type-sub: 400 14px/1.45 var(--font-body);
+  --type-label: 600 12px/1.2 var(--font-body);         /* +ls .12em, caps */
   --type-num-xl: 700 30px/1.1 var(--font-body);        /* tabular-nums */
   --type-num: 600 13px/1.2 var(--font-mono), ui-monospace, monospace; /* Messwerte */
   --ls-display: 0.04em;
-  --ls-label: 0.12em;
+  --ls-label: 0.08em; /* 0.12 → 0.08 (Leon 2026-08-26): Caps-Meta lief zu weit auseinander */
 
   /* Spacing (4px-Raster), Radien, Motion */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
@@ -284,6 +293,22 @@
   --hit-min: 44px; /* Mindest-Touchziel */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms; --dur-med: 220ms;
+}
+
+/* Mobil ist der Primärfall und bekommt die GRÖSSERE Typo-Stufe (Leon
+   2026-08-26): kleiner Screen, gleicher Lesabstand — komplette Skala eine
+   Stufe rauf. Media-Query NUR hier auf den Tokens, nie in Komponenten. */
+@media (max-width: 640px) {
+  :root {
+    --type-display: 800 30px/1.15 var(--font-body);
+    --type-h2: 700 22px/1.2 var(--font-body);
+    --type-h3: 700 18px/1.3 var(--font-body);
+    --type-body: 400 17px/1.5 var(--font-body);
+    --type-body-strong: 600 17px/1.5 var(--font-body);
+    --type-sub: 400 15px/1.45 var(--font-body);
+    --type-label: 600 13px/1.2 var(--font-body);
+    --type-num-xl: 700 32px/1.1 var(--font-body);
+  }
 }
 
 /* ─── Neues Token-System: Ambient-Mechanik ───────────────────────────────────

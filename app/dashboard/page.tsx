@@ -419,7 +419,7 @@ function DashboardContent() {
                     className="inline-flex shrink-0 items-center gap-1.5"
                     style={{
                       font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
-                      letterSpacing: "0.12em",
+                      letterSpacing: "var(--ls-label)",
                       textTransform: "uppercase",
                       color: "var(--text-3)",
                     }}
