@@ -9,10 +9,12 @@
  * hier lebt alles, was die Athleten-Shell braucht (Rolle, Theme, Tab-Bar).
  *
  * Drei Editier-Wege über EINEN Editor (Teilschritt 3, Leons Vorgabe):
- *   • allowEdit (Start-/Gym-Pläne): „Bearbeiten" öffnet einen FLÜCHTIGEN
- *     Entwurf — nichts wird automatisch gespeichert. „Workout starten" nutzt
- *     die Änderungen direkt; „Als eigenen Plan speichern" legt sie als
- *     persönliche Kopie ab (danach greift dort der Auto-Save).
+ *   • allowEdit (Start-/Gym-Pläne): der Editor ist DIREKT aktiv (Leons
+ *     Vorgabe 2026-08-28, kein „Bearbeiten"-Zwischenschritt mehr) — alle
+ *     Funktionen wie beim eigenen Workoutplan. Der Entwurf bleibt FLÜCHTIG,
+ *     nichts wird automatisch gespeichert; „Workout starten" nutzt die
+ *     Änderungen direkt, „Als eigenen Plan speichern"/„Verwerfen" erscheinen
+ *     erst bei einer Änderung (Kopie → dort greift der Auto-Save).
  *   • editing mit autoSave (persönliche Kopie /workout/eigene/[id]): die
  *     Seite hält den Plan-State und speichert debounced.
  *   • editing mit create (/workout/eigene/neu): lokaler Entwurf, expliziter
@@ -183,8 +185,8 @@ export default function PlanView({
   /** Zurück-Ziel überschreiben (Detail-Ansicht generierter Workouts) */
   backHref?: string;
   backLabel?: string;
-  /** „Bearbeiten" anbieten (Start-/Gym-Pläne): flüchtiger Entwurf +
-      „Als eigenen Plan speichern" — nie zusammen mit `editing` */
+  /** Editor direkt aktiv (Start-/Gym-Pläne): flüchtiger Entwurf,
+      „Als eigenen Plan speichern" bei Änderung — nie zusammen mit `editing` */
   allowEdit?: boolean;
   /** Editier-Modus von außen (persönliche Kopie / Neu-Erstellen) */
   editing?: PlanEditing;
@@ -229,6 +231,9 @@ export default function PlanView({
 
   // ── Flüchtiger Entwurf (allowEdit): Blöcke tief genug kopieren, damit
   //    Änderungen nie in das (statisch gerenderte) Original durchschlagen.
+  //    Der Editor ist direkt aktiv — der Entwurf entsteht automatisch,
+  //    sobald der eingeloggte User feststeht (statische Seite: Auth kommt
+  //    erst clientseitig an).
   const [draft, setDraft] = useState<WorkoutPlan | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -239,6 +244,20 @@ export default function PlanView({
       blocks: plan.blocks.map((b) => ({ ...b, exerciseIds: [...b.exerciseIds] })),
     });
   }
+
+  useEffect(() => {
+    if (!allowEdit || editing || !user) return;
+    setDraft(
+      (d) =>
+        d ?? {
+          ...plan,
+          blocks: plan.blocks.map((b) => ({
+            ...b,
+            exerciseIds: [...b.exerciseIds],
+          })),
+        },
+    );
+  }, [allowEdit, editing, user, plan]);
 
   function patchDraft(patch: (d: WorkoutPlan) => WorkoutPlan) {
     setDraft((d) => (d ? patch(d) : d));
@@ -268,6 +287,12 @@ export default function PlanView({
   // Externer Editier-Modus hat Vorrang; sonst ggf. der interne Entwurf
   const edit = editing ?? draftEditing;
   const shown = editing ? plan : draft ?? plan;
+
+  // Speichern/Verwerfen erst zeigen, wenn wirklich etwas geändert wurde —
+  // der Entwurf startet als strukturgleiche Kopie des Plans, ein purer
+  // JSON-Vergleich reicht daher als Änderungs-Erkennung
+  const draftDirty =
+    draft !== null && JSON.stringify(draft) !== JSON.stringify(plan);
 
   // Löschen mit kurzer Raus-Animation; solange sie läuft, keine weitere
   // Löschung (die Indizes würden sonst unter dem Timer wegrutschen)
@@ -749,23 +774,9 @@ export default function PlanView({
                     Workout starten
                   </button>
                 )}
-                {allowEdit && user && !edit && (
-                  <button
-                    type="button"
-                    onClick={startDraft}
-                    className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
-                    style={{
-                      ...BTN_FONT,
-                      background: "var(--surface-raised)",
-                      border: "1px solid var(--line)",
-                      color: "var(--text-2)",
-                    }}
-                  >
-                    <Icon name="edit" size={13} strokeWidth={2.2} />
-                    Bearbeiten
-                  </button>
-                )}
-                {draft && !editing && (
+                {/* Erst bei einer Änderung: Entwurf sichern oder auf das
+                    Original zurücksetzen (Editor bleibt aktiv) */}
+                {draft && !editing && draftDirty && (
                   <>
                     <button
                       type="button"
@@ -786,7 +797,7 @@ export default function PlanView({
                     <button
                       type="button"
                       onClick={() => {
-                        setDraft(null);
+                        startDraft();
                         setDraftError(null);
                         setPickerBlock(null);
                         setSelectedRow(null);

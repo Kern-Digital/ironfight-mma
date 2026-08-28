@@ -28,7 +28,7 @@ export default function TrainingPlanPage({
   const plan = getDefaultPlanBySlug(params.slug);
   if (!plan) notFound();
 
-  // allowEdit: „Bearbeiten" = flüchtiger Entwurf; gespeichert wird erst
-  // über „Als eigenen Plan speichern" oder das Herz nach dem Workout
+  // allowEdit: Editor direkt aktiv (flüchtiger Entwurf); gespeichert wird
+  // erst über „Als eigenen Plan speichern" oder das Herz nach dem Workout
   return <PlanView plan={plan} allowEdit />;
 }
