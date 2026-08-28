@@ -22,6 +22,7 @@
  */
 
 import AthleteTabBar from "@/components/AthleteTabBar";
+import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import ExercisePicker from "@/components/ExercisePicker";
 import SwipeAction from "@/components/SwipeAction";
 import Icon from "@/components/ui/Icon";
@@ -198,6 +199,9 @@ export default function PlanView({
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pickerBlock, setPickerBlock] = useState<number | null>(null);
+  // Übungs-Detail-Sheet: Tipp/Klick auf eine Übungszeile (Leons Wahl
+  // 2026-08-28 — gleiche Geste wie im Picker; Wischen/Halten unberührt)
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
 
   // ── Zeilen-Interaktion im Editor (Leons Vorgaben 2026-08-28):
   //    selectedRow = per Halten ausgewählt (▲/▼ verschieben), removingRow =
@@ -972,7 +976,13 @@ export default function PlanView({
                       <div
                         key={flashTick ?? undefined}
                         data-plan-row={`${idx}:${i}`}
-                        className={`relative flex min-h-hit flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4${
+                        // Tipp/Klick = Übungs-Detail; SwipeAction unterdrückt
+                        // Klicks nach Wisch/Halten, daher kein Gesten-Konflikt
+                        onClick={() => {
+                          if (isSelected || isRemoving) return;
+                          setDetailExercise(ex);
+                        }}
+                        className={`t-interactive relative flex min-h-hit cursor-pointer flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4${
                           isRemoving ? " animate-remove-row" : ""
                         }${flashTick !== null ? " animate-add-glow" : ""}${
                           isSelected ? " rounded-field px-2" : ""
@@ -1019,7 +1029,11 @@ export default function PlanView({
                             <button
                               type="button"
                               aria-label={`${ex.name} entfernen`}
-                              onClick={() => handleRemoveRow(idx, i)}
+                              onClick={(e) => {
+                                // nicht zusätzlich das Detail-Sheet öffnen
+                                e.stopPropagation();
+                                handleRemoveRow(idx, i);
+                              }}
                               className="t-interactive hidden h-9 w-9 items-center justify-center rounded-field sm:flex"
                               style={{ color: "var(--gesture-delete)" }}
                             >
@@ -1157,6 +1171,14 @@ export default function PlanView({
           blockCount={shown.blocks[pickerBlock].exerciseIds.length}
           onPick={(exerciseId) => edit.onAddExercise(pickerBlock, exerciseId)}
           onClose={() => setPickerBlock(null)}
+        />
+      )}
+
+      {/* Übungs-Detail — Tipp/Klick auf eine Übungszeile */}
+      {detailExercise && (
+        <ExerciseDetailSheet
+          exercise={detailExercise}
+          onClose={() => setDetailExercise(null)}
         />
       )}
 

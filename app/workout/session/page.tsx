@@ -26,11 +26,11 @@
  */
 
 import ExerciseAnimation from "@/components/ExerciseAnimation";
+import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
-import { EQUIPMENT } from "@/lib/equipment";
 import { getExerciseById } from "@/lib/exercises";
 import {
   setSpeechEnabled,
@@ -48,7 +48,7 @@ import {
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { logWorkoutFull } from "@/lib/workouts";
-import { CATEGORY_LABEL, getTechniqueById } from "@/lib/techniques";
+import { CATEGORY_LABEL } from "@/lib/techniques";
 import { type WorkoutDefinition } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -104,12 +104,6 @@ const BLOCK_LABEL: Record<string, string> = {
   main: "Hauptteil",
   conditioning: "Konditionierung",
   cooldown: "Cooldown",
-};
-
-const INTENSITY_LABEL: Record<string, string> = {
-  low: "Niedrig",
-  medium: "Mittel",
-  high: "Hoch",
 };
 
 // ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
@@ -858,175 +852,13 @@ function SessionRunner() {
       </div>
     )}
 
-    {/* ── Übungs-Detail — Sheet zum „Detail"-Button ──────────────────────────── */}
+    {/* ── Übungs-Detail — Sheet zum „Detail"-Button (gemeinsame Komponente,
+        auch im Übungs-Picker und Plan-Editor im Einsatz) ─────────────────── */}
     {detailOpen && currentExercise && (
-      <div
-        className="fixed inset-0 z-50 flex flex-col justify-end"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Details zu ${currentExercise.name}`}
-      >
-        <button
-          type="button"
-          aria-label="Übungs-Detail schließen"
-          className="absolute inset-0"
-          style={{
-            background: "var(--overlay)",
-            animation: "fade-in 0.2s ease-out both",
-          }}
-          onClick={() => setDetailOpen(false)}
-        />
-        <div
-          className="animate-slide-up relative flex max-h-[75vh] flex-col overflow-hidden"
-          style={{
-            maxHeight: "75dvh",
-            background: "var(--surface-card)",
-            borderRadius: "var(--r-xl) var(--r-xl) 0 0",
-            boxShadow: "var(--glass-shadow)",
-          }}
-        >
-          <div className="flex items-center justify-between gap-3 px-5 pt-3">
-            <div className="flex flex-col items-start">
-              <div
-                aria-hidden
-                className="mb-2 h-1 w-10 rounded-full"
-                style={{ background: "var(--line-strong)" }}
-              />
-              <span className="t-label">Übungs-Detail</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDetailOpen(false)}
-              aria-label="Schließen"
-              className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-              style={{ color: "var(--text-3)" }}
-            >
-              <Icon name="x" size={16} strokeWidth={2.2} />
-            </button>
-          </div>
-          <div
-            className="overflow-y-auto px-5 pt-2"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
-          >
-            <h2
-              style={{
-                font: "var(--type-h2)",
-                letterSpacing: "var(--ls-display)",
-                textTransform: "uppercase",
-              }}
-            >
-              {currentExercise.name}
-            </h2>
-            <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
-              {currentExercise.defaultRounds}× {currentExercise.durationSeconds}s
-              {" · "}Pause {currentExercise.restSeconds}s
-              {" · "}Intensität {INTENSITY_LABEL[currentExercise.intensity]}
-            </p>
-
-            {currentExercise.notes && (
-              <p
-                className="mt-3"
-                style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-              >
-                {currentExercise.notes}
-              </p>
-            )}
-
-            {(currentExercise.cues?.length ?? 0) > 0 && (
-              <div className="mt-5 flex flex-col gap-2">
-                <span className="t-label">Darauf achten</span>
-                <ul className="flex flex-col gap-1.5">
-                  {currentExercise.cues!.map((cue) => (
-                    <li
-                      key={cue}
-                      className="flex items-start gap-2"
-                      style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-                    >
-                      <span
-                        className="mt-[3px] shrink-0"
-                        style={{ color: "var(--accent-text)" }}
-                      >
-                        <Icon name="check" size={14} strokeWidth={2.6} />
-                      </span>
-                      {cue}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {currentExercise.focus.length > 0 && (
-              <div className="mt-5 flex flex-col gap-2">
-                <span className="t-label">Fokus</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {currentExercise.focus.map((f) => (
-                    <span
-                      key={f}
-                      className="rounded-badge px-2 py-1"
-                      style={{
-                        ...META_FONT,
-                        background: "var(--surface-raised)",
-                        border: "1px solid var(--line)",
-                        color: "var(--text-2)",
-                      }}
-                    >
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 flex flex-col gap-1">
-              <span className="t-label">Equipment</span>
-              <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-                {currentExercise.equipment.length > 0
-                  ? currentExercise.equipment
-                      .map((id) => EQUIPMENT[id]?.label)
-                      .filter(Boolean)
-                      .join(" · ")
-                  : EQUIPMENT.bodyweight.label}
-              </p>
-            </div>
-
-            {(currentExercise.techniqueIds?.length ?? 0) > 0 && (
-              <div className="mt-5 flex flex-col gap-2">
-                <span className="t-label">Techniken dazu</span>
-                <div className="flex flex-col gap-2">
-                  {currentExercise
-                    .techniqueIds!.map((id) => getTechniqueById(id))
-                    .filter((t): t is NonNullable<typeof t> => Boolean(t))
-                    .map((t) => (
-                      // Neuer Tab: die laufende Session bleibt erhalten
-                      <Link
-                        key={t.id}
-                        href={`/techniques/${t.id}`}
-                        target="_blank"
-                        className="t-interactive flex min-h-hit items-center justify-between gap-3 rounded-field px-3"
-                        style={{
-                          background: "var(--surface-raised)",
-                          border: "1px solid var(--line)",
-                          color: "var(--text-body)",
-                          textDecoration: "none",
-                        }}
-                      >
-                        <span
-                          className="min-w-0 flex-1 truncate"
-                          style={{ font: "var(--type-body-strong)" }}
-                        >
-                          {t.name}
-                        </span>
-                        <span style={{ ...META_FONT, color: "var(--text-3)" }}>
-                          Ansehen
-                        </span>
-                      </Link>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <ExerciseDetailSheet
+        exercise={currentExercise}
+        onClose={() => setDetailOpen(false)}
+      />
     )}
     </main>
   );

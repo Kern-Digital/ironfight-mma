@@ -4,14 +4,17 @@
  * Übungs-Picker — hochschiebbares Sheet über der GESAMTEN Übungsbibliothek
  * (Etappe Workout-Pläne, Spec-Punkt 4; erster Einsatz im Plan-Editor).
  * Filter Disziplin + Equipment als ui/Select; hinzugefügt wird auf Touch
- * per Rechts-Wisch oder +-Knopf (ein Tipp auf die Zeile fügt NICHTS
- * hinzu), am Desktop zusätzlich per Klick auf die Zeile (beides Leons
- * Vorgaben 2026-08-28). Das Sheet bleibt für
+ * per Rechts-Wisch oder +-Knopf, am Desktop zusätzlich per Klick auf die
+ * Zeile. ÜBUNGS-DETAILS (Leons Wahl 2026-08-28): auf Touch öffnet der
+ * Zeilen-Tipp das Detail-Sheet (die Geste war frei), am Desktop das
+ * Info-Icon neben dem + (der Zeilen-Klick fügt dort ja hinzu); im
+ * Detail-Sheet gibt es unten einen Hinzufügen-Knopf. Das Sheet bleibt für
  * weitere Übungen offen (beim Zusammenstellen kommen selten einzelne
  * Übungen). Optik = Übungslisten-Sheet des Runners (Overlay, slide-up,
  * Grabber, x schließt).
  */
 
+import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import SwipeAction from "@/components/SwipeAction";
@@ -72,6 +75,9 @@ export default function ExercisePicker({
   const [category, setCategory] = useState<Category | "all">("all");
   const [gear, setGear] = useState<EquipmentId | "all" | "none">("all");
 
+  // Übungs-Detail-Sheet (liegt ÜBER dem Picker → zIndex 60)
+  const [detail, setDetail] = useState<Exercise | null>(null);
+
   // Hinzufüge-Feedback (Leons Vorgabe 2026-08-28): Zeile leuchtet grün am
   // Rahmen + „+1" steigt auf; tick startet die Animation bei schnellen
   // Mehrfach-Hinzufügungen jedes Mal neu (keyed remount).
@@ -120,16 +126,62 @@ export default function ExercisePicker({
         }}
         onClick={onClose}
       />
+      {/* Kartei-Look (Leons Vorgabe 2026-08-28): liegt das Übungs-Detail
+          davor, rückt der Picker sichtbar nach hinten-oben. Transform auf
+          eigener Hülle — die Einblende-Animation des Panels (fill both)
+          würde eine Panel-Transform überschreiben. */}
       <div
-        className="animate-slide-up relative flex max-h-[80vh] flex-col overflow-hidden"
+        className="relative flex w-full justify-center"
         style={{
-          maxHeight: "80dvh",
-          background: "var(--surface-card)",
-          borderRadius: "var(--r-xl) var(--r-xl) 0 0",
-          boxShadow: "var(--glass-shadow)",
+          transform: detail ? "translateY(-44px) scaleX(0.9)" : undefined,
+          transformOrigin: "50% 100%",
+          transition: "transform .35s cubic-bezier(.22,.8,.3,1)",
         }}
       >
-        <div className="flex items-center justify-between gap-3 px-5 pt-3">
+      <div
+        className="animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden"
+        style={{
+          maxHeight: "80dvh",
+          // Hinten angestellt: volle Höhe erzwingen, damit die Oberkante
+          // sicher über dem Detail-Sheet hervorschaut ("0px" statt auto —
+          // auto→Länge springt statt zu animieren); heller, damit die
+          // Karte trotz des Overlays klar sichtbar bleibt
+          minHeight: detail ? "80dvh" : "0px",
+          transition:
+            "min-height .35s cubic-bezier(.22,.8,.3,1), background .35s ease, border-color .35s ease, box-shadow .35s ease",
+          // Akzent-Tönung + leuchtende Kante — nur heller ging unterm
+          // Overlay des vorderen Fensters unter (Leons Feedback)
+          background: detail
+            ? "color-mix(in oklab, var(--accent) 18%, color-mix(in oklab, white 10%, var(--surface-card)))"
+            : "var(--surface-card)",
+          border: "1px solid",
+          borderColor: detail
+            ? "color-mix(in oklab, var(--accent) 55%, transparent)"
+            : "transparent",
+          borderRadius: "var(--r-xl) var(--r-xl) 0 0",
+          boxShadow: detail
+            ? "var(--glass-shadow), var(--accent-glow)"
+            : "var(--glass-shadow)",
+        }}
+      >
+        {/* Kartei-Streifen: statt des Grabbers steht hier der Popup-Titel */}
+        {detail && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5"
+            style={{ animation: "fade-in 0.3s ease-out both" }}
+          >
+            <span
+              className="truncate px-6"
+              style={{ ...META_FONT, color: "var(--accent-text)" }}
+            >
+              Übung hinzufügen
+            </span>
+          </div>
+        )}
+        <div
+          className={`flex items-center justify-between gap-3 px-5 pt-3${detail ? " invisible" : ""}`}
+        >
           <div className="flex min-w-0 flex-col items-start">
             <div
               aria-hidden
@@ -222,9 +274,10 @@ export default function ExercisePicker({
                         <div
                           key={flashTick ?? undefined}
                           // Maus-Klick auf die Zeile fügt hinzu (Web-Ansicht);
-                          // ein Touch-Tipp bewusst nicht — Wisch oder +-Knopf
+                          // ein Touch-Tipp öffnet stattdessen die Details
                           onClick={(e) => {
                             if (isMouseLikeClick(e)) handleAdd(ex.id);
+                            else setDetail(ex);
                           }}
                           className={`t-interactive relative flex min-h-hit w-full cursor-pointer items-center gap-3 rounded-field px-2.5 py-2${flashTick !== null ? " animate-add-glow" : ""}`}
                           style={{ color: "var(--text-body)" }}
@@ -254,6 +307,19 @@ export default function ExercisePicker({
                           >
                             {ex.defaultRounds}× {ex.durationSeconds}s
                           </span>
+                          {/* Desktop-Weg zu den Details (auf Touch: Zeilen-Tipp) */}
+                          <button
+                            type="button"
+                            aria-label={`Details zu ${ex.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetail(ex);
+                            }}
+                            className="t-interactive hidden h-10 w-10 shrink-0 items-center justify-center rounded-field sm:flex"
+                            style={{ color: "var(--text-3)" }}
+                          >
+                            <Icon name="info" size={16} strokeWidth={2} />
+                          </button>
                           <button
                             type="button"
                             aria-label={`${ex.name} hinzufügen`}
@@ -290,6 +356,24 @@ export default function ExercisePicker({
           )}
         </div>
       </div>
+      </div>
+
+      {/* Übungs-Detail über dem Picker — mit direktem Hinzufügen-Weg */}
+      {detail && (
+        <ExerciseDetailSheet
+          exercise={detail}
+          zIndex={60}
+          onClose={() => setDetail(null)}
+          action={{
+            label: "Übung hinzufügen",
+            icon: "plus",
+            onClick: () => {
+              handleAdd(detail.id);
+              setDetail(null);
+            },
+          }}
+        />
+      )}
     </div>
   );
 }
