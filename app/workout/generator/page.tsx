@@ -15,14 +15,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
 import { generateWorkout } from "@/lib/workout-generator";
-import {
-  DEFAULT_WORKOUT_PLANS,
-  WORKOUT_DISCIPLINES,
-} from "@/lib/workout-plan-defaults";
+import { WORKOUT_DISCIPLINES } from "@/lib/workout-plan-defaults";
+import { resolveGymId } from "@/lib/gym";
 import SwipeAction from "@/components/SwipeAction";
 import WorkoutLogSheet, { WorkoutLogTile } from "@/components/WorkoutLogSheet";
 import {
   listPersonalWorkoutPlans,
+  listWorkoutPlansForGym,
   planDurationSeconds,
   planExerciseCount,
   planToSessionPayload,
@@ -30,6 +29,7 @@ import {
   toggleWorkoutFavorite,
   workoutDefinitionToPlan,
   type PersonalWorkoutPlan,
+  type WorkoutPlan,
 } from "@/lib/workout-plans";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
@@ -121,7 +121,7 @@ function ChoiceButton({
 
 export default function WorkoutHubPage() {
   const router = useRouter();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
@@ -129,6 +129,9 @@ export default function WorkoutHubPage() {
   // die Bereiche erscheinen erst mit dem Ergebnis (kein Leer-Blitz).
   const [ownPlans, setOwnPlans] = useState<PersonalWorkoutPlan[] | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
+  // Gym-Pläne aus Firestore (seit Seeding, Schritt 5) — nur für die
+  // Meta-Zeile der Disziplinkarten („n Pläne · n Level").
+  const [gymPlans, setGymPlans] = useState<WorkoutPlan[] | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
   const [heartBusy, setHeartBusy] = useState<string | null>(null);
   // Detail-Popup eines Log-Eintrags — als ID, damit Herz-Updates im
@@ -197,6 +200,23 @@ export default function WorkoutHubPage() {
       cancelled = true;
     };
   }, [user, authLoading]);
+
+  // Gym-Pläne — eigener Effect, weil die gymId aus dem Profil kommt
+  // (Spiegel des Token-Claims) und erst aufgelöst sein muss.
+  useEffect(() => {
+    if (!user || profileLoading) return;
+    let cancelled = false;
+    listWorkoutPlansForGym(resolveGymId(profile))
+      .then((plans) => {
+        if (!cancelled) setGymPlans(plans);
+      })
+      .catch(() => {
+        if (!cancelled) setGymPlans([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profile, profileLoading]);
 
   // Herz: speichert das ausgeführte Workout als eigenen Plan (bzw. entfernt
   // ihn wieder) — der Gefüllt-Zustand hängt am savedPlanId des Log-Eintrags.
@@ -472,7 +492,7 @@ export default function WorkoutHubPage() {
           />
           <div className="grid gap-3 sm:grid-cols-2">
             {WORKOUT_DISCIPLINES.map((d) => {
-              const plans = DEFAULT_WORKOUT_PLANS.filter(
+              const plans = (gymPlans ?? []).filter(
                 (p) => p.discipline === d.discipline,
               );
               const levels = new Set(plans.map((p) => p.difficulty)).size;
@@ -570,8 +590,12 @@ export default function WorkoutHubPage() {
                   </div>
 
                   <div className="relative mt-auto pt-2">
+                    {/* Bis zum Ladeergebnis nur die Zeilenhöhe halten —
+                        „0 Pläne" wäre ein falscher Zwischenstand */}
                     <span style={{ ...META_FONT, color: "var(--text-2)" }}>
-                      {plans.length} Pläne · {levels} Level
+                      {gymPlans === null
+                        ? " "
+                        : `${plans.length} Pläne · ${levels} Level`}
                     </span>
                   </div>
                 </Link>

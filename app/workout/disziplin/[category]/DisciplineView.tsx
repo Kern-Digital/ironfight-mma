@@ -6,8 +6,9 @@
  * Übungszahl und Equipment. Kopf mit Rubrik-Schein in der abgenommenen
  * Optik der Plan-Detail-Seite (Maske, Schein läuft nach unten aus).
  *
- * Datenquelle sind die eingebauten Start-Pläne — die Firestore-Gym-Pläne
- * übernehmen ab Etappen-Schritt 5 (Seeden), gleiche Filterlogik.
+ * Datenquelle sind seit dem Seeding (Etappen-Schritt 5) die Gym-Pläne aus
+ * Firestore (gyms/{gymId}/workoutPlans) — Trainer-Änderungen erscheinen
+ * sofort, die eingebauten Start-Pläne sind nur noch Seed-Datenquelle.
  */
 
 import AthleteTabBar from "@/components/AthleteTabBar";
@@ -16,11 +17,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { EQUIPMENT } from "@/lib/equipment";
+import { resolveGymId } from "@/lib/gym";
+import { type WorkoutDisciplineInfo } from "@/lib/workout-plan-defaults";
 import {
-  defaultPlansForDiscipline,
-  type WorkoutDisciplineInfo,
-} from "@/lib/workout-plan-defaults";
-import {
+  listWorkoutPlansForGym,
   planDurationSeconds,
   planEquipment,
   planExerciseCount,
@@ -28,7 +28,7 @@ import {
 } from "@/lib/workout-plans";
 import { DIFFICULTY_LABEL, type Difficulty } from "@/lib/types";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
 
@@ -59,17 +59,33 @@ export default function DisciplineView({
 }: {
   info: WorkoutDisciplineInfo;
 }) {
-  const { profile } = useAuth();
+  const { user, profile, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
 
-  const allPlans = useMemo(
-    () => defaultPlansForDiscipline(info.discipline),
-    [info.discipline],
-  );
-  const plans = allPlans.filter((p) => p.difficulty === difficulty);
+  // null = lädt noch (kein Leer-Blitz). gymId kommt aus dem Profil
+  // (Spiegel des Token-Claims) — erst laden, wenn es aufgelöst ist.
+  const [allPlans, setAllPlans] = useState<WorkoutPlan[] | null>(null);
+  useEffect(() => {
+    if (!user || profileLoading) return;
+    let cancelled = false;
+    listWorkoutPlansForGym(resolveGymId(profile))
+      .then((all) => {
+        if (!cancelled) {
+          setAllPlans(all.filter((p) => p.discipline === info.discipline));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAllPlans([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profile, profileLoading, info.discipline]);
+
+  const plans = (allPlans ?? []).filter((p) => p.difficulty === difficulty);
 
   return (
     <main
@@ -169,8 +185,8 @@ export default function DisciplineView({
           })}
         </div>
 
-        {/* Planliste */}
-        {plans.length === 0 ? (
+        {/* Planliste — erst mit dem Ladeergebnis (kein „keine Pläne"-Blitz) */}
+        {allPlans === null ? null : plans.length === 0 ? (
           <p
             className="py-8 text-center"
             style={{ font: "var(--type-sub)", color: "var(--text-3)" }}

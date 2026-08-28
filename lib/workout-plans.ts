@@ -32,7 +32,6 @@ import {
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import { getExerciseById } from "./exercises";
-import { DEFAULT_WORKOUT_PLANS } from "./workout-plan-defaults";
 import { setWorkoutSavedPlan, type WorkoutSession } from "./workouts";
 import { DIFFICULTY_LABEL, DISCIPLINE_LABEL } from "./types";
 import type {
@@ -472,14 +471,23 @@ export async function listGymWorkoutPlans(gymId: string): Promise<WorkoutPlan[]>
 }
 
 /**
- * Pläne, die ein Mitglied dieses Gyms sieht: die Gym-Pläne aus Firestore,
- * solange keine existieren die eingebauten Start-Pläne (Fallback, damit die
- * App vor dem Seeden in Schritt 5 nicht leer ist).
+ * Pläne, die ein Mitglied dieses Gyms sieht — seit dem Seeding (Etappe
+ * „Workout-Pläne", Schritt 5) direkt aus Firestore. Die eingebauten
+ * Start-Pläne (DEFAULT_WORKOUT_PLANS) sind nur noch Datenquelle des
+ * Seed-Skripts (scripts/seed-workout-plans.mjs), kein Laufzeit-Fallback.
  */
 export async function listWorkoutPlansForGym(gymId: string): Promise<WorkoutPlan[]> {
-  const own = await listGymWorkoutPlans(gymId);
-  if (own.length > 0) return own;
-  return DEFAULT_WORKOUT_PLANS;
+  return listGymWorkoutPlans(gymId);
+}
+
+/** Einzelner Gym-Plan; Doc-ID = Slug → stabile Deep-Links /workout/plans/[slug]. */
+export async function getGymWorkoutPlan(
+  gymId: string,
+  planId: string,
+): Promise<WorkoutPlan | null> {
+  const snap = await getDoc(doc(gymPlansCol(gymId), planId));
+  if (!snap.exists()) return null;
+  return docToPlan(snap.id, snap.data() as WorkoutPlanDoc);
 }
 
 /** Gym-Plan anlegen/aktualisieren (Trainer/Admin — Rules erzwingen das Gym). */
