@@ -697,42 +697,40 @@ function SessionRunner() {
         </div>
       )}
 
-      {/* ── Fertig-Screen (Leons Vorgaben 2026-08-28): „Workout fertig" über
-          der einmal abgespielten Häkchen-Animation (bleibt im letzten Bild
-          stehen), kleine Speicher-Anmerkung, darunter die zwei Buttons.
-          Oben rechts ein GROSSES Herz — speichert das ganze Workout (den
-          Plan) als eigenen Plan, gleicher Mechanismus wie im Hub. ───────── */}
+      {/* ── Fertig-Screen (Leons Vorgaben 2026-08-28): KEIN Kasten — die
+          Inhalte verteilen sich über die freie Bildschirmfläche. Oben rechts
+          das GROSSE Herz (speichert das ganze Workout als eigenen Plan,
+          gleicher Mechanismus wie im Hub), zentriert der Titel, das einmal
+          abgespielte Häkchen (bleibt im letzten Bild stehen) mittig in der
+          Resthöhe mit der Speicher-Anmerkung, die zwei Buttons unten
+          angepinnt wie sonst die Steuerung. ─────────────────────────────── */}
       {allDone && (
-        <div
-          className="relative my-6 rounded-modal px-6 pb-8 pt-8 text-center"
-          style={{
-            background: "color-mix(in oklab, var(--positive) 10%, transparent)",
-            border: "1px solid color-mix(in oklab, var(--positive) 40%, transparent)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => void toggleFinishFavorite()}
-            disabled={!loggedWorkoutId || heartBusy}
-            aria-pressed={Boolean(savedPlanId)}
-            aria-label={
-              savedPlanId
-                ? "Workout aus den Favoriten entfernen"
-                : "Workout als eigenen Plan speichern"
-            }
-            className="t-interactive absolute right-2 top-2 flex h-14 w-14 items-center justify-center rounded-field disabled:opacity-40"
-            style={{
-              color: savedPlanId ? heartColor : "var(--text-3)",
-              opacity: heartBusy ? 0.5 : undefined,
-            }}
-          >
-            <Icon
-              name="heart"
-              size={32}
-              strokeWidth={2}
-              style={savedPlanId ? { fill: "currentColor" } : undefined}
-            />
-          </button>
+        <div className="flex flex-1 flex-col text-center">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => void toggleFinishFavorite()}
+              disabled={!loggedWorkoutId || heartBusy}
+              aria-pressed={Boolean(savedPlanId)}
+              aria-label={
+                savedPlanId
+                  ? "Workout aus den Favoriten entfernen"
+                  : "Workout als eigenen Plan speichern"
+              }
+              className="t-interactive flex h-14 w-14 items-center justify-center rounded-field disabled:opacity-40"
+              style={{
+                color: savedPlanId ? heartColor : "var(--text-3)",
+                opacity: heartBusy ? 0.5 : undefined,
+              }}
+            >
+              <Icon
+                name="heart"
+                size={32}
+                strokeWidth={2}
+                style={savedPlanId ? { fill: "currentColor" } : undefined}
+              />
+            </button>
+          </div>
           <div
             style={{
               font: "800 40px/1.1 var(--font-archivo), system-ui, sans-serif",
@@ -744,27 +742,29 @@ function SessionRunner() {
           >
             Workout fertig!
           </div>
-          <DoneAnimation className="mx-auto mt-1 h-44 w-44" />
-          {logState === "saving" && (
-            <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
-              Speichere Session…
-            </p>
-          )}
-          {logState === "saved" && (
-            <p
-              className="mt-1 inline-flex items-center gap-1.5"
-              style={{ ...META_FONT, color: "var(--positive)" }}
-            >
-              <Icon name="check" size={12} strokeWidth={2.6} />
-              In deinen Workouts gespeichert
-            </p>
-          )}
-          {logState === "error" && (
-            <p className="mt-1" style={{ ...META_FONT, color: "var(--negative)" }}>
-              Speichern fehlgeschlagen
-            </p>
-          )}
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <DoneAnimation className="h-48 w-48 sm:h-56 sm:w-56" />
+            {logState === "saving" && (
+              <p className="mt-2" style={{ ...META_FONT, color: "var(--text-3)" }}>
+                Speichere Session…
+              </p>
+            )}
+            {logState === "saved" && (
+              <p
+                className="mt-2 inline-flex items-center gap-1.5"
+                style={{ ...META_FONT, color: "var(--positive)" }}
+              >
+                <Icon name="check" size={12} strokeWidth={2.6} />
+                In deinen Workouts gespeichert
+              </p>
+            )}
+            {logState === "error" && (
+              <p className="mt-2" style={{ ...META_FONT, color: "var(--negative)" }}>
+                Speichern fehlgeschlagen
+              </p>
+            )}
+          </div>
+          <div className="mt-auto flex flex-wrap justify-center gap-3 pt-4">
             <Link
               href="/dashboard"
               className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4"
