@@ -100,9 +100,11 @@ function SheetShell({
         onClick={onClose}
       />
       {/* Transform auf einer eigenen Hülle — die Einblende-Animation des
-          Panels (fill both) würde eine Panel-Transform überschreiben */}
+          Panels (fill both) würde eine Panel-Transform überschreiben.
+          pointer-events-none: neben dem zentrierten Panel (Desktop) müssen
+          Klicks das Overlay darunter treffen (= schließen) */}
       <div
-        className="relative flex w-full justify-center"
+        className="pointer-events-none relative flex w-full justify-center"
         style={{
           transform: stacked ? STACKED_TRANSFORM : undefined,
           transformOrigin: "50% 100%",
@@ -110,7 +112,7 @@ function SheetShell({
         }}
       >
       <div
-        className="animate-slide-up relative flex w-full max-h-[75vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[75vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
         style={{
           maxHeight: "75dvh",
           // "0px" statt auto — auto→Länge springt statt zu animieren

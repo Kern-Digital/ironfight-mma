@@ -111,7 +111,7 @@ export default function ExercisePicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`Übung zu „${blockTitle}" hinzufügen`}
@@ -131,7 +131,7 @@ export default function ExercisePicker({
           eigener Hülle — die Einblende-Animation des Panels (fill both)
           würde eine Panel-Transform überschreiben. */}
       <div
-        className="relative flex w-full justify-center"
+        className="pointer-events-none relative flex w-full justify-center"
         style={{
           transform: detail ? "translateY(-44px) scaleX(0.9)" : undefined,
           transformOrigin: "50% 100%",
@@ -139,7 +139,7 @@ export default function ExercisePicker({
         }}
       >
       <div
-        className="animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden"
+        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
         style={{
           maxHeight: "80dvh",
           // Hinten angestellt: volle Höhe erzwingen, damit die Oberkante
@@ -158,7 +158,6 @@ export default function ExercisePicker({
           borderColor: detail
             ? "color-mix(in oklab, var(--accent) 55%, transparent)"
             : "transparent",
-          borderRadius: "var(--r-xl) var(--r-xl) 0 0",
           boxShadow: detail
             ? "var(--glass-shadow), var(--accent-glow)"
             : "var(--glass-shadow)",
@@ -185,7 +184,7 @@ export default function ExercisePicker({
           <div className="flex min-w-0 flex-col items-start">
             <div
               aria-hidden
-              className="mb-2 h-1 w-10 rounded-full"
+              className="mb-2 h-1 w-10 rounded-full sm:invisible"
               style={{ background: "var(--line-strong)" }}
             />
             <span className="t-label">Übung hinzufügen</span>
