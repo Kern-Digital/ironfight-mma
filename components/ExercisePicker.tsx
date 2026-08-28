@@ -30,6 +30,15 @@ const META_FONT: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
+// Rubrik-Überschriften der Liste (Aufwärmen/Technik/…) — groß und in
+// Akzentfarbe, damit der Beginn eines neuen Bereichs sofort ins Auge
+// fällt (Leons Vorgabe 2026-08-28, zwei Nachschärf-Runden)
+const GROUP_FONT: React.CSSProperties = {
+  font: "700 16px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
 const KIND_LABEL: Record<ExerciseKind, string> = {
   warmup: "Aufwärmen",
   technique: "Technik",
@@ -250,10 +259,18 @@ export default function ExercisePicker({
               return (
                 <div key={kind} className="mb-2">
                   <div
-                    className="px-2.5 pb-1 pt-2"
-                    style={{ ...META_FONT, color: "var(--text-3)" }}
+                    className="flex items-center gap-3 px-2.5 pb-2 pt-5"
+                    style={{ ...GROUP_FONT, color: "var(--accent-text)" }}
                   >
                     {KIND_LABEL[kind]}
+                    <span
+                      aria-hidden
+                      className="h-px flex-1"
+                      style={{
+                        background:
+                          "color-mix(in oklab, var(--accent) 35%, transparent)",
+                      }}
+                    />
                   </div>
                   {group.map((ex) => {
                     const flashTick =
@@ -315,9 +332,9 @@ export default function ExercisePicker({
                               setDetail(ex);
                             }}
                             className="t-interactive hidden h-10 w-10 shrink-0 items-center justify-center rounded-field sm:flex"
-                            style={{ color: "var(--text-3)" }}
+                            style={{ color: "var(--accent-text)" }}
                           >
-                            <Icon name="info" size={16} strokeWidth={2} />
+                            <Icon name="info" size={24} strokeWidth={2} />
                           </button>
                           <button
                             type="button"
