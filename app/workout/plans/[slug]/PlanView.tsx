@@ -34,7 +34,7 @@ import { getWorkoutDiscipline } from "@/lib/workout-plan-defaults";
 import {
   planDurationSeconds,
   planExerciseCount,
-  planToWorkoutDefinition,
+  planToSessionPayload,
   planWithAddedExercise,
   planWithDuplicatedExercise,
   planWithMovedExercise,
@@ -557,16 +557,12 @@ export default function PlanView({
   const disciplineInfo = getWorkoutDiscipline(shown.discipline);
   const canCreate = shown.name.trim().length > 0 && totalExercises > 0;
 
-  // Gleiches Payload-Muster wie der Generator — der geführte Runner
-  // (/workout/session) läuft bis zu seiner Umstellung (Schritt 4) über die
-  // WorkoutDefinition-Brücke. Entwurfs-Änderungen fließen hier mit ein.
+  // Der geführte Runner (/workout/session) läuft nativ auf dem Plan-Modell
+  // (inkl. Blockpausen) — das Payload ist das Plan-JSON selbst.
+  // Entwurfs-Änderungen fließen hier mit ein.
   const sessionHref = useMemo(() => {
     const p = new URLSearchParams();
-    p.set(
-      "payload",
-      sessionPayload ??
-        encodeURIComponent(JSON.stringify(planToWorkoutDefinition(shown))),
-    );
+    p.set("payload", sessionPayload ?? planToSessionPayload(shown));
     return `/workout/session?${p.toString()}`;
   }, [shown, sessionPayload]);
 

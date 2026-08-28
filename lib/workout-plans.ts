@@ -32,6 +32,7 @@ import { getFirestoreDb } from "./firebase";
 import { getExerciseById } from "./exercises";
 import { DEFAULT_WORKOUT_PLANS } from "./workout-plan-defaults";
 import type { WorkoutSession } from "./workouts";
+import { DIFFICULTY_LABEL, DISCIPLINE_LABEL } from "./types";
 import type {
   Category,
   Difficulty,
@@ -193,13 +194,13 @@ export function planWithMovedExercise<T extends WorkoutPlan>(
   });
 }
 
-// ─── Brücke zum Runner (/workout, /workout/session) ────────────────────────
+// ─── Runner (/workout, /workout/session): Payload & Konverter ──────────────
 
 /**
- * Nächstliegende Kern-Kategorie einer Disziplin. Runner und Workout-Logs
- * rechnen (noch) in Category — exakt für die vier Kern-Disziplinen, Näherung
- * für den Rest, bis der Runner in Teilschritt 4 direkt auf dem neuen Modell
- * läuft (Familien-Zuordnung wie in lib/discipline-colors.ts).
+ * Nächstliegende Kern-Kategorie einer Disziplin. Der Runner läuft nativ auf
+ * dem Plan-Modell; nur Workout-Logs und die Dashboard-Statistik rechnen
+ * weiter in Category — exakt für die vier Kern-Disziplinen, Näherung für
+ * den Rest (Familien-Zuordnung wie in lib/discipline-colors.ts).
  */
 export const DISCIPLINE_CATEGORY: Record<Discipline, Category> = {
   boxing: "boxing",
@@ -224,35 +225,38 @@ export const PHASE_LABEL: Record<WorkoutBlock["phase"], string> = {
 
 /**
  * Ausgeführtes Workout (Log-Eintrag) → Plan für die persönliche Kopie
- * (Herz-Favorit im Hub, Teilschritt 3). Mit gespeicherter Definition bleibt
- * die Blockstruktur erhalten; ältere Logs ohne Definition werden als ein
- * Hauptteil-Block mit der flachen Übungsfolge übernommen.
+ * (Herz-Favorit im Hub, Teilschritt 3). Neue Logs tragen den ausgeführten
+ * Plan (Blockpausen und Rubrik-Titel bleiben erhalten); ältere Logs haben
+ * stattdessen eine WorkoutDefinition, noch ältere nur die flache
+ * Übungsfolge — dann entsteht ein Hauptteil-Block daraus.
  */
 export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
   const def = session.definition;
-  const blocks: WorkoutPlanBlock[] = def
-    ? def.blocks
-        .filter((b) => b.exerciseIds.length > 0)
-        .map((b) => ({
-          title: PHASE_LABEL[b.phase] ?? b.phase,
-          phase: b.phase,
-          exerciseIds: b.exerciseIds,
-          restSeconds: def.restSeconds,
-        }))
-    : [
-        {
-          title: PHASE_LABEL.main,
-          phase: "main" as const,
-          exerciseIds: session.exerciseIds,
-          restSeconds: session.restSeconds,
-        },
-      ];
+  const blocks: WorkoutPlanBlock[] = session.plan
+    ? session.plan.blocks.filter((b) => b.exerciseIds.length > 0)
+    : def
+      ? def.blocks
+          .filter((b) => b.exerciseIds.length > 0)
+          .map((b) => ({
+            title: PHASE_LABEL[b.phase] ?? b.phase,
+            phase: b.phase,
+            exerciseIds: b.exerciseIds,
+            restSeconds: def.restSeconds,
+          }))
+      : [
+          {
+            title: PHASE_LABEL.main,
+            phase: "main" as const,
+            exerciseIds: session.exerciseIds,
+            restSeconds: session.restSeconds,
+          },
+        ];
   return {
     id: "",
     slug: "",
     gymId: "personal",
     // Category ist Teilmenge von Discipline (gleiche Slugs)
-    discipline: session.category ?? "boxing",
+    discipline: session.plan?.discipline ?? session.category ?? "boxing",
     difficulty: session.difficulty ?? "anfaenger",
     name: session.label ?? "Workout",
     short: "",
@@ -262,29 +266,60 @@ export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
 }
 
 /**
- * Plan → WorkoutDefinition für die bestehenden Runner-Seiten (?payload=…).
- * Timer-Defaults kommen wie im Generator aus der ersten Hauptteil-Übung;
- * die Blockpausen nutzt der Runner erst nach seiner Umstellung (Schritt 4).
+ * WorkoutDefinition → Plan. Der Runner läuft nativ auf Plan-Blöcken —
+ * Definitionen (Generator-Ergebnisse, ältere Session-Links) werden beim
+ * Einlesen in die Plan-Form gehoben. Als Blockpause bleibt nur der flache
+ * restSeconds-Timerwert der Definition, mehr weiß sie nicht.
  */
-export function planToWorkoutDefinition(plan: WorkoutPlan): WorkoutDefinition {
-  const firstMain =
-    plan.blocks
-      .filter((b) => b.phase === "main")
-      .flatMap(blockExercises)[0] ?? plan.blocks.flatMap(blockExercises)[0];
-
+export function workoutDefinitionToPlan(def: WorkoutDefinition): WorkoutPlan {
   return {
-    id: `plan-${plan.slug}`,
-    label: plan.name,
-    category: DISCIPLINE_CATEGORY[plan.discipline],
-    difficulty: plan.difficulty,
-    rounds: firstMain?.defaultRounds ?? 3,
-    workSeconds: firstMain?.durationSeconds ?? 180,
-    restSeconds: firstMain?.restSeconds ?? 60,
-    prepSeconds: 10,
-    blocks: plan.blocks
+    id: def.id,
+    slug: def.id,
+    gymId: "generated",
+    // Category ist Teilmenge von Discipline (gleiche Slugs)
+    discipline: def.category,
+    difficulty: def.difficulty,
+    name: def.label,
+    short: "",
+    description: `Auto-generiertes Workout — ${DIFFICULTY_LABEL[def.difficulty]} · ${DISCIPLINE_LABEL[def.category]}`,
+    blocks: def.blocks
       .filter((b) => b.exerciseIds.length > 0)
-      .map((b) => ({ phase: b.phase, exerciseIds: b.exerciseIds })),
+      .map((b) => ({
+        title: PHASE_LABEL[b.phase] ?? b.phase,
+        phase: b.phase,
+        exerciseIds: b.exerciseIds,
+        restSeconds: def.restSeconds,
+      })),
   };
+}
+
+/**
+ * Plan → ?payload=…-Wert für /workout/session und /workout. Gleiches
+ * Encoding wie früher beim Generator (encodeURIComponent im Wert, außen
+ * URLSearchParams) — parseSessionPayload ist das Gegenstück.
+ */
+export function planToSessionPayload(plan: WorkoutPlan): string {
+  return encodeURIComponent(JSON.stringify(plan));
+}
+
+/**
+ * ?payload=…-Wert → Plan. Versteht BEIDE Formate: das Plan-JSON (Standard
+ * seit der Runner-Umstellung) und die alte WorkoutDefinition (ältere
+ * Bookmarks/Verläufe) — erkannt am label-Feld, das nur Definitionen haben.
+ */
+export function parseSessionPayload(payload: string | null): WorkoutPlan | null {
+  if (!payload) return null;
+  try {
+    const data = JSON.parse(decodeURIComponent(payload)) as
+      | WorkoutPlan
+      | WorkoutDefinition;
+    if (!data || typeof data !== "object" || !Array.isArray(data.blocks)) {
+      return null;
+    }
+    return "label" in data ? workoutDefinitionToPlan(data) : data;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Firestore: Gym-Pläne + persönliche Kopien ─────────────────────────────

@@ -119,6 +119,10 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
           enterPhase("work", 1);
         } else if (cur === "work") {
           if (r >= config.rounds) enterPhase("done");
+          // Pause 0 s (Blockpause im Plan-Modell darf 0 sein): direkt in
+          // die nächste Runde — eine 0-Sekunden-Rest-Phase bliebe hängen,
+          // weil enterPhase dann kein Phasenende setzt (endAt = null)
+          else if (config.restSeconds <= 0) enterPhase("work", r + 1);
           else enterPhase("rest", r);
         } else if (cur === "rest") {
           enterPhase("work", r + 1);
@@ -126,7 +130,7 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
       }
     }, 200);
     return () => window.clearInterval(id);
-  }, [running, config.rounds, enterPhase]);
+  }, [running, config.rounds, config.restSeconds, enterPhase]);
 
   const start = useCallback(() => {
     if (phase === "done" || phase === "idle") {
@@ -156,9 +160,11 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
     if (phase === "prep") enterPhase("work", 1);
     else if (phase === "work") {
       if (round >= config.rounds) enterPhase("done");
+      // Pause 0 s → wie im Tick direkt zur nächsten Runde
+      else if (config.restSeconds <= 0) enterPhase("work", round + 1);
       else enterPhase("rest", round);
     } else if (phase === "rest") enterPhase("work", round + 1);
-  }, [phase, round, config.rounds, enterPhase]);
+  }, [phase, round, config.rounds, config.restSeconds, enterPhase]);
 
   useEffect(() => {
     if (phase === "idle") setRemaining(config.workSeconds);

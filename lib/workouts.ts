@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import type { TimerConfig } from "./use-workout-timer";
+import type { WorkoutPlan } from "./workout-plans";
 import type {
   Category,
   Difficulty,
@@ -32,9 +33,13 @@ export type WorkoutSession = {
   status: WorkoutStatus;
   exerciseIds: string[];
   techniqueIds: string[];
-  /** Volle Definition (mit Blockstruktur) — seit Teilschritt 3; ältere
-      Logs haben nur die flache exerciseIds-Liste */
+  /** Volle Definition (mit Blockstruktur) — Teilschritt 3 bis zur
+      Runner-Umstellung; ganz alte Logs haben nur die flache
+      exerciseIds-Liste, neue stattdessen den Plan */
   definition: WorkoutDefinition | null;
+  /** Ausgeführter Plan (mit Blockpausen + Rubrik-Titeln) — seit der
+      Runner-Umstellung aufs Plan-Modell die Basis fürs Herz-Feature */
+  plan: WorkoutPlan | null;
   /** Als Favorit gespeicherte persönliche Kopie (users/{uid}/workoutPlans) */
   savedPlanId: string | null;
 };
@@ -52,6 +57,7 @@ type WorkoutDoc = {
   exerciseIds?: string[];
   techniqueIds?: string[];
   definition?: WorkoutDefinition | null;
+  plan?: WorkoutPlan | null;
   savedPlanId?: string | null;
 };
 
@@ -67,8 +73,10 @@ export interface LogWorkoutOptions {
   status?: WorkoutStatus;
   exerciseIds?: string[];
   techniqueIds?: string[];
-  /** Volle Definition — Basis für „als Favorit speichern" (Herz im Hub) */
+  /** Volle Definition — nur noch für ältere Aufrufer, neue loggen `plan` */
   definition?: WorkoutDefinition | null;
+  /** Ausgeführter Plan — Basis für „als Favorit speichern" (Herz im Hub) */
+  plan?: WorkoutPlan | null;
 }
 
 /** Vereinfachter Logger — bleibt rückwärtskompatibel mit bestehendem Code. */
@@ -107,6 +115,7 @@ export async function logWorkoutFull(
     exerciseIds: options.exerciseIds ?? [],
     techniqueIds: options.techniqueIds ?? [],
     definition: options.definition ?? null,
+    plan: options.plan ?? null,
     savedPlanId: null,
   });
 }
@@ -150,6 +159,7 @@ export async function getRecentWorkouts(
       exerciseIds: data.exerciseIds ?? [],
       techniqueIds: data.techniqueIds ?? [],
       definition: data.definition ?? null,
+      plan: data.plan ?? null,
       savedPlanId: data.savedPlanId ?? null,
     };
   });

@@ -24,7 +24,9 @@ import {
   listPersonalWorkoutPlans,
   planDurationSeconds,
   planExerciseCount,
+  planToSessionPayload,
   upsertPersonalWorkoutPlan,
+  workoutDefinitionToPlan,
   workoutSessionToPlan,
   type PersonalWorkoutPlan,
 } from "@/lib/workout-plans";
@@ -254,8 +256,10 @@ export default function WorkoutHubPage() {
       equipment: ["bodyweight", ...gear],
       durationMinutes: duration,
     });
+    // Der Runner läuft nativ auf dem Plan-Modell — das Generator-Ergebnis
+    // wird direkt in die Plan-Form gehoben (Blockpause = Timer-Default)
     const p = new URLSearchParams();
-    p.set("payload", encodeURIComponent(JSON.stringify(workout)));
+    p.set("payload", planToSessionPayload(workoutDefinitionToPlan(workout)));
     return p.toString();
   }
 

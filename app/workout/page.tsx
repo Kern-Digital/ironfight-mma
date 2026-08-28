@@ -1,31 +1,23 @@
 "use client";
 
 /**
- * Workout-Detail (?payload=…) — Ziel des „Detail"-Buttons im Session-Runner.
- * Zeigt das laufende Workout im selben Aufbau wie die Plan-Seite (PlanView):
- * Plan-Workouts lösen über die id „plan-<slug>" auf den echten Plan auf,
- * generierte Workouts werden als gleichgeformte Ansicht direkt aus dem
- * Payload gerendert. Der alte Timer-Runner dieser Route ist ersatzlos raus
- * (Leon 2026-08-27) — geführt trainiert wird nur noch in /workout/session;
- * „Workout starten" hier steigt mit dem unveränderten Payload wieder ein.
+ * Workout-Detail (?payload=…) — Wiedereinstiegs-Ansicht eines laufenden
+ * Workouts im selben Aufbau wie die Plan-Seite (PlanView). Das Payload ist
+ * seit der Runner-Umstellung das Plan-JSON selbst (parseSessionPayload hebt
+ * alte WorkoutDefinition-Payloads beim Einlesen); Alt-Links mit der id
+ * „plan-<slug>" lösen weiter auf den echten Start-Plan auf. Der alte
+ * Timer-Runner dieser Route ist ersatzlos raus (Leon 2026-08-27) — geführt
+ * trainiert wird nur noch in /workout/session; „Workout starten" hier
+ * steigt mit dem unveränderten Payload wieder ein.
  */
 
 import Icon from "@/components/ui/Icon";
-import { CATEGORY_LABEL } from "@/lib/techniques";
-import { DIFFICULTY_LABEL, type WorkoutDefinition } from "@/lib/types";
 import { getDefaultPlanBySlug } from "@/lib/workout-plan-defaults";
-import { type WorkoutPlan } from "@/lib/workout-plans";
+import { parseSessionPayload } from "@/lib/workout-plans";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 import PlanView from "./plans/[slug]/PlanView";
-
-const BLOCK_LABEL: Record<string, string> = {
-  warmup: "Aufwärmen",
-  main: "Hauptteil",
-  conditioning: "Konditionierung",
-  cooldown: "Cooldown",
-};
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -33,49 +25,21 @@ const BTN_FONT: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
-function parseWorkout(payload: string | null): WorkoutDefinition | null {
-  if (!payload) return null;
-  try {
-    return JSON.parse(decodeURIComponent(payload)) as WorkoutDefinition;
-  } catch {
-    return null;
-  }
-}
-
 function WorkoutDetail() {
   const params = useSearchParams();
   const raw = params.get("payload");
-  const workout = useMemo(() => parseWorkout(raw), [raw]);
+  const plan = useMemo(() => {
+    const parsed = parseSessionPayload(raw);
+    if (!parsed) return null;
+    // Alt-Link auf einen Start-Plan (die frühere Brücke setzte die id
+    // „plan-<slug>") → echten Plan mit voller Beschreibung zeigen
+    if (parsed.id.startsWith("plan-")) {
+      return getDefaultPlanBySlug(parsed.id.slice("plan-".length)) ?? parsed;
+    }
+    return parsed;
+  }, [raw]);
 
-  // Plan-Workout → echter Plan (planToWorkoutDefinition setzt id „plan-<slug>")
-  const plan = workout?.id.startsWith("plan-")
-    ? getDefaultPlanBySlug(workout.id.slice("plan-".length))
-    : undefined;
-
-  // Generiertes Workout → Plan-förmig aus dem Payload, damit PlanView es
-  // identisch rendert. Die Blockpause ist der Timer-Default der Definition;
-  // die Category ist Teilmenge von Discipline (gleiche Slugs).
-  const generatedPlan = useMemo<WorkoutPlan | null>(() => {
-    if (!workout) return null;
-    return {
-      id: workout.id,
-      slug: workout.id,
-      gymId: "generated",
-      discipline: workout.category,
-      difficulty: workout.difficulty,
-      name: workout.label,
-      short: "",
-      description: `Auto-generiertes Workout — ${DIFFICULTY_LABEL[workout.difficulty]} · ${CATEGORY_LABEL[workout.category]}`,
-      blocks: workout.blocks.map((b) => ({
-        title: BLOCK_LABEL[b.phase] ?? b.phase,
-        phase: b.phase,
-        exerciseIds: b.exerciseIds,
-        restSeconds: workout.restSeconds,
-      })),
-    };
-  }, [workout]);
-
-  if (!workout || !generatedPlan) {
+  if (!plan) {
     return (
       <main
         className="min-h-screen"
@@ -114,17 +78,19 @@ function WorkoutDetail() {
     );
   }
 
-  if (plan) {
-    return <PlanView plan={plan} sessionPayload={raw ?? undefined} />;
+  // Generierte Workouts führen zurück zum Generator, Pläne in ihre
+  // Disziplin-Navigation (PlanView-Default)
+  if (plan.gymId === "generated") {
+    return (
+      <PlanView
+        plan={plan}
+        sessionPayload={raw ?? undefined}
+        backHref="/workout/generator"
+        backLabel="Workout"
+      />
+    );
   }
-  return (
-    <PlanView
-      plan={generatedPlan}
-      sessionPayload={raw ?? undefined}
-      backHref="/workout/generator"
-      backLabel="Workout"
-    />
-  );
+  return <PlanView plan={plan} sessionPayload={raw ?? undefined} />;
 }
 
 export default function WorkoutDetailPage() {

@@ -16,7 +16,12 @@
  *    angedeutet — einmal pro Session-Start, max. 2× pro GERÄT (localStorage)
  *  - Sound/Vibration/Display-Toggles bewusst entfernt — wird später
  *    app-weit gesteuert
- *  - Gleicher URL-Parameter ?payload=... wie /workout
+ *  - Gleicher URL-Parameter ?payload=... wie /workout — trägt seit der
+ *    Runner-Umstellung (Schritt 5) das Plan-JSON: der Runner läuft NATIV
+ *    auf WorkoutPlan-Blöcken, die Pause zwischen den Runden ist die
+ *    BLOCKPAUSE des jeweiligen Blocks (nicht mehr der Übungs-Default).
+ *    Alte WorkoutDefinition-Payloads (Bookmarks/Verläufe) hebt
+ *    parseSessionPayload beim Einlesen in die Plan-Form.
  *
  * Neues Token-System (Rollout Etappe 4). Bewusst OHNE Tab-Bar: der Modus ist
  * ein immersiver Player — Verlassen nur gezielt über „Beenden" (mit
@@ -48,8 +53,8 @@ import {
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { logWorkoutFull } from "@/lib/workouts";
-import { CATEGORY_LABEL } from "@/lib/techniques";
-import { type WorkoutDefinition } from "@/lib/types";
+import { DISCIPLINE_CATEGORY, parseSessionPayload } from "@/lib/workout-plans";
+import { DISCIPLINE_LABEL } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -62,14 +67,9 @@ function formatTime(s: number) {
   return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
 }
 
-function parseWorkout(payload: string | null): WorkoutDefinition | null {
-  if (!payload) return null;
-  try {
-    return JSON.parse(decodeURIComponent(payload)) as WorkoutDefinition;
-  } catch {
-    return null;
-  }
-}
+/** Vorlauf vor der ersten Runde — das Plan-Modell kennt kein prepSeconds,
+    der Wert war auch vorher überall fix 10 (Generator wie Brücke). */
+const PREP_SECONDS = 10;
 
 // ─── Phase-Styling (Semantik-Tokens statt fester Farben) ──────────────────────
 
@@ -98,14 +98,6 @@ const PHASE_GLOW: Record<Phase, string> = {
   done: "drop-shadow(0 0 20px color-mix(in oklab, var(--positive) 50%, transparent))",
 };
 
-// Block-Überschriften der Übungsliste (gleiches Mapping wie /workout)
-const BLOCK_LABEL: Record<string, string> = {
-  warmup: "Aufwärmen",
-  main: "Hauptteil",
-  conditioning: "Konditionierung",
-  cooldown: "Cooldown",
-};
-
 // ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
 
 const BTN_FONT: React.CSSProperties = {
@@ -120,22 +112,39 @@ const META_FONT: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
+// Rubrik-Überschriften der Übungsliste — groß und in Akzentfarbe mit
+// Trennlinie, gleiche Optik wie im Übungs-Picker (Leons Vorgabe 2026-08-28);
+// die Titel kommen aus den Plan-Blöcken (block.title), nicht aus der Phase
+const GROUP_FONT: React.CSSProperties = {
+  font: "700 16px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
 // ─── Kern-Komponente ──────────────────────────────────────────────────────────
 
 function SessionRunner() {
   const params   = useSearchParams();
-  const workout  = useMemo(() => parseWorkout(params.get("payload")), [params]);
+  const plan     = useMemo(
+    () => parseSessionPayload(params.get("payload")),
+    [params],
+  );
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   // Nur noch lesen — die Toggle-UI (Sound/Vibration/Display) ist raus,
   // gesteuert wird das später app-weit (Leons Vorgabe 2026-08-27)
   const { settings } = useTimerSettings();
 
-  // Übungs-Sequenz
-  const exerciseSequence = useMemo(
-    () => workout?.blocks.flatMap((b) => b.exerciseIds) ?? [],
-    [workout],
+  // Übungs-Sequenz — jede Position kennt ihren Block, denn dessen
+  // Blockpause gilt für die Pausen zwischen den Runden dieser Übung
+  const sequence = useMemo(
+    () =>
+      plan?.blocks.flatMap((b, blockIndex) =>
+        b.exerciseIds.map((id) => ({ id, blockIndex })),
+      ) ?? [],
+    [plan],
   );
+  const exerciseSequence = useMemo(() => sequence.map((s) => s.id), [sequence]);
   const [exerciseIndex, setExerciseIndex] = useState(0);
 
   // Hochziehbare Übungsliste + Autostart nach Sprung daraus
@@ -151,7 +160,7 @@ function SessionRunner() {
   // GERÄTE-gebunden (localStorage, nicht Firestore; Leons Vorgabe 2026-08-27)
   const [hintVisible, setHintVisible] = useState(false);
   useEffect(() => {
-    if (!workout) return;
+    if (!plan) return;
     let seen = 0;
     try {
       seen = Number(localStorage.getItem("ta-session-swipe-hint")) || 0;
@@ -163,36 +172,42 @@ function SessionRunner() {
     setHintVisible(true);
     const id = setTimeout(() => setHintVisible(false), 7000);
     return () => clearTimeout(id);
-  }, [workout]);
+  }, [plan]);
 
-  // Zeilen der Übungsliste: Blöcke der Einheit → globale Übungs-Indizes
+  // Zeilen der Übungsliste: Plan-Blöcke → globale Übungs-Indizes; leere
+  // Blöcke (Editor erlaubt sie) tauchen in der Liste nicht auf
   const sheetBlocks = useMemo(() => {
     let i = 0;
-    return (workout?.blocks ?? []).map((b) => ({
-      phase: b.phase,
-      items: b.exerciseIds.map((id) => ({
-        index: i++,
-        exercise: getExerciseById(id),
-      })),
-    }));
-  }, [workout]);
+    return (plan?.blocks ?? [])
+      .map((b) => ({
+        title: b.title,
+        items: b.exerciseIds.map((id) => ({
+          index: i++,
+          exercise: getExerciseById(id),
+        })),
+      }))
+      .filter((b) => b.items.length > 0);
+  }, [plan]);
   const currentExerciseId = exerciseSequence[exerciseIndex];
   const currentExercise   = currentExerciseId ? getExerciseById(currentExerciseId) : null;
+  const currentBlock      = plan?.blocks[sequence[exerciseIndex]?.blockIndex ?? -1];
   const nextExerciseId    = exerciseSequence[exerciseIndex + 1];
   const nextExercise      = nextExerciseId ? getExerciseById(nextExerciseId) : null;
 
-  // Timer-Konfiguration per Übung
+  // Timer-Konfiguration per Übung — die Pause zwischen den Runden ist die
+  // BLOCKPAUSE des Plans (0 s erlaubt; der Timer überspringt die Rest-Phase
+  // dann), nicht mehr der restSeconds-Default der Übung
   const timerConfig: TimerConfig = useMemo(() => {
     if (currentExercise) {
       return {
         rounds:      currentExercise.defaultRounds,
         workSeconds: currentExercise.durationSeconds,
-        restSeconds: currentExercise.restSeconds || 30,
-        prepSeconds: workout?.prepSeconds ?? 10,
+        restSeconds: currentBlock?.restSeconds ?? currentExercise.restSeconds,
+        prepSeconds: PREP_SECONDS,
       };
     }
     return DEFAULT_CONFIG;
-  }, [currentExercise, workout]);
+  }, [currentExercise, currentBlock]);
 
   const t = useWorkoutTimer(timerConfig);
   useWakeLock(settings.wakeLock && t.running);
@@ -271,7 +286,7 @@ function SessionRunner() {
   const allDone   = !nextExerciseId && t.phase === "done";
 
   useEffect(() => {
-    if (!workout || !allDone || !user || loggedRef.current) return;
+    if (!plan || !allDone || !user || loggedRef.current) return;
     loggedRef.current = true;
     setLogState("saving");
     const techniqueIds = exerciseSequence.flatMap(
@@ -279,17 +294,18 @@ function SessionRunner() {
     );
     logWorkoutFull(user.uid, {
       config:       t.config,
-      label:        workout.label,
-      category:     workout.category,
-      difficulty:   workout.difficulty,
+      label:        plan.name,
+      // Logs/Statistik rechnen weiter im Category-Raster
+      category:     DISCIPLINE_CATEGORY[plan.discipline],
+      difficulty:   plan.difficulty,
       status:       "completed",
       exerciseIds:  exerciseSequence,
       techniqueIds: Array.from(new Set(techniqueIds)),
-      definition:   workout,
+      plan,
     })
       .then(() => setLogState("saved"))
       .catch(() => setLogState("error"));
-  }, [allDone, user, workout, exerciseSequence, t.config]);
+  }, [allDone, user, plan, exerciseSequence, t.config]);
 
   // ─── Audio-Unlock ─────────────────────────────────────────────────────────────
 
@@ -310,12 +326,12 @@ function SessionRunner() {
       loggedRef.current = true;
       logWorkoutFull(user.uid, {
         config:      t.config,
-        label:       workout?.label ?? null,
-        category:    workout?.category ?? null,
-        difficulty:  workout?.difficulty ?? null,
+        label:       plan?.name ?? null,
+        category:    plan ? DISCIPLINE_CATEGORY[plan.discipline] : null,
+        difficulty:  plan?.difficulty ?? null,
         status:      "aborted",
         exerciseIds: exerciseSequence.slice(0, exerciseIndex + 1),
-        definition:  workout ?? null,
+        plan:        plan ?? null,
       }).catch(() => {});
     }
     cancelSpeech();
@@ -373,7 +389,7 @@ function SessionRunner() {
 
   // ─── Kein Workout ─────────────────────────────────────────────────────────────
 
-  if (!workout) {
+  if (!plan) {
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 text-center"
@@ -448,7 +464,7 @@ function SessionRunner() {
 
         <div className="text-center">
           <div style={{ ...META_FONT, color: "var(--text-3)" }}>
-            {CATEGORY_LABEL[workout.category]}
+            {DISCIPLINE_LABEL[plan.discipline]}
           </div>
           <div style={{ font: "var(--type-sub)", fontWeight: 600 }}>
             Übung {Math.min(exerciseIndex + 1, totalExercises)}/{totalExercises}
@@ -793,12 +809,21 @@ function SessionRunner() {
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
           >
             {sheetBlocks.map((block, bi) => (
-              <div key={`${block.phase}-${bi}`} className="mb-2">
+              <div key={`${block.title}-${bi}`} className="mb-2">
+                {/* Rubrik-Überschrift — gleiche Optik wie im Übungs-Picker */}
                 <div
-                  className="px-2.5 pb-1 pt-2"
-                  style={{ ...META_FONT, color: "var(--text-3)" }}
+                  className="flex items-center gap-3 px-2.5 pb-2 pt-5"
+                  style={{ ...GROUP_FONT, color: "var(--accent-text)" }}
                 >
-                  {BLOCK_LABEL[block.phase] ?? block.phase}
+                  {block.title}
+                  <span
+                    aria-hidden
+                    className="h-px flex-1"
+                    style={{
+                      background:
+                        "color-mix(in oklab, var(--accent) 35%, transparent)",
+                    }}
+                  />
                 </div>
                 {block.items.map(({ index, exercise }) =>
                   exercise ? (
