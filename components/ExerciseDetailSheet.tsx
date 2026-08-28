@@ -14,6 +14,7 @@
  */
 
 import Icon, { type IconName } from "@/components/ui/Icon";
+import RestWheel, { formatRest } from "@/components/RestWheel";
 import { EQUIPMENT } from "@/lib/equipment";
 import { CATEGORY_LABEL, getTechniqueById } from "@/lib/techniques";
 import { DIFFICULTY_LABEL, type Exercise, type Technique } from "@/lib/types";
@@ -198,17 +199,25 @@ export default function ExerciseDetailSheet({
   exercise,
   onClose,
   action,
+  rest,
   zIndex = 50,
 }: {
   exercise: Exercise;
   onClose: () => void;
   /** Optionaler Aktions-Knopf unten (z. B. „Übung hinzufügen" im Picker) */
   action?: { label: string; icon: IconName; onClick: () => void };
+  /** Rubrik-Pause im Editor (Leons Vorgabe 2026-08-28: die Pause zwischen
+      den Runden ist NUR über die Übungsdetails einstellbar) — Tippen auf
+      den Wert öffnet das Pausen-Rad. Fehlt der Prop (Runner/Picker),
+      erscheint die Zeile nicht. */
+  rest?: { label: string; sub?: string; seconds: number; onChange: (seconds: number) => void };
   /** Über anderen Sheets (Picker ist z-50 → dort 60 übergeben) */
   zIndex?: number;
 }) {
   // Technik-Popup (Ebene über dem Übungs-Detail)
   const [technique, setTechnique] = useState<Technique | null>(null);
+  // Pausen-Rad (Ebene über dem Übungs-Detail)
+  const [wheelOpen, setWheelOpen] = useState(false);
 
   return (
     <>
@@ -249,9 +258,44 @@ export default function ExerciseDetailSheet({
         </h2>
         <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
           {exercise.defaultRounds}× {exercise.durationSeconds}s
-          {" · "}Pause {exercise.restSeconds}s
           {" · "}Intensität {INTENSITY_LABEL[exercise.intensity]}
         </p>
+
+        {/* Rundenpause dieser Übung — nur im Editor-Kontext; das GANZE Feld
+            ist der Button und öffnet das Pausen-Rad (Leon 2026-08-28) */}
+        {rest && (
+          <button
+            type="button"
+            onClick={() => setWheelOpen(true)}
+            aria-label={`${rest.label} ändern — aktuell ${formatRest(rest.seconds)} Minuten`}
+            className="t-interactive mt-4 flex w-full items-center justify-between gap-3 rounded-field px-3.5 py-2.5 text-left"
+            style={{
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="t-label">{rest.label}</span>
+              {rest.sub && (
+                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  {rest.sub}
+                </span>
+              )}
+            </span>
+            <span
+              className="inline-flex shrink-0 items-baseline gap-1 rounded-field px-3.5 py-2 tabular-nums"
+              style={{
+                font: "700 18px/1 var(--font-archivo), system-ui, sans-serif",
+                background: "var(--accent-subtle)",
+                border: "1px solid var(--accent)",
+                color: "var(--accent-text)",
+              }}
+            >
+              {formatRest(rest.seconds)}
+              <span style={{ ...META_FONT, color: "var(--text-3)" }}>min</span>
+            </span>
+          </button>
+        )}
 
         {exercise.notes && (
           <p
@@ -446,6 +490,17 @@ export default function ExerciseDetailSheet({
             </div>
           )}
         </SheetShell>
+      )}
+
+      {/* ── Pausen-Rad über dem Übungs-Detail ───────────────────────────── */}
+      {rest && wheelOpen && (
+        <RestWheel
+          label={rest.label}
+          value={rest.seconds}
+          onChange={rest.onChange}
+          onClose={() => setWheelOpen(false)}
+          zIndex={zIndex + 20}
+        />
       )}
     </>
   );

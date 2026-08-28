@@ -27,11 +27,13 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import { getExerciseById } from "./exercises";
 import { DEFAULT_WORKOUT_PLANS } from "./workout-plan-defaults";
-import type { WorkoutSession } from "./workouts";
+import { setWorkoutSavedPlan, type WorkoutSession } from "./workouts";
 import { DIFFICULTY_LABEL, DISCIPLINE_LABEL } from "./types";
 import type {
   Category,
@@ -52,8 +54,13 @@ export interface WorkoutPlanBlock {
   phase: WorkoutBlock["phase"];
   /** Übungs-IDs aus lib/exercises — Reihenfolge = Trainingsreihenfolge */
   exerciseIds: string[];
-  /** Pause zwischen den Runden/Übungen dieses Blocks in Sekunden */
+  /** STANDARD-Rundenpause der Rubrik in Sekunden — pro Übung über
+      WorkoutPlan.restOverrides übersteuerbar (Leons Vorgabe 2026-08-28:
+      Rundenpause einzeln je Übung, eingestellt in den Übungsdetails) */
   restSeconds: number;
+  /** Pause NACH diesem Block, vor der nächsten Rubrik (Chip zwischen den
+      Rubriken, Rad-Picker). Optional — fehlt = 0 s (ältere Pläne). */
+  restAfterSeconds?: number;
 }
 
 export interface WorkoutPlan {
@@ -68,8 +75,23 @@ export interface WorkoutPlan {
   short: string;
   description: string;
   blocks: WorkoutPlanBlock[];
+  /** Rundenpause PRO ÜBUNG (Sekunden), keyed nach Übungs-ID — übersteuert
+      die Standard-Rundenpause der Rubrik. Bewusst auf Plan-Ebene: der Wert
+      überlebt Verschieben/Duplizieren; taucht dieselbe Übung mehrfach auf,
+      teilt sie sich die Pause. */
+  restOverrides?: Record<string, number>;
   /** Sortierung innerhalb Disziplin+Level — Client sortiert, fehlt = ans Ende */
   sortOrder?: number;
+}
+
+/** Effektive Rundenpause einer Übung: Override des Plans, sonst der
+    Standard der Rubrik. */
+export function exerciseRestSeconds(
+  plan: WorkoutPlan,
+  block: WorkoutPlanBlock,
+  exerciseId: string,
+): number {
+  return plan.restOverrides?.[exerciseId] ?? block.restSeconds;
 }
 
 /** Persönliche Kopie in users/{uid}/workoutPlans. */
@@ -93,21 +115,24 @@ export function planExerciseCount(plan: WorkoutPlan): number {
 }
 
 /**
- * Gesamtdauer in Sekunden — berechnet, nie gespeichert:
- * pro Block Arbeitszeit aller Runden (defaultRounds × durationSeconds aus der
- * Übungs-DB) plus Blockpause zwischen den Runden (nach der letzten Runde
- * eines Blocks keine Pause).
+ * Gesamtdauer in Sekunden — berechnet, nie gespeichert. Spiegelt den
+ * Auto-Durchlauf des Runners: pro Übung Arbeitszeit aller Runden plus ihre
+ * Rundenpause zwischen den Runden UND als Übergang zur nächsten Übung der
+ * Rubrik (nach der letzten Übung einer Rubrik keine Rundenpause); zwischen
+ * den Rubriken die Zwischen-Rubrik-Pause (restAfterSeconds).
  */
 export function planDurationSeconds(plan: WorkoutPlan): number {
   let total = 0;
-  for (const block of plan.blocks) {
-    let rounds = 0;
-    for (const ex of blockExercises(block)) {
+  plan.blocks.forEach((block, i) => {
+    const exs = blockExercises(block);
+    exs.forEach((ex, j) => {
+      const rest = exerciseRestSeconds(plan, block, ex.id);
       total += ex.defaultRounds * ex.durationSeconds;
-      rounds += ex.defaultRounds;
-    }
-    if (rounds > 1) total += (rounds - 1) * block.restSeconds;
-  }
+      total += (ex.defaultRounds - 1) * rest;
+      if (j < exs.length - 1) total += rest;
+    });
+    if (i < plan.blocks.length - 1) total += block.restAfterSeconds ?? 0;
+  });
   return total;
 }
 
@@ -242,6 +267,7 @@ export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
             phase: b.phase,
             exerciseIds: b.exerciseIds,
             restSeconds: def.restSeconds,
+            restAfterSeconds: def.restSeconds,
           }))
       : [
           {
@@ -262,7 +288,54 @@ export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
     short: "",
     description: "Als Favorit gespeichertes Workout.",
     blocks,
+    ...(session.plan?.restOverrides
+      ? { restOverrides: session.plan.restOverrides }
+      : {}),
   };
+}
+
+/**
+ * Favoriten-Plan ENTFERNEN (Wischen in „Meine Workouts", leeres Herz auf
+ * der Plan-Seite, Herz-Toggle im Hub): löscht die persönliche Kopie und
+ * setzt ALLE Log-Einträge zurück, deren Herz auf diesen Plan zeigt —
+ * sonst bliebe im Hub/Verlauf ein gefülltes Herz auf einen toten Plan.
+ * Rückgabe: die IDs der zurückgesetzten Log-Einträge (für lokalen State).
+ */
+export async function removeSavedPlan(
+  uid: string,
+  planId: string,
+): Promise<string[]> {
+  await deletePersonalWorkoutPlan(uid, planId);
+  const workoutsCol = collection(getFirestoreDb(), "users", uid, "workouts");
+  const snap = await getDocs(
+    query(workoutsCol, where("savedPlanId", "==", planId)),
+  );
+  await Promise.all(
+    snap.docs.map((d) => updateDoc(d.ref, { savedPlanId: null })),
+  );
+  return snap.docs.map((d) => d.id);
+}
+
+/**
+ * Herz-Favorit (Hub, Verlauf, Fertig-Screen): speichert ein ausgeführtes
+ * Workout als persönlichen Plan bzw. entfernt die Kopie wieder. Rückgabe
+ * ist der neue savedPlanId-Zustand des Log-Eintrags (null = entfernt).
+ */
+export async function toggleWorkoutFavorite(
+  uid: string,
+  session: WorkoutSession,
+): Promise<string | null> {
+  if (session.savedPlanId) {
+    await removeSavedPlan(uid, session.savedPlanId);
+    return null;
+  }
+  const planId = await upsertPersonalWorkoutPlan(
+    uid,
+    workoutSessionToPlan(session),
+    { sourcePlanId: null },
+  );
+  await setWorkoutSavedPlan(uid, session.id, planId);
+  return planId;
 }
 
 /**
@@ -289,6 +362,8 @@ export function workoutDefinitionToPlan(def: WorkoutDefinition): WorkoutPlan {
         phase: b.phase,
         exerciseIds: b.exerciseIds,
         restSeconds: def.restSeconds,
+        // Generierte Workouts pausieren zwischen allem gleich lang
+        restAfterSeconds: def.restSeconds,
       })),
   };
 }
@@ -332,6 +407,7 @@ type WorkoutPlanDoc = {
   short: string;
   description: string;
   blocks: WorkoutPlanBlock[];
+  restOverrides?: Record<string, number>;
   sortOrder?: number;
   sourcePlanId?: string | null;
   createdAt?: Timestamp | null;
@@ -367,6 +443,7 @@ function docToPlan(id: string, data: WorkoutPlanDoc): WorkoutPlan {
     short: data.short ?? "",
     description: data.description ?? "",
     blocks: data.blocks ?? [],
+    ...(data.restOverrides ? { restOverrides: data.restOverrides } : {}),
     sortOrder: data.sortOrder,
   };
 }
@@ -381,6 +458,7 @@ function planPayload(gymId: string, plan: WorkoutPlan) {
     short: plan.short,
     description: plan.description,
     blocks: plan.blocks,
+    ...(plan.restOverrides ? { restOverrides: plan.restOverrides } : {}),
     ...(plan.sortOrder !== undefined ? { sortOrder: plan.sortOrder } : {}),
   };
 }

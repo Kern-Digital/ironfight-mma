@@ -12,17 +12,17 @@
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import {
-  deletePersonalWorkoutPlan,
   getPersonalWorkoutPlan,
   planWithAddedExercise,
   planWithDuplicatedExercise,
   planWithMovedExercise,
   planWithRemovedExercise,
+  removeSavedPlan,
   upsertPersonalWorkoutPlan,
   type PersonalWorkoutPlan,
 } from "@/lib/workout-plans";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlanView from "../../plans/[slug]/PlanView";
 
@@ -33,7 +33,6 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 export default function PersonalPlanPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
   const planId = params.id;
   const { user, loading: authLoading } = useAuth();
@@ -123,15 +122,36 @@ export default function PersonalPlanPage() {
     setPlan((p) => (p ? patch(p) : p));
   }
 
-  async function handleDelete() {
-    if (!user || !planRef.current) return;
-    deletedRef.current = true;
+  // Herz oben (Leons Vorgabe 2026-08-28): gefüllt = Plan ist Favorit.
+  // Klick entfernt die Kopie (inkl. Herz-Verweisen in den Logs) — die
+  // Seite bleibt offen, deletedRef pausiert derweil den Auto-Save; ein
+  // erneuter Klick legt den Plan unter derselben ID wieder an.
+  const [unfavorited, setUnfavorited] = useState(false);
+  const [heartBusy, setHeartBusy] = useState(false);
+
+  async function handleToggleFavorite() {
+    const current = planRef.current;
+    if (!user || !current || heartBusy) return;
+    setHeartBusy(true);
+    setError(null);
     try {
-      await deletePersonalWorkoutPlan(user.uid, planRef.current.id);
-      router.replace("/workout/generator");
+      if (unfavorited) {
+        deletedRef.current = false;
+        await upsertPersonalWorkoutPlan(user.uid, current, {
+          sourcePlanId: current.sourcePlanId,
+        });
+        setUnfavorited(false);
+      } else {
+        deletedRef.current = true;
+        await removeSavedPlan(user.uid, current.id);
+        setUnfavorited(true);
+      }
     } catch (err) {
-      deletedRef.current = false;
-      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      // Klick hat nicht gegriffen — Zustand zurückdrehen
+      deletedRef.current = unfavorited;
+      setError(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
+    } finally {
+      setHeartBusy(false);
     }
   }
 
@@ -192,11 +212,19 @@ export default function PersonalPlanPage() {
       backLabel="Workout"
       editing={{
         onNameChange: (name) => update((p) => ({ ...p, name })),
-        onRestChange: (blockIndex, restSeconds) =>
+        onExerciseRestChange: (exerciseId, restSeconds) =>
+          update((p) => ({
+            ...p,
+            restOverrides: {
+              ...(p.restOverrides ?? {}),
+              [exerciseId]: restSeconds,
+            },
+          })),
+        onRestAfterChange: (blockIndex, restAfterSeconds) =>
           update((p) => ({
             ...p,
             blocks: p.blocks.map((b, i) =>
-              i === blockIndex ? { ...b, restSeconds } : b,
+              i === blockIndex ? { ...b, restAfterSeconds } : b,
             ),
           })),
         onAddExercise: (blockIndex, exerciseId) =>
@@ -209,7 +237,11 @@ export default function PersonalPlanPage() {
           ),
         onMoveExercise: (from, to) =>
           update((p) => planWithMovedExercise(p, from, to)),
-        onDelete: () => void handleDelete(),
+        favorite: {
+          saved: !unfavorited,
+          busy: heartBusy,
+          onToggle: () => void handleToggleFavorite(),
+        },
         autoSave: { saving, saved },
         error,
       }}

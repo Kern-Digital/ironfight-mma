@@ -134,12 +134,15 @@ export function useWorkoutTimer(initial: TimerConfig = DEFAULT_CONFIG): UseWorko
 
   const start = useCallback(() => {
     if (phase === "done" || phase === "idle") {
-      enterPhase("prep", 1);
+      // Vorlauf 0 s (z. B. Auto-Durchlauf ohne Pause): direkt in die Arbeit —
+      // eine 0-Sekunden-Prep-Phase bliebe hängen (endAt = null)
+      if (config.prepSeconds <= 0) enterPhase("work", 1);
+      else enterPhase("prep", 1);
     } else {
       endAtRef.current = Date.now() + remaining * 1000;
     }
     setRunning(true);
-  }, [phase, remaining, enterPhase]);
+  }, [phase, remaining, config.prepSeconds, enterPhase]);
 
   const pause = useCallback(() => {
     setRunning(false);

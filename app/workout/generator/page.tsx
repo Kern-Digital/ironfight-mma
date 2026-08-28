@@ -19,22 +19,19 @@ import {
   DEFAULT_WORKOUT_PLANS,
   WORKOUT_DISCIPLINES,
 } from "@/lib/workout-plan-defaults";
+import SwipeAction from "@/components/SwipeAction";
+import WorkoutLogSheet, { WorkoutLogTile } from "@/components/WorkoutLogSheet";
 import {
-  deletePersonalWorkoutPlan,
   listPersonalWorkoutPlans,
   planDurationSeconds,
   planExerciseCount,
   planToSessionPayload,
-  upsertPersonalWorkoutPlan,
+  removeSavedPlan,
+  toggleWorkoutFavorite,
   workoutDefinitionToPlan,
-  workoutSessionToPlan,
   type PersonalWorkoutPlan,
 } from "@/lib/workout-plans";
-import {
-  getRecentWorkouts,
-  setWorkoutSavedPlan,
-  type WorkoutSession,
-} from "@/lib/workouts";
+import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
@@ -48,22 +45,10 @@ import { CATEGORY_LABEL } from "@/lib/techniques";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 const CATEGORIES: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
-
-/** Kompaktes Datum der Letzte-Workouts-Kacheln. */
-function dayLabel(d: Date): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const day = new Date(d);
-  day.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today.getTime() - day.getTime()) / 86400000);
-  if (diffDays <= 0) return "Heute";
-  if (diffDays === 1) return "Gestern";
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
-}
 
 // ─── Typo-Konstanten (Muster der Referenzseiten) ───────────────────────────
 
@@ -146,6 +131,40 @@ export default function WorkoutHubPage() {
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
   const [heartBusy, setHeartBusy] = useState<string | null>(null);
+  // Detail-Popup eines Log-Eintrags — als ID, damit Herz-Updates im
+  // recent-State auch das offene Popup erreichen
+  const [openLogId, setOpenLogId] = useState<string | null>(null);
+  // Auto-Generator als Popup (Leons Vorgabe 2026-08-28)
+  const [genOpen, setGenOpen] = useState(false);
+  // Links-Wisch in „Meine Workouts": Plan fliegt mit Raus-Animation, dann
+  // wird er entfernt (inkl. Herz-Verweisen in den Logs)
+  const [removingPlanId, setRemovingPlanId] = useState<string | null>(null);
+  const removePlanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (removePlanTimer.current) clearTimeout(removePlanTimer.current);
+    },
+    [],
+  );
+
+  function handleRemovePlan(planId: string) {
+    if (!user || removingPlanId) return;
+    setRemovingPlanId(planId);
+    removePlanTimer.current = setTimeout(() => {
+      setRemovingPlanId(null);
+      setOwnPlans((p) => p?.filter((pl) => pl.id !== planId) ?? p);
+      setRecent(
+        (r) =>
+          r?.map((s) =>
+            s.savedPlanId === planId ? { ...s, savedPlanId: null } : s,
+          ) ?? r,
+      );
+      removeSavedPlan(user.uid, planId).catch(() => {
+        // Fehlgeschlagen — Liste neu laden, damit der Plan wieder auftaucht
+        void listPersonalWorkoutPlans(user.uid).then(setOwnPlans);
+      });
+    }, 220);
+  }
 
   // Herz-Farbe nach Gender im Athleten-Profil (Leons Vorgabe 2026-08-27)
   const heartColor =
@@ -166,14 +185,10 @@ export default function WorkoutHubPage() {
       .catch(() => {
         if (!cancelled) setOwnPlans([]);
       });
-    // Abgebrochene zählen nicht als „ausgeführt" — deshalb mehr holen und
-    // clientseitig auf die letzten 3 abgeschlossenen filtern
-    getRecentWorkouts(user.uid, 10)
+    // Auch abgebrochene Workouts erscheinen im Stapel (Leon 2026-08-28)
+    getRecentWorkouts(user.uid, 3)
       .then((sessions) => {
-        if (!cancelled)
-          setRecent(
-            sessions.filter((s) => s.status === "completed").slice(0, 3),
-          );
+        if (!cancelled) setRecent(sessions);
       })
       .catch(() => {
         if (!cancelled) setRecent([]);
@@ -189,33 +204,14 @@ export default function WorkoutHubPage() {
     if (!user || heartBusy) return;
     setHeartBusy(session.id);
     try {
-      if (session.savedPlanId) {
-        const planId = session.savedPlanId;
-        await deletePersonalWorkoutPlan(user.uid, planId);
-        await setWorkoutSavedPlan(user.uid, session.id, null);
-        setRecent(
-          (r) =>
-            r?.map((s) =>
-              s.id === session.id ? { ...s, savedPlanId: null } : s,
-            ) ?? r,
-        );
-        setOwnPlans((p) => p?.filter((pl) => pl.id !== planId) ?? p);
-      } else {
-        const planId = await upsertPersonalWorkoutPlan(
-          user.uid,
-          workoutSessionToPlan(session),
-          { sourcePlanId: null },
-        );
-        await setWorkoutSavedPlan(user.uid, session.id, planId);
-        setRecent(
-          (r) =>
-            r?.map((s) =>
-              s.id === session.id ? { ...s, savedPlanId: planId } : s,
-            ) ?? r,
-        );
-        // Plan-Liste neu laden statt lokal nachbauen (Sortierung/Timestamps)
-        setOwnPlans(await listPersonalWorkoutPlans(user.uid));
-      }
+      const savedPlanId = await toggleWorkoutFavorite(user.uid, session);
+      setRecent(
+        (r) =>
+          r?.map((s) => (s.id === session.id ? { ...s, savedPlanId } : s)) ??
+          r,
+      );
+      // Plan-Liste neu laden statt lokal nachbauen (Sortierung/Timestamps)
+      setOwnPlans(await listPersonalWorkoutPlans(user.uid));
     } catch {
       // Fehlgeschlagen — Herz bleibt im alten Zustand
     } finally {
@@ -320,68 +316,76 @@ export default function WorkoutHubPage() {
 
       {/* pt-4/5: sichtbare Abgrenzung Kopf → erste Sektion (Leon 2026-08-27) */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
-        {/* ── Letzte Workouts — Herz speichert als eigenen Plan ── */}
+        {/* ── Letzte Workouts — Kartei-Stapel (Leons Vorgaben 2026-08-28):
+            volle Breite, Datum + Startzeit über dem Namen, Herz rechts;
+            ältere Einträge rücken nach unten-rechts und werden leichter.
+            Tippen öffnet das Detail-Popup, „Alle ansehen" den Verlauf. ── */}
         {recent !== null && recent.length > 0 && (
           <section className="flex flex-col gap-4">
-            <SectionHeader
-              title="Letzte Workouts"
-              subtitle="Tippe das Herz, um ein Workout bei dir zu speichern"
-            />
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {recent.map((s) => {
-                const minutes = Math.max(
-                  1,
-                  Math.round(s.totalWorkSeconds / 60),
-                );
-                const saved = Boolean(s.savedPlanId);
+            <div className="flex items-end justify-between gap-3">
+              <SectionHeader
+                title="Letzte Workouts"
+                subtitle="Tippen für Details — das Herz speichert als eigenen Plan"
+              />
+              <Link
+                href="/workout/verlauf"
+                className="shrink-0 pb-0.5"
+                style={{
+                  font: "var(--type-sub)",
+                  color: "var(--accent-text)",
+                  textDecoration: "none",
+                }}
+              >
+                Alle ansehen
+              </Link>
+            </div>
+            <div className="flex flex-col">
+              {recent.map((s, i) => {
+                // „Anleuchten" (Leon 2026-08-28): die Karte darüber wirft
+                // einen Schein auf die Oberkante der Karte darunter, nach
+                // hinten schwächer; die vorderste wird nicht angeleuchtet
+                // und ist dafür selbst etwas heller. Im HELLEN Theme wäre
+                // Weiß auf Weiß unsichtbar → dort leuchtet der Akzent.
+                const lit = theme === "light" ? "var(--accent)" : "white";
+                const litPct =
+                  theme === "light" ? (i === 1 ? 12 : 6) : i === 1 ? 10 : 5;
+                const frontBg =
+                  theme === "light"
+                    ? "color-mix(in srgb, var(--accent) 5%, var(--surface-card))"
+                    : "color-mix(in srgb, white 8%, var(--surface-card))";
                 return (
-                  <div
+                  <WorkoutLogTile
                     key={s.id}
-                    className="t-card relative flex flex-col gap-1 p-3 pr-10"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={saved}
-                      aria-label={
-                        saved
-                          ? `„${s.label ?? "Workout"}" aus den Favoriten entfernen`
-                          : `„${s.label ?? "Workout"}" als Favorit speichern`
-                      }
-                      onClick={() => void toggleFavorite(s)}
-                      disabled={heartBusy === s.id}
-                      className="t-interactive absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-field"
-                      style={{
-                        color: saved ? heartColor : "var(--text-3)",
-                        opacity: heartBusy === s.id ? 0.5 : undefined,
-                      }}
-                    >
-                      <Icon
-                        name="heart"
-                        size={17}
-                        strokeWidth={2}
-                        style={saved ? { fill: "currentColor" } : undefined}
-                      />
-                    </button>
-                    <span
-                      className="truncate"
-                      style={{ font: "var(--type-body-strong)" }}
-                    >
-                      {s.label ?? "Workout"}
-                    </span>
-                    <span
-                      className="mt-auto truncate"
-                      style={{ ...META_FONT, color: "var(--text-3)" }}
-                    >
-                      ≈ {minutes} min · {dayLabel(s.completedAt)}
-                    </span>
-                  </div>
+                    session={s}
+                    heartColor={heartColor}
+                    heartBusy={heartBusy === s.id}
+                    onToggleFavorite={() => void toggleFavorite(s)}
+                    onOpen={() => setOpenLogId(s.id)}
+                    style={{
+                      // Versatz nach unten-rechts, ältestes Workout hinten
+                      width: `calc(100% - ${i * 14}px)`,
+                      marginLeft: i * 14,
+                      marginTop: i === 0 ? 0 : -8,
+                      zIndex: recent.length - i,
+                      background:
+                        i === 0
+                          ? frontBg
+                          : `linear-gradient(to bottom, color-mix(in srgb, ${lit} ${litPct}%, var(--surface-card)) 0%, var(--surface-card) 55%)`,
+                      // Vorderste Karte: kräftigerer Rahmen — auf der
+                      // helleren Fläche ging der normale Card-Rand unter
+                      ...(i === 0
+                        ? { border: "1px solid var(--line-strong)" }
+                        : {}),
+                    }}
+                  />
                 );
               })}
             </div>
           </section>
         )}
 
-        {/* ── Eigene Workoutpläne — gerahmtes Feld, öffnet das Popup ── */}
+        {/* ── Meine Workouts (ehem. „Eigene Workoutpläne", Leon 2026-08-28)
+            — gerahmtes Feld, öffnet das Popup ── */}
         {ownPlans !== null && (
           <button
             type="button"
@@ -400,7 +404,7 @@ export default function WorkoutHubPage() {
                   textTransform: "uppercase",
                 }}
               >
-                Eigene Workoutpläne
+                Meine Workouts
               </h2>
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                 {ownPlans.length === 0
@@ -417,6 +421,48 @@ export default function WorkoutHubPage() {
             </span>
           </button>
         )}
+
+        {/* ── Auto-Generator — nur Karte, der Generator öffnet als Popup
+            (Leons Vorschlag 2026-08-28); sitzt ÜBER den Disziplinen ── */}
+        <button
+          type="button"
+          onClick={() => setGenOpen(true)}
+          className="t-card t-interactive flex w-full items-center gap-4 p-4 text-left sm:p-5"
+          style={{
+            border:
+              "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
+          }}
+        >
+          <span
+            aria-hidden
+            className="shrink-0"
+            style={{ color: "var(--accent-text)", lineHeight: 0 }}
+          >
+            <Icon name="spark" size={22} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h2
+              style={{
+                font: "var(--type-h2)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              Auto-Generator
+            </h2>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Sag uns, was du hast und wie viel Zeit — wir bauen dir das
+              passende Workout
+            </p>
+          </div>
+          <span
+            aria-hidden
+            className="shrink-0"
+            style={{ color: "var(--accent-text)", lineHeight: 0 }}
+          >
+            <Icon name="arrow-right" size={18} strokeWidth={2} />
+          </span>
+        </button>
 
         {/* ── Disziplinen (Ebene 1: Disziplin → Level → Plan) ── */}
         <section className="flex flex-col gap-4">
@@ -534,19 +580,62 @@ export default function WorkoutHubPage() {
           </div>
         </section>
 
-        {/* ── Trennung ── */}
-        <div className="flex items-center gap-4" aria-hidden>
-          <div className="h-px flex-1" style={{ background: "var(--line)" }} />
-          <span className="t-label">oder</span>
-          <div className="h-px flex-1" style={{ background: "var(--line)" }} />
-        </div>
+      </div>
 
-        {/* ── Auto-Generator ── */}
-        <section className="flex flex-col gap-8">
-          <SectionHeader
-            title="Auto-Generator"
-            subtitle="Sag uns, was du hast und wie viel Zeit — wir bauen dir das passende Workout"
+      {/* ── Popup „Auto-Generator" — die komplette Generator-Steuerung im
+          Sheet (mobil unten, Desktop zentriert; Leons Vorschlag 2026-08-28,
+          im Hub bleibt nur die Karte) ── */}
+      {genOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Auto-Generator"
+        >
+          <button
+            type="button"
+            aria-label="Auto-Generator schließen"
+            className="absolute inset-0"
+            style={{
+              background: "var(--overlay)",
+              animation: "fade-in 0.2s ease-out both",
+            }}
+            onClick={() => setGenOpen(false)}
           />
+          <div className="pointer-events-none relative flex w-full justify-center">
+          <div
+            className="pointer-events-auto animate-slide-up relative flex w-full max-h-[85vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+            style={{
+              maxHeight: "85dvh",
+              background: "var(--surface-card)",
+              boxShadow: "var(--glass-shadow)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 pt-3">
+              <div className="flex flex-col items-start">
+                <div
+                  aria-hidden
+                  className="mb-2 h-1 w-10 rounded-full sm:invisible"
+                  style={{ background: "var(--line-strong)" }}
+                />
+                <span className="t-label">Auto-Generator</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGenOpen(false)}
+                aria-label="Schließen"
+                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
+                style={{ color: "var(--text-3)" }}
+              >
+                <Icon name="x" size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+            <div
+              className="flex flex-col gap-6 overflow-y-auto px-5 pt-2"
+              style={{
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+              }}
+            >
 
           {/* Disziplin — Aufklapp-Menü (ui/Select-Standard) statt Button-Reihe.
               Die Geräte-Auswahl bleibt beim Wechsel erhalten: was der User
@@ -696,20 +785,37 @@ export default function WorkoutHubPage() {
               </button>
             </div>
           </div>
-        </section>
-      </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
 
-      {/* ── Popup „Eigene Workoutpläne" — Liste + „+" (Leons Vorgabe) ── */}
+      {/* ── Detail-Popup eines Log-Eintrags („Letzte Workouts") ── */}
+      {(() => {
+        const openLog = recent?.find((s) => s.id === openLogId) ?? null;
+        return openLog ? (
+          <WorkoutLogSheet
+            session={openLog}
+            heartColor={heartColor}
+            heartBusy={heartBusy === openLog.id}
+            onToggleFavorite={() => void toggleFavorite(openLog)}
+            onClose={() => setOpenLogId(null)}
+          />
+        ) : null;
+      })()}
+
+      {/* ── Popup „Meine Workouts" — Liste + „+" (Leons Vorgabe) ── */}
       {plansOpen && (
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end"
           role="dialog"
           aria-modal="true"
-          aria-label="Eigene Workoutpläne"
+          aria-label="Meine Workouts"
         >
           <button
             type="button"
-            aria-label="Eigene Workoutpläne schließen"
+            aria-label="Meine Workouts schließen"
             className="absolute inset-0"
             style={{
               background: "var(--overlay)",
@@ -733,7 +839,7 @@ export default function WorkoutHubPage() {
                   className="mb-2 h-1 w-10 rounded-full"
                   style={{ background: "var(--line-strong)" }}
                 />
-                <span className="t-label">Eigene Workoutpläne</span>
+                <span className="t-label">Meine Workouts</span>
               </div>
               <button
                 type="button"
@@ -772,49 +878,79 @@ export default function WorkoutHubPage() {
                   className="px-2.5 py-6"
                   style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                 >
-                  Noch keine eigenen Pläne. Speichere ein bearbeitetes oder
+                  Noch keine eigenen Workouts. Speichere ein bearbeitetes oder
                   ausgeführtes Workout — oder erstelle eins komplett selbst.
                 </p>
               ) : (
-                ownPlans?.map((plan) => {
-                  const minutes = Math.round(planDurationSeconds(plan) / 60);
-                  const exercises = planExerciseCount(plan);
-                  return (
-                    <Link
-                      key={plan.id}
-                      href={`/workout/eigene/${plan.id}`}
-                      className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2"
-                      style={{
-                        color: "var(--text-body)",
-                        textDecoration: "none",
-                      }}
-                    >
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span
-                          className="truncate"
-                          style={{ font: "var(--type-body-strong)" }}
-                        >
-                          {plan.name}
-                        </span>
-                        <span
-                          className="truncate"
-                          style={{ ...META_FONT, color: "var(--text-3)" }}
-                        >
-                          {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
-                          {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes} min
-                          · {exercises} Übungen
-                        </span>
-                      </div>
-                      <span
-                        aria-hidden
-                        className="shrink-0"
-                        style={{ color: "var(--text-3)", lineHeight: 0 }}
+                <div className="flex flex-col gap-2 pb-1 pt-1">
+                  {/* Gerahmte Karten; links wischen = aus den Favoriten
+                      entfernen (Lösch-Optik), am Desktop der x-Button */}
+                  {ownPlans?.map((plan) => {
+                    const minutes = Math.round(planDurationSeconds(plan) / 60);
+                    const exercises = planExerciseCount(plan);
+                    const isRemoving = removingPlanId === plan.id;
+                    return (
+                      <SwipeAction
+                        key={plan.id}
+                        left={{
+                          color: "var(--gesture-delete)",
+                          icon: "x",
+                          onTrigger: () => handleRemovePlan(plan.id),
+                        }}
+                        disabled={isRemoving}
                       >
-                        <Icon name="arrow-right" size={16} strokeWidth={2} />
-                      </span>
-                    </Link>
-                  );
-                })
+                        <Link
+                          href={`/workout/eigene/${plan.id}`}
+                          className={`t-card t-interactive flex min-h-hit w-full items-center gap-3 p-3${
+                            isRemoving ? " animate-remove-row" : ""
+                          }`}
+                          style={{
+                            color: "var(--text-body)",
+                            textDecoration: "none",
+                          }}
+                        >
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span
+                              className="truncate"
+                              style={{ font: "var(--type-body-strong)" }}
+                            >
+                              {plan.name}
+                            </span>
+                            <span
+                              className="truncate"
+                              style={{ ...META_FONT, color: "var(--text-3)" }}
+                            >
+                              {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
+                              {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes}{" "}
+                              min · {exercises} Übungen
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={`„${plan.name}" aus den Favoriten entfernen`}
+                            onClick={(e) => {
+                              // nicht zusätzlich zur Plan-Seite navigieren
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRemovePlan(plan.id);
+                            }}
+                            className="t-interactive hidden h-9 w-9 shrink-0 items-center justify-center rounded-field sm:flex"
+                            style={{ color: "var(--gesture-delete)" }}
+                          >
+                            <Icon name="x" size={15} strokeWidth={2.2} />
+                          </button>
+                          <span
+                            aria-hidden
+                            className="shrink-0"
+                            style={{ color: "var(--text-3)", lineHeight: 0 }}
+                          >
+                            <Icon name="arrow-right" size={16} strokeWidth={2} />
+                          </span>
+                        </Link>
+                      </SwipeAction>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>

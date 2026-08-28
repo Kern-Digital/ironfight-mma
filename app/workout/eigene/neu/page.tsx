@@ -93,11 +93,19 @@ export default function NewPersonalPlanPage() {
       backLabel="Workout"
       editing={{
         onNameChange: (name) => update((p) => ({ ...p, name })),
-        onRestChange: (blockIndex, restSeconds) =>
+        onExerciseRestChange: (exerciseId, restSeconds) =>
+          update((p) => ({
+            ...p,
+            restOverrides: {
+              ...(p.restOverrides ?? {}),
+              [exerciseId]: restSeconds,
+            },
+          })),
+        onRestAfterChange: (blockIndex, restAfterSeconds) =>
           update((p) => ({
             ...p,
             blocks: p.blocks.map((b, i) =>
-              i === blockIndex ? { ...b, restSeconds } : b,
+              i === blockIndex ? { ...b, restAfterSeconds } : b,
             ),
           })),
         onAddExercise: (blockIndex, exerciseId) =>

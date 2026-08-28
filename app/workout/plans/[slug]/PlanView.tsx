@@ -24,6 +24,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import ExercisePicker from "@/components/ExercisePicker";
+import RestWheel, { formatRest } from "@/components/RestWheel";
 import SwipeAction from "@/components/SwipeAction";
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
@@ -32,6 +33,7 @@ import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { getExerciseById } from "@/lib/exercises";
 import { getWorkoutDiscipline } from "@/lib/workout-plan-defaults";
 import {
+  exerciseRestSeconds,
   planDurationSeconds,
   planExerciseCount,
   planToSessionPayload,
@@ -42,7 +44,7 @@ import {
   upsertPersonalWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
-import type { Exercise } from "@/lib/types";
+import { GENDER_HEART_COLOR, type Exercise } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -73,7 +75,11 @@ const STATUS_FONT: React.CSSProperties = {
  */
 export interface PlanEditing {
   onNameChange: (name: string) => void;
-  onRestChange: (blockIndex: number, restSeconds: number) => void;
+  /** Rundenpause PRO ÜBUNG (restOverrides) — einstellbar NUR über die
+      Übungsdetails (Leons Vorgabe 2026-08-28) */
+  onExerciseRestChange: (exerciseId: string, restSeconds: number) => void;
+  /** Zwischen-Rubrik-Pause (Chip zwischen den Rubriken, Pausen-Rad) */
+  onRestAfterChange: (blockIndex: number, restAfterSeconds: number) => void;
   onAddExercise: (blockIndex: number, exerciseId: string) => void;
   onRemoveExercise: (blockIndex: number, exerciseIndex: number) => void;
   /** Rechts wischen auf einer Plan-Übung = direkt dahinter duplizieren */
@@ -87,15 +93,13 @@ export interface PlanEditing {
   /** Auto-Save-Statuszeile (persönliche Kopie) — fehlt bei Entwurf/Erstellen */
   autoSave?: { saving: boolean; saved: boolean };
   error?: string | null;
-  /** Kopie löschen (nur persönliche Kopie) */
-  onDelete?: () => void;
+  /** Großes Herz gegenüber „Workout starten" (persönliche Kopie, Leons
+      Vorgabe 2026-08-28): gefüllt = gespeichert, Klick entfernt den Plan
+      aus den Favoriten (bzw. legt ihn wieder an) */
+  favorite?: { saved: boolean; busy?: boolean; onToggle: () => void };
   /** Expliziter Erstellen-Knopf (Neu-Erstellen statt Auto-Save) */
   create?: { onSave: () => void; saving: boolean };
 }
-
-/** Blockpause: 15-s-Raster, 0–5 min — genug Spielraum ohne Unsinnswerte. */
-const REST_STEP = 15;
-const REST_MAX = 300;
 
 /** Ziel-Slot beim Ziehen: schmaler als eine echte Zeile … */
 const DROP_SLOT_HEIGHT = 36;
@@ -196,12 +200,19 @@ export default function PlanView({
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  // Herz-Farbe nach Gender im Athleten-Profil (wie Hub/Fertig-Screen)
+  const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [pickerBlock, setPickerBlock] = useState<number | null>(null);
   // Übungs-Detail-Sheet: Tipp/Klick auf eine Übungszeile (Leons Wahl
-  // 2026-08-28 — gleiche Geste wie im Picker; Wischen/Halten unberührt)
-  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+  // 2026-08-28 — gleiche Geste wie im Picker; Wischen/Halten unberührt).
+  // Der Block gehört dazu: dort wird die Rubrik-Pause eingestellt.
+  const [detailExercise, setDetailExercise] = useState<{
+    exercise: Exercise;
+    block: number;
+  } | null>(null);
+  // Pausen-Rad für die Zwischen-Rubrik-Pause (Index des Blocks DAVOR)
+  const [gapWheel, setGapWheel] = useState<number | null>(null);
 
   // ── Zeilen-Interaktion im Editor (Leons Vorgaben 2026-08-28):
   //    selectedRow = per Halten ausgewählt (▲/▼ verschieben), removingRow =
@@ -242,13 +253,6 @@ export default function PlanView({
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
-  function startDraft() {
-    setDraft({
-      ...plan,
-      blocks: plan.blocks.map((b) => ({ ...b, exerciseIds: [...b.exerciseIds] })),
-    });
-  }
-
   useEffect(() => {
     if (!allowEdit || editing || !user) return;
     setDraft(
@@ -270,11 +274,16 @@ export default function PlanView({
   const draftEditing: PlanEditing | undefined = draft
     ? {
         onNameChange: (name) => patchDraft((d) => ({ ...d, name })),
-        onRestChange: (i, restSeconds) =>
+        onExerciseRestChange: (exerciseId, restSeconds) =>
+          patchDraft((d) => ({
+            ...d,
+            restOverrides: { ...(d.restOverrides ?? {}), [exerciseId]: restSeconds },
+          })),
+        onRestAfterChange: (i, restAfterSeconds) =>
           patchDraft((d) => ({
             ...d,
             blocks: d.blocks.map((b, bi) =>
-              bi === i ? { ...b, restSeconds } : b,
+              bi === i ? { ...b, restAfterSeconds } : b,
             ),
           })),
         onAddExercise: (i, exerciseId) =>
@@ -694,8 +703,8 @@ export default function PlanView({
                 {edit.autoSave
                   ? "Änderungen werden automatisch gespeichert."
                   : edit.create
-                    ? `„Plan speichern" legt den Plan unter „Eigene Workoutpläne" an.`
-                    : `Änderungen werden nicht automatisch gespeichert — „Als eigenen Plan speichern" behält sie.`}
+                    ? `„Plan speichern" legt den Plan unter „Meine Workouts" an.`
+                    : "Änderungen werden nicht automatisch gespeichert — das Herz speichert sie als eigenen Plan."}
               </span>
               {edit.autoSave?.saving ? (
                 <span
@@ -725,7 +734,7 @@ export default function PlanView({
             <Stat label="Übungen" value={String(totalExercises)} />
             <Stat label="Blöcke" value={String(shown.blocks.length)} />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {edit?.create ? (
               <button
                 type="button"
@@ -774,45 +783,47 @@ export default function PlanView({
                     Workout starten
                   </button>
                 )}
-                {/* Erst bei einer Änderung: Entwurf sichern oder auf das
-                    Original zurücksetzen (Editor bleibt aktiv) */}
-                {draft && !editing && draftDirty && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void saveDraftAsOwn()}
-                      disabled={savingDraft}
-                      className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
-                      style={{
-                        ...BTN_FONT,
-                        background: "var(--accent-subtle)",
-                        border: "1px solid var(--accent)",
-                        color: "var(--accent-text)",
-                        opacity: savingDraft ? 0.6 : undefined,
-                      }}
-                    >
-                      <Icon name="copy" size={13} strokeWidth={2.2} />
-                      {savingDraft ? "Speichere…" : "Als eigenen Plan speichern"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        startDraft();
-                        setDraftError(null);
-                        setPickerBlock(null);
-                        setSelectedRow(null);
-                      }}
-                      className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
-                      style={{
-                        ...BTN_FONT,
-                        background: "var(--surface-raised)",
-                        border: "1px solid var(--line)",
-                        color: "var(--text-2)",
-                      }}
-                    >
-                      Verwerfen
-                    </button>
-                  </>
+                {/* Herz gegenüber dem Start-Button (Leons Vorgabe 2026-08-28):
+                    persönliche Kopie → gefüllt, Klick entfernt aus den
+                    Favoriten (bzw. legt sie wieder an); geänderter Start-/
+                    Gym-Plan → leeres Herz speichert den Entwurf als eigenen
+                    Plan (ersetzt „Als eigenen Plan speichern" + „Verwerfen") */}
+                {(editing?.favorite ||
+                  (draft !== null && !editing && draftDirty)) && (
+                  <button
+                    type="button"
+                    onClick={
+                      editing?.favorite
+                        ? editing.favorite.onToggle
+                        : () => void saveDraftAsOwn()
+                    }
+                    disabled={editing?.favorite?.busy || savingDraft}
+                    aria-pressed={editing?.favorite?.saved ?? false}
+                    aria-label={
+                      editing?.favorite
+                        ? editing.favorite.saved
+                          ? "Aus den Favoriten entfernen"
+                          : "Wieder als Favorit speichern"
+                        : "Änderungen als eigenen Plan speichern"
+                    }
+                    className="t-interactive flex h-12 w-12 shrink-0 items-center justify-center rounded-field disabled:opacity-50"
+                    style={{
+                      color: editing?.favorite?.saved
+                        ? heartColor
+                        : "var(--text-3)",
+                    }}
+                  >
+                    <Icon
+                      name="heart"
+                      size={28}
+                      strokeWidth={2}
+                      style={
+                        editing?.favorite?.saved
+                          ? { fill: "currentColor" }
+                          : undefined
+                      }
+                    />
+                  </button>
                 )}
               </>
             )}
@@ -858,16 +869,67 @@ export default function PlanView({
                 : null;
             const endOrdinal = rows.length - (draggedInBlock !== null ? 1 : 0);
             return (
-              <section key={`${block.phase}-${idx}`} className="flex flex-col gap-3">
-                {/* Editier-Modus: Stepper statt Text — Controls dürfen auf
-                    schmalen Screens in die zweite Zeile umbrechen */}
-                <div
-                  className={
-                    edit
-                      ? "flex flex-wrap items-center gap-x-3 gap-y-2"
-                      : "flex items-baseline gap-3"
-                  }
-                >
+              <Fragment key={`${block.phase}-${idx}`}>
+                {/* Zwischen-Rubrik-Pause — als Chip ZWISCHEN den Rubriken
+                    (Leons Vorgabe 2026-08-28); Tippen öffnet das Pausen-Rad.
+                    Der Wert liegt am Block DAVOR (restAfterSeconds). */}
+                {idx > 0 && (
+                  <div className="-my-3 flex items-center gap-3">
+                    <div
+                      aria-hidden
+                      className="h-px flex-1"
+                      style={{ background: "var(--line)" }}
+                    />
+                    {/* Ohne Feld, nur eine Zeile hoch (Leon 2026-08-28) */}
+                    {edit ? (
+                      <button
+                        type="button"
+                        onClick={() => setGapWheel(idx - 1)}
+                        aria-label={`Pause zwischen „${shown.blocks[idx - 1].title}" und „${block.title}" ändern`}
+                        className="t-interactive inline-flex items-baseline gap-1.5 rounded-field px-2 py-0.5 tabular-nums"
+                      >
+                        <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                          Pause
+                        </span>
+                        <span
+                          style={{
+                            font: "700 16px/1 var(--font-archivo), system-ui, sans-serif",
+                            color: "var(--accent-text)",
+                          }}
+                        >
+                          {formatRest(shown.blocks[idx - 1].restAfterSeconds ?? 0)}
+                        </span>
+                        <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                          min
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-baseline gap-1.5 px-2 py-0.5 tabular-nums">
+                        <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                          Pause
+                        </span>
+                        <span
+                          style={{
+                            font: "700 16px/1 var(--font-archivo), system-ui, sans-serif",
+                            color: "var(--text-2)",
+                          }}
+                        >
+                          {formatRest(shown.blocks[idx - 1].restAfterSeconds ?? 0)}
+                        </span>
+                        <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                          min
+                        </span>
+                      </span>
+                    )}
+                    <div
+                      aria-hidden
+                      className="h-px flex-1"
+                      style={{ background: "var(--line)" }}
+                    />
+                  </div>
+                )}
+              <section className="flex flex-col gap-3">
+                <div className="flex items-baseline gap-3">
                   <span
                     className="tabular-nums"
                     style={{ font: "var(--type-num-xl)", color: "var(--accent-text)" }}
@@ -883,66 +945,8 @@ export default function PlanView({
                   >
                     {block.title}
                   </h2>
-                  {/* Blockpause — im Editier-Modus als Stepper */}
-                  {edit ? (
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        aria-label={`Pause in „${block.title}" verkürzen`}
-                        disabled={block.restSeconds <= 0}
-                        onClick={() =>
-                          edit.onRestChange(
-                            idx,
-                            Math.max(0, block.restSeconds - REST_STEP),
-                          )
-                        }
-                        className="t-interactive flex h-11 w-11 items-center justify-center rounded-field disabled:opacity-40"
-                        style={{
-                          background: "var(--surface-raised)",
-                          border: "1px solid var(--line)",
-                          color: "var(--text-2)",
-                        }}
-                      >
-                        <Icon name="minus" size={14} strokeWidth={2.2} />
-                      </button>
-                      <span
-                        className="tabular-nums text-center"
-                        style={{
-                          ...META_FONT,
-                          color: "var(--text-2)",
-                          minWidth: "4.5rem",
-                        }}
-                      >
-                        Pause {formatDuration(block.restSeconds)}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`Pause in „${block.title}" verlängern`}
-                        disabled={block.restSeconds >= REST_MAX}
-                        onClick={() =>
-                          edit.onRestChange(
-                            idx,
-                            Math.min(REST_MAX, block.restSeconds + REST_STEP),
-                          )
-                        }
-                        className="t-interactive flex h-11 w-11 items-center justify-center rounded-field disabled:opacity-40"
-                        style={{
-                          background: "var(--surface-raised)",
-                          border: "1px solid var(--line)",
-                          color: "var(--text-2)",
-                        }}
-                      >
-                        <Icon name="plus" size={14} strokeWidth={2.2} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span
-                      className="ml-auto"
-                      style={{ ...META_FONT, color: "var(--text-3)" }}
-                    >
-                      Pause {formatDuration(block.restSeconds)}
-                    </span>
-                  )}
+                  {/* Keine Pausen-Anzeige mehr im Kopf: die Rundenpause ist
+                      PRO ÜBUNG (Übungsdetails), nicht mehr pro Rubrik */}
                 </div>
                 <div data-plan-block={idx} className="t-card px-3.5 py-0.5">
                   {rows.length === 0 && edit && (
@@ -976,7 +980,7 @@ export default function PlanView({
                         // Klicks nach Wisch/Halten, daher kein Gesten-Konflikt
                         onClick={() => {
                           if (isSelected || isRemoving) return;
-                          setDetailExercise(ex);
+                          setDetailExercise({ exercise: ex, block: idx });
                         }}
                         className={`t-interactive relative flex min-h-hit cursor-pointer flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4${
                           isRemoving ? " animate-remove-row" : ""
@@ -1107,56 +1111,13 @@ export default function PlanView({
                   )}
                 </div>
               </section>
+              </Fragment>
             );
           })}
         </div>
 
-        {/* Kopie löschen — Inline-Bestätigung statt Popup (App-Regel);
-            die Undo-Leiste kommt mit den Listen-Gesten in Teilschritt 4 */}
-        {edit?.onDelete && (
-          <section className="flex flex-wrap items-center gap-2 pt-2">
-            {confirmDelete ? (
-              <>
-                <button
-                  type="button"
-                  onClick={edit.onDelete}
-                  className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
-                  style={{
-                    ...BTN_FONT,
-                    background: "var(--negative)",
-                    color: "var(--on-accent)",
-                  }}
-                >
-                  <Icon name="trash" size={13} strokeWidth={2.2} />
-                  Wirklich löschen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(false)}
-                  className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
-                  style={{
-                    ...BTN_FONT,
-                    background: "var(--surface-raised)",
-                    border: "1px solid var(--line)",
-                    color: "var(--text-2)",
-                  }}
-                >
-                  Abbrechen
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="t-interactive -ml-2 inline-flex min-h-hit items-center gap-2 rounded-field px-2"
-                style={{ ...BTN_FONT, color: "var(--negative)" }}
-              >
-                <Icon name="trash" size={13} strokeWidth={2.2} />
-                Kopie löschen
-              </button>
-            )}
-          </section>
-        )}
+        {/* „Kopie löschen" ist raus (Leon 2026-08-28): entfernt wird über
+            das Herz oben bzw. per Links-Wisch in „Meine Workouts" */}
       </div>
 
       {/* Übungs-Picker — gesamte Bibliothek, Ziel ist der gewählte Block */}
@@ -1170,11 +1131,37 @@ export default function PlanView({
         />
       )}
 
-      {/* Übungs-Detail — Tipp/Klick auf eine Übungszeile */}
+      {/* Übungs-Detail — Tipp/Klick auf eine Übungszeile; im Editier-Modus
+          wird hier die Rundenpause DIESER Übung eingestellt */}
       {detailExercise && (
         <ExerciseDetailSheet
-          exercise={detailExercise}
+          exercise={detailExercise.exercise}
+          rest={
+            edit && shown.blocks[detailExercise.block]
+              ? {
+                  label: "Pause zwischen den Runden",
+                  sub: "Gilt nur für diese Übung",
+                  seconds: exerciseRestSeconds(
+                    shown,
+                    shown.blocks[detailExercise.block],
+                    detailExercise.exercise.id,
+                  ),
+                  onChange: (s) =>
+                    edit.onExerciseRestChange(detailExercise.exercise.id, s),
+                }
+              : undefined
+          }
           onClose={() => setDetailExercise(null)}
+        />
+      )}
+
+      {/* Pausen-Rad für die Zwischen-Rubrik-Pause */}
+      {edit && gapWheel !== null && shown.blocks[gapWheel] && (
+        <RestWheel
+          label="Pause zwischen den Rubriken"
+          value={shown.blocks[gapWheel].restAfterSeconds ?? 0}
+          onChange={(s) => edit.onRestAfterChange(gapWheel, s)}
+          onClose={() => setGapWheel(null)}
         />
       )}
 

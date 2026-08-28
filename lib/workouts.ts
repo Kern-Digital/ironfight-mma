@@ -29,6 +29,8 @@ export type WorkoutSession = {
   workSeconds: number;
   restSeconds: number;
   completedAt: Date;
+  /** Wann die Session GESTARTET wurde — ältere Logs haben nur completedAt */
+  startedAt: Date | null;
   totalWorkSeconds: number;
   status: WorkoutStatus;
   exerciseIds: string[];
@@ -52,6 +54,7 @@ type WorkoutDoc = {
   workSeconds: number;
   restSeconds: number;
   completedAt: Timestamp | null;
+  startedAt?: Timestamp | null;
   totalWorkSeconds: number;
   status?: WorkoutStatus;
   exerciseIds?: string[];
@@ -71,6 +74,8 @@ export interface LogWorkoutOptions {
   category?: Category | null;
   difficulty?: Difficulty | null;
   status?: WorkoutStatus;
+  /** Wann die Session gestartet wurde (Anzeige „Letzte Workouts") */
+  startedAt?: Date | null;
   exerciseIds?: string[];
   techniqueIds?: string[];
   /** Volle Definition — nur noch für ältere Aufrufer, neue loggen `plan` */
@@ -94,15 +99,16 @@ export async function logWorkout(
 
 /**
  * Erweiterter Logger — schreibt Kategorie, Schwierigkeit, Status,
- * Übungs-/Technik-IDs für Dashboard-Statistiken.
+ * Übungs-/Technik-IDs für Dashboard-Statistiken. Rückgabe ist die ID des
+ * neuen Log-Eintrags (Herz auf dem Fertig-Screen braucht sie).
  */
 export async function logWorkoutFull(
   userId: string,
   options: LogWorkoutOptions,
-) {
+): Promise<string> {
   const { config } = options;
   const totalWorkSeconds = config.rounds * config.workSeconds;
-  await addDoc(workoutsCol(userId), {
+  const ref = await addDoc(workoutsCol(userId), {
     label: options.label,
     category: options.category ?? null,
     difficulty: options.difficulty ?? null,
@@ -110,6 +116,7 @@ export async function logWorkoutFull(
     workSeconds: config.workSeconds,
     restSeconds: config.restSeconds,
     completedAt: serverTimestamp(),
+    startedAt: options.startedAt ?? null,
     totalWorkSeconds,
     status: options.status ?? "completed",
     exerciseIds: options.exerciseIds ?? [],
@@ -118,6 +125,7 @@ export async function logWorkoutFull(
     plan: options.plan ?? null,
     savedPlanId: null,
   });
+  return ref.id;
 }
 
 /**
@@ -154,6 +162,7 @@ export async function getRecentWorkouts(
       workSeconds: data.workSeconds,
       restSeconds: data.restSeconds,
       completedAt: data.completedAt?.toDate() ?? new Date(),
+      startedAt: data.startedAt?.toDate() ?? null,
       totalWorkSeconds: data.totalWorkSeconds,
       status: data.status ?? "completed",
       exerciseIds: data.exerciseIds ?? [],

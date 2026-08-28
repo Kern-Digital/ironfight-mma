@@ -535,17 +535,11 @@ function DashboardContent() {
           </div>
         </section>
 
-        {/* Letzte Trainings */}
+        {/* Letzte Trainings — Klick auf einen Eintrag führt in den vollen
+            Verlauf (/workout/verlauf); „Neue Session" ist raus (Leon
+            2026-08-28) */}
         <section className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between">
-            <span className="t-label">Letzte Trainings</span>
-            <Link
-              href="/workout/generator"
-              style={{ font: "var(--type-sub)", color: "var(--accent-text)" }}
-            >
-              Neue Session
-            </Link>
-          </div>
+          <span className="t-label">Letzte Trainings</span>
           <div className="t-card px-3.5 py-0.5">
             {sessions === null && !error && (
               <div className="flex flex-col gap-2 py-3">
@@ -580,10 +574,15 @@ function DashboardContent() {
             {sessions &&
               sessions.length > 0 &&
               sessions.slice(0, 6).map((s, i) => (
-                <div
+                <Link
                   key={s.id}
-                  className="flex min-h-hit items-center gap-3 py-3"
-                  style={i > 0 ? { borderTop: "1px solid var(--line)" } : undefined}
+                  href="/workout/verlauf"
+                  className="t-interactive flex min-h-hit items-center gap-3 py-3"
+                  style={{
+                    textDecoration: "none",
+                    color: "inherit",
+                    ...(i > 0 ? { borderTop: "1px solid var(--line)" } : {}),
+                  }}
                 >
                   <div className="w-11 shrink-0 text-center leading-tight">
                     <span
@@ -627,7 +626,7 @@ function DashboardContent() {
                       {formatRelative(s.completedAt)}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
           </div>
         </section>

@@ -30,6 +30,7 @@
  * done=positive), Glows via color-mix aus denselben Tokens.
  */
 
+import DoneAnimation from "@/components/DoneAnimation";
 import ExerciseAnimation from "@/components/ExerciseAnimation";
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import Icon from "@/components/ui/Icon";
@@ -52,9 +53,15 @@ import {
 } from "@/lib/use-workout-timer";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
-import { logWorkoutFull } from "@/lib/workouts";
-import { DISCIPLINE_CATEGORY, parseSessionPayload } from "@/lib/workout-plans";
-import { DISCIPLINE_LABEL } from "@/lib/types";
+import { logWorkoutFull, setWorkoutSavedPlan } from "@/lib/workouts";
+import {
+  DISCIPLINE_CATEGORY,
+  deletePersonalWorkoutPlan,
+  exerciseRestSeconds,
+  parseSessionPayload,
+  upsertPersonalWorkoutPlan,
+} from "@/lib/workout-plans";
+import { DISCIPLINE_LABEL, GENDER_HEART_COLOR } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -129,7 +136,7 @@ function SessionRunner() {
     () => parseSessionPayload(params.get("payload")),
     [params],
   );
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   // Nur noch lesen — die Toggle-UI (Sound/Vibration/Display) ist raus,
   // gesteuert wird das später app-weit (Leons Vorgabe 2026-08-27)
@@ -152,8 +159,16 @@ function SessionRunner() {
   // Übungs-Detail-Sheet („Detail"-Button): erklärt die AKTUELLE Übung
   const [detailOpen, setDetailOpen] = useState(false);
   const autoStartRef = useRef(false);
+  // Auto-Durchlauf (Leons Wahl 2026-08-28): nach einer Übung läuft die
+  // Pause automatisch und die nächste Übung startet von selbst. Die Pause
+  // fährt als „prep" der Folge-Übung — autoRestRef trägt ihre Länge,
+  // autoPause stellt die Anzeige von „Vorbereitung" auf „Pause" um.
+  const autoRestRef = useRef<number | null>(null);
+  const [autoPause, setAutoPause] = useState(false);
   const [autoStartTick, setAutoStartTick] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  // Wann die Session gestartet wurde — landet im Log („Letzte Workouts")
+  const startedAtRef = useRef<Date | null>(null);
 
   // Wisch-Hinweis (Coach-Mark) statt sichtbarem Listen-Button: einmal pro
   // Session-Start kurz einblenden, insgesamt max. 2× — die Regel ist
@@ -195,31 +210,43 @@ function SessionRunner() {
   const nextExercise      = nextExerciseId ? getExerciseById(nextExerciseId) : null;
 
   // Timer-Konfiguration per Übung — die Pause zwischen den Runden ist die
-  // BLOCKPAUSE des Plans (0 s erlaubt; der Timer überspringt die Rest-Phase
-  // dann), nicht mehr der restSeconds-Default der Übung
+  // RUNDENPAUSE dieser Übung (restOverrides des Plans, sonst der Standard
+  // der Rubrik; 0 s erlaubt — der Timer überspringt die Rest-Phase dann)
   const timerConfig: TimerConfig = useMemo(() => {
     if (currentExercise) {
       return {
         rounds:      currentExercise.defaultRounds,
         workSeconds: currentExercise.durationSeconds,
-        restSeconds: currentBlock?.restSeconds ?? currentExercise.restSeconds,
+        restSeconds:
+          plan && currentBlock
+            ? exerciseRestSeconds(plan, currentBlock, currentExercise.id)
+            : currentExercise.restSeconds,
         prepSeconds: PREP_SECONDS,
       };
     }
     return DEFAULT_CONFIG;
-  }, [currentExercise, currentBlock]);
+  }, [currentExercise, currentBlock, plan]);
 
   const t = useWorkoutTimer(timerConfig);
   useWakeLock(settings.wakeLock && t.running);
 
   // Config + Reset bei Übungswechsel. Nach einem Sprung aus der Übungsliste:
-  // 3-2-1-Countdown + Autostart — der Start läuft über autoStartTick in einem
+  // 3-2-1-Countdown + Autostart; beim Auto-Durchlauf läuft stattdessen die
+  // Pause als Vorlauf. Der Start läuft über autoStartTick in einem
   // Folge-Effekt, weil t.start() erst NACH dem Config-Render die neue
   // Konfiguration sieht (enterPhase hängt am config-State).
   useEffect(() => {
     const jumped = autoStartRef.current;
     autoStartRef.current = false;
-    t.setConfig(jumped ? { ...timerConfig, prepSeconds: 3 } : timerConfig);
+    const autoRest = autoRestRef.current;
+    autoRestRef.current = null;
+    if (jumped && autoRest !== null) {
+      t.setConfig({ ...timerConfig, prepSeconds: autoRest });
+      setAutoPause(true);
+    } else {
+      t.setConfig(jumped ? { ...timerConfig, prepSeconds: 3 } : timerConfig);
+      setAutoPause(false);
+    }
     t.reset();
     if (jumped) setAutoStartTick((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,13 +259,29 @@ function SessionRunner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartTick]);
 
-  // Auto-Advance zur nächsten Übung
+  // Auto-Advance zur nächsten Übung — MIT automatischer Pause und
+  // Autostart (Leons Wahl 2026-08-28): innerhalb einer Rubrik gilt die
+  // Rundenpause, beim Rubrikwechsel die Zwischen-Rubrik-Pause; 0 s
+  // bedeutet direkt weiter (der Timer springt dann sofort in die Arbeit)
   useEffect(() => {
     if (t.phase === "done" && nextExerciseId) {
-      const id = setTimeout(() => setExerciseIndex((i) => i + 1), 1500);
+      const id = setTimeout(() => {
+        const cur = sequence[exerciseIndex];
+        const nxt = sequence[exerciseIndex + 1];
+        const curBlock = cur ? plan?.blocks[cur.blockIndex] : undefined;
+        autoRestRef.current =
+          cur && nxt && plan && curBlock
+            ? cur.blockIndex === nxt.blockIndex
+              ? // gleiche Rubrik: Rundenpause der eben beendeten Übung
+                exerciseRestSeconds(plan, curBlock, cur.id)
+              : curBlock.restAfterSeconds ?? 0
+            : 0;
+        autoStartRef.current = true;
+        setExerciseIndex((i) => i + 1);
+      }, 1500);
       return () => clearTimeout(id);
     }
-  }, [t.phase, nextExerciseId]);
+  }, [t.phase, nextExerciseId, exerciseIndex, sequence, plan]);
 
   // ─── Sprachansagen ───────────────────────────────────────────────────────────
 
@@ -285,6 +328,13 @@ function SessionRunner() {
   const loggedRef = useRef(false);
   const allDone   = !nextExerciseId && t.phase === "done";
 
+  // Herz auf dem Fertig-Screen: speichert das GANZE Workout (den Plan) als
+  // persönliche Kopie — der Zustand hängt wie im Hub am savedPlanId des Logs
+  const [loggedWorkoutId, setLoggedWorkoutId] = useState<string | null>(null);
+  const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
+  const [heartBusy, setHeartBusy] = useState(false);
+  const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
+
   useEffect(() => {
     if (!plan || !allDone || !user || loggedRef.current) return;
     loggedRef.current = true;
@@ -299,13 +349,48 @@ function SessionRunner() {
       category:     DISCIPLINE_CATEGORY[plan.discipline],
       difficulty:   plan.difficulty,
       status:       "completed",
+      startedAt:    startedAtRef.current,
       exerciseIds:  exerciseSequence,
       techniqueIds: Array.from(new Set(techniqueIds)),
       plan,
     })
-      .then(() => setLogState("saved"))
+      .then((id) => {
+        setLoggedWorkoutId(id);
+        setLogState("saved");
+      })
       .catch(() => setLogState("error"));
   }, [allDone, user, plan, exerciseSequence, t.config]);
+
+  async function toggleFinishFavorite() {
+    if (!user || !plan || !loggedWorkoutId || heartBusy) return;
+    setHeartBusy(true);
+    try {
+      if (savedPlanId) {
+        await deletePersonalWorkoutPlan(user.uid, savedPlanId);
+        await setWorkoutSavedPlan(user.uid, loggedWorkoutId, null);
+        setSavedPlanId(null);
+      } else {
+        const planId = await upsertPersonalWorkoutPlan(
+          user.uid,
+          {
+            ...plan,
+            id: "",
+            slug: "",
+            gymId: "personal",
+            short: "",
+            description: "Als Favorit gespeichertes Workout.",
+          },
+          { sourcePlanId: null },
+        );
+        await setWorkoutSavedPlan(user.uid, loggedWorkoutId, planId);
+        setSavedPlanId(planId);
+      }
+    } catch {
+      // Fehlgeschlagen — Herz bleibt im alten Zustand
+    } finally {
+      setHeartBusy(false);
+    }
+  }
 
   // ─── Audio-Unlock ─────────────────────────────────────────────────────────────
 
@@ -317,6 +402,7 @@ function SessionRunner() {
       const ok = await unlockAudio();
       setAudioUnlocked(ok);
     }
+    startedAtRef.current ??= new Date();
     t.start();
   }
 
@@ -330,6 +416,7 @@ function SessionRunner() {
         category:    plan ? DISCIPLINE_CATEGORY[plan.discipline] : null,
         difficulty:  plan?.difficulty ?? null,
         status:      "aborted",
+        startedAt:   startedAtRef.current,
         exerciseIds: exerciseSequence.slice(0, exerciseIndex + 1),
         plan:        plan ?? null,
       }).catch(() => {});
@@ -355,8 +442,10 @@ function SessionRunner() {
       // noch innerhalb der User-Geste — Audio direkt mit freischalten
       unlockAudio().then((ok) => setAudioUnlocked(ok));
     }
+    startedAtRef.current ??= new Date();
     if (idx === exerciseIndex) {
       t.setConfig({ ...timerConfig, prepSeconds: 3 });
+      setAutoPause(false);
       t.reset();
       setAutoStartTick((n) => n + 1);
     } else {
@@ -422,7 +511,12 @@ function SessionRunner() {
   const phaseProgress   = t.totalForPhase > 0
     ? Math.min(100, ((t.totalForPhase - t.remaining) / t.totalForPhase) * 100)
     : 0;
-  const phaseColor = PHASE_COLOR[t.phase];
+  // Auto-Pause läuft technisch als prep — angezeigt wird sie als „Pause"
+  // im Rest-Stil (mm:ss statt nackter Zahl)
+  const isAutoPause = autoPause && t.phase === "prep";
+  const phaseColor  = isAutoPause ? PHASE_COLOR.rest : PHASE_COLOR[t.phase];
+  const phaseGlow   = isAutoPause ? PHASE_GLOW.rest : PHASE_GLOW[t.phase];
+  const phaseLabel  = isAutoPause ? "Pause" : PHASE_LABEL[t.phase];
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -439,7 +533,12 @@ function SessionRunner() {
     >
     <div
       className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-0 overflow-y-auto px-4 pt-3 sm:px-6"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+      style={{
+        // Platz für den Kartei-Peek der Übungsliste am unteren Rand
+        paddingBottom: allDone
+          ? "calc(env(safe-area-inset-bottom, 0px) + 16px)"
+          : "calc(env(safe-area-inset-bottom, 0px) + 40px)",
+      }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -504,7 +603,7 @@ function SessionRunner() {
       {/* ── Phase-Label ──────────────────────────────────────────────────────── */}
       <div className="mb-2 text-center">
         <span className="t-label" style={{ color: phaseColor }}>
-          {PHASE_LABEL[t.phase]}
+          {phaseLabel}
         </span>
         {t.phase === "work" && t.config.rounds > 1 && (
           <span className="ml-2" style={{ ...META_FONT, color: "var(--text-3)" }}>
@@ -532,7 +631,7 @@ function SessionRunner() {
               letterSpacing: "var(--ls-display)",
               textTransform: "uppercase",
               color: phaseColor,
-              filter: PHASE_GLOW[t.phase],
+              filter: phaseGlow,
             }}
           >
             {currentExercise.name}
@@ -557,14 +656,14 @@ function SessionRunner() {
             font: "800 96px/1 var(--font-archivo), system-ui, sans-serif",
             fontSize: "clamp(5rem, 22vw, 9rem)",
             color: phaseColor,
-            filter: PHASE_GLOW[t.phase],
+            filter: phaseGlow,
           }}
           aria-live="polite"
           aria-label={`${t.remaining} Sekunden verbleibend`}
         >
           {/* Vorbereitung zählt als nackte Zahl runter (…3, 2, 1) —
-              erst Übung/Pause laufen im mm:ss-Format */}
-          {t.phase === "prep" ? t.remaining : formatTime(t.remaining)}
+              Übung, Pause und AUTO-Pause laufen im mm:ss-Format */}
+          {t.phase === "prep" && !autoPause ? t.remaining : formatTime(t.remaining)}
         </div>
       )}
 
@@ -598,15 +697,42 @@ function SessionRunner() {
         </div>
       )}
 
-      {/* ── Fertig-Banner ─────────────────────────────────────────────────────── */}
+      {/* ── Fertig-Screen (Leons Vorgaben 2026-08-28): „Workout fertig" über
+          der einmal abgespielten Häkchen-Animation (bleibt im letzten Bild
+          stehen), kleine Speicher-Anmerkung, darunter die zwei Buttons.
+          Oben rechts ein GROSSES Herz — speichert das ganze Workout (den
+          Plan) als eigenen Plan, gleicher Mechanismus wie im Hub. ───────── */}
       {allDone && (
         <div
-          className="my-8 rounded-modal px-6 py-10 text-center"
+          className="relative my-6 rounded-modal px-6 pb-8 pt-8 text-center"
           style={{
             background: "color-mix(in oklab, var(--positive) 10%, transparent)",
             border: "1px solid color-mix(in oklab, var(--positive) 40%, transparent)",
           }}
         >
+          <button
+            type="button"
+            onClick={() => void toggleFinishFavorite()}
+            disabled={!loggedWorkoutId || heartBusy}
+            aria-pressed={Boolean(savedPlanId)}
+            aria-label={
+              savedPlanId
+                ? "Workout aus den Favoriten entfernen"
+                : "Workout als eigenen Plan speichern"
+            }
+            className="t-interactive absolute right-2 top-2 flex h-14 w-14 items-center justify-center rounded-field disabled:opacity-40"
+            style={{
+              color: savedPlanId ? heartColor : "var(--text-3)",
+              opacity: heartBusy ? 0.5 : undefined,
+            }}
+          >
+            <Icon
+              name="heart"
+              size={32}
+              strokeWidth={2}
+              style={savedPlanId ? { fill: "currentColor" } : undefined}
+            />
+          </button>
           <div
             style={{
               font: "800 40px/1.1 var(--font-archivo), system-ui, sans-serif",
@@ -618,25 +744,23 @@ function SessionRunner() {
           >
             Workout fertig!
           </div>
-          <div className="mt-3 flex justify-center" style={{ color: "var(--positive)" }}>
-            <Icon name="trophy" size={36} />
-          </div>
+          <DoneAnimation className="mx-auto mt-1 h-44 w-44" />
           {logState === "saving" && (
-            <p className="mt-4" style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+            <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
               Speichere Session…
             </p>
           )}
           {logState === "saved" && (
             <p
-              className="mt-4 inline-flex items-center gap-1.5"
-              style={{ font: "var(--type-sub)", color: "var(--positive)" }}
+              className="mt-1 inline-flex items-center gap-1.5"
+              style={{ ...META_FONT, color: "var(--positive)" }}
             >
-              <Icon name="check" size={14} strokeWidth={2.6} />
-              Im Dashboard gespeichert
+              <Icon name="check" size={12} strokeWidth={2.6} />
+              In deinen Workouts gespeichert
             </p>
           )}
           {logState === "error" && (
-            <p className="mt-4" style={{ font: "var(--type-sub)", color: "var(--negative)" }}>
+            <p className="mt-1" style={{ ...META_FONT, color: "var(--negative)" }}>
               Speichern fehlgeschlagen
             </p>
           )}
@@ -756,6 +880,33 @@ function SessionRunner() {
           </span>
         </div>
       </div>
+    )}
+
+    {/* ── Kartei-Peek: angedeuteter Anfang der Übungsliste am unteren Rand
+        (halbe Button-Höhe, Leons Vorgabe 2026-08-28) — Tippen öffnet die
+        Liste, Hochwischen funktioniert weiter ───────────────────────────── */}
+    {!allDone && !sheetOpen && (
+      <button
+        type="button"
+        onClick={() => {
+          setHintVisible(false);
+          setSheetOpen(true);
+        }}
+        aria-label="Alle Übungen dieser Einheit öffnen"
+        className="t-interactive fixed inset-x-0 bottom-0 z-40 mx-auto flex w-full max-w-lg items-start justify-center"
+        style={{
+          height: "calc(env(safe-area-inset-bottom, 0px) + 22px)",
+          background: "var(--surface-card)",
+          borderRadius: "var(--r-xl) var(--r-xl) 0 0",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
+        <span
+          aria-hidden
+          className="mt-2 h-1 w-10 rounded-full"
+          style={{ background: "var(--line-strong)" }}
+        />
+      </button>
     )}
 
     {/* ── Übungsliste — hochziehbares Sheet ──────────────────────────────────── */}
