@@ -19,9 +19,25 @@ import {
   DEFAULT_WORKOUT_PLANS,
   WORKOUT_DISCIPLINES,
 } from "@/lib/workout-plan-defaults";
+import {
+  deletePersonalWorkoutPlan,
+  listPersonalWorkoutPlans,
+  planDurationSeconds,
+  planExerciseCount,
+  upsertPersonalWorkoutPlan,
+  workoutSessionToPlan,
+  type PersonalWorkoutPlan,
+} from "@/lib/workout-plans";
+import {
+  getRecentWorkouts,
+  setWorkoutSavedPlan,
+  type WorkoutSession,
+} from "@/lib/workouts";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
+  DISCIPLINE_LABEL,
+  GENDER_HEART_COLOR,
   type Category,
   type Difficulty,
   type EquipmentId,
@@ -30,10 +46,22 @@ import { CATEGORY_LABEL } from "@/lib/techniques";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 const CATEGORIES: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
+
+/** Kompaktes Datum der Letzte-Workouts-Kacheln. */
+function dayLabel(d: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - day.getTime()) / 86400000);
+  if (diffDays <= 0) return "Heute";
+  if (diffDays === 1) return "Gestern";
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+}
 
 // ─── Typo-Konstanten (Muster der Referenzseiten) ───────────────────────────
 
@@ -106,9 +134,92 @@ function ChoiceButton({
 
 export default function WorkoutHubPage() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+
+  // Eigene Workoutpläne + letzte Workouts (Teilschritt 3): null = lädt noch —
+  // die Bereiche erscheinen erst mit dem Ergebnis (kein Leer-Blitz).
+  const [ownPlans, setOwnPlans] = useState<PersonalWorkoutPlan[] | null>(null);
+  const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
+  const [plansOpen, setPlansOpen] = useState(false);
+  const [heartBusy, setHeartBusy] = useState<string | null>(null);
+
+  // Herz-Farbe nach Gender im Athleten-Profil (Leons Vorgabe 2026-08-27)
+  const heartColor =
+    GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setOwnPlans([]);
+      setRecent([]);
+      return;
+    }
+    let cancelled = false;
+    listPersonalWorkoutPlans(user.uid)
+      .then((plans) => {
+        if (!cancelled) setOwnPlans(plans);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnPlans([]);
+      });
+    // Abgebrochene zählen nicht als „ausgeführt" — deshalb mehr holen und
+    // clientseitig auf die letzten 3 abgeschlossenen filtern
+    getRecentWorkouts(user.uid, 10)
+      .then((sessions) => {
+        if (!cancelled)
+          setRecent(
+            sessions.filter((s) => s.status === "completed").slice(0, 3),
+          );
+      })
+      .catch(() => {
+        if (!cancelled) setRecent([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
+
+  // Herz: speichert das ausgeführte Workout als eigenen Plan (bzw. entfernt
+  // ihn wieder) — der Gefüllt-Zustand hängt am savedPlanId des Log-Eintrags.
+  async function toggleFavorite(session: WorkoutSession) {
+    if (!user || heartBusy) return;
+    setHeartBusy(session.id);
+    try {
+      if (session.savedPlanId) {
+        const planId = session.savedPlanId;
+        await deletePersonalWorkoutPlan(user.uid, planId);
+        await setWorkoutSavedPlan(user.uid, session.id, null);
+        setRecent(
+          (r) =>
+            r?.map((s) =>
+              s.id === session.id ? { ...s, savedPlanId: null } : s,
+            ) ?? r,
+        );
+        setOwnPlans((p) => p?.filter((pl) => pl.id !== planId) ?? p);
+      } else {
+        const planId = await upsertPersonalWorkoutPlan(
+          user.uid,
+          workoutSessionToPlan(session),
+          { sourcePlanId: null },
+        );
+        await setWorkoutSavedPlan(user.uid, session.id, planId);
+        setRecent(
+          (r) =>
+            r?.map((s) =>
+              s.id === session.id ? { ...s, savedPlanId: planId } : s,
+            ) ?? r,
+        );
+        // Plan-Liste neu laden statt lokal nachbauen (Sortierung/Timestamps)
+        setOwnPlans(await listPersonalWorkoutPlans(user.uid));
+      }
+    } catch {
+      // Fehlgeschlagen — Herz bleibt im alten Zustand
+    } finally {
+      setHeartBusy(null);
+    }
+  }
 
   const [category, setCategory] = useState<Category>("boxing");
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
@@ -205,6 +316,104 @@ export default function WorkoutHubPage() {
 
       {/* pt-4/5: sichtbare Abgrenzung Kopf → erste Sektion (Leon 2026-08-27) */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
+        {/* ── Letzte Workouts — Herz speichert als eigenen Plan ── */}
+        {recent !== null && recent.length > 0 && (
+          <section className="flex flex-col gap-4">
+            <SectionHeader
+              title="Letzte Workouts"
+              subtitle="Tippe das Herz, um ein Workout bei dir zu speichern"
+            />
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {recent.map((s) => {
+                const minutes = Math.max(
+                  1,
+                  Math.round(s.totalWorkSeconds / 60),
+                );
+                const saved = Boolean(s.savedPlanId);
+                return (
+                  <div
+                    key={s.id}
+                    className="t-card relative flex flex-col gap-1 p-3 pr-10"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={saved}
+                      aria-label={
+                        saved
+                          ? `„${s.label ?? "Workout"}" aus den Favoriten entfernen`
+                          : `„${s.label ?? "Workout"}" als Favorit speichern`
+                      }
+                      onClick={() => void toggleFavorite(s)}
+                      disabled={heartBusy === s.id}
+                      className="t-interactive absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-field"
+                      style={{
+                        color: saved ? heartColor : "var(--text-3)",
+                        opacity: heartBusy === s.id ? 0.5 : undefined,
+                      }}
+                    >
+                      <Icon
+                        name="heart"
+                        size={17}
+                        strokeWidth={2}
+                        style={saved ? { fill: "currentColor" } : undefined}
+                      />
+                    </button>
+                    <span
+                      className="truncate"
+                      style={{ font: "var(--type-body-strong)" }}
+                    >
+                      {s.label ?? "Workout"}
+                    </span>
+                    <span
+                      className="mt-auto truncate"
+                      style={{ ...META_FONT, color: "var(--text-3)" }}
+                    >
+                      ≈ {minutes} min · {dayLabel(s.completedAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Eigene Workoutpläne — gerahmtes Feld, öffnet das Popup ── */}
+        {ownPlans !== null && (
+          <button
+            type="button"
+            onClick={() => setPlansOpen(true)}
+            className="t-card t-interactive flex w-full items-center gap-4 p-4 text-left sm:p-5"
+            style={{
+              border:
+                "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
+            }}
+          >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <h2
+                style={{
+                  font: "var(--type-h2)",
+                  letterSpacing: "var(--ls-display)",
+                  textTransform: "uppercase",
+                }}
+              >
+                Eigene Workoutpläne
+              </h2>
+              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                {ownPlans.length === 0
+                  ? "Noch keine — erstelle oder speichere deinen ersten Plan"
+                  : `${ownPlans.length} ${ownPlans.length === 1 ? "Plan" : "Pläne"} — zuletzt bearbeitet zuerst`}
+              </p>
+            </div>
+            <span
+              aria-hidden
+              className="shrink-0"
+              style={{ color: "var(--accent-text)", lineHeight: 0 }}
+            >
+              <Icon name="arrow-right" size={18} strokeWidth={2} />
+            </span>
+          </button>
+        )}
+
         {/* ── Disziplinen (Ebene 1: Disziplin → Level → Plan) ── */}
         <section className="flex flex-col gap-4">
           <SectionHeader
@@ -485,6 +694,128 @@ export default function WorkoutHubPage() {
           </div>
         </section>
       </div>
+
+      {/* ── Popup „Eigene Workoutpläne" — Liste + „+" (Leons Vorgabe) ── */}
+      {plansOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Eigene Workoutpläne"
+        >
+          <button
+            type="button"
+            aria-label="Eigene Workoutpläne schließen"
+            className="absolute inset-0"
+            style={{
+              background: "var(--overlay)",
+              animation: "fade-in 0.2s ease-out both",
+            }}
+            onClick={() => setPlansOpen(false)}
+          />
+          <div
+            className="animate-slide-up relative flex max-h-[75vh] flex-col overflow-hidden"
+            style={{
+              maxHeight: "75dvh",
+              background: "var(--surface-card)",
+              borderRadius: "var(--r-xl) var(--r-xl) 0 0",
+              boxShadow: "var(--glass-shadow)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 pt-3">
+              <div className="flex flex-col items-start">
+                <div
+                  aria-hidden
+                  className="mb-2 h-1 w-10 rounded-full"
+                  style={{ background: "var(--line-strong)" }}
+                />
+                <span className="t-label">Eigene Workoutpläne</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlansOpen(false)}
+                aria-label="Schließen"
+                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
+                style={{ color: "var(--text-3)" }}
+              >
+                <Icon name="x" size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+            <div
+              className="overflow-y-auto px-3 pt-2"
+              style={{
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+              }}
+            >
+              {/* Der „+"-Knopf des Popups: völlig eigenes Workout erstellen */}
+              <Link
+                href="/workout/eigene/neu"
+                className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2"
+                style={{ color: "var(--accent-text)", textDecoration: "none" }}
+              >
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field"
+                  style={{ border: "1px dashed var(--accent)" }}
+                >
+                  <Icon name="plus" size={16} strokeWidth={2.2} />
+                </span>
+                <span style={{ font: "var(--type-body-strong)" }}>
+                  Neues Workout erstellen
+                </span>
+              </Link>
+              {ownPlans?.length === 0 ? (
+                <p
+                  className="px-2.5 py-6"
+                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                >
+                  Noch keine eigenen Pläne. Speichere ein bearbeitetes oder
+                  ausgeführtes Workout — oder erstelle eins komplett selbst.
+                </p>
+              ) : (
+                ownPlans?.map((plan) => {
+                  const minutes = Math.round(planDurationSeconds(plan) / 60);
+                  const exercises = planExerciseCount(plan);
+                  return (
+                    <Link
+                      key={plan.id}
+                      href={`/workout/eigene/${plan.id}`}
+                      className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2"
+                      style={{
+                        color: "var(--text-body)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span
+                          className="truncate"
+                          style={{ font: "var(--type-body-strong)" }}
+                        >
+                          {plan.name}
+                        </span>
+                        <span
+                          className="truncate"
+                          style={{ ...META_FONT, color: "var(--text-3)" }}
+                        >
+                          {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
+                          {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes} min
+                          · {exercises} Übungen
+                        </span>
+                      </div>
+                      <span
+                        aria-hidden
+                        className="shrink-0"
+                        style={{ color: "var(--text-3)", lineHeight: 0 }}
+                      >
+                        <Icon name="arrow-right" size={16} strokeWidth={2} />
+                      </span>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!isTrainer && <AthleteTabBar />}
     </main>

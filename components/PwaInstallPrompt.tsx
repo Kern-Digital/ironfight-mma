@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+
+// Der Prompt legt sich als Modal (Backdrop + Bottom-Sheet) über ALLES.
+// Deshalb nur auf den Einstiegsseiten zeigen — mitten in einem Flow hat
+// das Sheet schon unbemerkt Taps geschluckt (2026-08-28: „Übung
+// hinzufügen" im Plan-Editor wirkte tot, weil das Panel darüberlag).
+const PROMPT_ROUTES = new Set(["/", "/dashboard", "/trainer"]);
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface BeforeInstallPromptEvent extends Event {
@@ -92,6 +99,7 @@ function IconPlusSquare() {
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function PwaInstallPrompt() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -159,6 +167,8 @@ export default function PwaInstallPrompt() {
   // Only render on android (with prompt) or ios
   if (!visible || !platform) return null;
   if (platform === "other" && !deferredPrompt) return null;
+  // Nur auf Einstiegsseiten — nie über laufenden Flows (Editor, Runner …)
+  if (!PROMPT_ROUTES.has(pathname)) return null;
 
   return (
     <AnimatePresence>

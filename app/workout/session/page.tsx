@@ -291,6 +291,7 @@ function SessionRunner() {
       status:       "completed",
       exerciseIds:  exerciseSequence,
       techniqueIds: Array.from(new Set(techniqueIds)),
+      definition:   workout,
     })
       .then(() => setLogState("saved"))
       .catch(() => setLogState("error"));
@@ -320,6 +321,7 @@ function SessionRunner() {
         difficulty:  workout?.difficulty ?? null,
         status:      "aborted",
         exerciseIds: exerciseSequence.slice(0, exerciseIndex + 1),
+        definition:  workout ?? null,
       }).catch(() => {});
     }
     cancelSpeech();

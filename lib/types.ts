@@ -378,6 +378,17 @@ export const GENDER_LABEL: Record<Gender, string> = {
   female: "Weiblich",
 };
 
+/**
+ * Herz-Farbe der Workout-Favoriten (Leons Vorgabe 2026-08-27): Männlich =
+ * Blau, Weiblich = Lila, ohne Angabe = Gelb — aus den Palette-Tokens
+ * (cat-1/2/4), nie als Hex. „unset" = Gender im Athleten-Profil nicht gesetzt.
+ */
+export const GENDER_HEART_COLOR: Record<Gender | "unset", string> = {
+  male: "var(--cat-1)",
+  female: "var(--cat-2)",
+  unset: "var(--cat-4)",
+};
+
 export type AthleteLevel = "beginner" | "intermediate" | "advanced" | "competitor";
 
 export const ATHLETE_LEVEL_LABEL: Record<AthleteLevel, string> = {

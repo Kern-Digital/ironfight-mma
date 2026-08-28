@@ -20,6 +20,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -30,6 +31,7 @@ import {
 import { getFirestoreDb } from "./firebase";
 import { getExerciseById } from "./exercises";
 import { DEFAULT_WORKOUT_PLANS } from "./workout-plan-defaults";
+import type { WorkoutSession } from "./workouts";
 import type {
   Category,
   Difficulty,
@@ -119,6 +121,78 @@ export function planEquipment(plan: WorkoutPlan): EquipmentId[] {
   return Array.from(set);
 }
 
+// ─── Editor-Hilfen: Übungslisten unveränderlich bearbeiten ─────────────────
+// Generisch über T, damit PersonalWorkoutPlan seine Zusatzfelder behält.
+
+function withBlockExercises<T extends WorkoutPlan>(
+  plan: T,
+  blockIndex: number,
+  mutate: (ids: string[]) => string[],
+): T {
+  return {
+    ...plan,
+    blocks: plan.blocks.map((b, i) =>
+      i === blockIndex ? { ...b, exerciseIds: mutate([...b.exerciseIds]) } : b,
+    ),
+  } as T;
+}
+
+export function planWithAddedExercise<T extends WorkoutPlan>(
+  plan: T,
+  blockIndex: number,
+  exerciseId: string,
+): T {
+  return withBlockExercises(plan, blockIndex, (ids) => {
+    ids.push(exerciseId);
+    return ids;
+  });
+}
+
+export function planWithRemovedExercise<T extends WorkoutPlan>(
+  plan: T,
+  blockIndex: number,
+  exerciseIndex: number,
+): T {
+  return withBlockExercises(plan, blockIndex, (ids) => {
+    ids.splice(exerciseIndex, 1);
+    return ids;
+  });
+}
+
+/** Duplikat landet direkt hinter dem Original (rechts wischen = kopieren). */
+export function planWithDuplicatedExercise<T extends WorkoutPlan>(
+  plan: T,
+  blockIndex: number,
+  exerciseIndex: number,
+): T {
+  return withBlockExercises(plan, blockIndex, (ids) => {
+    ids.splice(exerciseIndex + 1, 0, ids[exerciseIndex]);
+    return ids;
+  });
+}
+
+/**
+ * Übung verschieben — auch über Blockgrenzen (Halten + ▲/▼). Die
+ * Zielposition gilt NACH dem Entfernen an der Quelle (relevant nur
+ * innerhalb desselben Blocks).
+ */
+export function planWithMovedExercise<T extends WorkoutPlan>(
+  plan: T,
+  from: { block: number; index: number },
+  to: { block: number; index: number },
+): T {
+  const id = plan.blocks[from.block]?.exerciseIds[from.index];
+  if (id === undefined) return plan;
+  const removed = withBlockExercises(plan, from.block, (ids) => {
+    ids.splice(from.index, 1);
+    return ids;
+  });
+  return withBlockExercises(removed, to.block, (ids) => {
+    ids.splice(Math.max(0, Math.min(ids.length, to.index)), 0, id);
+    return ids;
+  });
+}
+
 // ─── Brücke zum Runner (/workout, /workout/session) ────────────────────────
 
 /**
@@ -139,6 +213,53 @@ export const DISCIPLINE_CATEGORY: Record<Discipline, Category> = {
   "wing-tsung": "boxing",
   "self-defense": "boxing",
 };
+
+/** Anzeigename der Runner-Phasen — zentrale Quelle für alle Block-Titel. */
+export const PHASE_LABEL: Record<WorkoutBlock["phase"], string> = {
+  warmup: "Aufwärmen",
+  main: "Hauptteil",
+  conditioning: "Konditionierung",
+  cooldown: "Cooldown",
+};
+
+/**
+ * Ausgeführtes Workout (Log-Eintrag) → Plan für die persönliche Kopie
+ * (Herz-Favorit im Hub, Teilschritt 3). Mit gespeicherter Definition bleibt
+ * die Blockstruktur erhalten; ältere Logs ohne Definition werden als ein
+ * Hauptteil-Block mit der flachen Übungsfolge übernommen.
+ */
+export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
+  const def = session.definition;
+  const blocks: WorkoutPlanBlock[] = def
+    ? def.blocks
+        .filter((b) => b.exerciseIds.length > 0)
+        .map((b) => ({
+          title: PHASE_LABEL[b.phase] ?? b.phase,
+          phase: b.phase,
+          exerciseIds: b.exerciseIds,
+          restSeconds: def.restSeconds,
+        }))
+    : [
+        {
+          title: PHASE_LABEL.main,
+          phase: "main" as const,
+          exerciseIds: session.exerciseIds,
+          restSeconds: session.restSeconds,
+        },
+      ];
+  return {
+    id: "",
+    slug: "",
+    gymId: "personal",
+    // Category ist Teilmenge von Discipline (gleiche Slugs)
+    discipline: session.category ?? "boxing",
+    difficulty: session.difficulty ?? "anfaenger",
+    name: session.label ?? "Workout",
+    short: "",
+    description: "Als Favorit gespeichertes Workout.",
+    blocks,
+  };
+}
 
 /**
  * Plan → WorkoutDefinition für die bestehenden Runner-Seiten (?payload=…).
@@ -283,6 +404,21 @@ export async function listPersonalWorkoutPlans(
       updatedAt: data.updatedAt?.toDate() ?? null,
     };
   });
+}
+
+/** Einzelne persönliche Kopie — null, wenn es sie (nicht mehr) gibt. */
+export async function getPersonalWorkoutPlan(
+  uid: string,
+  planId: string,
+): Promise<PersonalWorkoutPlan | null> {
+  const snap = await getDoc(doc(personalPlansCol(uid), planId));
+  if (!snap.exists()) return null;
+  const data = snap.data() as WorkoutPlanDoc;
+  return {
+    ...docToPlan(snap.id, data),
+    sourcePlanId: data.sourcePlanId ?? null,
+    updatedAt: data.updatedAt?.toDate() ?? null,
+  };
 }
 
 /**

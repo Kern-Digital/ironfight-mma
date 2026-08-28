@@ -51,7 +51,11 @@ export type IconName =
   | "chevron-up"
   | "play"
   | "pause"
-  | "fast-forward";
+  | "fast-forward"
+  | "minus"
+  | "copy"
+  | "trash"
+  | "heart";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -278,6 +282,26 @@ const PATHS: Record<IconName, React.ReactNode> = {
   "arrow-right": <path d="M4 12h16M14 6l6 6-6 6" />,
   "arrow-left": <path d="M20 12H4m6-6-6 6 6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  // Zwei Blätter versetzt — „als Kopie speichern"
+  copy: (
+    <>
+      <rect x="9" y="9" width="11.5" height="11.5" rx="2" />
+      <path d="M5.5 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v.5" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 6.5h16" />
+      <path d="M9.5 6.5V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v1.5" />
+      <path d="M6.3 6.5 7.1 19a2 2 0 0 0 2 1.9h5.8a2 2 0 0 0 2-1.9l.8-12.5" />
+      <path d="M10 10.5v6M14 10.5v6" />
+    </>
+  ),
+  // Favorit — gefüllt via style={{ fill: "currentColor" }} (schlägt fill="none")
+  heart: (
+    <path d="M12 20.3 4.9 13a4.9 4.9 0 0 1 0-6.9 4.7 4.7 0 0 1 6.8 0l.3.4.3-.4a4.7 4.7 0 0 1 6.8 0 4.9 4.9 0 0 1 0 6.9Z" />
+  ),
   // Timer-Steuerung (Workout-Runner/Session)
   play: <path d="M8 5.5v13l11-6.5-11-6.5Z" />,
   pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,

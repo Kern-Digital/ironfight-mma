@@ -144,6 +144,12 @@
   --negative: oklch(0.72 0.16 25);
   --warning: oklch(0.82 0.13 90);
 
+  /* Listen-Gesten (Etappe Workout-Pläne): bewusst kräftiger/leuchtender als
+     positive/negative (Leons Vorgabe 2026-08-28) — nur für Wisch-Balken und
+     Hinzufüge-/Lösch-Feedback, nicht für Status-Texte. */
+  --gesture-add: oklch(0.80 0.24 150);
+  --gesture-delete: oklch(0.66 0.25 27);
+
   /* Kategorische Daten-Farben (Rubriken/Disziplinen + Charts).
      EINZIGER Verbraucher ist die Registry lib/discipline-colors.ts —
      Komponenten greifen nie direkt auf --cat-* zu. Feste Hues, keine
@@ -236,6 +242,8 @@
   --positive: oklch(0.55 0.13 150);
   --negative: oklch(0.55 0.18 25);
   --warning: oklch(0.60 0.12 90);
+  --gesture-add: oklch(0.60 0.22 150);
+  --gesture-delete: oklch(0.56 0.23 27);
   --cat-1: oklch(0.54 0.11 197);
   --cat-2: oklch(0.50 0.17 290);
   --cat-3: oklch(0.55 0.19 356);
@@ -803,6 +811,49 @@ body {
 }
 .animate-swipe-hint { animation: swipe-hint 1.8s ease-out infinite; }
 
+/* ─── Listen-Gesten: Hinzufüge-/Lösch-Feedback (Etappe Workout-Pläne) ───── */
+/* Rahmen der Übungszeile leuchtet kurz kräftig grün auf (hinzugefügt) */
+@keyframes add-glow {
+  0%   { box-shadow: 0 0 0 1px var(--gesture-add), 0 0 0 color-mix(in oklab, var(--gesture-add) 55%, transparent); }
+  35%  { box-shadow: 0 0 0 1.5px var(--gesture-add), 0 0 24px color-mix(in oklab, var(--gesture-add) 55%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.animate-add-glow { animation: add-glow .7s ease-out both; }
+
+/* „+1" poppt groß auf, zieht nach oben und verschwindet wieder */
+@keyframes plus-one {
+  0%   { opacity: 0; transform: translateY(8px) scale(.6); }
+  22%  { opacity: 1; transform: translateY(-4px) scale(1.15); }
+  40%  { transform: translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(1); }
+}
+.animate-plus-one {
+  animation: plus-one .9s ease-out both;
+  text-shadow: 0 0 14px color-mix(in oklab, var(--gesture-add) 70%, transparent);
+}
+
+/* Ziel-Slot beim Ziehen wächst weich auf (echtes Layout — schiebt die
+   folgenden Boxen wirklich nach unten) */
+@keyframes drop-slot {
+  from { height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; }
+}
+.animate-drop-slot { animation: drop-slot .15s ease-out both; }
+
+/* Übungszeile fliegt beim Löschen mit rotem Schein nach links raus */
+@keyframes remove-row {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    box-shadow: 0 0 0 1px var(--gesture-delete), 0 0 20px color-mix(in oklab, var(--gesture-delete) 55%, transparent);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-48px);
+    box-shadow: 0 0 0 1px transparent;
+  }
+}
+.animate-remove-row { animation: remove-row .22s ease-in both; }
+
 /* Shimmer für Lade-/Highlight-Flächen */
 @keyframes shimmer {
   from { background-position: -200% 0; }
@@ -825,7 +876,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .rise, .rise-1, .rise-2, .rise-3, .rise-4, .rise-5, .rise-6,
   .animate-float, .shimmer, .animate-grow-x,
-  .animate-slide-up, .animate-fade-in {
+  .animate-slide-up, .animate-fade-in,
+  .animate-add-glow, .animate-plus-one, .animate-remove-row,
+  .animate-drop-slot {
     animation: none;
   }
   .card:hover, .card-interactive:hover { transform: none; }

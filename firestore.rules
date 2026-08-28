@@ -85,6 +85,14 @@ service cloud.firestore {
         allow write: if request.auth != null && isAdmin();
       }
 
+      // Persoenliche Workoutplan-Kopien (Etappe Workout-Plaene, Teilschritt 3):
+      // der Owner liest/schreibt NUR seine eigenen Kopien. Heute schon von der
+      // generischen Subcollection-Regel oben abgedeckt — hier EXPLIZIT, damit
+      // die Kopien einen spaeteren Zuschnitt der generischen Regel ueberleben.
+      match /workoutPlans/{planId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
       // Trainer + Admin verwalten Wettkaempfe (fightCamps) — eigenes Gym.
       match /fightCamps/{campId} {
         allow read, write: if request.auth != null && isStaffForUser(uid);
@@ -119,8 +127,7 @@ service cloud.firestore {
       // Gym-Workoutplaene (Etappe Workout-Plaene): Gym-Scope liegt im PFAD —
       // Mitglieder lesen die Plaene ihres Gyms, Trainer desselben Gyms
       // pflegen sie; Admin gym-uebergreifend. Persoenliche Kopien liegen in
-      // users/{uid}/workoutPlans und laufen dort ueber die generische
-      // Subcollection-Regel (Owner read/write).
+      // users/{uid}/workoutPlans (explizite Owner-Regel dort).
       match /workoutPlans/{planId} {
         allow read: if request.auth != null
                     && (isAdmin() || userGymId() == gymId);

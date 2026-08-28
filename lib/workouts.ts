@@ -1,16 +1,23 @@
 import {
   addDoc,
   collection,
+  doc,
   getDocs,
   limit,
   orderBy,
   query,
   serverTimestamp,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import type { TimerConfig } from "./use-workout-timer";
-import type { Category, Difficulty, WorkoutStatus } from "./types";
+import type {
+  Category,
+  Difficulty,
+  WorkoutDefinition,
+  WorkoutStatus,
+} from "./types";
 
 export type WorkoutSession = {
   id: string;
@@ -25,6 +32,11 @@ export type WorkoutSession = {
   status: WorkoutStatus;
   exerciseIds: string[];
   techniqueIds: string[];
+  /** Volle Definition (mit Blockstruktur) — seit Teilschritt 3; ältere
+      Logs haben nur die flache exerciseIds-Liste */
+  definition: WorkoutDefinition | null;
+  /** Als Favorit gespeicherte persönliche Kopie (users/{uid}/workoutPlans) */
+  savedPlanId: string | null;
 };
 
 type WorkoutDoc = {
@@ -39,6 +51,8 @@ type WorkoutDoc = {
   status?: WorkoutStatus;
   exerciseIds?: string[];
   techniqueIds?: string[];
+  definition?: WorkoutDefinition | null;
+  savedPlanId?: string | null;
 };
 
 function workoutsCol(userId: string) {
@@ -53,6 +67,8 @@ export interface LogWorkoutOptions {
   status?: WorkoutStatus;
   exerciseIds?: string[];
   techniqueIds?: string[];
+  /** Volle Definition — Basis für „als Favorit speichern" (Herz im Hub) */
+  definition?: WorkoutDefinition | null;
 }
 
 /** Vereinfachter Logger — bleibt rückwärtskompatibel mit bestehendem Code. */
@@ -90,7 +106,22 @@ export async function logWorkoutFull(
     status: options.status ?? "completed",
     exerciseIds: options.exerciseIds ?? [],
     techniqueIds: options.techniqueIds ?? [],
+    definition: options.definition ?? null,
+    savedPlanId: null,
   });
+}
+
+/**
+ * Favoriten-Verweis am Log-Eintrag setzen/lösen (Herz im Hub): die
+ * eigentliche Kopie liegt in users/{uid}/workoutPlans, hier steht nur
+ * ihre ID — daraus speist sich der Gefüllt-Zustand des Herzens.
+ */
+export async function setWorkoutSavedPlan(
+  userId: string,
+  workoutId: string,
+  savedPlanId: string | null,
+) {
+  await updateDoc(doc(workoutsCol(userId), workoutId), { savedPlanId });
 }
 
 export async function getRecentWorkouts(
@@ -118,6 +149,8 @@ export async function getRecentWorkouts(
       status: data.status ?? "completed",
       exerciseIds: data.exerciseIds ?? [],
       techniqueIds: data.techniqueIds ?? [],
+      definition: data.definition ?? null,
+      savedPlanId: data.savedPlanId ?? null,
     };
   });
 }
