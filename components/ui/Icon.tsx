@@ -56,7 +56,8 @@ export type IconName =
   | "copy"
   | "trash"
   | "heart"
-  | "info";
+  | "info"
+  | "search";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -339,6 +340,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 11v5M12 7.6v.4" />
+    </>
+  ),
+  // Lupe — Suche
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20.5 20.5 15.7 15.7" />
     </>
   ),
 };

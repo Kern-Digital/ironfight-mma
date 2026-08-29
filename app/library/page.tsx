@@ -1,58 +1,101 @@
 "use client";
 
-import Icon from "@/components/ui/Icon";
+/**
+ * Meine Bibliothek — persönlich gespeicherte Techniken
+ * (Redesign-Etappe 5, Rollout im Muster der Referenzseiten):
+ *  - Kopf mit Ambient, „← Techniken"-Rücksprung, Athleten-Shell (Tab-Bar,
+ *    Training aktiv); Trainer behalten die Navbar
+ *  - Liste als EINE Karte mit Haarlinien-Trennern (Token-Regel), Zeilen
+ *    verlinken auf die Technik-Seite; Links-Wisch = entfernen mit
+ *    Raus-Animation (SwipeAction, Muster „Meine Workouts"), Desktop-x ab sm
+ *  - „Techniken durchsuchen" als Popup-Sheet (Muster Übungs-Picker):
+ *    ui/Select-Filter, Rechts-Wisch oder +-Knopf = speichern mit
+ *    Grün-Feedback (+1)
+ *  - Rubrik-Farbe nur aus lib/discipline-colors.ts (Farbpunkt), Level
+ *    NIE farbcodiert — nur Text (Regel Rubrik-Farben/Slot-System)
+ */
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import AthleteTabBar from "@/components/AthleteTabBar";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import SwipeAction from "@/components/SwipeAction";
+import Icon from "@/components/ui/Icon";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import {
   addTechniqueToLibrary,
   getLibrary,
   removeFromLibrary,
 } from "@/lib/training-sessions";
 import { ALL_TECHNIQUES, getTechniqueById } from "@/lib/techniques";
-import type { Category, LibraryEntry, Technique } from "@/lib/types";
-import { TECHNIQUE_LEVEL_LABEL } from "@/lib/types";
-import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
+import { CATEGORY_COLOR } from "@/lib/discipline-colors";
+import {
+  TECHNIQUE_LEVEL_LABEL,
+  type Category,
+  type LibraryEntry,
+  type Technique,
+} from "@/lib/types";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-// ─── Hilfskonstanten ───────────────────────────────────────────────────────
+// ─── Hilfskonstanten ──────────────────────────────────────────────────────────
 
-// Farben zentral aus lib/discipline-colors.ts — eine Rubrik = app-weit eine Farbe.
+// Kurze Rubrik-Labels für Meta-Zeilen und Filter (CATEGORY_LABEL wäre mit
+// „Brazilian Jiu-Jitsu" zu lang); Farben zentral aus lib/discipline-colors.ts.
 const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
-  boxing:      { label: "Boxing",    color: CATEGORY_COLOR.boxing },
-  wrestling:   { label: "Ringen",    color: CATEGORY_COLOR.wrestling },
-  bjj:         { label: "BJJ",       color: CATEGORY_COLOR.bjj },
+  boxing: { label: "Boxing", color: CATEGORY_COLOR.boxing },
+  wrestling: { label: "Ringen", color: CATEGORY_COLOR.wrestling },
+  bjj: { label: "BJJ", color: CATEGORY_COLOR.bjj },
   "muay-thai": { label: "Muay Thai", color: CATEGORY_COLOR["muay-thai"] },
 };
 
-const TECHNIQUE_LEVEL_COLOR: Record<string, string> = {
-  anfaenger:       "#4ade80",
-  aufbau:          "#60a5fa",
-  fortgeschritten: "#f59e0b",
-  advanced:        "#f97316",
-  pro:             "#ef4444",
-};
-
 const ALL_FILTER_CATS: Array<Category | "all"> = [
-  "all", "boxing", "wrestling", "bjj", "muay-thai",
+  "all",
+  "boxing",
+  "wrestling",
+  "bjj",
+  "muay-thai",
 ];
 
 const FILTER_LABEL: Record<string, string> = {
-  all:         "Alle",
-  boxing:      "Boxing",
-  wrestling:   "Ringen",
-  bjj:         "BJJ",
+  all: "Alle",
+  boxing: "Boxing",
+  wrestling: "Ringen",
+  bjj: "BJJ",
   "muay-thai": "Muay Thai",
 };
 
-// ─── Typen ─────────────────────────────────────────────────────────────────
+const BROWSE_DISCIPLINES = [
+  { value: "all", label: "Alle Disziplinen" },
+  { value: "boxing", label: "Boxing" },
+  { value: "kickboxen", label: "Kickboxen" },
+  { value: "muay-thai", label: "Muay Thai" },
+  { value: "wrestling", label: "Wrestling" },
+  { value: "bjj", label: "BJJ" },
+  { value: "mma", label: "MMA" },
+];
+
+// ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
+// ─── Typen ────────────────────────────────────────────────────────────────────
 
 interface EnrichedEntry extends LibraryEntry {
   technique: Technique | undefined;
 }
 
-// ─── Hauptkomponente ───────────────────────────────────────────────────────
+// ─── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
   return (
@@ -63,16 +106,33 @@ export default function LibraryPage() {
 }
 
 function LibraryContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
   const [entries, setEntries] = useState<EnrichedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCat, setFilterCat] = useState<Category | "all">("all");
   const [showBrowse, setShowBrowse] = useState(false);
-  const [browseSearch, setBrowseSearch] = useState(""  );
+  const [browseSearch, setBrowseSearch] = useState("");
   const [browseDiscipline, setBrowseDiscipline] = useState<string>("all");
   const [addingId, setAddingId] = useState<string | null>(null);
+  // Links-Wisch: Zeile fliegt mit Raus-Animation, dann wird sie entfernt
+  // (Muster handleRemovePlan im Hub)
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const removeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Grün-Feedback beim Speichern (Muster Übungs-Picker): Rahmen leuchtet,
+  // „+1" steigt auf; tick remountet die Animation bei schnellen Folgen.
+  const [flash, setFlash] = useState<{ id: string; tick: number } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      if (removeTimer.current) clearTimeout(removeTimer.current);
+    },
+    [],
+  );
 
   const loadLibrary = useCallback(async () => {
     if (!user) return;
@@ -95,8 +155,11 @@ function LibraryContent() {
   }, [loadLibrary]);
 
   async function handleManualAdd(techniqueId: string) {
-    if (!user) return;
+    if (!user || addingId) return;
     setAddingId(techniqueId);
+    setFlash((f) => ({ id: techniqueId, tick: (f?.tick ?? 0) + 1 }));
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 800);
     try {
       await addTechniqueToLibrary(user.uid, techniqueId, "manual");
       await loadLibrary();
@@ -105,20 +168,21 @@ function LibraryContent() {
     }
   }
 
-  async function handleRemove(exerciseId: string) {
-    if (!user) return;
+  function handleRemove(exerciseId: string) {
+    if (!user || removingId) return;
     setRemovingId(exerciseId);
-    try {
-      await removeFromLibrary(user.uid, exerciseId);
-      setEntries((prev) => prev.filter((e) => e.exerciseId !== exerciseId));
-    } finally {
+    removeTimer.current = setTimeout(() => {
       setRemovingId(null);
-    }
+      setEntries((prev) => prev.filter((e) => e.exerciseId !== exerciseId));
+      removeFromLibrary(user.uid, exerciseId).catch(() => {
+        // Fehlgeschlagen — Liste neu laden, damit der Eintrag wieder auftaucht
+        void loadLibrary();
+      });
+    }, 220);
   }
 
   const savedIds = new Set(entries.map((e) => e.exerciseId));
 
-  // Filter nach Kategorie
   const filtered = entries.filter((e) => {
     if (filterCat === "all") return true;
     const cat = e.technique?.category;
@@ -128,269 +192,400 @@ function LibraryContent() {
 
   const recent = entries.slice(0, 3);
 
-  // Verfügbare Disziplinen für Browse-Tabs
-  const BROWSE_DISCIPLINES = [
-    { id: "all", label: "Alle" },
-    { id: "boxing", label: "Boxing" },
-    { id: "kickboxen", label: "Kickboxen" },
-    { id: "muay-thai", label: "Muay Thai" },
-    { id: "wrestling", label: "Wrestling" },
-    { id: "bjj", label: "BJJ" },
-    { id: "mma", label: "MMA" },
-  ];
-
   // Browse-Liste: alle Techniken gefiltert nach Disziplin + Suche
   const browseList = ALL_TECHNIQUES.filter((t) => {
-    if (browseSearch && !t.name.toLowerCase().includes(browseSearch.toLowerCase())) return false;
+    if (
+      browseSearch &&
+      !t.name.toLowerCase().includes(browseSearch.toLowerCase())
+    )
+      return false;
     if (browseDiscipline !== "all") {
-      const matchesDiscipline = t.disciplines?.includes(browseDiscipline as never) ?? t.category === browseDiscipline;
+      const matchesDiscipline =
+        t.disciplines?.includes(browseDiscipline as never) ??
+        t.category === browseDiscipline;
       if (!matchesDiscipline) return false;
     }
     return true;
   });
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Header */}
-      <div className="border-b px-4 py-8 sm:px-6" style={{ borderColor: "var(--ink-4)" }}>
-        <div className="mx-auto flex max-w-3xl items-end justify-between gap-4">
-          <div>
-            <p className="mb-1 font-mono-ta text-xs uppercase" style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}>
-              Persönlich
-            </p>
-            <h1 className="font-display-ta text-3xl font-black uppercase sm:text-4xl" style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}>
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* ── Kopf — Muster der Referenzseiten ── */}
+      <section className="relative">
+        <div
+          className="absolute inset-0 overflow-hidden"
+          aria-hidden
+          style={{
+            maskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
+          }}
+        >
+          <div data-ambient style={{ background: "var(--ambient)" }} />
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:px-6 lg:pb-7 lg:pt-6">
+          <div className="flex flex-1 flex-col gap-1">
+            <Link
+              href="/techniques"
+              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
+              style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
+            >
+              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
+              Techniken
+            </Link>
+            <h1
+              style={{
+                font: "var(--type-display)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
               Meine Bibliothek
             </h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--fg-3)" }}>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
               {loading
                 ? "Lade…"
                 : entries.length === 0
-                  ? "Noch keine Techniken — besuche ein Training und nehme teil."
+                  ? "Noch keine Techniken gespeichert"
                   : `${entries.length} Technik${entries.length !== 1 ? "en" : ""} gespeichert`}
             </p>
           </div>
-          <button
-            onClick={() => { setShowBrowse(true); setBrowseSearch(""); setBrowseDiscipline("all"); }}
-            className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold uppercase transition-colors"
-            style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em" }}
-          >
-            + Hinzufügen
-          </button>
+          {!isTrainer && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark"
+                  ? "Helles Design aktivieren"
+                  : "Dunkles Design aktivieren"
+              }
+              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+            </button>
+          )}
         </div>
-      </div>
+      </section>
 
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-4 lg:px-6 lg:pt-5">
+        {/* ── Techniken durchsuchen — gerahmtes Feld öffnet das Sheet
+            (Muster „Meine Workouts"-Feld im Hub) ── */}
+        <button
+          type="button"
+          onClick={() => {
+            setShowBrowse(true);
+            setBrowseSearch("");
+            setBrowseDiscipline("all");
+          }}
+          className="t-card t-interactive flex w-full items-center gap-4 p-4 text-left sm:p-5"
+          style={{
+            border: "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
+          }}
+        >
+          <span
+            aria-hidden
+            className="shrink-0"
+            style={{ color: "var(--accent-text)", lineHeight: 0 }}
+          >
+            <Icon name="plus" size={22} strokeWidth={2.2} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h2
+              style={{
+                font: "var(--type-h2)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              Techniken durchsuchen
+            </h2>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Aus der gesamten Technik-Datenbank speichern
+            </p>
+          </div>
+          <span
+            aria-hidden
+            className="shrink-0"
+            style={{ color: "var(--accent-text)", lineHeight: 0 }}
+          >
+            <Icon name="arrow-right" size={18} strokeWidth={2} />
+          </span>
+        </button>
+
         {loading ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="h-16 animate-pulse rounded-xl" style={{ background: "var(--ink-3)" }} />
+              <div
+                key={n}
+                className="h-16 animate-pulse rounded-card"
+                style={{ background: "var(--surface-raised)" }}
+              />
             ))}
           </div>
         ) : entries.length === 0 ? (
           <EmptyState />
         ) : (
           <>
-            {/* Zuletzt hinzugefügt */}
+            {/* ── Zuletzt hinzugefügt ── */}
             {recent.length > 0 && (
-              <section className="mb-8">
-                <SectionTitle>Zuletzt hinzugefügt</SectionTitle>
-                <div className="space-y-2">
-                  {recent.map((entry) => (
-                    <LibraryCard
-                      key={entry.exerciseId}
-                      entry={entry}
-                      removing={removingId === entry.exerciseId}
-                      onRemove={() => handleRemove(entry.exerciseId)}
-                    />
-                  ))}
-                </div>
+              <section className="flex flex-col gap-2">
+                <span className="t-label">Zuletzt hinzugefügt</span>
+                <EntryList
+                  entries={recent}
+                  removingId={removingId}
+                  onRemove={handleRemove}
+                />
               </section>
             )}
 
-            {/* Alle Techniken mit Kategorie-Filter */}
-            <section>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <SectionTitle>Alle Techniken</SectionTitle>
-                <div className="flex flex-wrap gap-1">
-                  {ALL_FILTER_CATS.map((cat) => {
-                    const active = filterCat === cat;
-                    const style = cat !== "all" ? CATEGORY_STYLE[cat] : null;
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setFilterCat(cat as Category | "all")}
-                        className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
-                        style={{
-                          background: active ? style?.color ?? "var(--ta-cyan)" : "var(--ink-3)",
-                          color: active ? "var(--ink-1)" : "var(--fg-3)",
-                          border: `1px solid ${active ? "transparent" : "var(--ink-5)"}`,
-                          letterSpacing: "0.08em",
-                        }}
-                      >
-                        {FILTER_LABEL[cat]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {filtered.length === 0 ? (
-                <p className="text-sm" style={{ color: "var(--fg-4)" }}>
-                  Keine Techniken in dieser Kategorie.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {filtered.map((entry) => (
-                    <LibraryCard
-                      key={entry.exerciseId}
-                      entry={entry}
-                      removing={removingId === entry.exerciseId}
-                      onRemove={() => handleRemove(entry.exerciseId)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {/* Tipp */}
-        {!loading && (
-          <div className="mt-8">
-            <p className="mb-1 text-xs font-bold uppercase" style={{ color: "var(--ta-cyan)", letterSpacing: "0.1em", fontFamily: "var(--font-mono)" }}>
-              Tipp
-            </p>
-            <p className="text-sm" style={{ color: "var(--fg-3)" }}>
-              Klicke im{" "}
-              <Link href="/schedule" className="font-bold underline" style={{ color: "var(--ta-cyan)" }}>
-                Stundenplan
-              </Link>{" "}
-              auf ein Training und wähle „Ich nehme teil" — alle Techniken der Einheit werden automatisch hier gespeichert.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Browse-Modal */}
-      {showBrowse && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-          style={{ background: "var(--modal-backdrop)" }}
-          onClick={(e) => e.target === e.currentTarget && setShowBrowse(false)}
-        >
-          <div
-            className="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl sm:max-w-lg sm:rounded-2xl"
-            style={{ background: "var(--ink-2)", border: "1px solid var(--ink-4)" }}
-          >
-            <div className="p-5">
-              {/* Browse-Header */}
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display-ta text-lg font-black uppercase" style={{ letterSpacing: "0.04em", color: "var(--fg-1)" }}>
-                  Techniken durchsuchen
-                </h2>
-                <button
-                  onClick={() => setShowBrowse(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
-                  style={{ background: "var(--ink-4)", color: "var(--fg-3)", border: "1px solid var(--ink-5)" }}
-                  aria-label="Schließen"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Disziplin-Filter */}
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {BROWSE_DISCIPLINES.map((d) => {
-                  const active = browseDiscipline === d.id;
-                  const color =
-                    d.id !== "all"
-                      ? ((DISCIPLINE_COLOR as Record<string, string>)[d.id] ??
-                        "var(--ta-cyan)")
-                      : "var(--ta-cyan)";
+            {/* ── Alle Techniken mit Rubrik-Filter ── */}
+            <section className="flex flex-col gap-2">
+              <span className="t-label">Alle Techniken</span>
+              <div className="flex flex-wrap gap-2">
+                {ALL_FILTER_CATS.map((cat) => {
+                  const active = filterCat === cat;
                   return (
                     <button
-                      key={d.id}
-                      onClick={() => setBrowseDiscipline(d.id)}
-                      className="rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-colors"
+                      key={cat}
+                      type="button"
+                      onClick={() => setFilterCat(cat)}
+                      aria-pressed={active}
+                      className="t-interactive min-h-hit whitespace-nowrap rounded-field px-4"
                       style={{
+                        ...BTN_FONT,
                         background: active
-                          ? `color-mix(in oklab, ${color} 13%, transparent)`
-                          : "var(--ink-3)",
-                        border: `1px solid ${active ? color : "var(--ink-5)"}`,
-                        color: active ? color : "var(--fg-3)",
-                        letterSpacing: "0.08em",
+                          ? "var(--accent-subtle)"
+                          : "var(--surface-raised)",
+                        border: "1px solid",
+                        borderColor: active ? "var(--accent)" : "var(--line)",
+                        color: active ? "var(--accent-text)" : "var(--text-2)",
                       }}
                     >
-                      {d.label}
+                      {FILTER_LABEL[cat]}
                     </button>
                   );
                 })}
               </div>
 
-              <input
-                type="text"
-                placeholder="Technik suchen…"
-                value={browseSearch}
-                onChange={(e) => setBrowseSearch(e.target.value)}
-                autoFocus
-                className="mb-3 w-full rounded-lg px-3 py-2 text-sm"
-                style={{ background: "var(--ink-3)", border: "1px solid var(--ink-5)", color: "var(--fg-1)", outline: "none" }}
-              />
+              {filtered.length === 0 ? (
+                <p
+                  className="py-4"
+                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                >
+                  Keine Techniken in dieser Rubrik.
+                </p>
+              ) : (
+                <EntryList
+                  entries={filtered}
+                  removingId={removingId}
+                  onRemove={handleRemove}
+                />
+              )}
+            </section>
 
-              <div className="space-y-1.5">
+            {/* ── Tipp ── */}
+            <div className="flex flex-col gap-1">
+              <span className="t-label">Tipp</span>
+              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                Klicke im{" "}
+                <Link
+                  href="/schedule"
+                  style={{ color: "var(--accent-text)", fontWeight: 600 }}
+                >
+                  Stundenplan
+                </Link>{" "}
+                auf ein Training und wähle „Ich nehme teil" — alle Techniken
+                der Einheit werden automatisch hier gespeichert.
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Sheet „Techniken durchsuchen" (Muster Übungs-Picker) ── */}
+      {showBrowse && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Techniken durchsuchen"
+        >
+          <button
+            type="button"
+            aria-label="Durchsuchen schließen"
+            className="absolute inset-0"
+            style={{
+              background: "var(--overlay)",
+              animation: "fade-in 0.2s ease-out both",
+            }}
+            onClick={() => setShowBrowse(false)}
+          />
+          <div className="pointer-events-none relative flex w-full justify-center">
+            <div
+              className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+              style={{
+                maxHeight: "80dvh",
+                background: "var(--surface-card)",
+                boxShadow: "var(--glass-shadow)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3 px-5 pt-3">
+                <div className="flex min-w-0 flex-col items-start">
+                  <div
+                    aria-hidden
+                    className="mb-2 h-1 w-10 rounded-full sm:invisible"
+                    style={{ background: "var(--line-strong)" }}
+                  />
+                  <span className="t-label">Techniken durchsuchen</span>
+                  <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                    {savedIds.size}{" "}
+                    {savedIds.size === 1 ? "Technik" : "Techniken"} gespeichert
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBrowse(false)}
+                  aria-label="Fertig"
+                  className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
+                  style={{ color: "var(--text-3)" }}
+                >
+                  <Icon name="x" size={16} strokeWidth={2.2} />
+                </button>
+              </div>
+
+              {/* Filter + Suche */}
+              <div className="flex flex-col gap-2 px-4 pt-3">
+                <Select
+                  value={browseDiscipline}
+                  onChange={(v) => setBrowseDiscipline(v)}
+                  options={BROWSE_DISCIPLINES}
+                />
+                <input
+                  type="search"
+                  placeholder="Technik suchen…"
+                  value={browseSearch}
+                  onChange={(e) => setBrowseSearch(e.target.value)}
+                  autoFocus
+                  aria-label="Technik suchen"
+                  className="t-interactive w-full min-h-hit rounded-field px-3.5"
+                  style={{
+                    font: "var(--type-body)",
+                    background: "var(--surface-raised)",
+                    border: "1px solid var(--line)",
+                    color: "var(--text-body)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div
+                className="overflow-y-auto px-3 pt-2"
+                style={{
+                  paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+                }}
+              >
                 {browseList.slice(0, 80).map((t) => {
                   const alreadySaved = savedIds.has(t.id);
                   const catStyle = CATEGORY_STYLE[t.category] ?? null;
-                  const levelColor = TECHNIQUE_LEVEL_COLOR[t.level ?? ""] ?? "var(--fg-4)";
+                  const flashTick =
+                    flash && flash.id === t.id ? flash.tick : null;
                   return (
-                    <div
+                    // Rechts wischen = speichern (grüner Balken mit +);
+                    // gezielter Desktop-/Fallback-Weg ist der +-Knopf rechts
+                    <SwipeAction
                       key={t.id}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2"
-                      style={{
-                        background: alreadySaved ? "rgba(35,196,206,.06)" : "var(--ink-3)",
-                        border: `1px solid ${alreadySaved ? "rgba(35,196,206,.2)" : "var(--ink-4)"}`,
-                      }}
+                      right={
+                        alreadySaved
+                          ? undefined
+                          : {
+                              color: "var(--gesture-add)",
+                              icon: "plus",
+                              onTrigger: () => void handleManualAdd(t.id),
+                            }
+                      }
                     >
                       <div
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: catStyle?.color ?? "var(--fg-4)" }}
-                      />
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-medium" style={{ color: "var(--fg-1)" }}>
-                          {t.name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px]" style={{ color: catStyle?.color ?? "var(--fg-4)", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
-                            {catStyle?.label ?? t.category}
+                        key={flashTick ?? undefined}
+                        className={`relative flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2${flashTick !== null ? " animate-add-glow" : ""}`}
+                        style={{ color: "var(--text-body)" }}
+                      >
+                        <div
+                          aria-hidden
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: catStyle?.color ?? "var(--text-3)" }}
+                        />
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span
+                            className="truncate"
+                            style={{ font: "var(--type-body-strong)" }}
+                          >
+                            {t.name}
                           </span>
-                          {t.level && (
-                            <span className="text-[10px]" style={{ color: levelColor }}>
-                              {TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}
-                            </span>
-                          )}
+                          <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                            {catStyle && (
+                              <span style={{ color: catStyle.color }}>
+                                {catStyle.label}
+                              </span>
+                            )}
+                            {t.level &&
+                              ` · ${TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}`}
+                          </span>
                         </div>
+                        {alreadySaved ? (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1.5 pr-2"
+                            style={{ ...META_FONT, color: "var(--accent-text)" }}
+                          >
+                            <Icon name="check" size={13} strokeWidth={2.6} />
+                            Gespeichert
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`${t.name} speichern`}
+                            onClick={() => void handleManualAdd(t.id)}
+                            disabled={addingId === t.id}
+                            className="t-interactive flex h-10 w-10 shrink-0 items-center justify-center rounded-field disabled:opacity-40"
+                            style={{ color: "var(--accent-text)" }}
+                          >
+                            <Icon name="plus" size={16} strokeWidth={2.2} />
+                          </button>
+                        )}
+                        {/* „+1" poppt groß auf und zieht nach oben weg */}
+                        {flashTick !== null && (
+                          <span
+                            aria-hidden
+                            className="animate-plus-one pointer-events-none absolute right-12 top-0 z-10"
+                            style={{
+                              font: "800 28px/1 var(--font-archivo), system-ui, sans-serif",
+                              color: "var(--gesture-add)",
+                            }}
+                          >
+                            +1
+                          </span>
+                        )}
                       </div>
-                      {alreadySaved ? (
-                        <span className="shrink-0 text-[10px] font-bold uppercase" style={{ color: "var(--ta-cyan)" }}>
-                          ✓ Gespeichert
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleManualAdd(t.id)}
-                          disabled={addingId === t.id}
-                          className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-opacity"
-                          style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.08em", opacity: addingId === t.id ? 0.6 : 1 }}
-                        >
-                          {addingId === t.id ? "…" : "+ Speichern"}
-                        </button>
-                      )}
-                    </div>
+                    </SwipeAction>
                   );
                 })}
+                {browseList.length === 0 && (
+                  <p
+                    className="px-2.5 py-8 text-center"
+                    style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                  >
+                    Keine Technik passt zu diesen Filtern.
+                  </p>
+                )}
                 {browseList.length > 80 && (
-                  <p className="pt-2 text-center text-xs" style={{ color: "var(--fg-4)" }}>
+                  <p
+                    className="pt-2 text-center"
+                    style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                  >
                     + {browseList.length - 80} weitere — Suche verfeinern
                   </p>
                 )}
@@ -399,13 +594,44 @@ function LibraryContent() {
           </div>
         </div>
       )}
+
+      {!isTrainer && <AthleteTabBar />}
     </main>
   );
 }
 
-// ─── LibraryCard ──────────────────────────────────────────────────────────
+// ─── Eintragsliste — EINE Karte mit Haarlinien-Trennern ──────────────────────
 
-function LibraryCard({
+function EntryList({
+  entries,
+  removingId,
+  onRemove,
+}: {
+  entries: EnrichedEntry[];
+  removingId: string | null;
+  onRemove: (exerciseId: string) => void;
+}) {
+  return (
+    <div className="t-card px-2 py-0.5">
+      {entries.map((entry, i) => (
+        <div key={entry.exerciseId}>
+          {/* Trennlinie als eigenes Element — border-top auf der gerundeten
+              Zeile würde die Linienenden mitrunden */}
+          {i > 0 && (
+            <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
+          )}
+          <LibraryRow
+            entry={entry}
+            removing={removingId === entry.exerciseId}
+            onRemove={() => onRemove(entry.exerciseId)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LibraryRow({
   entry,
   removing,
   onRemove,
@@ -416,86 +642,134 @@ function LibraryCard({
 }) {
   const t = entry.technique;
   const catStyle = t ? CATEGORY_STYLE[t.category] ?? null : null;
-  const levelColor = TECHNIQUE_LEVEL_COLOR[t?.level ?? ""] ?? "var(--fg-4)";
+  const dateStr = entry.addedAt.toLocaleDateString("de-DE", {
+    day: "numeric",
+    month: "short",
+  });
 
-  const dateStr = entry.addedAt.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-
-  return (
-    <div
-      className="flex items-center gap-3 py-2 pl-3"
-      style={{
-        borderLeft: `3px solid ${catStyle?.color ?? "var(--fg-4)"}`,
-        opacity: removing ? 0.5 : 1,
-        transition: "opacity 0.2s",
-      }}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-bold" style={{ color: "var(--fg-1)" }}>
+  const inner = (
+    <>
+      <div
+        aria-hidden
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ background: catStyle?.color ?? "var(--text-3)" }}
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate" style={{ font: "var(--type-body-strong)" }}>
           {t?.name ?? entry.exerciseId}
-        </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        </span>
+        <span
+          className="truncate"
+          style={{ ...META_FONT, color: "var(--text-3)" }}
+        >
           {catStyle && (
-            <span className="text-[10px] font-bold uppercase" style={{ color: catStyle.color, fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
-              {catStyle.label}
-            </span>
+            <span style={{ color: catStyle.color }}>{catStyle.label}</span>
           )}
-          {t?.level && (
-            <span className="text-[10px]" style={{ color: levelColor, fontFamily: "var(--font-mono)" }}>
-              {TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}
-            </span>
-          )}
-          <span className="text-[10px]" style={{ color: "var(--fg-4)" }}>
-            {entry.source === "training" ? `Training: ${entry.contextLabel ?? "Kurs"}` : "Manuell gemerkt"}
-          </span>
-          <span className="text-[10px]" style={{ color: "var(--fg-4)" }}>{dateStr}</span>
-        </div>
+          {t?.level && ` · ${TECHNIQUE_LEVEL_LABEL[t.level] ?? t.level}`}
+          {" · "}
+          {entry.source === "training"
+            ? `Training: ${entry.contextLabel ?? "Kurs"}`
+            : "Manuell gemerkt"}
+          {" · "}
+          {dateStr}
+        </span>
       </div>
       <button
-        onClick={onRemove}
-        disabled={removing}
-        className="shrink-0 rounded-lg px-2 py-1 text-[11px] transition-colors"
-        style={{ color: "var(--fg-4)" }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--ta-pink)")}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--fg-4)")}
-        aria-label="Entfernen"
+        type="button"
+        aria-label={`„${t?.name ?? entry.exerciseId}" entfernen`}
+        onClick={(e) => {
+          // nicht zusätzlich zur Technik-Seite navigieren
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="t-interactive hidden h-9 w-9 shrink-0 items-center justify-center rounded-field sm:flex"
+        style={{ color: "var(--gesture-delete)" }}
       >
-        ✕
+        <Icon name="x" size={15} strokeWidth={2.2} />
       </button>
-    </div>
+      {t && (
+        <span
+          aria-hidden
+          className="shrink-0"
+          style={{ color: "var(--text-3)", lineHeight: 0 }}
+        >
+          <Icon name="arrow-right" size={16} strokeWidth={2} />
+        </span>
+      )}
+    </>
   );
-}
 
-// ─── Hilfskomponenten ─────────────────────────────────────────────────────
+  const rowClass = `t-interactive flex min-h-hit w-full items-center gap-3 rounded-badge px-1.5 py-2${
+    removing ? " animate-remove-row" : ""
+  }`;
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 text-xs font-bold uppercase" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", fontFamily: "var(--font-mono)" }}>
-      {children}
-    </p>
+    // Links wischen = entfernen (Lösch-Optik, Muster „Meine Workouts")
+    <SwipeAction
+      left={{
+        color: "var(--gesture-delete)",
+        icon: "x",
+        onTrigger: onRemove,
+      }}
+      disabled={removing}
+    >
+      {t ? (
+        <Link
+          href={`/techniques/${t.id}`}
+          className={rowClass}
+          style={{ color: "var(--text-body)", textDecoration: "none" }}
+        >
+          {inner}
+        </Link>
+      ) : (
+        <div className={rowClass} style={{ color: "var(--text-body)" }}>
+          {inner}
+        </div>
+      )}
+    </SwipeAction>
   );
 }
+
+// ─── Leerzustand ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
   return (
-    <div className="py-12 text-center">
-      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "var(--ink-3)", color: "var(--ta-cyan)" }}>
+    <div className="flex flex-col items-center gap-4 py-10 text-center">
+      <div
+        className="flex h-16 w-16 items-center justify-center rounded-card"
+        style={{ background: "var(--accent-subtle)", color: "var(--accent-text)" }}
+      >
         <Icon name="book" size={30} />
       </div>
-      <h3 className="mb-2 font-display-ta text-lg font-black uppercase" style={{ color: "var(--fg-2)", letterSpacing: "0.04em" }}>
-        Bibliothek leer
-      </h3>
-      <p className="mb-6 text-sm" style={{ color: "var(--fg-4)" }}>
-        Besuche ein Training im Stundenplan oder füge Techniken manuell hinzu.
-      </p>
-      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-        <Link
-          href="/schedule"
-          className="rounded-xl px-5 py-2.5 text-xs font-bold uppercase"
-          style={{ background: "var(--ta-cyan)", color: "var(--ink-1)", letterSpacing: "0.1em", textDecoration: "none" }}
+      <div className="flex flex-col gap-1">
+        <h2
+          style={{
+            font: "var(--type-h2)",
+            letterSpacing: "var(--ls-display)",
+            textTransform: "uppercase",
+          }}
         >
-          Zum Stundenplan
-        </Link>
+          Bibliothek leer
+        </h2>
+        <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          Besuche ein Training im Stundenplan oder speichere Techniken über
+          „Techniken durchsuchen".
+        </p>
       </div>
+      <Link
+        href="/schedule"
+        className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
+        style={{
+          ...BTN_FONT,
+          background: "var(--accent)",
+          color: "var(--on-accent)",
+          boxShadow: "var(--accent-glow)",
+          textDecoration: "none",
+        }}
+      >
+        Zum Stundenplan
+      </Link>
     </div>
   );
 }
