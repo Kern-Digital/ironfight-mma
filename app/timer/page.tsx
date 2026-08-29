@@ -1,21 +1,45 @@
 "use client";
 
-import Icon, { type IconName } from "@/components/ui/Icon";
+/**
+ * Runden-Timer — freies Training ohne Plan (Redesign-Etappe 5, Referenzseite).
+ *
+ * Neues Token-System, Formensprache des Runners (/workout/session):
+ *  - Phasenfarben = Semantik-Tokens (prep=warning, work=accent, rest=neutral,
+ *    done=positive), Glows via color-mix aus denselben Tokens
+ *  - Steuerung im Runner-Muster: Start/Pause (3/4) + Phasen-Skip (1/4),
+ *    Reset darunter in voller Breite
+ *  - Kampf- und Pausenzeit über das RestWheel (Glas-Rad, 15-s-Raster) —
+ *    dieselbe Interaktion wie im Plan-Editor; Runden und Vorlauf als Stepper
+ *  - Sound/Vibration/Display-Toggles bewusst NICHT hier: app-weit unter
+ *    /profile (gleiche Entscheidung wie beim Runner, 2026-08-27)
+ *  - Athleten-Shell (Tab-Bar, Training aktiv); Trainer behalten die Navbar
+ *
+ * Der Timer bleibt der FREIE Modus — für strukturierte Einheiten verweist
+ * die Karte unten auf die Workout-Pläne (geführter Runner, Plan-Modell).
+ * Query-Parameter ?rounds/work/rest/prep/label bleiben unterstützt
+ * (alte Bookmarks/Verläufe).
+ */
 
-import PageHeader from "@/components/PageHeader";
+import AthleteTabBar from "@/components/AthleteTabBar";
+import RestWheel, { formatRest } from "@/components/RestWheel";
+import Icon from "@/components/ui/Icon";
+import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
+import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import { useTimerSettings } from "@/lib/use-timer-settings";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import {
   DEFAULT_CONFIG,
   useWorkoutTimer,
   type Phase,
   type TimerConfig,
 } from "@/lib/use-workout-timer";
-import { useAuth } from "@/lib/auth-context";
 import { logWorkout } from "@/lib/workouts";
-import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
-import { useTimerSettings } from "@/lib/use-timer-settings";
-import { useWakeLock } from "@/lib/use-wake-lock";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
 
 const PRESETS: { label: string; config: TimerConfig }[] = [
   {
@@ -36,48 +60,66 @@ const PRESETS: { label: string; config: TimerConfig }[] = [
   },
 ];
 
+function sameConfig(a: TimerConfig, b: TimerConfig) {
+  return (
+    a.rounds === b.rounds &&
+    a.workSeconds === b.workSeconds &&
+    a.restSeconds === b.restSeconds &&
+    a.prepSeconds === b.prepSeconds
+  );
+}
+
+// ─── Phase-Styling (Semantik-Tokens, identisch zum Runner) ────────────────────
+
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Bereit",
   prep: "Vorbereitung",
   work: "Kampf",
   rest: "Pause",
-  done: "Fertig!",
+  done: "Fertig",
 };
 
-function phaseAccent(phase: Phase) {
-  if (phase === "prep") return {
-    color: "rgb(255,140,0)",
-    border: "rgba(255,140,0,.4)",
-    bg: "rgba(255,140,0,.06)",
-    glow: "rgba(255,140,0,.4)",
-    shadow: "rgba(255,140,0,.5)",
-    bigShadow: "rgba(255,140,0,.6)",
-  };
-  if (phase === "work") return {
-    color: "rgb(220,38,38)",
-    border: "rgba(220,38,38,.4)",
-    bg: "rgba(220,38,38,.06)",
-    glow: "rgba(220,38,38,.4)",
-    shadow: "rgba(220,38,38,.5)",
-    bigShadow: "rgba(220,38,38,.6)",
-  };
-  if (phase === "rest") return {
-    color: "rgb(59,130,246)",
-    border: "rgba(59,130,246,.4)",
-    bg: "rgba(59,130,246,.06)",
-    glow: "rgba(59,130,246,.4)",
-    shadow: "rgba(59,130,246,.5)",
-    bigShadow: "rgba(59,130,246,.6)",
-  };
-  return {
-    color: "var(--fg-3)",
-    border: "rgba(136,147,161,.2)",
-    bg: "rgba(136,147,161,.03)",
-    glow: "transparent",
-    shadow: "transparent",
-    bigShadow: "transparent",
-  };
-}
+const PHASE_COLOR: Record<Phase, string> = {
+  idle: "var(--text-3)",
+  prep: "var(--warning)",
+  work: "var(--accent-text)",
+  rest: "var(--text-2)",
+  done: "var(--positive)",
+};
+
+const PHASE_GLOW: Record<Phase, string> = {
+  idle: "none",
+  prep: "drop-shadow(0 0 20px color-mix(in oklab, var(--warning) 50%, transparent))",
+  work: "drop-shadow(0 0 28px color-mix(in oklab, var(--accent) 55%, transparent))",
+  rest: "none",
+  done: "drop-shadow(0 0 20px color-mix(in oklab, var(--positive) 50%, transparent))",
+};
+
+// Ring-Stroke braucht die ECHTE Phasenfarbe (accent statt accent-text, damit
+// der Kreis in beiden Themes leuchtet wie die Fortschrittsbalken)
+const PHASE_STROKE: Record<Phase, string> = {
+  idle: "var(--line-strong)",
+  prep: "var(--warning)",
+  work: "var(--accent)",
+  rest: "var(--text-3)",
+  done: "var(--positive)",
+};
+
+// ─── Typo-Konstanten (Muster der Referenzseiten) ──────────────────────────────
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
+// ─── Helfer ───────────────────────────────────────────────────────────────────
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -91,83 +133,212 @@ function parsePositive(v: string | null, fallback: number) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
-// SVG circular progress ring
+// ─── Timer-Ring ───────────────────────────────────────────────────────────────
+
 function TimerRing({
   progress,
   phase,
   remaining,
+  round,
+  rounds,
 }: {
   progress: number;
   phase: Phase;
   remaining: number;
+  round: number;
+  rounds: number;
 }) {
   const r = 120;
   const circ = 2 * Math.PI * r;
-  const accent = phaseAccent(phase);
-  const pulseClass =
-    phase === "prep" ? "phase-prep-pulse" :
-    phase === "work" ? "phase-work-pulse" :
-    phase === "rest" ? "phase-rest-pulse" : "";
-
   return (
-    <div className={`relative flex h-[280px] w-[280px] items-center justify-center ${pulseClass}`}>
+    <div className="relative flex h-[260px] w-[260px] items-center justify-center sm:h-[300px] sm:w-[300px]">
       <svg
-        className="absolute inset-0"
+        className="absolute inset-0 h-full w-full"
         viewBox="0 0 280 280"
         style={{ transform: "rotate(-90deg)" }}
+        aria-hidden
       >
-        {/* Track */}
         <circle
           cx="140"
           cy="140"
           r={r}
           fill="none"
-          stroke="var(--ink-4)"
-          strokeWidth="8"
+          stroke="var(--line-strong)"
+          strokeWidth="7"
         />
-        {/* Progress */}
         <circle
           cx="140"
           cy="140"
           r={r}
           fill="none"
-          stroke={accent.color}
-          strokeWidth="8"
+          stroke={PHASE_STROKE[phase]}
+          strokeWidth="7"
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - Math.min(1, progress))}
-          style={{ transition: "stroke-dashoffset .3s linear, stroke .3s" }}
+          style={{
+            transition: "stroke-dashoffset 300ms linear, stroke 300ms",
+            filter:
+              phase === "idle" || phase === "rest"
+                ? undefined
+                : `drop-shadow(0 0 10px color-mix(in oklab, ${PHASE_STROKE[phase]} 55%, transparent))`,
+          }}
         />
       </svg>
 
-      {/* Center content */}
       <div className="relative flex flex-col items-center">
         <div
-          className="font-display-ta font-black leading-none"
+          className="tabular-nums"
           style={{
-            fontSize: "78px",
+            font: "800 56px/1 var(--font-archivo), system-ui, sans-serif",
+            fontSize: "clamp(3rem, 14vw, 4rem)",
             letterSpacing: "0.02em",
-            color: "var(--fg)",
-            textShadow: pulseClass ? `0 0 30px ${accent.shadow}` : "none",
+            color: PHASE_COLOR[phase],
+            filter: PHASE_GLOW[phase],
           }}
+          aria-live="polite"
+          aria-label={`${remaining} Sekunden verbleibend`}
         >
           {formatTime(remaining)}
         </div>
-        <div
-          className="font-mono-ta mt-1.5 text-[10px] uppercase"
-          style={{ letterSpacing: "0.25em", color: "var(--fg-3)" }}
-        >
-          {PHASE_LABEL.work === PHASE_LABEL[phase] ? "Kampf" : "verbleibend"}
+        <div className="mt-1.5" style={{ ...META_FONT, color: "var(--text-3)" }}>
+          {phase === "idle" ? "Bereit" : `Runde ${Math.min(round, rounds)} / ${rounds}`}
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Konfigurations-Bausteine ─────────────────────────────────────────────────
+
+// Kachel-Beschriftung deutlich größer als META (Leon 2026-08-29: lesbarer)
+const TILE_LABEL_FONT: React.CSSProperties = {
+  font: "700 13px/1.2 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+/** Kachel mit Label — Inhalt ist entweder ein Stepper oder ein Rad-Feld. */
+function ConfigTile({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-field p-3"
+      style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
+    >
+      <span style={{ ...TILE_LABEL_FONT, color: "var(--text-2)" }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Stepper({
+  value,
+  display,
+  onStep,
+  disabled,
+  decLabel,
+  incLabel,
+}: {
+  value: number;
+  display: string;
+  onStep: (dir: -1 | 1) => void;
+  disabled?: boolean;
+  decLabel: string;
+  incLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <button
+        type="button"
+        onClick={() => onStep(-1)}
+        disabled={disabled}
+        aria-label={decLabel}
+        className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field disabled:opacity-40"
+        style={{
+          background: "var(--surface-card)",
+          border: "1px solid var(--line)",
+          color: "var(--text-2)",
+        }}
+      >
+        <Icon name="minus" size={15} strokeWidth={2.2} />
+      </button>
+      <span
+        className="tabular-nums"
+        style={{ font: "700 20px/1 var(--font-archivo), system-ui, sans-serif" }}
+        data-value={value}
+      >
+        {display}
+      </span>
+      <button
+        type="button"
+        onClick={() => onStep(1)}
+        disabled={disabled}
+        aria-label={incLabel}
+        className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field disabled:opacity-40"
+        style={{
+          background: "var(--surface-card)",
+          border: "1px solid var(--line)",
+          color: "var(--text-2)",
+        }}
+      >
+        <Icon name="plus" size={15} strokeWidth={2.2} />
+      </button>
+    </div>
+  );
+}
+
+/** Zeit-Feld — das GANZE Feld öffnet das RestWheel (Muster ExerciseDetailSheet). */
+function WheelField({
+  value,
+  onOpen,
+  disabled,
+  ariaLabel,
+}: {
+  value: number;
+  onOpen: () => void;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className="t-interactive flex min-h-hit items-center justify-between rounded-field px-3 disabled:opacity-40"
+      style={{
+        background: "var(--surface-card)",
+        border: "1px solid var(--line)",
+        color: "var(--text-body)",
+      }}
+    >
+      <span
+        className="tabular-nums"
+        style={{ font: "700 20px/1 var(--font-archivo), system-ui, sans-serif" }}
+      >
+        {formatRest(value)}
+      </span>
+      <span aria-hidden style={{ color: "var(--text-3)", lineHeight: 0 }}>
+        <Icon name="chevron-down" size={16} strokeWidth={2.2} />
+      </span>
+    </button>
+  );
+}
+
+// ─── Seite ────────────────────────────────────────────────────────────────────
+
 function TimerView() {
   const params = useSearchParams();
-  const { user } = useAuth();
-  const { settings, setSoundOn, setVibrate } = useTimerSettings();
+  const { user, profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const { settings } = useTimerSettings();
+  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
   const initial = useMemo<TimerConfig>(
     () => ({
@@ -185,12 +356,31 @@ function TimerView() {
     t.phase === "idle" || t.totalForPhase === 0
       ? 0
       : 1 - t.remaining / t.totalForPhase;
+  const isLocked = t.phase !== "idle";
 
-  useWakeLock(t.running);
+  useWakeLock(settings.wakeLock && t.running);
 
-  // Fullscreen
+  // RestWheel — welches Zeitfeld gerade offen ist
+  const [wheelFor, setWheelFor] = useState<"work" | "rest" | null>(null);
+
+  function updateConfig<K extends keyof TimerConfig>(key: K, value: number) {
+    t.setConfig({ ...t.config, [key]: Math.max(0, Math.floor(value || 0)) });
+  }
+
+  // ── Audio-Unlock (Mobile braucht eine Nutzer-Geste) ──
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  useEffect(() => setAudioUnlocked(isAudioUnlocked()), []);
+
+  async function handleStart() {
+    if (!audioUnlocked) {
+      const ok = await unlockAudio();
+      setAudioUnlocked(ok);
+    }
+    t.start();
+  }
+
+  // ── Vollbild (mit Landscape-Lock, bestehendes Verhalten) ──
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const fullscreenRef = useRef<HTMLDivElement>(null);
 
   const openFullscreen = useCallback(async () => {
     setIsFullscreen(true);
@@ -211,42 +401,33 @@ function TimerView() {
       if (!document.fullscreenElement) setIsFullscreen(false);
     }
     document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-    };
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
-  useEffect(() => { setAudioUnlocked(isAudioUnlocked()); }, []);
-
-  const [vibrateSupported, setVibrateSupported] = useState(false);
-  useEffect(() => {
-    setVibrateSupported(typeof navigator !== "undefined" && typeof navigator.vibrate === "function");
-  }, []);
-
+  // ── Session-Log nach der letzten Runde ──
   const [logState, setLogState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const loggedRef = useRef<symbol | null>(null);
+  const loggedRef = useRef(false);
 
   useEffect(() => {
     if (t.phase !== "done") {
       if (t.phase === "idle" || t.phase === "prep") {
-        loggedRef.current = null;
+        loggedRef.current = false;
         setLogState("idle");
       }
       return;
     }
-    if (!user) { setLogState("idle"); return; }
-    const sessionToken = Symbol("session");
-    if (loggedRef.current) return;
-    loggedRef.current = sessionToken;
+    if (!user || loggedRef.current) return;
+    loggedRef.current = true;
     setLogState("saving");
     logWorkout(user.uid, t.config, label)
       .then(() => setLogState("saved"))
-      .catch(() => { setLogState("error"); loggedRef.current = null; });
+      .catch(() => {
+        setLogState("error");
+        loggedRef.current = false;
+      });
   }, [t.phase, user, t.config, label]);
 
+  // ── Browser-Titel zeigt die laufende Zeit ──
   useEffect(() => {
     if (typeof document === "undefined") return;
     const original = document.title;
@@ -256,453 +437,445 @@ function TimerView() {
     return () => { document.title = original; };
   }, [t.remaining, t.phase, t.running]);
 
-  function updateConfig<K extends keyof TimerConfig>(key: K, value: number) {
-    t.setConfig({ ...t.config, [key]: Math.max(1, Math.floor(value || 0)) });
-  }
-
-  async function handleStart() {
-    if (!audioUnlocked) {
-      const ok = await unlockAudio();
-      setAudioUnlocked(ok);
-    }
-    t.start();
-  }
-
-  const isLocked = t.phase !== "idle";
-  const accent = phaseAccent(t.phase);
-
-  // Icon helpers
-  const IconPlay = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-      <path d="M8 5.14v14l11-7-11-7z" />
-    </svg>
-  );
-  const IconPause = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-    </svg>
-  );
-  const IconSkip = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-      <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-    </svg>
-  );
-  const IconReset = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-      <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-4.95" />
-    </svg>
-  );
+  const phaseColor = PHASE_COLOR[t.phase];
 
   return (
-    <>
+    <main
+      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
+      {/* ── Kopf — Muster der Disziplin-Seite (Ambient, Titel, Toggles) ── */}
+      <section className="relative">
+        <div
+          className="absolute inset-0 overflow-hidden"
+          aria-hidden
+          style={{
+            maskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
+          }}
+        >
+          <div data-ambient style={{ background: "var(--ambient)" }} />
+        </div>
+        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
+          <div className="flex flex-1 flex-col gap-1">
+            <Link
+              href="/dashboard"
+              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
+              style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
+            >
+              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
+              Training
+            </Link>
+            <h1
+              style={{
+                font: "var(--type-display)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              Runden-Timer
+            </h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={openFullscreen}
+              aria-label="Vollbild öffnen"
+              className="t-glass t-interactive inline-flex h-11 w-11 items-center justify-center rounded-field"
+              style={{ color: "var(--text-2)" }}
+            >
+              <Icon name="fullscreen" size={20} />
+            </button>
+            {!isTrainer && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={
+                  theme === "dark"
+                    ? "Helles Design aktivieren"
+                    : "Dunkles Design aktivieren"
+                }
+                className="t-glass t-interactive inline-flex h-11 w-11 items-center justify-center rounded-field lg:hidden"
+                style={{ color: "var(--text-2)" }}
+              >
+                <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-2 lg:px-6 lg:pt-3">
+
+        {/* ── Timer-Kern ── */}
+        <div className="flex flex-col items-center">
+          <span className="t-label" style={{ color: phaseColor }}>
+            {PHASE_LABEL[t.phase]}
+          </span>
+          <div className="mt-2">
+            <TimerRing
+              progress={progress}
+              phase={t.phase}
+              remaining={t.remaining}
+              round={t.round}
+              rounds={t.config.rounds}
+            />
+          </div>
+
+          {/* Runden-Balken: erledigt = Akzent, aktiv = Phasenfarbe, offen = Linie */}
+          <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+            {Array.from({ length: t.config.rounds }).map((_, i) => {
+              const isDone = i < t.round - 1 || t.phase === "done";
+              const isActive =
+                i === t.round - 1 && t.phase !== "idle" && t.phase !== "done";
+              return (
+                <span
+                  key={i}
+                  className="h-1.5 w-6 rounded-full transition-all duration-300"
+                  style={{
+                    background: isDone
+                      ? "var(--accent)"
+                      : isActive
+                        ? PHASE_STROKE[t.phase]
+                        : "var(--line-strong)",
+                    boxShadow: isDone
+                      ? "0 0 8px color-mix(in oklab, var(--accent) 60%, transparent)"
+                      : isActive
+                        ? `0 0 8px color-mix(in oklab, ${PHASE_STROKE[t.phase]} 60%, transparent)`
+                        : "none",
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Log-Status nach der letzten Runde */}
+          {t.phase === "done" && (
+            <p className="mt-3" style={{ ...META_FONT, color: "var(--text-3)" }}>
+              {!user && <span>Login, um Sessions zu speichern</span>}
+              {user && logState === "saving" && <span>Speichere Session…</span>}
+              {user && logState === "saved" && (
+                <span
+                  className="inline-flex items-center gap-1.5"
+                  style={{ color: "var(--positive)" }}
+                >
+                  <Icon name="check" size={12} strokeWidth={2.6} />
+                  Session gespeichert
+                </span>
+              )}
+              {user && logState === "error" && (
+                <span style={{ color: "var(--negative)" }}>Speichern fehlgeschlagen</span>
+              )}
+            </p>
+          )}
+        </div>
+
+        {/* ── Steuerung (Runner-Muster) ── */}
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-4 gap-3">
+            <button
+              type="button"
+              onClick={t.running ? t.pause : handleStart}
+              className="t-interactive col-span-3 inline-flex items-center justify-center gap-2 rounded-field py-4"
+              style={{
+                ...BTN_FONT,
+                fontSize: "15px",
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+              }}
+            >
+              <Icon name={t.running ? "pause" : "play"} size={15} strokeWidth={2.2} />
+              {t.running
+                ? "Pause"
+                : t.phase === "idle" || t.phase === "done"
+                  ? "Start"
+                  : "Weiter"}
+            </button>
+            <button
+              type="button"
+              onClick={t.skip}
+              disabled={t.phase === "idle" || t.phase === "done"}
+              aria-label="Phase überspringen"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field py-3.5 disabled:opacity-40"
+              style={{
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Icon name="fast-forward" size={18} strokeWidth={2} />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={t.reset}
+            className="t-interactive inline-flex min-h-hit w-full items-center justify-center gap-2 rounded-field py-3"
+            style={{
+              ...BTN_FONT,
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-2)",
+            }}
+          >
+            <Icon name="refresh" size={14} strokeWidth={2.2} />
+            Reset
+          </button>
+        </div>
+
+        {/* ── Konfiguration ── */}
+        <section className="flex flex-col gap-3">
+          <span className="t-label" style={{ color: "var(--accent-text)" }}>
+            Konfiguration
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            <ConfigTile label="Runden">
+              <Stepper
+                value={t.config.rounds}
+                display={`${t.config.rounds}×`}
+                disabled={isLocked}
+                decLabel="Eine Runde weniger"
+                incLabel="Eine Runde mehr"
+                onStep={(dir) =>
+                  updateConfig(
+                    "rounds",
+                    Math.min(20, Math.max(1, t.config.rounds + dir)),
+                  )
+                }
+              />
+            </ConfigTile>
+            <ConfigTile label="Vorlauf">
+              <Stepper
+                value={t.config.prepSeconds}
+                display={`${t.config.prepSeconds}s`}
+                disabled={isLocked}
+                decLabel="Vorlauf verkürzen"
+                incLabel="Vorlauf verlängern"
+                onStep={(dir) =>
+                  updateConfig(
+                    "prepSeconds",
+                    Math.min(60, Math.max(0, t.config.prepSeconds + dir * 5)),
+                  )
+                }
+              />
+            </ConfigTile>
+            <ConfigTile label="Kampf">
+              <WheelField
+                value={t.config.workSeconds}
+                disabled={isLocked}
+                ariaLabel="Kampfzeit einstellen"
+                onOpen={() => setWheelFor("work")}
+              />
+            </ConfigTile>
+            <ConfigTile label="Pause">
+              <WheelField
+                value={t.config.restSeconds}
+                disabled={isLocked}
+                ariaLabel="Pausenzeit einstellen"
+                onOpen={() => setWheelFor("rest")}
+              />
+            </ConfigTile>
+          </div>
+          {isLocked && (
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Reset drücken, um die Konfiguration zu ändern.
+            </p>
+          )}
+
+          {/* Presets als Chips — aktive Kombination leuchtet in Akzent */}
+          <div className="mt-1 flex flex-wrap gap-2">
+            {PRESETS.map((p) => {
+              const active = sameConfig(t.config, p.config);
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    t.setConfig(p.config);
+                    t.reset();
+                  }}
+                  disabled={isLocked}
+                  aria-pressed={active}
+                  className="t-interactive min-h-hit rounded-field px-4 disabled:opacity-40"
+                  style={{
+                    ...BTN_FONT,
+                    background: active ? "var(--accent-subtle)" : "var(--surface-raised)",
+                    border: "1px solid",
+                    borderColor: active ? "var(--accent)" : "var(--line)",
+                    color: active ? "var(--accent-text)" : "var(--text-2)",
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Brücke zu den strukturierten Plänen (Plan-Modell) ── */}
+        <Link
+          href="/workout/generator"
+          className="t-card t-interactive flex items-center gap-3 p-4 sm:p-5"
+          style={{ textDecoration: "none", color: "var(--text-body)" }}
+        >
+          <span
+            aria-hidden
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field"
+            style={{
+              background: "var(--accent-subtle)",
+              color: "var(--accent-text)",
+            }}
+          >
+            <Icon name="spark" size={22} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span
+              style={{
+                font: "var(--type-h2)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
+            >
+              Geführtes Workout
+            </span>
+            <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Strukturierte Pläne mit Übungen, Ansagen und Auto-Durchlauf
+            </span>
+          </span>
+          <span aria-hidden className="shrink-0" style={{ color: "var(--accent-text)", lineHeight: 0 }}>
+            <Icon name="arrow-right" size={18} strokeWidth={2} />
+          </span>
+        </Link>
+      </div>
+
+      {/* ── RestWheel für Kampf-/Pausenzeit ── */}
+      {wheelFor && (
+        <RestWheel
+          label={wheelFor === "work" ? "Kampfzeit" : "Pause zwischen den Runden"}
+          value={wheelFor === "work" ? t.config.workSeconds : t.config.restSeconds}
+          onChange={(seconds) =>
+            wheelFor === "work"
+              ? // 0:00 Kampfzeit gäbe eine hängende Phase — kleinste Stufe gilt
+                updateConfig("workSeconds", Math.max(15, seconds))
+              : updateConfig("restSeconds", seconds)
+          }
+          onClose={() => setWheelFor(null)}
+        />
+      )}
+
       {/* ── Vollbild-Overlay ── */}
       {isFullscreen && (
         <div
-          ref={fullscreenRef}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
-          style={{ background: "var(--ink-0)", touchAction: "none" }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 px-6"
+          style={{ background: "var(--surface-page)", touchAction: "none" }}
         >
-          <div className="absolute left-0 right-0 top-6 flex items-center justify-between px-8">
-            <span
-              className="font-mono-ta text-sm uppercase"
-              style={{
-                letterSpacing: "0.25em",
-                color: accent.color,
-              }}
-            >
+          <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-6 pt-5">
+            <span className="t-label" style={{ color: phaseColor }}>
               {PHASE_LABEL[t.phase]}
             </span>
-            <span
-              className="font-mono-ta text-sm uppercase"
-              style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
-            >
+            <span style={{ ...META_FONT, color: "var(--text-3)" }}>
               Runde {Math.min(t.round, t.config.rounds)} / {t.config.rounds}
             </span>
           </div>
+
           <div
-            className="font-display-ta font-black leading-none select-none"
+            className="select-none tabular-nums"
             style={{
-              fontSize: "clamp(6rem, 28vw, 22rem)",
+              font: "800 96px/1 var(--font-archivo), system-ui, sans-serif",
+              fontSize: "clamp(6rem, 26vw, 18rem)",
               letterSpacing: "0.02em",
-              color: "var(--fg)",
-              textShadow: `0 0 40px ${accent.bigShadow}`,
+              color: phaseColor,
+              filter: PHASE_GLOW[t.phase],
             }}
           >
             {formatTime(t.remaining)}
           </div>
-          <div className="mt-8 flex gap-4">
-            {!t.running ? (
-              <button onClick={handleStart} className="btn-primary px-10 py-5 text-xl">
-                {t.phase === "idle" || t.phase === "done" ? "Start" : "Weiter"}
-              </button>
-            ) : (
-              <button onClick={t.pause} className="btn-primary px-10 py-5 text-xl">
-                Pause
-              </button>
-            )}
-            <button onClick={t.skip} className="btn-secondary px-8 py-5 text-xl" disabled={t.phase === "idle" || t.phase === "done"}>Skip</button>
-            <button onClick={t.reset} className="btn-secondary px-8 py-5 text-xl">Reset</button>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={t.running ? t.pause : handleStart}
+              className="t-interactive inline-flex items-center justify-center gap-2 rounded-field px-8 py-4"
+              style={{
+                ...BTN_FONT,
+                fontSize: "15px",
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+              }}
+            >
+              <Icon name={t.running ? "pause" : "play"} size={15} strokeWidth={2.2} />
+              {t.running
+                ? "Pause"
+                : t.phase === "idle" || t.phase === "done"
+                  ? "Start"
+                  : "Weiter"}
+            </button>
+            <button
+              type="button"
+              onClick={t.skip}
+              disabled={t.phase === "idle" || t.phase === "done"}
+              aria-label="Phase überspringen"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5 disabled:opacity-40"
+              style={{
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Icon name="fast-forward" size={18} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={t.reset}
+              aria-label="Zurücksetzen"
+              className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
+              style={{
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Icon name="refresh" size={16} strokeWidth={2.2} />
+            </button>
           </div>
+
           <button
+            type="button"
             onClick={closeFullscreen}
-            className="absolute bottom-6 right-8 rounded-xl px-4 py-2 text-xs font-bold uppercase transition-colors"
+            className="t-interactive absolute bottom-5 right-6 inline-flex min-h-hit items-center gap-1.5 rounded-field px-4"
             style={{
-              border: "1px solid var(--ink-5)",
-              background: "var(--ink-3)",
-              color: "var(--fg-3)",
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.15em",
+              ...BTN_FONT,
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-3)",
             }}
           >
-            ✕ Vollbild beenden
+            <Icon name="x" size={13} strokeWidth={2.2} />
+            Vollbild beenden
           </button>
         </div>
       )}
 
-      <PageHeader
-        eyebrow={label ? `Workout · ${label}` : "Workout"}
-        title="Runden-Timer"
-        description="Konfiguriere Runden, Pausen und Vorbereitung — dann auf die Glocke."
-      />
-
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-
-        {/* Audio unlock hint */}
-        {!audioUnlocked && t.phase === "idle" && (
-          <div
-            className="mb-6 rounded-xl px-4 py-3 text-sm"
-            style={{
-              border: "1px solid rgba(35,196,206,.3)",
-              background: "rgba(35,196,206,.06)",
-              color: "var(--fg-2)",
-            }}
-          >
-            <div className="font-bold" style={{ color: "var(--ta-cyan)" }}>Sound-Hinweis</div>
-            <p className="mt-1 text-xs" style={{ color: "var(--fg-3)" }}>
-              Auf Handys muss der Sound einmal pro Sitzung freigegeben werden.
-              Tippe auf <strong>Start</strong> oder den Button unten.
-            </p>
-            <button
-              onClick={async () => { const ok = await unlockAudio(); setAudioUnlocked(ok); }}
-              className="mt-3 rounded-xl px-4 py-2 text-xs font-bold uppercase transition-all"
-              style={{
-                border: "1px solid rgba(35,196,206,.5)",
-                background: "rgba(35,196,206,.1)",
-                color: "var(--ta-cyan)",
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.15em",
-              }}
-            >
-              Sound aktivieren
-            </button>
-          </div>
-        )}
-
-        {/* Phase pill */}
-        <div className="mb-4 flex justify-center">
-          <span
-            className="font-mono-ta text-[11px] uppercase px-4 py-1.5 rounded-full"
-            style={{
-              letterSpacing: "0.25em",
-              color: accent.color,
-              border: `1px solid ${accent.border}`,
-              background: accent.bg,
-              transition: "all .3s",
-            }}
-          >
-            {PHASE_LABEL[t.phase]}
-          </span>
-        </div>
-
-        {/* Main timer ring */}
-        <div className="flex justify-center">
-          <TimerRing progress={progress} phase={t.phase} remaining={t.remaining} />
-        </div>
-
-        {/* Round dots */}
-        <div className="mt-4 flex justify-center gap-1.5">
-          {Array.from({ length: t.config.rounds }).map((_, i) => (
-            <div
-              key={i}
-              className="h-1.5 w-6 rounded-sm transition-all duration-300"
-              style={{
-                background:
-                  i < t.round - 1
-                    ? "var(--ta-cyan)"
-                    : i === t.round - 1 && t.phase !== "idle" && t.phase !== "done"
-                    ? accent.color
-                    : "var(--ink-5)",
-                boxShadow:
-                  i < t.round - 1
-                    ? "0 0 8px var(--ta-cyan)"
-                    : i === t.round - 1 && t.phase !== "idle" && t.phase !== "done"
-                    ? `0 0 10px ${accent.color}`
-                    : "none",
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Round counter */}
-        <div
-          className="mt-3 text-center font-mono-ta text-xs uppercase"
-          style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
-        >
-          Runde {Math.min(t.round, t.config.rounds)} von {t.config.rounds}
-        </div>
-
-        {/* Controls: skip | play/pause | reset */}
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <button
-            onClick={t.skip}
-            disabled={t.phase === "idle" || t.phase === "done"}
-            className="flex h-14 items-center justify-center rounded-xl transition-all"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg)",
-            }}
-            onMouseEnter={(e) => {
-              if (!e.currentTarget.disabled) {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ta-cyan)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--ta-cyan)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ink-5)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--fg)";
-            }}
-          >
-            <IconSkip />
-          </button>
-
-          {/* Primary play/pause */}
-          <button
-            onClick={t.running ? t.pause : handleStart}
-            className="col-span-1 flex h-14 items-center justify-center rounded-xl transition-all"
-            style={{
-              background: "var(--ta-cyan)",
-              color: "#03201D",
-              boxShadow:
-                "0 0 0 1px rgba(35,196,206,.6), 0 0 24px rgba(35,196,206,.4)",
-            }}
-          >
-            {t.running ? <IconPause /> : <IconPlay />}
-          </button>
-
-          <button
-            onClick={t.reset}
-            className="flex h-14 items-center justify-center rounded-xl transition-all"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ta-cyan)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--ta-cyan)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ink-5)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--fg)";
-            }}
-          >
-            <IconReset />
-          </button>
-        </div>
-
-        {/* Presets */}
-        <div className="mt-8">
-          <div
-            className="font-mono-ta mb-3 text-[10px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
-          >
-            Presets
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => (
-              <button
-                key={p.label}
-                onClick={() => { t.setConfig(p.config); t.reset(); }}
-                disabled={isLocked}
-                className="font-mono-ta rounded-xl px-3 py-2 text-[11px] uppercase transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                style={{
-                  letterSpacing: "0.12em",
-                  background: "var(--ink-3)",
-                  border: "1px solid var(--ink-5)",
-                  color: "var(--fg-2)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isLocked) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ta-cyan)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "var(--ta-cyan)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ink-5)";
-                  (e.currentTarget as HTMLButtonElement).style.color = "var(--fg-2)";
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Settings row */}
-        <div className={`mt-6 grid ${vibrateSupported ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
-          <SettingToggle label="Sound" value={settings.soundOn} onChange={setSoundOn} icon="bell" />
-          {vibrateSupported && (
-            <SettingToggle label="Vibration" value={settings.vibrate} onChange={setVibrate} icon="vibrate" />
-          )}
-          <button
-            onClick={openFullscreen}
-            className="flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all"
-            style={{
-              border: "1px solid var(--ink-5)",
-              background: "var(--ink-3)",
-              color: "var(--fg-3)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ta-cyan)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--ta-cyan)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--ink-5)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--fg-3)";
-            }}
-          >
-            <Icon name="fullscreen" size={18} />
-            <span className="font-mono-ta text-[10px] font-bold uppercase" style={{ letterSpacing: "0.15em" }}>Vollbild</span>
-          </button>
-        </div>
-
-        {/* Config */}
-        <div className="mt-8">
-          <div
-            className="font-mono-ta mb-4 text-[10px] uppercase"
-            style={{ letterSpacing: "0.25em", color: "var(--ta-cyan)" }}
-          >
-            Konfiguration
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <ConfigField label="Runden" value={t.config.rounds} onChange={(v) => updateConfig("rounds", v)} disabled={isLocked} suffix="×" />
-            <ConfigField label="Kampf (Sek.)" value={t.config.workSeconds} onChange={(v) => updateConfig("workSeconds", v)} disabled={isLocked} suffix="s" />
-            <ConfigField label="Pause (Sek.)" value={t.config.restSeconds} onChange={(v) => updateConfig("restSeconds", v)} disabled={isLocked} suffix="s" />
-            <ConfigField label="Vorlauf (Sek.)" value={t.config.prepSeconds} onChange={(v) => updateConfig("prepSeconds", v)} disabled={isLocked} suffix="s" />
-          </div>
-          {isLocked && (
-            <p className="mt-4 text-xs" style={{ color: "var(--fg-4)" }}>
-              Reset drücken, um die Konfiguration zu ändern.
-            </p>
-          )}
-        </div>
-
-        {/* Session log state */}
-        {t.phase === "done" && (
-          <div className="mt-6 text-center font-mono-ta text-xs uppercase" style={{ letterSpacing: "0.15em" }}>
-            {!user && <span style={{ color: "var(--fg-4)" }}>Login, um Sessions zu speichern</span>}
-            {user && logState === "saving" && <span style={{ color: "var(--fg-3)" }}>Speichere Session…</span>}
-            {user && logState === "saved" && <span style={{ color: "var(--ta-cyan)" }}>Session gespeichert ✓</span>}
-            {user && logState === "error" && <span style={{ color: "var(--ta-pink)" }}>Speichern fehlgeschlagen</span>}
-          </div>
-        )}
-      </div>
-    </>
+      {!isTrainer && <AthleteTabBar />}
+    </main>
   );
 }
 
-function SettingToggle({
-  label,
-  value,
-  onChange,
-  icon,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  icon: IconName;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!value)}
-      className="flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all"
-      style={{
-        border: value
-          ? "1px solid rgba(35,196,206,.5)"
-          : "1px solid var(--ink-5)",
-        background: value ? "rgba(35,196,206,.08)" : "var(--ink-3)",
-        color: value ? "var(--ta-cyan)" : "var(--fg-4)",
-      }}
-    >
-      <Icon name={icon} size={18} />
-      <span className="font-mono-ta text-[10px] font-bold uppercase" style={{ letterSpacing: "0.15em" }}>
-        {label} {value ? "an" : "aus"}
-      </span>
-    </button>
-  );
-}
-
-function ConfigField({
-  label,
-  value,
-  onChange,
-  disabled,
-  suffix,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  suffix?: string;
-}) {
-  return (
-    <div>
-      <label
-        className="font-mono-ta mb-1.5 block text-[10px] uppercase"
-        style={{ letterSpacing: "0.2em", color: "var(--fg-3)" }}
-      >
-        {label}
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          min={1}
-          inputMode="numeric"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          disabled={disabled}
-          className="w-full rounded-xl px-3 py-2 text-sm font-mono-ta transition-all disabled:opacity-50"
-          style={{
-            background: "var(--ink-2)",
-            border: "1px solid var(--ink-5)",
-            color: "var(--fg)",
-            outline: "none",
-          }}
-          onFocus={(e) => {
-            (e.currentTarget as HTMLInputElement).style.borderColor = "var(--ta-cyan)";
-            (e.currentTarget as HTMLInputElement).style.boxShadow = "0 0 0 3px rgba(35,196,206,.18)";
-          }}
-          onBlur={(e) => {
-            (e.currentTarget as HTMLInputElement).style.borderColor = "var(--ink-5)";
-            (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
-          }}
-        />
-        {suffix && (
-          <span className="font-mono-ta text-xs flex-shrink-0" style={{ color: "var(--fg-4)" }}>
-            {suffix}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
+// ─── Export ───────────────────────────────────────────────────────────────────
 
 export default function TimerPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-2xl px-4 py-32 text-center font-mono-ta text-sm uppercase tracking-widest" style={{ color: "var(--fg-4)" }}>
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{
+            font: "var(--type-sub)",
+            color: "var(--text-3)",
+            background: "var(--surface-page)",
+          }}
+        >
           Lade Timer…
         </div>
       }

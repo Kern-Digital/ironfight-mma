@@ -1,24 +1,26 @@
 "use client";
 
 /**
- * Pausen-Rad (Leons Vorgabe 2026-08-28): statt Stepper ein von unten
- * aufschiebendes Rad, in dem sich die Pause zwischen 0:00 und 9:45 in
- * 15-Sekunden-Schritten drehen lässt. Der Wert wird LIVE beim Einrasten
- * übernommen (Scroll-Snap auf die Zeilenhöhe); „Fertig" oder ein Klick
- * aufs Overlay schließen. Mobil Bottom-Sheet, am Desktop ein zentriertes
- * schmales Fenster.
+ * Pausen-Rad (Leons Vorgabe 2026-08-28): Rad, in dem sich die Zeit
+ * zwischen 0:00 und 9:45 in 15-Sekunden-Schritten drehen lässt. Der Wert
+ * wird LIVE beim Einrasten übernommen (Scroll-Snap auf die Zeilenhöhe).
  *
- * Optik (Leons Feedback-Runden 2+3): mittig zentriertes Glas-Panel mit
- * backdrop-blur, sonst NICHTS — kein Kopftext, kein Fertig-Button, keine
- * Auslauf-Verläufe, kein Band um den gewählten Wert. Der aktuelle Wert
- * ist einfach deutlich größer (≥1/3) und leuchtet in Akzent; übernommen
- * wird live beim Einrasten, geschlossen per Klick auf den Hintergrund
- * (oder das kleine x). Die Zentrier-Ränder sind echte Spacer-Elemente
- * statt Container-Padding (padding-bottom in Scroll-Containern ist
- * browserabhängig unzuverlässig).
+ * Optik (Leons Feedback-Runden, zuletzt 2026-08-29): KEIN Panel — kein
+ * Glas, kein Rahmen, kein x, kein Scrollbalken. Nur die Zeiten schweben
+ * frei: der gewählte Wert in der Mitte am größten (Akzent), nach oben und
+ * unten stufenweise kleiner und blasser. Dahinter ein radialer Schleier:
+ * Blur + Abdunkelung am stärksten hinter den Zeiten, zu den Rändern
+ * deutlich auslaufend (Maske auf dem backdrop-filter-Layer).
+ *
+ * Interaktion: Der Scroll-Container füllt den GANZEN Bildschirm — egal wo
+ * man scrollt, dreht sich nur das Rad (die Seite dahinter ist per
+ * Body-Lock eingefroren). Tippen ins Leere (neben/über/unter den Zahlen)
+ * schließt, ebenso ein Tipp auf den gewählten Wert; ein Tipp auf eine
+ * andere sichtbare Zeile dreht dorthin. Die Zentrier-Ränder sind echte
+ * Spacer-Elemente statt Container-Padding (padding-bottom in
+ * Scroll-Containern ist browserabhängig unzuverlässig).
  */
 
-import Icon from "@/components/ui/Icon";
 import { useEffect, useRef, useState } from "react";
 
 /** 15-s-Raster bis 9:45 — „zwischen 0 und 9 min 59 sec" im Schrittraster */
@@ -31,14 +33,15 @@ const VALUES = Array.from(
 
 /** Zeilenhöhe des Rads — Scroll-Snap rastet auf diesem Raster ein */
 const ITEM_H = 44;
-/** Sichtbare Zeilen (ungerade, damit eine Zeile exakt mittig steht) */
-const VISIBLE = 5;
-const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
 
-/** Durchsichtiger Glas-Grund des Panels — auch die Auslauf-Verläufe des
-    Rads müssen in GENAU diese Farbe münden. Bewusst SEHR transparent
-    (Leon 2026-08-28: „viel durchsichtiger"), der Blur hält es lesbar. */
-const GLASS_BG = "color-mix(in srgb, var(--surface-card) 32%, transparent)";
+/** Stufen-Typo nach Abstand zur Mitte: gewählt am größten, dann treppab */
+const SIZE_BY_DISTANCE = [34, 22, 18, 15];
+/** Ab Abstand 4 läuft das Rad in Unsichtbarkeit aus (voller Bildschirm) */
+const OPACITY_BY_DISTANCE = [1, 0.7, 0.45, 0.25, 0.1, 0];
+const SUFFIX_BY_DISTANCE = [12, 10, 9, 9];
+
+/** Halbe Breite der Zahlen-Spalte — Tipps weiter außen gelten als „Leere" */
+const COLUMN_HALF_W = 130;
 
 export function formatRest(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -53,7 +56,7 @@ export default function RestWheel({
   onClose,
   zIndex = 70,
 }: {
-  /** Kopfzeile („Pause zwischen den Rubriken", …) */
+  /** Beschreibung fürs Screenreader-Dialog-Label („Pause zwischen …") */
   label: string;
   value: number;
   onChange: (seconds: number) => void;
@@ -71,8 +74,19 @@ export default function RestWheel({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // Startposition: gewählter Wert steht mittig. Mehrfach nachgezogen —
-  // Einblende-Animation/Snap können den ersten Wert wieder verwerfen.
+  // Seite dahinter einfrieren — nur das Rad darf scrollen
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  // Startposition: gewählter Wert steht mittig (scrollTop = Index × Zeile,
+  // die dvh-Spacer zentrieren unabhängig von der Bildschirmhöhe). Mehrfach
+  // nachgezogen — Einblende-Animation/Layout können den ersten Wert
+  // wieder verwerfen.
   useEffect(() => {
     const idx = clampIndex(Math.round(value / REST_WHEEL_STEP));
     const apply = () => {
@@ -103,101 +117,106 @@ export default function RestWheel({
     listRef.current?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
   }
 
+  function handleRowClick(e: React.MouseEvent, i: number) {
+    e.stopPropagation();
+    const d = Math.abs(i - index);
+    const dx = Math.abs(e.clientX - window.innerWidth / 2);
+    // Seitlich neben den Zahlen oder außerhalb des sichtbaren Rads = Leere
+    if (dx > COLUMN_HALF_W || d > 3) {
+      onClose();
+      return;
+    }
+    if (i === index) onClose();
+    else scrollTo(i);
+  }
+
   return (
-    // Immer MITTIG zentriert (Leon 2026-08-28) — kein Bottom-Sheet-Modus
     <div
-      className="fixed inset-0 flex items-center justify-center p-6"
+      className="fixed inset-0"
       style={{ zIndex }}
       role="dialog"
       aria-modal="true"
       aria-label={label}
     >
-      <button
-        type="button"
-        aria-label="Pausen-Rad schließen"
+      {/* Radialer Schleier — rein visuell (Interaktion liegt auf dem
+          Scroll-Container darüber): Mitte voll, Ränder deutlich reduziert */}
+      <div
+        aria-hidden
         className="absolute inset-0"
         style={{
           background: "var(--overlay)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          maskImage:
+            "radial-gradient(ellipse 95% 85% at 50% 50%, black 45%, rgba(0,0,0,0.22) 100%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 95% 85% at 50% 50%, black 45%, rgba(0,0,0,0.22) 100%)",
           animation: "fade-in 0.2s ease-out both",
         }}
-        onClick={onClose}
       />
-      {/* pointer-events-Muster wie bei den Detail-Sheets: neben dem
-          zentrierten Fenster (Desktop) trifft der Klick das Overlay */}
-      <div className="pointer-events-none relative flex w-full justify-center">
-        <div
-          className="pointer-events-auto animate-slide-up relative flex w-full max-w-xs flex-col overflow-hidden rounded-[var(--r-xl)]"
-          style={{
-            background: GLASS_BG,
-            backdropFilter: "blur(18px) saturate(140%)",
-            WebkitBackdropFilter: "blur(18px) saturate(140%)",
-            border: "1px solid color-mix(in srgb, var(--line) 55%, transparent)",
-            boxShadow: "var(--glass-shadow)",
-          }}
-        >
-          {/* Kein Kopftext, kein Fertig-Button (Leon 2026-08-28): der Wert
-              gilt immer live, geschlossen wird über den Hintergrund — das
-              kleine x bleibt als expliziter Ausweg */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Schließen"
-            className="t-interactive absolute right-1.5 top-1.5 z-30 inline-flex h-9 w-9 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={15} strokeWidth={2.2} />
-          </button>
 
-          {/* ── Das Rad — ohne Auslauf-Schleier und ohne Einrast-Band: der
-              gewählte Wert ist einfach deutlich größer und leuchtet ────── */}
-          <div className="relative mx-5 my-3">
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="relative overflow-y-auto"
+      {/* Bildschirmfüllender Scroll-Container: egal wo gescrollt wird,
+          dreht sich das Rad. Klick auf Spacer/Lücken = ins Leere = zu. */}
+      <div
+        ref={listRef}
+        onScroll={handleScroll}
+        onClick={onClose}
+        className="no-scrollbar absolute inset-0 overflow-y-auto"
+        style={{
+          scrollSnapType: "y mandatory",
+          overscrollBehavior: "contain",
+          animation: "fade-in 0.2s ease-out both",
+          // Weicher Auslauf zum oberen/unteren Bildschirmrand
+          maskImage:
+            "linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%)",
+        }}
+      >
+        {/* Spacer statt Padding: zentrieren die erste/letzte Zeile exakt
+            in der Bildschirmmitte — scrollTop bleibt Index × Zeilenhöhe */}
+        <div aria-hidden style={{ height: `calc(50dvh - ${ITEM_H / 2}px)` }} />
+        {VALUES.map((v, i) => {
+          const d = Math.abs(i - index);
+          const dSize = Math.min(d, SIZE_BY_DISTANCE.length - 1);
+          const dOpacity = Math.min(d, OPACITY_BY_DISTANCE.length - 1);
+          const selected = i === index;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={(e) => handleRowClick(e, i)}
+              aria-label={
+                selected
+                  ? `${formatRest(v)} Minuten übernehmen und schließen`
+                  : `${formatRest(v)} Minuten wählen`
+              }
+              aria-pressed={selected}
+              className="flex w-full items-center justify-center gap-1 tabular-nums"
               style={{
-                height: VISIBLE * ITEM_H,
-                scrollSnapType: "y mandatory",
-                overscrollBehavior: "contain",
+                height: ITEM_H,
+                scrollSnapAlign: "center",
+                font: `700 ${SIZE_BY_DISTANCE[dSize]}px/1 var(--font-archivo), system-ui, sans-serif`,
+                color: selected ? "var(--accent-text)" : "var(--text-2)",
+                opacity: OPACITY_BY_DISTANCE[dOpacity],
+                transition:
+                  "font-size .15s ease, color .15s ease, opacity .15s ease",
               }}
             >
-              {/* Spacer statt Padding: erste/letzte Zeile können mittig
-                  stehen, zuverlässig in allen Browsern */}
-              <div aria-hidden style={{ height: PAD }} />
-              {VALUES.map((v, i) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => scrollTo(i)}
-                  aria-label={`Pause ${formatRest(v)} Minuten`}
-                  aria-pressed={i === index}
-                  className="flex w-full items-center justify-center gap-1 tabular-nums"
-                  style={{
-                    height: ITEM_H,
-                    scrollSnapAlign: "center",
-                    // Gewählter Wert ≥ 1/3 größer als die übrigen
-                    font: `700 ${i === index ? 30 : 21}px/1 var(--font-archivo), system-ui, sans-serif`,
-                    color: i === index ? "var(--accent-text)" : "var(--text-3)",
-                    opacity: i === index ? 1 : 0.5,
-                    transition:
-                      "font-size .15s ease, color .15s ease, opacity .15s ease",
-                  }}
-                >
-                  {formatRest(v)}
-                  <span
-                    style={{
-                      font: "600 11px/1 var(--font-archivo), system-ui, sans-serif",
-                      color: "var(--text-3)",
-                    }}
-                  >
-                    min
-                  </span>
-                </button>
-              ))}
-              <div aria-hidden style={{ height: PAD }} />
-            </div>
-          </div>
-        </div>
+              {formatRest(v)}
+              <span
+                style={{
+                  font: `600 ${SUFFIX_BY_DISTANCE[dSize]}px/1 var(--font-archivo), system-ui, sans-serif`,
+                  color: selected ? "var(--accent-text)" : "var(--text-3)",
+                  transition: "font-size .15s ease, color .15s ease",
+                }}
+              >
+                min
+              </span>
+            </button>
+          );
+        })}
+        <div aria-hidden style={{ height: `calc(50dvh - ${ITEM_H / 2}px)` }} />
       </div>
     </div>
   );

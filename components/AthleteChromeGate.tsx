@@ -16,6 +16,7 @@ const ATHLETE_SHELL_ROUTES = [
   "/kampfprofil",
   "/profile",
   "/workout",
+  "/timer",
 ];
 
 export default function AthleteChromeGate({ children }: { children: React.ReactNode }) {

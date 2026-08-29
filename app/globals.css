@@ -525,6 +525,10 @@ body {
     linear-gradient(180deg, #EEF2F8 0%, #E8EEF6 100%);
 }
 
+/* Scrollbar gezielt ausblenden (z. B. RestWheel — Rad ohne sichtbaren Balken) */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--ink-1); }
