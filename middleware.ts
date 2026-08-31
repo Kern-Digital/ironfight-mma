@@ -173,6 +173,14 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
+/**
+ * NICHT AUFNEHMEN: `/beitreten/*` (Einladungen einlösen, Checkpoint 1C).
+ * Die Seite ist für AUSGELOGGTE gedacht — ein Eingeladener öffnet den Link,
+ * bevor er ein Konto hat. Stünde sie im matcher, würfe die Middleware ihn auf
+ * /login, bevor er die Einladung überhaupt sieht. Geschützt ist der Vorgang
+ * trotzdem: /api/invites/preview und /redeem verlangen beide ein gültiges
+ * ID-Token, die Seite selbst zeigt ohne Anmeldung nur den Code.
+ */
 export const config = {
   matcher: [
     "/admin/:path*",

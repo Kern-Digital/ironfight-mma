@@ -3,9 +3,10 @@
 import Icon from "@/components/ui/Icon";
 
 import { useAuth } from "@/lib/auth-context";
+import { inviteQueryFor, useAfterAuthTarget } from "@/lib/use-invite-param";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 
 function authErrorMessage(code: string) {
@@ -41,9 +42,12 @@ function GoogleIcon() {
   );
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const { signIn, signInWithGoogle, user, redirectError } = useAuth();
   const router = useRouter();
+  // Kam der Besucher über eine Einladung (?invite=), führt der Weg nach der
+  // Anmeldung zurück auf /beitreten/{code} statt aufs Dashboard.
+  const afterAuth = useAfterAuthTarget();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +56,8 @@ export default function LoginPage() {
   const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
 
   useEffect(() => {
-    if (user) router.replace("/dashboard");
-  }, [user, router]);
+    if (user) router.replace(afterAuth);
+  }, [user, router, afterAuth]);
 
   useEffect(() => {
     if (redirectError) setError(redirectError);
@@ -66,7 +70,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await signIn(email, password);
-      router.push("/dashboard");
+      router.push(afterAuth);
     } catch (err) {
       const code = err instanceof FirebaseError ? err.code : "";
       setError(authErrorMessage(code));
@@ -274,7 +278,7 @@ export default function LoginPage() {
             <p className="font-mono-ta text-xs" style={{ color: "var(--fg-3)" }}>
               Noch kein Account?{" "}
               <Link
-                href="/register"
+                href={`/register${inviteQueryFor(afterAuth)}`}
                 className="font-bold transition-colors"
                 style={{ color: "var(--ta-cyan)" }}
               >
@@ -285,5 +289,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * useAfterAuthTarget liest die Adresszeile über useSearchParams — und das
+ * verlangt in Next 14 eine Suspense-Grenze, sonst bricht der Build der
+ * statisch vorgerenderten Seite. Der Wrapper ist genau dafür da; er hält
+ * nichts eigenes.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

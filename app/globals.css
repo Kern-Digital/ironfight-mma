@@ -1174,3 +1174,271 @@ body {
     text-shadow: 0 0 8px rgba(157, 123, 250, 0.9);
   }
 }
+
+/* ─── Beitritts-Kulisse (Multi-Gym Checkpoint 1C) ───────────────────────────
+   Die Einladungsseite ist für viele der ERSTE Bildschirm der App — sie soll
+   nach Kampfsport aussehen, nicht nach Formular. Dafür laufen hinter dem
+   Inhalt zwei Bänder schräg geschnittener Fotos: das obere nach links, das
+   untere nach rechts (Leon 31.08.). Schnitt und Entzerrung sind dieselbe
+   Technik wie im „Meine Bibliothek"-Feld (skewX außen, Gegen-Skew innen),
+   nur größer.
+
+   Nur transform wird animiert (akku-schonend, native-ready, Design-Brief §3);
+   das Band trägt seine Kacheln DOPPELT und wandert um exakt die Hälfte —
+   deshalb springt der Übergang nicht. Farben kommen ausschließlich aus
+   Tokens, der Schleier folgt damit Dark und Light von selbst. */
+.join-backdrop {
+  /* Reihenhöhe steht fest, damit sich daraus die Schräge RECHNEN lässt:
+     der seitliche Versatz einer 10°-Diagonale ist Höhe × tan(10°). */
+  --tile-gap: 6px;
+  /* Zwischen den Reihen derselbe Abstand wie zwischen den Kacheln
+     (Leon 31.08.) — die Höhe teilt sich den Rest. */
+  --row-h: calc((100dvh - 2 * var(--tile-gap)) / 3);
+  --shear: calc(var(--row-h) * 0.176);
+
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tile-gap);
+}
+.join-band-wrap { height: var(--row-h); overflow: hidden; }
+.join-band {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  gap: 6px;
+  /* Ruhig, aber nicht tot: 260 s wirkten wie ein Standbild (Leon 31.08.). */
+  animation: join-band-left 140s linear infinite;
+}
+.join-band[data-dir="right"] { animation-name: join-band-right; }
+/* SCHRÄGE PER BESCHNITT, NICHT PER VERZERRUNG (Leon 31.08.).
+   Vorher lief das über skewX an der Kachel plus Gegen-skew am Bild. Das
+   erzeugte an zwei Ecken leere Flächen, die sich nur mit sehr viel Zoom
+   decken ließen — und der Zoom hat die Motive zerschnitten: von den Kämpfern
+   blieben Körperteile übrig. Jetzt sitzt das Bild unverzerrt und ungezoomt
+   in einer rechteckigen Kachel, und ein clip-path schneidet daraus das
+   Parallelogramm. Keine leeren Ecken, weil nichts verschoben wird.
+
+   Die Kacheln greifen ineinander: der negative Außenabstand ist genau die
+   Schräge minus dem gewünschten Spalt — dadurch bleibt oben wie unten
+   derselbe Abstand stehen, und alle Kacheln sind gleich breit. Das ist
+   wichtig für die Endlosschleife, die um exakt 50 % wandert. */
+.join-tile {
+  position: relative;
+  flex: none;
+  height: 100%;
+  width: 172px;
+  margin-left: calc(var(--tile-gap) - var(--shear));
+  clip-path: polygon(
+    var(--shear) 0,
+    100% 0,
+    calc(100% - var(--shear)) 100%,
+    0 100%
+  );
+}
+@media (min-width: 640px) { .join-tile { width: 232px; } }
+.join-tile img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+/* Schleier: Mitte dichter (dort steht die Karte), Ränder offener — die Fotos
+   bleiben sichtbar, der Text bleibt lesbar. */
+.join-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      125% 85% at 50% 48%,
+      color-mix(in oklab, var(--surface-page) 68%, transparent) 0%,
+      color-mix(in oklab, var(--surface-page) 44%, transparent) 48%,
+      color-mix(in oklab, var(--surface-page) 22%, transparent) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--surface-page) 58%, transparent),
+      color-mix(in oklab, var(--surface-page) 20%, transparent) 40%,
+      color-mix(in oklab, var(--surface-page) 66%, transparent)
+    );
+}
+@keyframes join-band-left {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes join-band-right {
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .join-band { animation: none; }
+}
+
+/* ─── Beitritts-Karte („Tunnel-Plakat", Checkpoint 1C) ──────────────────────
+   Gestaltung nach einer Vorlage, die Leon am 31.08. gebracht hat: dunkle
+   Karte, Verlauf von oben, dahinter eine langsam auf den Betrachter
+   zulaufende Ring-Animation, darunter die Code-Felder und eine feine
+   Rechts-Zeile.
+
+   ABWEICHUNGEN ZUR VORLAGE (bewusst):
+   • Die Vorlage lud ein Giphy-GIF als Hintergrund. Hier läuft stattdessen
+     eine CSS-Animation — keine fremde URL, kein Ladegewicht, und sie folgt
+     dem Akzent-Token. Ein Gym-Branding färbt den Tunnel automatisch mit.
+   • Statt der Blau-Stufen der Vorlage kommen alle Farben aus
+     --accent-h/--accent-c (Tidal-Türkis). KEIN Hex, kein festes Blau.
+   • Deutlich langsamer (Vorgabe Leon): ein Ring braucht 20 s.
+
+   Die Karte trägt EIGENE Tokens (--panel-*) statt der App-Tokens, weil ihr
+   Grund ein Verlauf ist und kein Flächenton: Text, Felder und Knopf müssen
+   sich gegen diesen Verlauf behaupten, nicht gegen --surface-card. Der Block
+   hier beschreibt die dunkle Fassung; die helle steht weiter unten und
+   überschreibt genau diese Tokens (Leon 31.08.). */
+.join-panel {
+  --panel-fg: oklch(0.98 calc(var(--accent-c) * 0.04) var(--accent-h));
+  --panel-fg-2: oklch(0.98 calc(var(--accent-c) * 0.04) var(--accent-h) / 0.74);
+  --panel-fg-3: oklch(0.98 calc(var(--accent-c) * 0.04) var(--accent-h) / 0.52);
+  --panel-field: oklch(1 0 0 / 0.1);
+  --panel-field-line: oklch(1 0 0 / 0.22);
+  --panel-field-active: oklch(1 0 0 / 0.2);
+  /* Eigener Akzent statt --accent: auf dem dunklen Verlauf wirkt der
+     Light-Akzent (dunkleres Türkis für helle Flächen) stumpf. Im hellen
+     Theme zeigt der Block unten wieder auf --accent. */
+  --panel-accent: oklch(0.78 var(--accent-c) var(--accent-h));
+  --panel-on-accent: oklch(0.16 calc(var(--accent-c) * 0.3) var(--accent-h));
+  --panel-accent-glow: 0 0 18px
+    oklch(0.78 var(--accent-c) var(--accent-h) / 0.35);
+
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  /* Tief genug, dass die Ringe leuchten können — eine hellere Fläche
+     schluckte den Tunnel komplett. */
+  background: oklch(0.1 calc(var(--accent-c) * 0.45) var(--accent-h));
+  color: var(--panel-fg);
+  box-shadow: 0 30px 80px -34px
+    oklch(0.25 calc(var(--accent-c) * 0.5) var(--accent-h) / 0.95);
+}
+
+/* Der Tunnel: konzentrische Ringe, die aus der Mitte auf den Betrachter
+   zuwachsen. Nur transform/opacity — dieselbe Regel wie beim Ambient. */
+.join-tunnel {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  /* Nur noch ein ruhiges Glühen hinter dem Kopf. Die wandernden Ringe sind
+     raus (Leon 31.08.), und die Maske hält das Licht oberhalb der
+     Code-Felder — unten passiert gar nichts mehr. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 58%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 58%);
+  /* Licht hinter der Kopfzeile — statisch, keine Bewegung. */
+  background: radial-gradient(
+    34% 20% at 50% 15%,
+    oklch(0.92 var(--accent-c) var(--accent-h) / 0.5) 0%,
+    oklch(0.75 var(--accent-c) var(--accent-h) / 0.16) 45%,
+    transparent 78%
+  );
+}
+/* Verlauf über dem Tunnel — Akzent oben, Tiefe unten (Aufbau der Vorlage,
+   Farben aus dem Token). Hält den Text lesbar, ohne den Sog zu töten. */
+.join-panel-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    oklch(0.55 var(--accent-c) var(--accent-h) / 0.22) 0%,
+    oklch(0.3 var(--accent-c) var(--accent-h) / 0.6) 26%,
+    oklch(0.2 calc(var(--accent-c) * 0.95) var(--accent-h) / 0.9) 52%,
+    oklch(0.06 calc(var(--accent-c) * 0.35) var(--accent-h) / 0.98) 100%
+  );
+}
+
+/* Ein Feld pro Zeichen. Gruppiert 4 + 4 wie die Schreibweise ABCD-2345. */
+/* Größer als in der Vorlage (Leon 31.08.) — acht Felder statt vier dürfen
+   trotzdem nicht schrumpfen, deshalb wächst die Karte auf dem Desktop mit. */
+.join-slot {
+  width: 100%;
+  aspect-ratio: 1 / 1.15;
+  border-radius: 16px;
+  border: 1px solid var(--panel-field-line);
+  background: var(--panel-field);
+  color: var(--panel-fg);
+  text-align: center;
+  text-transform: uppercase;
+  font:
+    700 clamp(18px, 5vw, 30px) / 1 var(--font-mono),
+    ui-monospace,
+    monospace;
+  letter-spacing: 0;
+  outline: none;
+  /* BEWUSST OHNE transition (Leon 31.08.): jedes Zeichen ließ acht Kästchen
+     nachblenden, das flackerte beim Tippen. Der Fokus wechselt hart. */
+}
+.join-slot:focus {
+  background: var(--panel-field-active);
+  border-color: oklch(0.88 var(--accent-c) var(--accent-h) / 0.75);
+}
+
+
+/* Im Light-Theme mischt der Schleier mit WEISS — bei gleicher Deckkraft
+   verblassen die Fotos dort viel stärker als im Dunkeln. Deshalb liegt
+   darunter eine dünne dunkle Schicht, die den Kontrast zurückholt. Nur
+   diese eine Zeile ist theme-abhängig; alles andere bleibt token-gleich. */
+[data-theme="light"] .join-band-wrap {
+  filter: brightness(0.82) contrast(1.08) saturate(0.95);
+}
+
+
+/* ─── Beitritts-Karte im hellen Theme (Leon 31.08.) ─────────────────────────
+   Dieselbe Karte, andere Tiefe: der Verlauf läuft von einer Akzent-Tönung
+   oben in ein helles Weiß unten, der Text dreht sich um, die Felder werden
+   zu leichten Vertiefungen statt zu hellen Aufhellungen. Alles wieder aus
+   --accent-h/--accent-c abgeleitet — ein Gym-Branding färbt auch die helle
+   Fassung automatisch mit. */
+[data-theme="light"] .join-panel {
+  --panel-fg: oklch(0.3 calc(var(--accent-c) * 0.5) var(--accent-h));
+  --panel-fg-2: oklch(0.44 calc(var(--accent-c) * 0.35) var(--accent-h));
+  --panel-fg-3: oklch(0.56 calc(var(--accent-c) * 0.28) var(--accent-h));
+  /* Auf hellem Grund ist ein Feld eine Vertiefung, keine Aufhellung. */
+  --panel-field: oklch(0.35 calc(var(--accent-c) * 0.4) var(--accent-h) / 0.07);
+  --panel-field-line: oklch(0.35 calc(var(--accent-c) * 0.4) var(--accent-h) / 0.18);
+  --panel-field-active: oklch(0.35 calc(var(--accent-c) * 0.4) var(--accent-h) / 0.13);
+  --panel-accent: var(--accent);
+  --panel-on-accent: var(--on-accent);
+  --panel-accent-glow: 0 0 18px
+    oklch(0.5 var(--accent-c) var(--accent-h) / 0.28);
+
+  background: oklch(0.99 calc(var(--accent-c) * 0.05) var(--accent-h));
+  /* Die Karte steht auf hellen Fotos — ohne Kante verliert sie den Rand. */
+  border: 1px solid var(--line);
+  box-shadow: 0 26px 70px -34px
+    oklch(0.55 calc(var(--accent-c) * 0.45) var(--accent-h) / 0.55);
+}
+[data-theme="light"] .join-tunnel {
+  background: radial-gradient(
+    34% 20% at 50% 15%,
+    oklch(0.72 var(--accent-c) var(--accent-h) / 0.5) 0%,
+    oklch(0.82 var(--accent-c) var(--accent-h) / 0.2) 45%,
+    transparent 78%
+  );
+}
+[data-theme="light"] .join-panel-veil {
+  background: linear-gradient(
+    to bottom,
+    oklch(0.74 var(--accent-c) var(--accent-h) / 0.28) 0%,
+    oklch(0.88 calc(var(--accent-c) * 0.75) var(--accent-h) / 0.55) 30%,
+    oklch(0.96 calc(var(--accent-c) * 0.3) var(--accent-h) / 0.88) 62%,
+    oklch(0.99 calc(var(--accent-c) * 0.12) var(--accent-h) / 0.97) 100%
+  );
+}
+[data-theme="light"] .join-slot:focus {
+  border-color: oklch(0.55 var(--accent-c) var(--accent-h) / 0.85);
+}

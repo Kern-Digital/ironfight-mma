@@ -2,12 +2,14 @@
  * POST /api/invites/preview — Was steckt hinter diesem Code?
  *
  * Body:    { code }
- * Antwort: { valid, gymName?, role?, reason? }
+ * Antwort: { valid, gymName?, role?, alreadyMember?, reason? }
  *
  * BEWUSST NUR FÜR ANGEMELDETE NUTZER: Ohne diese Hürde wäre die Route ein
  * Orakel, an dem sich Codes durchprobieren lassen, bis einer „gültig" meldet.
  * Wer eingeloggt ist, ist identifizierbar — das genügt als Bremse, ohne den
- * Beitritt zu verkomplizieren.
+ * Beitritt zu verkomplizieren. Dazu kommt seit Checkpoint 1C die Zählbremse
+ * pro Konto (lib/server/rate-limit.ts): sie steht VOR der collectionGroup-
+ * Abfrage, weil genau die der teure Teil eines Rateversuchs ist.
  *
  * Die Antwort enthält bewusst nur Gym-Name und Rolle: alles, was für die
  * Entscheidung „will ich beitreten?" nötig ist, und nichts darüber hinaus.
@@ -16,6 +18,12 @@
 import { NextResponse } from "next/server";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { findInviteByCode } from "@/lib/server/invites";
+import {
+  clearInviteMisses,
+  inviteAttemptGate,
+  inviteBlockedMessage,
+  recordInviteMiss,
+} from "@/lib/server/rate-limit";
 import { bearerToken, verifyUser } from "@/lib/server/verify-user";
 import {
   inviteStatus,
@@ -52,13 +60,28 @@ export async function POST(req: Request) {
 
   try {
     const db = adminDb();
+
+    const gate = await inviteAttemptGate(db, user.uid);
+    if (gate.blocked) {
+      return NextResponse.json(
+        { error: inviteBlockedMessage() },
+        {
+          status: 429,
+          headers: { "retry-after": String(gate.retryAfterSeconds) },
+        },
+      );
+    }
+
     const found = await findInviteByCode(db, code);
     if (!found) {
+      // Nur der Fehlgriff zählt — ein abgelaufener Code war ja echt.
+      await recordInviteMiss(db, user.uid);
       return NextResponse.json({
         valid: false,
         reason: "Diesen Einladungscode gibt es nicht.",
       });
     }
+    await clearInviteMisses(db, user.uid);
 
     const status = inviteStatus({
       revokedAt: (found.get("revokedAt")?.toDate?.() as Date) ?? null,
@@ -88,8 +111,26 @@ export async function POST(req: Request) {
     const gym = await db.collection("gyms").doc(gymId).get();
     const gymName =
       (gym.get("name") as string | undefined)?.trim() || DEFAULT_GYM_LABEL;
+    // Branding-Kit (Konzept §8): hat das Gym ein Logo hinterlegt, trägt die
+    // Beitritts-Karte es statt des Tidal-Zeichens. Heute ist das Feld überall
+    // leer — der Aufruf kostet nichts extra, das Gym-Dokument wird ohnehin
+    // für den Namen gelesen.
+    const gymLogo =
+      (gym.get("branding") as Record<string, string> | undefined)?.logoUrl ??
+      null;
 
-    return NextResponse.json({ valid: true, gymName, role });
+    // Schon in DIESEM Gym: der Beitritt wäre ein Leerlauf, würde aber eine
+    // Nutzung verbrauchen. Die Oberfläche bietet ihn deshalb gar nicht erst
+    // an (Checkpoint 1C) — der Code bleibt für jemand anderen übrig.
+    const alreadyMember = !!user.gymId && user.gymId === gymId;
+
+    return NextResponse.json({
+      valid: true,
+      gymName,
+      gymLogo,
+      role,
+      alreadyMember,
+    });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {
       return NextResponse.json(

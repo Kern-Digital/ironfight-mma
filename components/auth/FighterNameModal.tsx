@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -14,13 +15,23 @@ import { useAuth } from "@/lib/auth-context";
  *  • Wenn übersprungen wird, bleibt displayName null und die App nutzt
  *    weiter den Default "Fighter".
  *  • Auch Skip- und Save-Aktion zählt als User-Geste — kein iOS-Audio-Issue.
+ *  • NICHT auf /beitreten/* (Checkpoint 1C): Wer über eine Einladung
+ *    registriert, wird direkt dorthin zurückgeschickt — das Modal legte sich
+ *    dann über das Ergebnis, und der Eingeladene bekam eine Namensfrage,
+ *    bevor er überhaupt wusste, ob er drin ist. Nach dem Beitritt geht es
+ *    aufs Dashboard, dort fragt es wie gewohnt.
  */
 export default function FighterNameModal() {
   const { user, profile, profileLoading, updateDisplayName, finishOnboarding } =
     useAuth();
+  const pathname = usePathname();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Beitritt zuerst zu Ende führen (siehe Kopf)
+  if (pathname === "/beitreten" || pathname.startsWith("/beitreten/")) {
+    return null;
+  }
   // Nicht zeigen während noch geladen wird oder kein User da ist
   if (!user || profileLoading) return null;
   if (!profile) return null;

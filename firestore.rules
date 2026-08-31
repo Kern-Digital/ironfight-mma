@@ -206,6 +206,16 @@ service cloud.firestore {
       }
     }
 
+    // Zaehlbremse gegen Code-Durchprobieren (Checkpoint 1C,
+    // lib/server/rate-limit.ts). Rein serverseitig: gelesen und geschrieben
+    // wird ausschliesslich per Admin-SDK in /api/invites/preview und /redeem.
+    // Deshalb hier explizit ZU — auch fuer den Betroffenen selbst. Laege der
+    // Zaehler am eigenen users-Dokument, koennte er ihn selbst zuruecksetzen
+    // und die Bremse waere wirkungslos.
+    match /inviteAttempts/{uid} {
+      allow read, write: if false;
+    }
+
     // Laufende KI-Kosten-Summe + Budget (Guthaben-Anzeige der Video-Analyse).
     // Pro-Gym-Kontingent folgt in Phase 3 (aiUsage/{gymId}).
     match /aiUsage/{docId} {

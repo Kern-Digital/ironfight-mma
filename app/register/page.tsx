@@ -3,9 +3,10 @@
 import Icon from "@/components/ui/Icon";
 
 import { useAuth } from "@/lib/auth-context";
+import { inviteQueryFor, useAfterAuthTarget } from "@/lib/use-invite-param";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 
 function authErrorMessage(code: string): string {
@@ -41,9 +42,12 @@ function GoogleIcon() {
   );
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { signUp, signInWithGoogle, user, redirectError } = useAuth();
   const router = useRouter();
+  // Kam der Besucher über eine Einladung (?invite=), führt der Weg nach der
+  // Anmeldung zurück auf /beitreten/{code} statt aufs Dashboard.
+  const afterAuth = useAfterAuthTarget();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,8 +57,8 @@ export default function RegisterPage() {
   const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
 
   useEffect(() => {
-    if (user) router.replace("/dashboard");
-  }, [user, router]);
+    if (user) router.replace(afterAuth);
+  }, [user, router, afterAuth]);
 
   useEffect(() => {
     if (redirectError) setError(redirectError);
@@ -67,7 +71,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await signUp(email, password, name.trim() || undefined);
-      router.push("/dashboard");
+      router.push(afterAuth);
     } catch (err) {
       const code = err instanceof FirebaseError ? err.code : "";
       setError(authErrorMessage(code));
@@ -286,7 +290,7 @@ export default function RegisterPage() {
           >
             Schon registriert?{" "}
             <Link
-              href="/login"
+              href={`/login${inviteQueryFor(afterAuth)}`}
               className="font-bold transition-colors"
               style={{ color: "var(--ta-cyan)" }}
             >
@@ -296,5 +300,19 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * useAfterAuthTarget liest die Adresszeile über useSearchParams — und das
+ * verlangt in Next 14 eine Suspense-Grenze, sonst bricht der Build der
+ * statisch vorgerenderten Seite. Der Wrapper ist genau dafür da; er hält
+ * nichts eigenes.
+ */
+export default function RegistrierungPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }

@@ -460,6 +460,26 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Service-Account nötig — setzt nur das Feld, nicht den Claim).
       Endgültig löst das erst das Einladungssystem aus Phase 2, das
       `gymId` als Claim beim Einlösen setzt.
+- [ ] **Rechts-Zeile der Beitritts-Karte verlinken** (notiert 2026-08-31,
+      Checkpoint 1C): Am Fuß von `/beitreten` und `/beitreten/{code}` steht
+      „Mit dem Beitritt stimmst du unseren Nutzungsbedingungen und
+      Datenschutzhinweisen zu." — Platzierung von Leon abgenommen, aber die
+      beiden Begriffe sind bewusst nur `<span>` im Link-Look: die Seiten
+      existieren noch nicht. Sobald `/agb` und `/datenschutz` da sind, in
+      `components/JoinLayout.tsx` (`JoinLegalNote`) die zwei `<span>` durch
+      `<Link>` ersetzen — sonst nichts. Hängt am selben Paket wie Impressum
+      und AVV (siehe Kostenkarte: „vor der ersten Zahlung fällig").
+- [ ] **Gym-Logo + Gym-Farbe auf der Beitritts-Karte** (vorbereitet
+      2026-08-31, Checkpoint 1C): Die Karte zeigt oben das Zeichen des
+      einladenden Gyms. Der Weg steht schon: `/api/invites/preview` liefert
+      `gymLogo` aus `gyms/{gymId}.branding.logoUrl`, `JoinLayout` nimmt es
+      als `logo`-Prop, und `JoinMark` fällt auf `/logo.png` (Tidal) zurück,
+      solange nichts hinterlegt ist — heute bei jedem Gym. Die FARBEN
+      brauchen gar nichts: Verlauf, Glühen, Code-Felder und der Knopf leiten
+      sich aus `--accent-h`/`--accent-c` ab, das Branding-Kit muss nur diese
+      Tokens setzen. Zu tun bleibt: Feld im Branding-Kit befüllbar machen
+      (Konzept §8) und prüfen, ob ein sehr helles Gym-Logo auf dem dunklen
+      Panel eine neutrale Hinterlegung braucht.
 - [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
       Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,

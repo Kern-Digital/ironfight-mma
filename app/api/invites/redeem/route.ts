@@ -31,6 +31,12 @@ import {
   adminDb,
 } from "@/lib/server/firebase-admin";
 import { findInviteByCode, writeAudit } from "@/lib/server/invites";
+import {
+  clearInviteMisses,
+  inviteAttemptGate,
+  inviteBlockedMessage,
+  recordInviteMiss,
+} from "@/lib/server/rate-limit";
 import { bearerToken, verifyUser } from "@/lib/server/verify-user";
 import {
   inviteStatus,
@@ -73,13 +79,30 @@ export async function POST(req: Request) {
 
   try {
     const db = adminDb();
+
+    // Zählbremse gegen Code-Durchprobieren — vor der collectionGroup-Abfrage,
+    // weil genau die der teure Teil ist (lib/server/rate-limit.ts).
+    // Gemeinsamer Zähler mit /preview: es ist derselbe Rateversuch.
+    const gate = await inviteAttemptGate(db, user.uid);
+    if (gate.blocked) {
+      return NextResponse.json(
+        { error: inviteBlockedMessage() },
+        {
+          status: 429,
+          headers: { "retry-after": String(gate.retryAfterSeconds) },
+        },
+      );
+    }
+
     const found = await findInviteByCode(db, code);
     if (!found) {
+      await recordInviteMiss(db, user.uid);
       return NextResponse.json(
         { error: "Diesen Einladungscode gibt es nicht." },
         { status: 404 },
       );
     }
+    await clearInviteMisses(db, user.uid);
 
     const ref = found.ref;
     const gymId = (found.get("gymId") as string) ?? "";

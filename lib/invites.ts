@@ -237,7 +237,7 @@ export interface CreateInviteResult {
 }
 
 async function postInvites<T>(
-  action: "create" | "revoke" | "note",
+  action: "create" | "revoke" | "note" | "preview" | "redeem",
   idToken: string,
   body: Record<string, unknown>,
 ): Promise<T> {
@@ -296,4 +296,60 @@ export async function updateInviteNoteRequest(
     { code: normalizeInviteCode(code), note },
   );
   return res.note;
+}
+
+// ─── Beitreten (Checkpoint 1C) ─────────────────────────────────────────────
+
+/**
+ * Ergebnis von /api/invites/preview. `valid: false` ist KEIN Fehler, sondern
+ * eine Auskunft — deshalb liefert der Server dafür 200 mit `reason` und nicht
+ * einen Statuscode, den der Aufrufer erst übersetzen müsste. Echte Fehler
+ * (nicht angemeldet, gesperrt, Server aus) werfen wie überall.
+ */
+export interface InvitePreview {
+  valid: boolean;
+  gymName?: string;
+  /**
+   * Logo des Gyms, falls es ein Branding-Kit gebucht hat (Konzept §8).
+   * Heute liefert das noch kein Gym — die Beitritts-Karte zeigt dann das
+   * Tidal-Zeichen. Das Feld steht hier schon, damit der Tag, an dem das
+   * erste Gym ein Logo hinterlegt, KEINE Code-Änderung mehr braucht.
+   */
+  gymLogo?: string | null;
+  role?: InviteRole;
+  /** Der Betrachter gehört bereits zu diesem Gym — Beitreten wäre Leerlauf. */
+  alreadyMember?: boolean;
+  reason?: string;
+}
+
+/** Zeigt Gym und Rolle hinter einem Code, ohne ihn einzulösen. */
+export function previewInviteRequest(
+  idToken: string,
+  code: string,
+): Promise<InvitePreview> {
+  return postInvites<InvitePreview>("preview", idToken, {
+    code: normalizeInviteCode(code),
+  });
+}
+
+export interface RedeemInviteResult {
+  ok: boolean;
+  gymId: string;
+  gymName: string;
+  /** Rolle NACH dem Beitritt — eine Einladung senkt nie bestehende Rechte. */
+  role: string;
+}
+
+/**
+ * Löst die Einladung ein. Danach MUSS der Aufrufer `refreshRole()` rufen:
+ * der frische `gymId`-Claim steckt im ID-Token, und das holt sich der Client
+ * nicht von selbst neu.
+ */
+export function redeemInviteRequest(
+  idToken: string,
+  code: string,
+): Promise<RedeemInviteResult> {
+  return postInvites<RedeemInviteResult>("redeem", idToken, {
+    code: normalizeInviteCode(code),
+  });
 }
