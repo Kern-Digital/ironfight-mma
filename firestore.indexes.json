@@ -35,6 +35,14 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "invites",
+      "fieldPath": "code",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "fightCamps",
       "fieldPath": "competitionDate",
       "indexes": [

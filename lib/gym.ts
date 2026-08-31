@@ -55,3 +55,42 @@ export function belongsToGym(
 ): boolean {
   return (recordGymId || DEFAULT_GYM_ID) === viewerGymId;
 }
+
+// ─── Gym-Stammdaten ────────────────────────────────────────────────────────
+
+/**
+ * Abo-Zustand eines Gyms (Selbstbedienungs-Registrierung, Roadmap Phase 4).
+ *
+ * BEWUSST JETZT SCHON GESCHNITTEN, obwohl noch nichts davon gefüllt wird:
+ * Das Feld später nachzurüsten hieße, jedes bestehende Gym-Dokument zu
+ * migrieren. Als leeres Feld kostet es nichts.
+ *
+ * Geschrieben wird es AUSSCHLIESSLICH serverseitig (Stripe-Webhook per
+ * Admin-SDK) — die Regeln für gyms/{gymId} erlauben Client-Schreibzugriff
+ * ohnehin nur Admins.
+ *
+ * Der Status gehört später zusätzlich in die Custom Claims: Eine Regel, die
+ * bei jeder Auswertung das Gym-Dokument nachschlägt, kostet einen
+ * Lesevorgang und Latenz pro Zugriff — ein Claim kostet nichts.
+ */
+export interface GymSubscription {
+  status: "trial" | "active" | "pastDue" | "canceled";
+  /** Tarif-Kennung, z. B. "basis" | "branding". */
+  plan: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  currentPeriodEnd?: Date | null;
+  /** Enthaltene KI-Analysen pro Abrechnungszeitraum (Konzept §6). */
+  analysisQuota?: number;
+  /** Im laufenden Zeitraum verbraucht — Prüfung erfolgt serverseitig. */
+  analysisUsed?: number;
+}
+
+export interface Gym {
+  id: string;
+  name: string;
+  /** Branding-Tokens (Konzept §8) — leer = kompletter Tidal-Look. */
+  branding?: Record<string, string> | null;
+  subscription?: GymSubscription | null;
+  createdAt?: Date | null;
+}

@@ -12,11 +12,20 @@
  * KI-Routen aufrufen.
  */
 
+import { DEFAULT_GYM_ID } from "@/lib/gym";
+
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 export interface VerifiedUser {
   uid: string;
   role: string | null;
+  /**
+   * Gym aus dem Claim. `null` = kein Claim gesetzt (Bestand vor der
+   * Migration und Signups ohne Einladung). Fuer die Gym-Zuordnung gilt dann
+   * das Default-Gym — genau wie in firestore.rules (userGymId()) und im
+   * Client (resolveGymId).
+   */
+  gymId: string | null;
 }
 
 /** Extrahiert das Bearer-Token aus dem Authorization-Header. */
@@ -46,15 +55,21 @@ export async function verifyUser(idToken: string): Promise<VerifiedUser | null> 
     if (!user?.localId) return null;
 
     let role: string | null = null;
+    let gymId: string | null = null;
     if (user.customAttributes) {
       try {
-        const claims = JSON.parse(user.customAttributes) as { role?: string };
+        const claims = JSON.parse(user.customAttributes) as {
+          role?: string;
+          gymId?: string;
+        };
         role = claims.role ?? null;
+        gymId = claims.gymId ?? null;
       } catch {
         role = null;
+        gymId = null;
       }
     }
-    return { uid: user.localId, role };
+    return { uid: user.localId, role, gymId };
   } catch {
     return null;
   }
@@ -63,4 +78,17 @@ export async function verifyUser(idToken: string): Promise<VerifiedUser | null> 
 /** True, wenn der User Trainer oder Admin ist. */
 export function isTrainerOrAdmin(user: VerifiedUser | null): boolean {
   return !!user && (user.role === "trainer" || user.role === "admin");
+}
+
+/** True, wenn der User Plattform-Admin ist (gym-uebergreifend). */
+export function isAdmin(user: VerifiedUser | null): boolean {
+  return user?.role === "admin";
+}
+
+/**
+ * Gym des Aufrufers — fehlender Claim faellt aufs Default-Gym zurueck,
+ * identisch zu userGymId() in firestore.rules und resolveGymId im Client.
+ */
+export function userGymId(user: VerifiedUser): string {
+  return user.gymId?.trim() || DEFAULT_GYM_ID;
 }

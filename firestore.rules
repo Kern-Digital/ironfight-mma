@@ -136,6 +136,32 @@ service cloud.firestore {
                          || (isTrainerOrAdmin() && userGymId() == gymId));
       }
 
+      // Einladungen (Multi-Gym Phase 2, Konzept §5) — der Mechanismus, der
+      // die Mandantentrennung herstellt: Einloesen setzt den gymId-Claim.
+      // SCHREIBEN IST HIER GANZ VERBOTEN. Erzeugt, zurueckgezogen und
+      // eingeloest wird ausschliesslich ueber /api/invites (Admin-SDK).
+      // Grund: Duerfte ein Trainer Einladungen selbst schreiben, koennte er
+      // sich eine mit role="admin" ausstellen und einloesen — Rechte-
+      // ausweitung ueber Umwege. Lesen duerfen nur Trainer/Admins des Gyms
+      // (ihre eigene Uebersicht); Eingeladene brauchen keinen Lesezugriff,
+      // der Beitritt laeuft serverseitig.
+      match /invites/{code} {
+        allow read: if request.auth != null
+                    && (isAdmin()
+                        || (isTrainerOrAdmin() && userGymId() == gymId));
+        allow write: if false;
+      }
+
+      // Protokoll rechteveraendernder Vorgaenge (Konzept §4). Ebenfalls rein
+      // serverseitig geschrieben — ein Protokoll, das der Betroffene aendern
+      // kann, ist keines.
+      match /auditLog/{entryId} {
+        allow read: if request.auth != null
+                    && (isAdmin()
+                        || (isTrainerOrAdmin() && userGymId() == gymId));
+        allow write: if false;
+      }
+
       // Trainer-Plaene mit Freigabe (Workout-Plaene AUSBAU Stufe 1):
       // Sichtbarkeit liegt SERVERSEITIG in audienceUids (beim Freigeben
       // materialisierte Schueler-Auswahl, Muster opponents.sharedWith) —
