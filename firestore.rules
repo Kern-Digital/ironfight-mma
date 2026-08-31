@@ -142,23 +142,26 @@ service cloud.firestore {
       // eingeloest wird ausschliesslich ueber /api/invites (Admin-SDK).
       // Grund: Duerfte ein Trainer Einladungen selbst schreiben, koennte er
       // sich eine mit role="admin" ausstellen und einloesen — Rechte-
-      // ausweitung ueber Umwege. Lesen duerfen nur Trainer/Admins des Gyms
-      // (ihre eigene Uebersicht); Eingeladene brauchen keinen Lesezugriff,
-      // der Beitritt laeuft serverseitig.
+      // ausweitung ueber Umwege.
+      //
+      // LESEN NUR DIE VERWALTUNG (Leon 31.08.): Wer die Codes sieht, kann sie
+      // weiterreichen — also einladen. Ein Trainer ohne Einladungsrecht darf
+      // die Liste deshalb nicht lesen. Die Rolle `verwaltung` entsteht erst in
+      // Checkpoint 3; bis dahin steht `admin` stellvertretend, danach wird aus
+      // isAdmin() hier: isAdmin() || (isVerwaltung() && userGymId() == gymId).
+      // Eingeladene brauchen ohnehin keinen Lesezugriff — der Beitritt laeuft
+      // serverseitig ueber /api/invites/redeem.
       match /invites/{code} {
-        allow read: if request.auth != null
-                    && (isAdmin()
-                        || (isTrainerOrAdmin() && userGymId() == gymId));
+        allow read: if request.auth != null && isAdmin();
         allow write: if false;
       }
 
       // Protokoll rechteveraendernder Vorgaenge (Konzept §4). Ebenfalls rein
       // serverseitig geschrieben — ein Protokoll, das der Betroffene aendern
-      // kann, ist keines.
+      // kann, ist keines. Lesen wie bei den Einladungen nur die Verwaltung:
+      // die Eintraege enthalten die Codes im Klartext.
       match /auditLog/{entryId} {
-        allow read: if request.auth != null
-                    && (isAdmin()
-                        || (isTrainerOrAdmin() && userGymId() == gymId));
+        allow read: if request.auth != null && isAdmin();
         allow write: if false;
       }
 

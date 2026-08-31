@@ -172,6 +172,17 @@ export default function TrainerDashboardPage() {
           <Link href="/trainer/plans" className="btn-secondary px-4 py-2 text-xs">
             Workout-Pläne
           </Link>
+          {/* Einladen darf nur die Verwaltung (Multi-Gym Phase 2) — bis
+              Checkpoint 3 vertreten durch `admin`. Server und Firestore-Regeln
+              setzen das hart durch; hier verschwindet nur der Einstieg. */}
+          {profile?.role === "admin" && (
+            <Link
+              href="/trainer/einladungen"
+              className="btn-secondary px-4 py-2 text-xs"
+            >
+              Einladungen
+            </Link>
+          )}
         </div>
       </DashboardHero>
 

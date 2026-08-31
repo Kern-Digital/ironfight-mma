@@ -5,8 +5,15 @@
  * Antwort: { code, gymId, role, expiresAt, maxUses }
  *
  * Schutzregeln (Konzept §4 „Rechte vergeben darf nur, wer sie selbst hat"):
- *   • Trainer laden nur ins EIGENE Gym ein.
- *   • Eine Trainer-Einladung darf nur ein Admin ausstellen.
+ *   • EINLADEN DARF NUR DIE VERWALTUNG (Leon 31.08.). Die Rolle `verwaltung`
+ *     entsteht erst in Checkpoint 3 (Claims-Set statt einzelnem `role`) —
+ *     bis dahin ist `admin` der einzige Rang über dem Trainer und steht
+ *     hier stellvertretend. Beim Umstieg wird aus `isAdmin(user)` an genau
+ *     dieser Stelle `isAdmin(user) || verwaltung im eigenen Gym`; ein
+ *     Trainer MIT Verwaltungsrecht darf dann einladen, ein Trainer ohne
+ *     weiterhin nicht. Dieselbe Kante steht in /revoke und in den Rules
+ *     (Lesen der Einladungen) — wer die Codes sieht, kann einladen.
+ *   • Verwaltung/Admin lädt nur ins EIGENE Gym ein.
  *   • role="admin" ist gar nicht erst vorgesehen — Plattform-Rechte werden
  *     niemals über einen Link vergeben.
  */
@@ -25,7 +32,6 @@ import {
 import {
   bearerToken,
   isAdmin,
-  isTrainerOrAdmin,
   userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
@@ -44,9 +50,9 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  if (!isTrainerOrAdmin(user)) {
+  if (!isAdmin(user)) {
     return NextResponse.json(
-      { error: "Nur Trainer und Admins können einladen." },
+      { error: "Nur die Gym-Verwaltung kann einladen." },
       { status: 403 },
     );
   }
@@ -65,9 +71,13 @@ export async function POST(req: Request) {
   }
 
   const role: InviteRole = body.role === "trainer" ? "trainer" : "user";
+  // Solange nur der Admin überhaupt einladen darf, kann das hier nicht
+  // greifen — die Kante bleibt trotzdem stehen: mit der Rolle `verwaltung`
+  // (Checkpoint 3) wird die Prüfung oben durchlässiger, und dann muss
+  // weiterhin entschieden sein, WER Trainer-Rechte per Link vergeben darf.
   if (role === "trainer" && !isAdmin(user)) {
     return NextResponse.json(
-      { error: "Trainer-Einladungen darf nur ein Admin ausstellen." },
+      { error: "Trainer-Einladungen darf nur die Verwaltung ausstellen." },
       { status: 403 },
     );
   }

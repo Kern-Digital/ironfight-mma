@@ -89,7 +89,15 @@ export const INVITE_MAX_USES = 200;
 /**
  * Verwechslungsfreies Alphabet: ohne 0/O und 1/I/L — ein am Telefon
  * durchgegebener oder abgetippter Code darf nicht an der Schriftart scheitern.
- * 32 Zeichen ^ 8 Stellen ≈ 1,1 Billionen Möglichkeiten.
+ * 31 Zeichen ^ 8 Stellen ≈ 853 Milliarden Möglichkeiten.
+ *
+ * Zum Durchprobieren: Sowohl /preview als auch /redeem verlangen ein gültiges
+ * ID-Token — Raten setzt also ein Konto voraus und ist protokollierbar. Bei
+ * einer Handvoll offener Codes liegt die Trefferwahrscheinlichkeit pro Versuch
+ * unter 1 : 100 Milliarden; dazu verfallen Codes nach INVITE_DEFAULT_DAYS.
+ * Eine Bremse pro Konto (Fehlversuche zählen, dann sperren) gehört trotzdem
+ * dazu, sobald /beitreten existiert — sie schützt weniger vor Zutritt als vor
+ * Kosten (jeder Versuch ist eine Firestore-Abfrage).
  */
 export const INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const INVITE_CODE_LENGTH = 8;
@@ -190,4 +198,102 @@ export async function listGymInvites(gymId: string): Promise<GymInvite[]> {
     ),
   );
   return snap.docs.map((d) => decodeInvite(d.id, d.data() as InviteDoc));
+}
+
+// ─── Schreiben (ausschließlich über die Server-Routen) ─────────────────────
+
+/**
+ * Einladungen werden NIE direkt aus dem Client geschrieben — die
+ * Firestore-Regeln verbieten das ausdrücklich (`write: if false`), weil sonst
+ * jeder Schreibberechtigte sich selbst eine Einladung mit höherer Rolle
+ * ausstellen und einlösen könnte. Erlaubt ist nur der Weg über die
+ * Admin-SDK-Routen, die Rolle und Gym des Aufrufers hart prüfen.
+ *
+ * Das ID-Token kommt vom aufrufenden Bildschirm (`await user.getIdToken()`)
+ * und wird als Bearer-Token mitgeschickt.
+ */
+
+export interface CreateInviteInput {
+  role: InviteRole;
+  /** Wie viele Personen den Code einlösen dürfen (1 = persönlich). */
+  maxUses: number;
+  /**
+   * Gültigkeit in Tagen. Ohne Angabe INVITE_DEFAULT_DAYS — die Oberfläche
+   * lässt das bewusst fest (Leon 31.08.: ein Wahlfeld, das immer auf dem
+   * Standard steht, macht das Formular nur länger). Der Server nimmt 1–90
+   * entgegen, das Feld ist also jederzeit nachrüstbar.
+   */
+  days?: number;
+  note?: string;
+}
+
+export interface CreateInviteResult {
+  code: string;
+  gymId: string;
+  role: InviteRole;
+  maxUses: number;
+  /** ISO-Zeitstempel. */
+  expiresAt: string;
+}
+
+async function postInvites<T>(
+  action: "create" | "revoke" | "note",
+  idToken: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`/api/invites/${action}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  // Fehlerseiten (502/504) liefern kein JSON — dann bleibt die Standardmeldung
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    throw new Error(data.error ?? "Die Anfrage ist fehlgeschlagen.");
+  }
+  return data as T;
+}
+
+/** Stellt eine Einladung aus. Nur die Verwaltung darf das (Server prüft). */
+export function createInviteRequest(
+  idToken: string,
+  input: CreateInviteInput,
+): Promise<CreateInviteResult> {
+  return postInvites<CreateInviteResult>("create", idToken, {
+    role: input.role,
+    maxUses: input.maxUses,
+    days: input.days ?? INVITE_DEFAULT_DAYS,
+    note: input.note ?? "",
+  });
+}
+
+/** Zieht eine Einladung zurück (löscht sie nicht — setzt `revokedAt`). */
+export async function revokeInviteRequest(
+  idToken: string,
+  code: string,
+): Promise<void> {
+  await postInvites<{ ok: boolean }>("revoke", idToken, {
+    code: normalizeInviteCode(code),
+  });
+}
+
+/**
+ * Ändert die Notiz. Auch das läuft über den Server: Einladungen sind in den
+ * Regeln komplett schreibgeschützt, und die Route schreibt genau dieses Feld.
+ * Liefert die gespeicherte (getrimmte, auf 120 Zeichen gekürzte) Fassung.
+ */
+export async function updateInviteNoteRequest(
+  idToken: string,
+  code: string,
+  note: string,
+): Promise<string> {
+  const res = await postInvites<{ ok: boolean; note: string }>(
+    "note",
+    idToken,
+    { code: normalizeInviteCode(code), note },
+  );
+  return res.note;
 }

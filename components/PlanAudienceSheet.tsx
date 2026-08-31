@@ -236,7 +236,7 @@ export default function PlanAudienceSheet({
               className="mb-2 h-1 w-10 rounded-full sm:invisible"
               style={{ background: "var(--line-strong)" }}
             />
-            <span className="t-label">Freigabe</span>
+            <span className="t-sheet-title">Freigabe</span>
             <span
               className="max-w-full truncate"
               style={{ ...META_FONT, color: "var(--text-3)" }}

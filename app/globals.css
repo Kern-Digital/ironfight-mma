@@ -291,7 +291,13 @@
   --type-body: 400 16px/1.5 var(--font-body);
   --type-body-strong: 600 16px/1.5 var(--font-body);
   --type-sub: 400 14px/1.45 var(--font-body);
-  --type-label: 600 12px/1.2 var(--font-body);         /* +ls .12em, caps */
+  /* Feld- und Rubrik-Label („FÜR WEN?", „NOTIZ"). 12 → 14px (Leon 31.08.:
+     Überschriften über Feldern waren zu klein) — app-weit am Token, nie in
+     der Komponente. */
+  --type-label: 600 14px/1.2 var(--font-body);         /* +ls .08em, caps */
+  /* Kopfzeile von Sheets/Overlays — eine Stufe ÜBER dem Feld-Label, damit
+     „Neue Einladung" als Titel liest und nicht als weiteres Feld. */
+  --type-sheet-title: 700 19px/1.2 var(--font-body);   /* +ls .08em, caps */
   /* Meta-Zeilen unter Titeln („Level · Disziplin · 33 min"), Badges,
      Kartenfüße. Lag bis 2026-08-31 als hartkodierte 10px in 17 Dateien
      und war zu klein (Leon) — jetzt EIN Token für die ganze App. */
@@ -321,7 +327,8 @@
     --type-body: 400 17px/1.5 var(--font-body);
     --type-body-strong: 600 17px/1.5 var(--font-body);
     --type-sub: 400 15px/1.45 var(--font-body);
-    --type-label: 600 13px/1.2 var(--font-body);
+    --type-label: 600 15px/1.2 var(--font-body);
+    --type-sheet-title: 700 20px/1.2 var(--font-body);
     /* Mobil bewusst NICHT größer: Meta steht oft in schmalen Karten
        (zwei-spaltige Hub-Felder), 13px würde dort umbrechen */
     --type-meta: 600 12px/1.35 var(--font-body);
@@ -378,10 +385,39 @@
     text-transform: uppercase;
     color: var(--text-label);
   }
+  /* Titel eines Sheets/Overlays (Picker-Optik). Eigene Klasse statt t-label,
+     weil ein Sheet-Kopf über den Feld-Labels darunter stehen muss —
+     app-weit gesetzt, damit alle Sheets gleich klingen (Leon 31.08.). */
+  .t-sheet-title {
+    font: var(--type-sheet-title);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--text-body);
+  }
   .t-card {
     background: var(--surface-card);
     border: 1px solid var(--card-border);
     border-radius: var(--r-lg);
+  }
+  /* Listenzeile: GANZE Karte klickbar, dazu eine eigene Aktion in derselben
+     Zeile (Leon 31.08.: der markierte Bereich soll den ganzen Block füllen).
+     Ein Knopf IM Knopf wäre ungültiges HTML — deshalb liegt das Klickziel als
+     unsichtbares Geschwister-Overlay (.t-row-target) über der Karte, und
+     Hover/Press/Fokus zeichnen per :has() die ganze Karte. Der Zeilen-Knopf
+     steht darüber und übernimmt seine eigenen Zeiger-Ereignisse. */
+  .t-row-card {
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .t-row-card:has(.t-row-target:hover) { background: var(--surface-raised); }
+  .t-row-card:has(.t-row-target:active) { transform: scale(0.99); }
+  .t-row-card:has(.t-row-target:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .t-row-card:has(.t-row-target:active) { transform: none; }
   }
   /* DeepFight-Karte — dezente Feature-Hervorhebung: 1px-Verlaufsrand
      (Gym-Akzent → Brand-Violett, stark mit --line abgeschwächt) + feiner

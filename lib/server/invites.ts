@@ -74,7 +74,8 @@ export async function findInviteByCode(db: Firestore, code: string) {
 export type AuditType =
   | "invite.create"
   | "invite.revoke"
-  | "invite.redeem";
+  | "invite.redeem"
+  | "invite.note";
 
 /**
  * Protokolliert Vorgänge, die Rechte verändern (Konzept §4). Bewusst
