@@ -389,6 +389,30 @@ export async function getSubscriptions(
 }
 
 /**
+ * Welche der übergebenen Mitglieder haben diesen Kurs abonniert? (Freigabe-
+ * Dialog der Trainer-Pläne: Kurs-Auswahl belegt die Schüler-Checkliste vor.)
+ * Ein getDoc pro Mitglied — die Doc-ID der Subcollection IST die Kurs-ID,
+ * und Trainer dürfen die Abos ihrer Gym-Mitglieder per Rules lesen. Eine
+ * collectionGroup-Query wäre billiger, hat aber bewusst keine Rules-Freigabe.
+ */
+export async function filterSubscribedUids(
+  blockId: string,
+  uids: string[],
+): Promise<string[]> {
+  const checks = await Promise.all(
+    uids.map(async (uid) => {
+      try {
+        const snap = await getDoc(subscriptionDocRef(uid, blockId));
+        return snap.exists() ? uid : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return checks.filter((uid): uid is string => uid !== null);
+}
+
+/**
  * Synchronisiert alle abonnierten Kurse für die aktuelle Woche.
  * Holt zugewiesene Techniken und packt sie in die Library.
  * `lastSyncedWeek` verhindert Doppelsync innerhalb derselben Woche.

@@ -448,6 +448,18 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       markiert als „automatisch erkannt". Achtung: Schema-Erweiterung der
       Beobachtung invalidiert einmalig gespeicherte
       pendingObservation-Fingerprints (Resume startet Gemini neu — ok).
+- [ ] **Neue Signups sind für Trainer UNSICHTBAR** (Lücke bis Phase 2,
+      gefunden 2026-08-31): Beim Anlegen des eigenen Profils verbieten die
+      Rules `gymId` (Beitritt ist serverseitig) — die Trainer-Queries in
+      `lib/admin.ts` filtern aber `where("gymId","==",…)`. Ein frisch
+      registrierter Nutzer fehlt dadurch überall: Schülerliste,
+      Freigabe-Dialog der Trainer-Pläne, DeepFight-Grid. Er selbst merkt
+      nichts (Rules und Client fallen bei fehlendem Claim aufs Default-Gym
+      zurück). Zwischenlösung: `node scripts/backfill-user-gym.mjs`
+      (`--dry-run` / `--uid=<uid>`; REST über firebase-tools, KEIN
+      Service-Account nötig — setzt nur das Feld, nicht den Claim).
+      Endgültig löst das erst das Einladungssystem aus Phase 2, das
+      `gymId` als Claim beim Einlösen setzt.
 - [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
       Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,

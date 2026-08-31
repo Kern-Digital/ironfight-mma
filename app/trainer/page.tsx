@@ -169,6 +169,9 @@ export default function TrainerDashboardPage() {
           <Link href="/trainer/students" className="btn-secondary px-4 py-2 text-xs">
             Schüler ansehen
           </Link>
+          <Link href="/trainer/plans" className="btn-secondary px-4 py-2 text-xs">
+            Workout-Pläne
+          </Link>
         </div>
       </DashboardHero>
 

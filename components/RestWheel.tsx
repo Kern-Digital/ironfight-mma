@@ -147,10 +147,15 @@ export default function RestWheel({
           background: "var(--overlay)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
+          // Weicher Verlauf über mehrere Stufen statt eines harten Sprungs
+          // von voll auf 0,22 — sonst zeichnet sich die Ellipse als Form ab
+          // (Leon 31.08.: „nicht so stark als Kreis erkennen"). Die Ellipse
+          // reicht jetzt über den Bildschirm hinaus, der Rand bleibt
+          // deutlich gedeckt → die Kante liegt außerhalb des Sichtbaren.
           maskImage:
-            "radial-gradient(ellipse 95% 85% at 50% 50%, black 45%, rgba(0,0,0,0.22) 100%)",
+            "radial-gradient(ellipse 130% 115% at 50% 50%, black 0%, rgba(0,0,0,0.86) 45%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0.58) 100%)",
           WebkitMaskImage:
-            "radial-gradient(ellipse 95% 85% at 50% 50%, black 45%, rgba(0,0,0,0.22) 100%)",
+            "radial-gradient(ellipse 130% 115% at 50% 50%, black 0%, rgba(0,0,0,0.86) 45%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0.58) 100%)",
           animation: "fade-in 0.2s ease-out both",
         }}
       />

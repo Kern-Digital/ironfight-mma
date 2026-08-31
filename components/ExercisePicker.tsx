@@ -25,7 +25,7 @@ import type { Category, EquipmentId, Exercise, ExerciseKind } from "@/lib/types"
 import { useEffect, useRef, useState } from "react";
 
 const META_FONT: React.CSSProperties = {
-  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  font: "var(--type-meta)",
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };

@@ -9,7 +9,7 @@
  */
 
 import AthleteTabBar from "@/components/AthleteTabBar";
-import Icon from "@/components/ui/Icon";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
@@ -18,17 +18,17 @@ import { generateWorkout } from "@/lib/workout-generator";
 import { WORKOUT_DISCIPLINES } from "@/lib/workout-plan-defaults";
 import { resolveGymId } from "@/lib/gym";
 import SwipeAction from "@/components/SwipeAction";
-import WorkoutLogSheet, { WorkoutLogTile } from "@/components/WorkoutLogSheet";
 import {
   listPersonalWorkoutPlans,
+  listSharedTrainerPlans,
   listWorkoutPlansForGym,
   planDurationSeconds,
   planExerciseCount,
   planToSessionPayload,
   removeSavedPlan,
-  toggleWorkoutFavorite,
   workoutDefinitionToPlan,
   type PersonalWorkoutPlan,
+  type TrainerWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
@@ -36,7 +36,6 @@ import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import {
   DIFFICULTY_LABEL,
   DISCIPLINE_LABEL,
-  GENDER_HEART_COLOR,
   type Category,
   type Difficulty,
   type EquipmentId,
@@ -59,7 +58,7 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 const META_FONT: React.CSSProperties = {
-  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  font: "var(--type-meta)",
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
@@ -83,6 +82,137 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
       )}
     </div>
   );
+}
+
+// ─── Hub-Kopffelder „Letzte Workouts" / „Meine Workouts" (Leon 31.08.) ─────
+
+/** Großes Symbol über dem Titel — gibt dem Feld sein Gesicht. */
+function HubFieldHead({ icon, title }: { icon: IconName; title: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span aria-hidden style={{ color: "var(--accent-text)", lineHeight: 0 }}>
+        <Icon name={icon} size={34} strokeWidth={1.8} />
+      </span>
+      <h2
+        style={{
+          font: "var(--type-h2)",
+          letterSpacing: "var(--ls-display)",
+          textTransform: "uppercase",
+        }}
+      >
+        {title}
+      </h2>
+    </div>
+  );
+}
+
+/**
+ * Angedeutete Kartei: die ersten drei Einträge als kompakte Kacheln, nach
+ * unten in den Seitengrund ausgeblendet (Maske) — man sieht den Anfang,
+ * der Rest „läuft aus". Die vollen Listen liegen hinter dem Feld.
+ */
+function PeekStack({
+  items,
+  empty,
+  emptyText,
+}: {
+  items: { key: string; title: string; meta: string }[];
+  empty: boolean;
+  emptyText: string;
+}) {
+  if (empty) {
+    return (
+      <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+        {emptyText}
+      </p>
+    );
+  }
+  return (
+    <div
+      aria-hidden
+      className="relative overflow-hidden"
+      style={{
+        // Zeigt gut zwei Kacheln, die dritte läuft in der Maske aus
+        height: 96,
+        maskImage: "linear-gradient(to bottom, black 40%, transparent 96%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, black 40%, transparent 96%)",
+      }}
+    >
+      <div className="flex flex-col gap-1.5">
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className="flex flex-col rounded-field px-2.5 py-1.5"
+            style={{
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <span
+              className="truncate"
+              style={{
+                font: "600 14px/1.3 var(--font-archivo), system-ui, sans-serif",
+                color: "var(--text-body)",
+              }}
+            >
+              {it.title}
+            </span>
+            <span
+              className="truncate"
+              style={{ ...META_FONT, color: "var(--text-3)" }}
+            >
+              {it.meta}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Die letzten Workouts als angedeutete Kartei (Datum unter dem Namen). */
+function PeekStackRecent({ items }: { items: WorkoutSession[] }) {
+  return (
+    <PeekStack
+      empty={false}
+      emptyText=""
+      items={items.slice(0, 3).map((s) => ({
+        key: s.id,
+        title: s.label ?? "Workout",
+        meta: shortLogDate(s.startedAt ?? s.completedAt),
+      }))}
+    />
+  );
+}
+
+/** Eigene Pläne als angedeutete Kartei (Dauer + Übungszahl). */
+function PeekStackOwn({ items }: { items: PersonalWorkoutPlan[] }) {
+  return (
+    <PeekStack
+      empty={false}
+      emptyText=""
+      items={items.slice(0, 3).map((p) => ({
+        key: p.id,
+        title: p.name,
+        meta: `${Math.round(planDurationSeconds(p) / 60)} min · ${planExerciseCount(p)} Übungen`,
+      }))}
+    />
+  );
+}
+
+/** Kurzdatum für die angedeuteten Log-Kacheln („Heute", „28.08.") */
+function shortLogDate(d: Date | null | undefined): string {
+  if (!d) return "";
+  const today = new Date();
+  const sameDay =
+    d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
+  if (sameDay) {
+    return `Heute · ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
 // ─── Auswahl-Baustein (Disziplin/Schwierigkeit/Dauer) ──────────────────────
@@ -132,11 +262,15 @@ export default function WorkoutHubPage() {
   // Gym-Pläne aus Firestore (seit Seeding, Schritt 5) — nur für die
   // Meta-Zeile der Disziplinkarten („n Pläne · n Level").
   const [gymPlans, setGymPlans] = useState<WorkoutPlan[] | null>(null);
+  // Für MICH freigegebene Trainer-Pläne (AUSBAU Stufe 1) — Sektion
+  // „Vom Trainer für dich"; leer = Sektion erscheint gar nicht.
+  const [trainerPlans, setTrainerPlans] = useState<TrainerWorkoutPlan[] | null>(
+    null,
+  );
   const [plansOpen, setPlansOpen] = useState(false);
-  const [heartBusy, setHeartBusy] = useState<string | null>(null);
-  // Detail-Popup eines Log-Eintrags — als ID, damit Herz-Updates im
-  // recent-State auch das offene Popup erreichen
-  const [openLogId, setOpenLogId] = useState<string | null>(null);
+  // Freigegebene Trainer-Pläne als Popup (Leon 31.08. — die Sektion ist
+  // eine Bild-Karte im Muster „Meine Bibliothek")
+  const [trainerPlansOpen, setTrainerPlansOpen] = useState(false);
   // Auto-Generator als Popup (Leons Vorgabe 2026-08-28)
   const [genOpen, setGenOpen] = useState(false);
   // Links-Wisch in „Meine Workouts": Plan fliegt mit Raus-Animation, dann
@@ -168,10 +302,6 @@ export default function WorkoutHubPage() {
       });
     }, 220);
   }
-
-  // Herz-Farbe nach Gender im Athleten-Profil (Leons Vorgabe 2026-08-27)
-  const heartColor =
-    GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 
   useEffect(() => {
     if (authLoading) return;
@@ -213,31 +343,34 @@ export default function WorkoutHubPage() {
       .catch(() => {
         if (!cancelled) setGymPlans([]);
       });
+    // Freigegebene Trainer-Pläne — die array-contains-Query auf die eigene
+    // uid ist die einzige, die die Rules einem Athleten hier erlauben.
+    listSharedTrainerPlans(resolveGymId(profile), user.uid)
+      .then((plans) => {
+        if (!cancelled) setTrainerPlans(plans);
+      })
+      .catch(() => {
+        if (!cancelled) setTrainerPlans([]);
+      });
     return () => {
       cancelled = true;
     };
   }, [user, profile, profileLoading]);
 
-  // Herz: speichert das ausgeführte Workout als eigenen Plan (bzw. entfernt
-  // ihn wieder) — der Gefüllt-Zustand hängt am savedPlanId des Log-Eintrags.
-  async function toggleFavorite(session: WorkoutSession) {
-    if (!user || heartBusy) return;
-    setHeartBusy(session.id);
-    try {
-      const savedPlanId = await toggleWorkoutFavorite(user.uid, session);
-      setRecent(
-        (r) =>
-          r?.map((s) => (s.id === session.id ? { ...s, savedPlanId } : s)) ??
-          r,
-      );
-      // Plan-Liste neu laden statt lokal nachbauen (Sortierung/Timestamps)
-      setOwnPlans(await listPersonalWorkoutPlans(user.uid));
-    } catch {
-      // Fehlgeschlagen — Herz bleibt im alten Zustand
-    } finally {
-      setHeartBusy(null);
-    }
-  }
+  // Titel der Freigabe-Karte: „Vom Trainer für dich" wäre für einen
+  // Trainer schief — er IST der Trainer und bekommt die Pläne von
+  // Kollegen (oder sich selbst). Leons Wahl 31.08.
+  const sharedPlansTitle = isTrainer ? "Aus dem Team" : "Vom Trainer für dich";
+  // Passendes Foto zur Rolle (Pexels, frei nutzbar — Ordner bewusst
+  // /library-stack, /library läuft durch die Auth-Middleware):
+  // Trainer sehen das Corner-Team um den Kämpfer, Athleten den Coach
+  // an den Pratzen.
+  const sharedPlansImage = isTrainer
+    ? // Coach beobachtet sein Team beim Sparring im Käfig — der Coach
+      // steht links, deshalb der Ausschnitt weiter rechts: in der Karte
+      // ist nur die rechte Bildhälfte sichtbar (Maske läuft nach links)
+      { src: "/library-stack/coach-team.jpg", position: "62% 45%" }
+    : { src: "/library-stack/coach-pads.jpg", position: "50% 40%" };
 
   const [category, setCategory] = useState<Category>("boxing");
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
@@ -336,87 +469,99 @@ export default function WorkoutHubPage() {
 
       {/* pt-4/5: sichtbare Abgrenzung Kopf → erste Sektion (Leon 2026-08-27) */}
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
-        {/* ── Letzte Workouts — Kartei-Stapel (Leons Vorgaben 2026-08-28):
-            volle Breite, Datum + Startzeit über dem Namen, Herz rechts;
-            ältere Einträge rücken nach unten-rechts und werden leichter.
-            Tippen öffnet das Detail-Popup, „Alle ansehen" den Verlauf. ── */}
-        {recent !== null && recent.length > 0 && (
-          <section className="flex flex-col gap-4">
-            <div className="flex items-end justify-between gap-3">
-              <SectionHeader
-                title="Letzte Workouts"
-                subtitle="Tippen für Details — das Herz speichert als eigenen Plan"
-              />
-              <Link
-                href="/workout/verlauf"
-                className="shrink-0 pb-0.5"
-                style={{
-                  font: "var(--type-sub)",
-                  color: "var(--accent-text)",
-                  textDecoration: "none",
-                }}
-              >
-                Alle ansehen
-              </Link>
-            </div>
-            <div className="flex flex-col">
-              {recent.map((s, i) => {
-                // „Anleuchten" (Leon 2026-08-28): die Karte darüber wirft
-                // einen Schein auf die Oberkante der Karte darunter, nach
-                // hinten schwächer; die vorderste wird nicht angeleuchtet
-                // und ist dafür selbst etwas heller. Im HELLEN Theme wäre
-                // Weiß auf Weiß unsichtbar → dort leuchtet der Akzent.
-                const lit = theme === "light" ? "var(--accent)" : "white";
-                const litPct =
-                  theme === "light" ? (i === 1 ? 12 : 6) : i === 1 ? 10 : 5;
-                const frontBg =
-                  theme === "light"
-                    ? "color-mix(in srgb, var(--accent) 5%, var(--surface-card))"
-                    : "color-mix(in srgb, white 8%, var(--surface-card))";
-                return (
-                  <WorkoutLogTile
-                    key={s.id}
-                    session={s}
-                    heartColor={heartColor}
-                    heartBusy={heartBusy === s.id}
-                    onToggleFavorite={() => void toggleFavorite(s)}
-                    onOpen={() => setOpenLogId(s.id)}
-                    style={{
-                      // Versatz nach unten-rechts, ältestes Workout hinten
-                      width: `calc(100% - ${i * 14}px)`,
-                      marginLeft: i * 14,
-                      marginTop: i === 0 ? 0 : -8,
-                      zIndex: recent.length - i,
-                      background:
-                        i === 0
-                          ? frontBg
-                          : `linear-gradient(to bottom, color-mix(in srgb, ${lit} ${litPct}%, var(--surface-card)) 0%, var(--surface-card) 55%)`,
-                      // Vorderste Karte: kräftigerer Rahmen — auf der
-                      // helleren Fläche ging der normale Card-Rand unter
-                      ...(i === 0
-                        ? { border: "1px solid var(--line-strong)" }
-                        : {}),
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </section>
+        {/* ── Zwei Felder auf gleicher Höhe (Leon 31.08.): links die
+            letzten Workouts nur ANGEDEUTET (Klick → ganzer Verlauf),
+            rechts „Meine Workouts" (Klick → Popup mit der Planliste).
+            Herz und Detail-Popup leben jetzt auf /workout/verlauf. ── */}
+        {(recent !== null || ownPlans !== null) && (
+          <div className="grid grid-cols-2 items-stretch gap-3">
+            <Link
+              href="/workout/verlauf"
+              className="t-card t-interactive flex flex-col gap-2 p-4 sm:p-5"
+              style={{
+                border:
+                  "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
+                textDecoration: "none",
+                color: "var(--text-body)",
+              }}
+            >
+              <HubFieldHead icon="chart" title="Letzte Workouts" />
+              {recent !== null && recent.length > 0 ? (
+                <PeekStackRecent items={recent} />
+              ) : (
+                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  {recent === null ? " " : "Noch kein Workout gelaufen"}
+                </p>
+              )}
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setPlansOpen(true)}
+              disabled={ownPlans === null}
+              className="t-card t-interactive flex flex-col gap-2 p-4 text-left sm:p-5"
+              style={{
+                border:
+                  "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
+              }}
+            >
+              <HubFieldHead icon="heart" title="Meine Workouts" />
+              {ownPlans !== null && ownPlans.length > 0 ? (
+                <PeekStackOwn items={ownPlans} />
+              ) : (
+                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  {ownPlans === null
+                    ? " "
+                    : "Noch keine — speichere deinen ersten Plan"}
+                </p>
+              )}
+            </button>
+          </div>
         )}
 
-        {/* ── Meine Workouts (ehem. „Eigene Workoutpläne", Leon 2026-08-28)
-            — gerahmtes Feld, öffnet das Popup ── */}
-        {ownPlans !== null && (
+        {/* ── Vom Trainer für dich (AUSBAU Stufe 1) — Bild-Karte im
+            Muster „Meine Bibliothek" (Leon 31.08.): ein Feld mit
+            Coach-Foto, das die freigegebenen Pläne als Popup öffnet.
+            Sichtbar nur, wenn der Trainer für DIESEN Athleten etwas
+            freigegeben hat — erzwungen von den Firestore-Regeln. ── */}
+        {trainerPlans !== null && trainerPlans.length > 0 && (
           <button
             type="button"
-            onClick={() => setPlansOpen(true)}
-            className="t-card t-interactive flex w-full items-center gap-4 p-4 text-left sm:p-5"
+            onClick={() => setTrainerPlansOpen(true)}
+            className="t-card t-interactive relative flex min-h-[7rem] items-center gap-4 overflow-hidden p-4 text-left sm:min-h-[8rem] sm:p-5"
             style={{
               border:
                 "1px solid color-mix(in oklab, var(--accent) 60%, transparent)",
             }}
           >
-            <div className="flex min-w-0 flex-1 flex-col">
+            {/* Foto rechts, nach links in die Karte auslaufend (Maske) */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-0 w-[62%] sm:w-[52%]"
+              style={{
+                maskImage:
+                  "linear-gradient(to left, black 45%, transparent 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to left, black 45%, transparent 100%)",
+              }}
+            >
+              <Image
+                src={sharedPlansImage.src}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 60vw, 420px"
+                className="object-cover"
+                style={{ objectPosition: sharedPlansImage.position }}
+              />
+            </div>
+            <span
+              aria-hidden
+              className="relative shrink-0"
+              style={{ color: "var(--accent-text)", lineHeight: 0 }}
+            >
+              <Icon name="users" size={22} />
+            </span>
+            <div className="relative flex min-w-0 flex-1 flex-col">
               <h2
                 style={{
                   font: "var(--type-h2)",
@@ -424,21 +569,13 @@ export default function WorkoutHubPage() {
                   textTransform: "uppercase",
                 }}
               >
-                Meine Workouts
+                {sharedPlansTitle}
               </h2>
-              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                {ownPlans.length === 0
-                  ? "Noch keine — erstelle oder speichere deinen ersten Plan"
-                  : `${ownPlans.length} ${ownPlans.length === 1 ? "Plan" : "Pläne"} — zuletzt bearbeitet zuerst`}
-              </p>
+              <span style={{ ...META_FONT, color: "var(--text-2)" }}>
+                {trainerPlans.length}{" "}
+                {trainerPlans.length === 1 ? "Plan" : "Pläne"} freigegeben
+              </span>
             </div>
-            <span
-              aria-hidden
-              className="shrink-0"
-              style={{ color: "var(--accent-text)", lineHeight: 0 }}
-            >
-              <Icon name="arrow-right" size={18} strokeWidth={2} />
-            </span>
           </button>
         )}
 
@@ -815,19 +952,123 @@ export default function WorkoutHubPage() {
         </div>
       )}
 
-      {/* ── Detail-Popup eines Log-Eintrags („Letzte Workouts") ── */}
-      {(() => {
-        const openLog = recent?.find((s) => s.id === openLogId) ?? null;
-        return openLog ? (
-          <WorkoutLogSheet
-            session={openLog}
-            heartColor={heartColor}
-            heartBusy={heartBusy === openLog.id}
-            onToggleFavorite={() => void toggleFavorite(openLog)}
-            onClose={() => setOpenLogId(null)}
+      {/* Detail-Popup und Herz der letzten Workouts liegen seit dem
+          Zwei-Felder-Umbau (Leon 31.08.) auf /workout/verlauf */}
+
+      {/* ── Popup „Vom Trainer für dich" — freigegebene Pläne ── */}
+      {trainerPlansOpen && trainerPlans !== null && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={sharedPlansTitle}
+        >
+          <button
+            type="button"
+            aria-label="Schließen"
+            className="absolute inset-0"
+            style={{
+              background: "var(--overlay)",
+              animation: "fade-in 0.2s ease-out both",
+            }}
+            onClick={() => setTrainerPlansOpen(false)}
           />
-        ) : null;
-      })()}
+          <div
+            className="animate-slide-up relative flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+            style={{
+              maxHeight: "75dvh",
+              background: "var(--surface-card)",
+              boxShadow: "var(--glass-shadow)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 pt-3">
+              <div className="flex flex-col items-start">
+                <div
+                  aria-hidden
+                  className="mb-2 h-1 w-10 rounded-full sm:invisible"
+                  style={{ background: "var(--line-strong)" }}
+                />
+                <span className="t-label">{sharedPlansTitle}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrainerPlansOpen(false)}
+                aria-label="Schließen"
+                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
+                style={{ color: "var(--text-3)" }}
+              >
+                <Icon name="x" size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+            <div
+              className="flex flex-col gap-3 overflow-y-auto px-4 pt-3"
+              style={{
+                paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+              }}
+            >
+              {trainerPlans.map((plan) => {
+                const minutes = Math.round(planDurationSeconds(plan) / 60);
+                const exercises = planExerciseCount(plan);
+                return (
+                  <Link
+                    key={plan.id}
+                    href={`/workout/plans/${plan.id}`}
+                    className="t-card t-interactive relative flex items-center gap-4 overflow-hidden p-4"
+                    style={{
+                      textDecoration: "none",
+                      color: "var(--text-body)",
+                    }}
+                  >
+                    {/* Rubrik-Farbe leuchtet von links (Muster Hub-Karten) */}
+                    <div aria-hidden data-ambient className="overflow-hidden">
+                      <span
+                        data-glow
+                        style={{
+                          left: "-22%",
+                          top: "-30%",
+                          width: "32%",
+                          height: "160%",
+                          background: `color-mix(in oklab, ${DISCIPLINE_COLOR[plan.discipline]} var(--cat-glow-mix), transparent)`,
+                        }}
+                      />
+                    </div>
+                    <div className="relative flex min-w-0 flex-1 flex-col gap-1">
+                      <h3
+                        style={{
+                          font: "var(--type-h2)",
+                          letterSpacing: "var(--ls-display)",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {plan.name || "Trainer-Plan"}
+                      </h3>
+                      <span style={{ ...META_FONT, color: "var(--text-2)" }}>
+                        {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
+                        {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes} min ·{" "}
+                        {exercises} Übungen
+                      </span>
+                      {plan.createdByName && (
+                        <span
+                          style={{ ...META_FONT, color: "var(--accent-text)" }}
+                        >
+                          Von {plan.createdByName}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      aria-hidden
+                      className="relative shrink-0"
+                      style={{ color: "var(--accent-text)", lineHeight: 0 }}
+                    >
+                      <Icon name="arrow-right" size={18} strokeWidth={2} />
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Popup „Meine Workouts" — Liste + „+" (Leons Vorgabe) ── */}
       {plansOpen && (

@@ -21,7 +21,7 @@ import { DIFFICULTY_LABEL, type Exercise, type Technique } from "@/lib/types";
 import { useState } from "react";
 
 const META_FONT: React.CSSProperties = {
-  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  font: "var(--type-meta)",
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };

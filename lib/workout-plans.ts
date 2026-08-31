@@ -100,6 +100,30 @@ export interface PersonalWorkoutPlan extends WorkoutPlan {
   updatedAt: Date | null;
 }
 
+/**
+ * Trainer-Plan mit Freigabe (AUSBAU Stufe 1) in gyms/{gymId}/trainerPlans —
+ * bewusst GETRENNT von gyms/{gymId}/workoutPlans: die Start-/Gym-Pläne sind
+ * für alle Mitglieder lesbar (ungefilterte Query), Trainer-Pläne nur für die
+ * freigegebenen Athleten. Die Sichtbarkeit liegt SERVERSEITIG in den
+ * Firestore-Regeln über `audienceUids` (Muster opponents.sharedWith) — beim
+ * Freigeben materialisiert, KEIN Client-Filter.
+ */
+export interface TrainerWorkoutPlan extends WorkoutPlan {
+  /** SICHERHEITSWIRKSAM: uids, für die der Plan freigegeben ist (Rules-Read
+      via array-contains). Leer = Entwurf, nur Trainer/Admin sehen ihn. */
+  audienceUids: string[];
+  /** Nur Anzeige: beim Freigeben gewählte Kurse (TRAINING_BLOCKS-IDs).
+      Die Auswahl ist ein SNAPSHOT — wer den Kurs später abonniert, kommt
+      nicht automatisch dazu (echte Mitgliedschaft erst Multi-Gym Phase 2). */
+  audienceCourseIds: string[];
+  createdBy: string;
+  /** Anzeigename des Erstellers, BEIM ANLEGEN mitgeschrieben — Athleten
+      dürfen fremde users-Dokumente nicht lesen (Rules), könnten die uid
+      also nie auflösen. „Von X geteilt" braucht den Namen im Dokument. */
+  createdByName: string;
+  updatedAt: Date | null;
+}
+
 // ─── Berechnungen (Gesamtdauer, Übungszahl, Equipment) ─────────────────────
 
 /** Aufgelöste Übungen eines Blocks — unbekannte IDs werden übersprungen. */
@@ -194,6 +218,50 @@ export function planWithDuplicatedExercise<T extends WorkoutPlan>(
     ids.splice(exerciseIndex + 1, 0, ids[exerciseIndex]);
     return ids;
   });
+}
+
+/**
+ * Ganze Rubrik entfernen (Trainer-Editor, Leon 30.08.) — restOverrides
+ * bleiben bewusst stehen: sie sind pro Übungs-ID und können in anderen
+ * Rubriken weiterwirken; verwaiste Einträge sind wirkungslos.
+ */
+export function planWithRemovedBlock<T extends WorkoutPlan>(
+  plan: T,
+  blockIndex: number,
+): T {
+  return {
+    ...plan,
+    blocks: plan.blocks.filter((_, i) => i !== blockIndex),
+  } as T;
+}
+
+/** Neue leere Rubrik ans Ende („+ Block", Leon 30.08.) — der Titel wird
+    im Editor direkt umbenannt (onBlockTitleChange). */
+export function planWithAddedBlock<T extends WorkoutPlan>(plan: T): T {
+  return {
+    ...plan,
+    blocks: [
+      ...plan.blocks,
+      { title: "Neuer Block", phase: "main", exerciseIds: [], restSeconds: 60 },
+    ],
+  } as T;
+}
+
+/**
+ * Ganze Rubrik verschieben (Halten auf freier Blockfläche, Leon 30.08.) —
+ * wie bei den Übungen gilt die Zielposition NACH dem Entfernen an der
+ * Quelle. Die Zwischen-Pause (restAfterSeconds) wandert mit ihrer Rubrik.
+ */
+export function planWithMovedBlock<T extends WorkoutPlan>(
+  plan: T,
+  from: number,
+  to: number,
+): T {
+  const blocks = [...plan.blocks];
+  const [moved] = blocks.splice(from, 1);
+  if (!moved) return plan;
+  blocks.splice(Math.max(0, Math.min(blocks.length, to)), 0, moved);
+  return { ...plan, blocks } as T;
 }
 
 /**
@@ -409,6 +477,10 @@ type WorkoutPlanDoc = {
   restOverrides?: Record<string, number>;
   sortOrder?: number;
   sourcePlanId?: string | null;
+  audienceUids?: string[];
+  audienceCourseIds?: string[];
+  createdBy?: string;
+  createdByName?: string;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
   updatedBy?: string;
@@ -566,4 +638,145 @@ export async function upsertPersonalWorkoutPlan(
 
 export async function deletePersonalWorkoutPlan(uid: string, planId: string) {
   await deleteDoc(doc(personalPlansCol(uid), planId));
+}
+
+// ─── Firestore: Trainer-Pläne mit Freigabe (AUSBAU Stufe 1) ────────────────
+
+function trainerPlansCol(gymId: string) {
+  return collection(getFirestoreDb(), "gyms", gymId, "trainerPlans");
+}
+
+function docToTrainerPlan(id: string, data: WorkoutPlanDoc): TrainerWorkoutPlan {
+  return {
+    ...docToPlan(id, data),
+    audienceUids: data.audienceUids ?? [],
+    audienceCourseIds: data.audienceCourseIds ?? [],
+    createdBy: data.createdBy ?? "",
+    createdByName: data.createdByName ?? "",
+    updatedAt: data.updatedAt?.toDate() ?? null,
+  };
+}
+
+/** ALLE Trainer-Pläne des Gyms — nur Trainer/Admin (Rules erzwingen das). */
+export async function listTrainerWorkoutPlans(
+  gymId: string,
+): Promise<TrainerWorkoutPlan[]> {
+  const snap = await getDocs(trainerPlansCol(gymId));
+  return sortPlans(
+    snap.docs.map((d) => docToTrainerPlan(d.id, d.data() as WorkoutPlanDoc)),
+  );
+}
+
+/**
+ * Für DIESEN Athleten freigegebene Trainer-Pläne („Vom Trainer für dich").
+ * Die array-contains-Query auf die eigene uid ist für die Rules-Engine
+ * beweisbar — mehr darf ein Athlet in dieser Collection nicht lesen.
+ */
+export async function listSharedTrainerPlans(
+  gymId: string,
+  uid: string,
+): Promise<TrainerWorkoutPlan[]> {
+  const snap = await getDocs(
+    query(trainerPlansCol(gymId), where("audienceUids", "array-contains", uid)),
+  );
+  return sortPlans(
+    snap.docs.map((d) => docToTrainerPlan(d.id, d.data() as WorkoutPlanDoc)),
+  );
+}
+
+/** Einzelner Trainer-Plan — wirft permission-denied ohne Freigabe/Rolle. */
+export async function getTrainerWorkoutPlan(
+  gymId: string,
+  planId: string,
+): Promise<TrainerWorkoutPlan | null> {
+  const snap = await getDoc(doc(trainerPlansCol(gymId), planId));
+  if (!snap.exists()) return null;
+  return docToTrainerPlan(snap.id, snap.data() as WorkoutPlanDoc);
+}
+
+/**
+ * Trainer-Plan anlegen/aktualisieren (Inhalt — Name, Blöcke, Pausen, …).
+ * Die Freigabe-Felder werden hier bewusst NICHT angefasst (merge), dafür
+ * gibt es updateTrainerPlanAudience; beim Anlegen starten sie leer.
+ */
+export async function upsertTrainerWorkoutPlan(
+  gymId: string,
+  plan: WorkoutPlan,
+  updatedBy: string,
+  updatedByName = "",
+  options: { isCreator?: boolean } = {},
+): Promise<string> {
+  const ref = plan.id
+    ? doc(trainerPlansCol(gymId), plan.id)
+    : doc(trainerPlansCol(gymId));
+  await setDoc(
+    ref,
+    {
+      ...planPayload(gymId, plan),
+      updatedAt: serverTimestamp(),
+      updatedBy,
+      // Speichert der ERSTELLER, wird sein Anzeigename aufgefrischt —
+      // so heilen Pläne von vor der Namens-Denormalisierung selbst und
+      // eine Namensänderung schlägt durch. Fremde Trainer fassen das
+      // Feld nie an (sonst stünde ihr Name auf fremden Plänen).
+      ...(plan.id && options.isCreator && updatedByName
+        ? { createdByName: updatedByName }
+        : {}),
+      ...(plan.id
+        ? {}
+        : {
+            // Frischer Plan: Freigabe startet leer, Ersteller wird
+            // festgeschrieben (Name denormalisiert — s. createdByName)
+            audienceUids: [],
+            audienceCourseIds: [],
+            createdBy: updatedBy,
+            createdByName: updatedByName,
+            createdAt: serverTimestamp(),
+          }),
+    },
+    { merge: true },
+  );
+  return ref.id;
+}
+
+/**
+ * Fremden Trainer-Plan als EIGENEN Plan übernehmen (Leon 31.08.): ein
+ * anderer Trainer darf einen freigegebenen Plan anpassen und als neuen
+ * eigenen Plan speichern — Original und dessen Freigabe bleiben unberührt,
+ * die Kopie startet ohne Freigabe (er gibt sie selbst frei).
+ */
+export async function copyAsOwnTrainerPlan(
+  gymId: string,
+  plan: WorkoutPlan,
+  createdBy: string,
+  createdByName = "",
+): Promise<string> {
+  return upsertTrainerWorkoutPlan(
+    gymId,
+    { ...plan, id: "" },
+    createdBy,
+    createdByName,
+  );
+}
+
+/**
+ * Freigabe MATERIALISIEREN: die explizite Schüler-Auswahl wird als
+ * audienceUids geschrieben (Kurse sind nur Anzeige-Info). Snapshot-Semantik —
+ * erneutes Speichern aktualisiert die Liste.
+ */
+export async function updateTrainerPlanAudience(
+  gymId: string,
+  planId: string,
+  audienceUids: string[],
+  audienceCourseIds: string[],
+): Promise<void> {
+  await updateDoc(doc(trainerPlansCol(gymId), planId), {
+    audienceUids,
+    audienceCourseIds,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteTrainerWorkoutPlan(gymId: string, planId: string) {
+  await deleteDoc(doc(trainerPlansCol(gymId), planId));
 }

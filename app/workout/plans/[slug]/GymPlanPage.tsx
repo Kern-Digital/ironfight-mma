@@ -4,16 +4,32 @@
  * Plan-Detail der Gym-/Start-Pläne — lädt den Plan seit dem Seeding
  * (Etappe „Workout-Pläne", Schritt 5) clientseitig aus
  * gyms/{gymId}/workoutPlans (Doc-ID = Slug → Deep-Links bleiben stabil,
- * Trainer-Änderungen erscheinen sofort). Editor direkt aktiv (flüchtiger
- * Entwurf); gespeichert wird erst über „Als eigenen Plan speichern" oder
- * das Herz nach dem Workout.
+ * Trainer-Änderungen erscheinen sofort). Findet sich dort nichts, wird ein
+ * freigegebener TRAINER-Plan versucht (AUSBAU Stufe 1) — EINE Route für
+ * beide Quellen; ohne Freigabe wirft der Read permission-denied und die
+ * Seite zeigt „Plan nicht gefunden" (Existenz bleibt verborgen).
+ *
+ * Editierbarkeit (Leons Vorgabe 31.08.):
+ *   • Gym-/Start-Pläne: Editor direkt aktiv für alle (unverändert) —
+ *     geändert + Herz = persönliche Kopie.
+ *   • Trainer-Pläne: für ATHLETEN read-only (ein freigegebener Plan ist
+ *     eine Vorgabe, keine Vorlage). Andere TRAINER dürfen anpassen und den
+ *     Entwurf als NEUEN EIGENEN Trainer-Plan speichern, den sie dann selbst
+ *     freigeben — das Original samt Freigabe bleibt unberührt.
  */
 
 import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
-import { getGymWorkoutPlan, type WorkoutPlan } from "@/lib/workout-plans";
+import {
+  copyAsOwnTrainerPlan,
+  getGymWorkoutPlan,
+  getTrainerWorkoutPlan,
+  type TrainerWorkoutPlan,
+  type WorkoutPlan,
+} from "@/lib/workout-plans";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import PlanView from "./PlanView";
 
@@ -24,9 +40,15 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 export default function GymPlanPage({ slug }: { slug: string }) {
+  const router = useRouter();
   const { user, profile, loading: authLoading, profileLoading } = useAuth();
+  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
+  // Trainer-Plan-Herkunft: null = Gym-/Start-Plan
+  const [trainerPlan, setTrainerPlan] = useState<TrainerWorkoutPlan | null>(
+    null,
+  );
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -35,11 +57,19 @@ export default function GymPlanPage({ slug }: { slug: string }) {
     // an und die Rules werfen ihn ab.
     if (!user || profileLoading) return;
     let cancelled = false;
-    getGymWorkoutPlan(resolveGymId(profile), slug)
-      .then((p) => {
+    const gymId = resolveGymId(profile);
+    getGymWorkoutPlan(gymId, slug)
+      .then(async (gymPlan) => {
+        if (gymPlan) return { plan: gymPlan, trainer: null };
+        const tp = await getTrainerWorkoutPlan(gymId, slug);
+        return tp ? { plan: tp as WorkoutPlan, trainer: tp } : null;
+      })
+      .then((found) => {
         if (cancelled) return;
-        if (p) setPlan(p);
-        else setMissing(true);
+        if (found) {
+          setPlan(found.plan);
+          setTrainerPlan(found.trainer);
+        } else setMissing(true);
       })
       .catch(() => {
         if (!cancelled) setMissing(true);
@@ -96,6 +126,41 @@ export default function GymPlanPage({ slug }: { slug: string }) {
     );
   }
 
-  // allowEdit: Editor direkt aktiv (flüchtiger Entwurf, PlanView-Draft)
-  return <PlanView plan={plan} allowEdit />;
+  // Gym-/Start-Plan: unverändert für alle editierbar (persönliche Kopie
+  // über das Herz). Trainer-Plan: nur Trainer/Admin dürfen anpassen.
+  if (!trainerPlan) {
+    return <PlanView plan={plan} allowEdit />;
+  }
+
+  const sharedBy = trainerPlan.createdByName || undefined;
+  // Trainer-Pläne hängen nicht an der Disziplin-Navigation — der Athlet
+  // kommt aus dem Hub, nicht von der Disziplin-Seite (Leon 31.08.)
+  const backProps = { backHref: "/workout/generator", backLabel: "Workout" };
+
+  if (!isTrainer) {
+    return <PlanView plan={plan} {...backProps} sharedBy={sharedBy} />;
+  }
+
+  return (
+    <PlanView
+      plan={plan}
+      allowEdit
+      {...backProps}
+      sharedBy={sharedBy}
+      draftAction={{
+        label: "Als eigenen Plan speichern",
+        icon: "copy",
+        onSave: async (draft) => {
+          if (!user) return;
+          const id = await copyAsOwnTrainerPlan(
+            resolveGymId(profile),
+            draft,
+            user.uid,
+            profile?.displayName ?? profile?.authProviderName ?? "",
+          );
+          router.push(`/trainer/plans/${id}`);
+        },
+      }}
+    />
+  );
 }

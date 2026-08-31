@@ -87,7 +87,7 @@ function StreakCalendar({ sessions }: { sessions: WorkoutSession[] }) {
             key={i}
             className="flex flex-1 flex-col items-center gap-1 rounded-badge py-2"
             style={{
-              font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+              font: "var(--type-meta)",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               background: done ? "var(--accent-subtle)" : "var(--surface-raised)",
@@ -418,7 +418,7 @@ function DashboardContent() {
                   <span
                     className="inline-flex shrink-0 items-center gap-1.5"
                     style={{
-                      font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+                      font: "var(--type-meta)",
                       letterSpacing: "var(--ls-label)",
                       textTransform: "uppercase",
                       color: "var(--text-3)",

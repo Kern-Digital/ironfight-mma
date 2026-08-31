@@ -20,10 +20,12 @@ import { EQUIPMENT } from "@/lib/equipment";
 import { resolveGymId } from "@/lib/gym";
 import { type WorkoutDisciplineInfo } from "@/lib/workout-plan-defaults";
 import {
+  listSharedTrainerPlans,
   listWorkoutPlansForGym,
   planDurationSeconds,
   planEquipment,
   planExerciseCount,
+  type TrainerWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
 import { DIFFICULTY_LABEL, type Difficulty } from "@/lib/types";
@@ -39,7 +41,7 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 const META_FONT: React.CSSProperties = {
-  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  font: "var(--type-meta)",
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
@@ -68,6 +70,11 @@ export default function DisciplineView({
   // null = lädt noch (kein Leer-Blitz). gymId kommt aus dem Profil
   // (Spiegel des Token-Claims) — erst laden, wenn es aufgelöst ist.
   const [allPlans, setAllPlans] = useState<WorkoutPlan[] | null>(null);
+  // Für MICH freigegebene Trainer-Pläne (AUSBAU Stufe 1) — erscheinen
+  // OBEN in der Level-Liste mit „Vom Trainer"-Chip.
+  const [sharedPlans, setSharedPlans] = useState<TrainerWorkoutPlan[] | null>(
+    null,
+  );
   useEffect(() => {
     if (!user || profileLoading) return;
     let cancelled = false;
@@ -80,11 +87,23 @@ export default function DisciplineView({
       .catch(() => {
         if (!cancelled) setAllPlans([]);
       });
+    listSharedTrainerPlans(resolveGymId(profile), user.uid)
+      .then((all) => {
+        if (!cancelled) {
+          setSharedPlans(all.filter((p) => p.discipline === info.discipline));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSharedPlans([]);
+      });
     return () => {
       cancelled = true;
     };
   }, [user, profile, profileLoading, info.discipline]);
 
+  const trainerPlans = (sharedPlans ?? []).filter(
+    (p) => p.difficulty === difficulty,
+  );
   const plans = (allPlans ?? []).filter((p) => p.difficulty === difficulty);
 
   return (
@@ -185,8 +204,12 @@ export default function DisciplineView({
           })}
         </div>
 
-        {/* Planliste — erst mit dem Ladeergebnis (kein „keine Pläne"-Blitz) */}
-        {allPlans === null ? null : plans.length === 0 ? (
+        {/* Planliste — erst mit dem Ladeergebnis (kein „keine Pläne"-Blitz).
+            Freigegebene Trainer-Pläne stehen OBEN, markiert per Chip
+            (Level nie farbcodiert — der Chip ist Text im Akzent). */}
+        {allPlans === null || sharedPlans === null ? null : trainerPlans.length +
+            plans.length ===
+          0 ? (
           <p
             className="py-8 text-center"
             style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
@@ -195,17 +218,39 @@ export default function DisciplineView({
           </p>
         ) : (
           <div className="flex flex-col gap-3">
-            {plans.map((plan) => {
+            {[
+              ...trainerPlans.map((plan) => ({
+                plan: plan as WorkoutPlan,
+                // Wer geteilt hat (Leon 31.08.) — bei mehreren Trainern
+                // muss die Herkunft am Plan erkennbar sein
+                sharedBy: plan.createdByName || "Trainer",
+              })),
+              ...plans.map((plan) => ({ plan, sharedBy: null })),
+            ].map(({ plan, sharedBy }) => {
+              const fromTrainer = sharedBy !== null;
               const minutes = Math.round(planDurationSeconds(plan) / 60);
               const exercises = planExerciseCount(plan);
               return (
                 <Link
-                  key={plan.slug}
+                  key={`${fromTrainer ? "trainer" : "gym"}-${plan.slug}`}
                   href={`/workout/plans/${plan.slug}`}
                   className="t-card t-interactive flex items-center gap-4 p-4 sm:p-5"
                   style={{ textDecoration: "none", color: "var(--text-body)" }}
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    {fromTrainer && (
+                      <span
+                        className="self-start rounded-badge px-2 py-1"
+                        style={{
+                          ...META_FONT,
+                          background: "var(--accent-subtle)",
+                          border: "1px solid var(--accent)",
+                          color: "var(--accent-text)",
+                        }}
+                      >
+                        Von {sharedBy}
+                      </span>
+                    )}
                     <h3
                       style={{
                         font: "var(--type-h2)",

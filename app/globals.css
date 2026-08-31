@@ -292,6 +292,10 @@
   --type-body-strong: 600 16px/1.5 var(--font-body);
   --type-sub: 400 14px/1.45 var(--font-body);
   --type-label: 600 12px/1.2 var(--font-body);         /* +ls .12em, caps */
+  /* Meta-Zeilen unter Titeln („Level · Disziplin · 33 min"), Badges,
+     Kartenfüße. Lag bis 2026-08-31 als hartkodierte 10px in 17 Dateien
+     und war zu klein (Leon) — jetzt EIN Token für die ganze App. */
+  --type-meta: 600 12px/1.35 var(--font-body);         /* +ls .08em, caps */
   --type-num-xl: 700 30px/1.1 var(--font-body);        /* tabular-nums */
   --type-num: 600 13px/1.2 var(--font-mono), ui-monospace, monospace; /* Messwerte */
   --ls-display: 0.04em;
@@ -318,6 +322,9 @@
     --type-body-strong: 600 17px/1.5 var(--font-body);
     --type-sub: 400 15px/1.45 var(--font-body);
     --type-label: 600 13px/1.2 var(--font-body);
+    /* Mobil bewusst NICHT größer: Meta steht oft in schmalen Karten
+       (zwei-spaltige Hub-Felder), 13px würde dort umbrechen */
+    --type-meta: 600 12px/1.35 var(--font-body);
     --type-num-xl: 700 32px/1.1 var(--font-body);
   }
 }
@@ -424,6 +431,61 @@
   .t-interactive:hover { background-color: var(--surface-raised); }
   .t-interactive:active { transform: scale(0.98); }
   .t-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Klickbares OHNE eigene Rundung: die Hover-Fläche bekommt trotzdem
+     runde Ecken (Leon 30.08.) — Elemente mit rounded-*-Klasse oder Karten
+     behalten ihre eigene Rundung (Attribut-Check greift nur, wenn keine
+     rounded-Klasse am Element hängt). */
+  .t-interactive:not([class*="rounded"]):not(.t-card) {
+    border-radius: var(--r-field);
+  }
+  /* Ganze Rubrik greifbar (Trainer-Editor, Leon 30.08.): Hover über der
+     freien Blockfläche (NICHT über einer Übungszeile o. ä. — :has prüft
+     auf gehoverte Interaktiv-Kinder) zeichnet den ganzen Blockbereich
+     leicht ab; Halten hebt ihn an (plan-section-lifted) und verschiebt. */
+  .plan-section-grab {
+    /* Zwischenmaß (Leon 30.08.): r-xl war zu stark, r-field zu klein */
+    border-radius: var(--r-lg);
+    outline: 1px solid transparent;
+    outline-offset: 8px;
+    transition: outline-color var(--dur-fast) var(--ease-out);
+  }
+  .plan-section-grab:hover:not(:has(.t-interactive:hover)) {
+    outline-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+  .plan-section-lifted,
+  .plan-section-lifted:hover {
+    outline: 1.5px solid var(--accent) !important;
+    outline-offset: 8px;
+    /* Angehoben = UNDURCHSICHTIG (Leon 30.08.: Kopfzeile schien beim
+       Ziehen durch): Seitengrund als Fläche + als 8px-Ring bis zur
+       Outline, dazu Tiefenwirkung */
+    background: var(--surface-page);
+    box-shadow:
+      0 0 0 8px var(--surface-page),
+      0 18px 40px rgba(0, 0, 0, 0.35);
+  }
+  /* Fokus-Modus fürs Umbenennen (Leon 31.08.): Doppelklick auf die freie
+     Blockfläche hebt den Block über ein dunkles Overlay — größer, klar
+     abgesetzt; erst dann ist der Titel editierbar. */
+  .plan-section-focus {
+    z-index: 40;
+    transform: scale(1.03);
+    background: var(--surface-page);
+    outline: 1px solid color-mix(in oklab, var(--accent) 45%, transparent) !important;
+    outline-offset: 8px;
+    box-shadow:
+      0 0 0 8px var(--surface-page),
+      0 24px 60px rgba(0, 0, 0, 0.45);
+    transition: transform var(--dur-med) var(--ease-out);
+  }
+  /* Rubrik-Titel als Inline-Eingabe (Trainer-Editor): bewusst OHNE
+     Unterlinie (Leon 30.08. — die Linie lief am Desktop bis zum
+     Papierkorb); der Cursor allein zeigt den Eingabemodus. */
+  .plan-block-title-input {
+    background: transparent;
+    border: none;
+    outline: none;
+  }
   /* Aufklapp-Panel des gestylten Selects (components/ui/Select.tsx):
      kleines Entfalten von der Feld-Unterkante aus — nur transform/opacity. */
   .t-select-panel {
@@ -484,6 +546,7 @@
     .t-interactive:active { transform: none; }
     .t-select-panel, .t-select-option { animation: none; }
     .t-ai-badge, .t-ai-badge::before, .t-ai-badge::after { animation: none; }
+    .plan-section-focus { transition: none; }
   }
 }
 /* Position sinkt 200% → 0% = der Verlauf wandert nach rechts (Vorgabe:

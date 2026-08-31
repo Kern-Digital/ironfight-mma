@@ -315,7 +315,7 @@ function SubscriptionsCard({ uid }: { uid: string }) {
                   </span>
                   <span
                     style={{
-                      font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+                      font: "var(--type-meta)",
                       letterSpacing: "var(--ls-label)",
                       textTransform: "uppercase",
                       color: "var(--text-3)",

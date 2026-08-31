@@ -26,12 +26,16 @@ import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import ExercisePicker from "@/components/ExercisePicker";
 import RestWheel, { formatRest } from "@/components/RestWheel";
 import SwipeAction from "@/components/SwipeAction";
-import Icon from "@/components/ui/Icon";
+import Icon, { type IconName } from "@/components/ui/Icon";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { getExerciseById } from "@/lib/exercises";
-import { getWorkoutDiscipline } from "@/lib/workout-plan-defaults";
+import {
+  getWorkoutDiscipline,
+  WORKOUT_DISCIPLINES,
+} from "@/lib/workout-plan-defaults";
 import {
   exerciseRestSeconds,
   planDurationSeconds,
@@ -44,7 +48,13 @@ import {
   upsertPersonalWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
-import { GENDER_HEART_COLOR, type Exercise } from "@/lib/types";
+import {
+  DIFFICULTY_LABEL,
+  GENDER_HEART_COLOR,
+  type Difficulty,
+  type Discipline,
+  type Exercise,
+} from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -56,7 +66,7 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 const META_FONT: React.CSSProperties = {
-  font: "600 10px/1.2 var(--font-archivo), system-ui, sans-serif",
+  font: "var(--type-meta)",
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
@@ -90,6 +100,18 @@ export interface PlanEditing {
     from: { block: number; index: number },
     to: { block: number; index: number },
   ) => void;
+  /** Ganze Rubrik löschen (Trainer-Editor, Leon 30.08.) — nur wo ein
+      Verwerfen-Weg existiert; fehlt der Handler, gibt es keinen Knopf */
+  onRemoveBlock?: (blockIndex: number) => void;
+  /** „+ Block" unter dem letzten Block (Leon 30.08.) */
+  onAddBlock?: () => void;
+  /** Rubrik-Titel umbenennen — gehört zu „+ Block": neue Rubriken
+      brauchen einen Namen (Inline-Eingabe im Blockkopf) */
+  onBlockTitleChange?: (blockIndex: number, title: string) => void;
+  /** Ganze Rubrik per Halten auf freier Blockfläche verschieben (Leon
+      30.08., gleiche Geste wie bei den Übungen) — Ziel gilt NACH dem
+      Entfernen an der Quelle */
+  onMoveBlock?: (from: number, to: number) => void;
   /** Auto-Save-Statuszeile (persönliche Kopie) — fehlt bei Entwurf/Erstellen */
   autoSave?: { saving: boolean; saved: boolean };
   error?: string | null;
@@ -97,9 +119,31 @@ export interface PlanEditing {
       Vorgabe 2026-08-28): gefüllt = gespeichert, Klick entfernt den Plan
       aus den Favoriten (bzw. legt ihn wieder an) */
   favorite?: { saved: boolean; busy?: boolean; onToggle: () => void };
-  /** Expliziter Erstellen-Knopf (Neu-Erstellen statt Auto-Save) */
-  create?: { onSave: () => void; saving: boolean };
+  /** Expliziter Erstellen-Knopf (Neu-Erstellen statt Auto-Save); `hint`
+      überschreibt die Statuszeile (Trainer-Plan ≠ „Meine Workouts") */
+  create?: { onSave: () => void; saving: boolean; hint?: string };
+  /** Disziplin/Level-Selects im Editier-Kopf — Trainer-Pläne (AUSBAU
+      Stufe 1) brauchen beide für die Disziplin→Level-Navigation;
+      persönliche Pläne bleiben bewusst ohne (Leon 2026-08-28) */
+  meta?: {
+    discipline: Discipline;
+    difficulty: Difficulty;
+    onDisciplineChange: (d: Discipline) => void;
+    onDifficultyChange: (d: Difficulty) => void;
+  };
+  /** Expliziter Speichern/Verwerfen-Weg (Trainer-Plan bearbeiten):
+      freigegebene Athleten sehen den Live-Stand — Auto-Save würde
+      halbfertige Änderungen an alle pushen */
+  save?: {
+    dirty: boolean;
+    saving: boolean;
+    saved: boolean;
+    onSave: () => void;
+    onDiscard: () => void;
+  };
 }
+
+const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
 
 /** Ziel-Slot beim Ziehen: schmaler als eine echte Zeile … */
 const DROP_SLOT_HEIGHT = 36;
@@ -181,6 +225,12 @@ export default function PlanView({
   backLabel,
   allowEdit,
   editing,
+  belowStats,
+  belowBlocks,
+  startBelowBlocks,
+  editHeadBelowStats,
+  draftAction,
+  sharedBy,
 }: {
   plan: WorkoutPlan;
   /** Original-Payload einer laufenden Session (Detail-Ansicht /workout):
@@ -195,6 +245,28 @@ export default function PlanView({
   allowEdit?: boolean;
   /** Editier-Modus von außen (persönliche Kopie / Neu-Erstellen) */
   editing?: PlanEditing;
+  /** Seiten-spezifische Sektion zwischen Eckdaten und Blöcken (Trainer-
+      Plan: Freigabe) — hält Trainer-Details aus PlanView */
+  belowStats?: React.ReactNode;
+  /** Seiten-spezifische Sektion GANZ unten, nach Blöcken und Start-Knopf
+      (Trainer-Plan: „Plan löschen") */
+  belowBlocks?: React.ReactNode;
+  /** „Workout starten" unter dem LETZTEN Block statt oben in der
+      Aktionszeile (Leon 30.08., Trainer-Plan-Detail) */
+  startBelowBlocks?: boolean;
+  /** Editier-Kopf (Name + Disziplin/Level + Status) NACH belowStats statt
+      ganz oben (Leon 30.08.: „das unter die Freigabe") */
+  editHeadBelowStats?: boolean;
+  /** Ersetzt bei allowEdit das Herz: statt einer persönlichen Kopie
+      speichert der Knopf den Entwurf anders ab (Trainer auf einem fremden
+      Trainer-Plan → neuer eigener Trainer-Plan, Leon 31.08.) */
+  draftAction?: {
+    label: string;
+    icon: IconName;
+    onSave: (draft: WorkoutPlan) => Promise<void>;
+  };
+  /** „Von X geteilt" unter dem Titel (freigegebener Trainer-Plan) */
+  sharedBy?: string;
 }) {
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -540,6 +612,190 @@ export default function PlanView({
     [],
   );
 
+  // ── Ganze Rubrik verschieben (Leon 30.08.): Halten auf FREIER
+  //    Blockfläche (nicht auf Übungszeile/Knopf/Eingabe) hebt den Block
+  //    an — gleiche Mechanik wie bei den Übungen: Transform folgt dem
+  //    Zeiger, ein echter Slot zeigt das Ziel, platziert wird beim
+  //    Loslassen. Ziel-Koordinaten gelten NACH Entfernen an der Quelle.
+  const [blockDragFrom, setBlockDragFrom] = useState<number | null>(null);
+  const [blockDropTarget, setBlockDropTarget] = useState<number | null>(null);
+  // Rubrik-Titel (Leon 31.08., 3. Runde): DOPPELKLICK auf die freie
+  // Blockfläche öffnet den Fokus-Modus — der Block rückt vergrößert über
+  // ein dunkles Overlay, erst dann ist der Titel editierbar. Klick ins
+  // Leere (aufs Overlay) speichert per Blur; der Schutz-Ref verhindert,
+  // dass der schließende Klick die Eingabe sofort wieder öffnet.
+  const [editingTitleBlock, setEditingTitleBlock] = useState<number | null>(
+    null,
+  );
+  const titleClosedAtRef = useRef(0);
+
+  function handleSectionDoubleClick(idx: number, e: React.MouseEvent) {
+    if (!editRef.current?.onBlockTitleChange) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-plan-row], button, input, a, textarea")) return;
+    if (Date.now() - titleClosedAtRef.current < 300) return;
+    setEditingTitleBlock(idx);
+  }
+  const blockDragRef = useRef<{
+    from: number;
+    target: number | null;
+    pointerY: number;
+    el: HTMLElement | null;
+    grabOffset: number;
+    baseTop: number;
+    baseScroll: number;
+    raf: number | null;
+    cleanup: () => void;
+  } | null>(null);
+
+  function blockDragFrame() {
+    const d = blockDragRef.current;
+    if (!d) return;
+    const EDGE = 80;
+    const MAX_SPEED = 14;
+    const y = d.pointerY;
+    if (y < EDGE) {
+      window.scrollBy(0, -Math.ceil(((EDGE - y) / EDGE) * MAX_SPEED));
+    } else if (y > window.innerHeight - EDGE) {
+      window.scrollBy(
+        0,
+        Math.ceil(((y - (window.innerHeight - EDGE)) / EDGE) * MAX_SPEED),
+      );
+    }
+    // Einfüge-Position = Sektionen (ohne die gezogene), deren Mitte über
+    // dem Zeiger liegt
+    let ordinal = 0;
+    for (const el of Array.from(
+      document.querySelectorAll<HTMLElement>("[data-plan-section]"),
+    )) {
+      if (Number(el.dataset.planSection) === d.from) continue;
+      const r = el.getBoundingClientRect();
+      if (y > r.top + r.height / 2) ordinal += 1;
+    }
+    if (ordinal !== d.target) {
+      d.target = ordinal;
+      setBlockDropTarget(ordinal);
+    }
+    // Block folgt dem Zeiger; liegt der Slot oberhalb, drückt er die
+    // natürliche Lage nach unten → gegenrechnen (Muster Übungs-Drag)
+    if (d.el) {
+      const slotAbove = d.target !== null && d.target < d.from;
+      const originTop =
+        d.baseTop -
+        (window.scrollY - d.baseScroll) +
+        (slotAbove ? DROP_SLOT_TOTAL : 0);
+      d.el.style.transform = `translateY(${y - d.grabOffset - originTop}px) scale(1.01)`;
+    }
+    d.raf = requestAnimationFrame(blockDragFrame);
+  }
+
+  function startBlockDrag(from: number, startY: number) {
+    if (!editRef.current?.onMoveBlock || blockDragRef.current) return;
+    setBlockDragFrom(from);
+    const el = document.querySelector<HTMLElement>(
+      `[data-plan-section="${from}"]`,
+    );
+    if (el) el.style.zIndex = "30";
+    const onTouchMoveDoc = (e: TouchEvent) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      if (blockDragRef.current && t) blockDragRef.current.pointerY = t.clientY;
+    };
+    const onMouseMoveDoc = (e: MouseEvent) => {
+      if (blockDragRef.current) blockDragRef.current.pointerY = e.clientY;
+    };
+    const finish = () => stopBlockDrag();
+    document.addEventListener("touchmove", onTouchMoveDoc, { passive: false });
+    document.addEventListener("touchend", finish);
+    document.addEventListener("touchcancel", finish);
+    document.addEventListener("mousemove", onMouseMoveDoc);
+    document.addEventListener("mouseup", finish);
+    blockDragRef.current = {
+      from,
+      target: null,
+      pointerY: startY,
+      el,
+      grabOffset: el ? startY - el.getBoundingClientRect().top : 0,
+      baseTop: el ? el.getBoundingClientRect().top : 0,
+      baseScroll: window.scrollY,
+      raf: null,
+      cleanup: () => {
+        document.removeEventListener("touchmove", onTouchMoveDoc);
+        document.removeEventListener("touchend", finish);
+        document.removeEventListener("touchcancel", finish);
+        document.removeEventListener("mousemove", onMouseMoveDoc);
+        document.removeEventListener("mouseup", finish);
+      },
+    };
+    blockDragRef.current.raf = requestAnimationFrame(blockDragFrame);
+  }
+
+  function stopBlockDrag() {
+    const d = blockDragRef.current;
+    if (!d) return;
+    if (d.raf !== null) cancelAnimationFrame(d.raf);
+    d.cleanup();
+    if (d.el) {
+      d.el.style.transform = "";
+      d.el.style.zIndex = "";
+    }
+    const from = d.from;
+    const tgt = d.target;
+    blockDragRef.current = null;
+    setBlockDragFrom(null);
+    setBlockDropTarget(null);
+    if (tgt !== null && tgt !== from) {
+      editRef.current?.onMoveBlock?.(from, tgt);
+    }
+  }
+
+  // Halten auf freier Blockfläche erkennen — Übungszeilen, Knöpfe und
+  // Eingaben sind ausgenommen (deren Gesten laufen weiter wie bisher)
+  function beginBlockHold(idx: number, e: React.PointerEvent) {
+    if (!editRef.current?.onMoveBlock || blockDragRef.current) return;
+    // Im Titel-Fokus-Modus kein Verschieben — erst speichern (Klick/Enter)
+    if (editingTitleBlock !== null) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-plan-row], button, input, a, textarea")) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const cancel = () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", cancel);
+      document.removeEventListener("pointercancel", cancel);
+    };
+    const onMove = (ev: PointerEvent) => {
+      if (
+        Math.abs(ev.clientX - startX) > 8 ||
+        Math.abs(ev.clientY - startY) > 8
+      ) {
+        cancel();
+      }
+    };
+    // Bewusst kürzer als das Übungs-Halten (400 ms) — der Block soll
+    // schneller reagieren (Leon 30.08.)
+    const timer = setTimeout(() => {
+      cancel();
+      startBlockDrag(idx, startY);
+    }, 250);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", cancel);
+    document.addEventListener("pointercancel", cancel);
+  }
+
+  useEffect(
+    () => () => {
+      const d = blockDragRef.current;
+      if (d) {
+        if (d.raf !== null) cancelAnimationFrame(d.raf);
+        d.cleanup();
+        blockDragRef.current = null;
+      }
+    },
+    [],
+  );
+
   // Entwurf als persönliche Kopie sichern und direkt hinein — dort greift
   // der Auto-Save. `savingDraft` bleibt bei Erfolg stehen (Navigation läuft).
   async function saveDraftAsOwn() {
@@ -547,6 +803,12 @@ export default function PlanView({
     setSavingDraft(true);
     setDraftError(null);
     try {
+      // draftAction überschreibt das Ziel (Trainer: neuer Trainer-Plan
+      // statt persönlicher Kopie) — sie navigiert selbst weiter
+      if (draftAction) {
+        await draftAction.onSave(draft);
+        return;
+      }
       const id = await upsertPersonalWorkoutPlan(
         user.uid,
         { ...draft, id: "" },
@@ -574,6 +836,137 @@ export default function PlanView({
     p.set("payload", sessionPayload ?? planToSessionPayload(shown));
     return `/workout/session?${p.toString()}`;
   }, [shown, sessionPayload]);
+
+  // Start-Knopf — sitzt je nach Seite oben in der Aktionszeile oder unter
+  // dem letzten Block (startBelowBlocks, Leon 30.08.)
+  const startAction =
+    totalExercises > 0 ? (
+      <Link
+        href={sessionHref}
+        className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
+        style={{
+          ...BTN_FONT,
+          background: "var(--accent)",
+          color: "var(--on-accent)",
+          boxShadow: "var(--accent-glow)",
+          textDecoration: "none",
+        }}
+      >
+        <Icon name="play" size={13} strokeWidth={2.2} />
+        Workout starten
+      </Link>
+    ) : (
+      <button
+        type="button"
+        disabled
+        className="inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5 opacity-50"
+        style={{
+          ...BTN_FONT,
+          background: "var(--accent)",
+          color: "var(--on-accent)",
+        }}
+      >
+        <Icon name="play" size={13} strokeWidth={2.2} />
+        Workout starten
+      </button>
+    );
+
+  // Editier-Kopf: Name (+ ggf. Disziplin/Level) + Speicher-Status — sitzt
+  // standardmäßig ganz oben, auf der Trainer-Detailseite unter der
+  // Freigabe (editHeadBelowStats, Leon 30.08.)
+  const editHead = edit ? (
+    <section className="flex flex-col gap-3">
+      <label className="flex flex-col gap-2">
+        <span className="t-label">Name</span>
+        <input
+          type="text"
+          maxLength={60}
+          value={shown.name}
+          onChange={(e) => edit.onNameChange(e.target.value)}
+          placeholder="z. B. Mein Boxprogramm"
+          className="t-interactive w-full min-h-hit rounded-field px-3.5"
+          style={{
+            font: "var(--type-body)",
+            background: "var(--surface-raised)",
+            border: "1px solid var(--line)",
+            color: "var(--text-body)",
+            outline: "none",
+          }}
+        />
+      </label>
+      {/* Disziplin/Level — nur wo die Navigation sie braucht
+          (Trainer-Pläne); ui/Select ist der App-Standard */}
+      {edit.meta && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2">
+            <span className="t-label">Disziplin</span>
+            <Select
+              value={edit.meta.discipline}
+              onChange={(v) => edit.meta?.onDisciplineChange(v as Discipline)}
+              options={WORKOUT_DISCIPLINES.map((d) => ({
+                value: d.discipline,
+                label: d.name,
+              }))}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="t-label">Level</span>
+            <Select
+              value={edit.meta.difficulty}
+              onChange={(v) => edit.meta?.onDifficultyChange(v as Difficulty)}
+              options={DIFFICULTIES.map((d) => ({
+                value: d,
+                label: DIFFICULTY_LABEL[d],
+              }))}
+            />
+          </div>
+        </div>
+      )}
+      {edit.error && (
+        <div
+          className="rounded-field px-3.5 py-2.5"
+          style={{
+            font: "var(--type-sub)",
+            background: "color-mix(in oklab, var(--negative) 12%, transparent)",
+            border:
+              "1px solid color-mix(in oklab, var(--negative) 40%, transparent)",
+            color: "var(--negative)",
+          }}
+        >
+          {edit.error}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          {edit.autoSave
+            ? "Änderungen werden automatisch gespeichert."
+            : edit.create
+              ? (edit.create.hint ??
+                `„Plan speichern" legt den Plan unter „Meine Workouts" an.`)
+              : edit.save
+                ? "Änderungen sind erst nach dem Speichern sichtbar — auch für freigegebene Schüler."
+                : "Änderungen werden nicht automatisch gespeichert — das Herz speichert sie als eigenen Plan."}
+        </span>
+        {edit.autoSave?.saving || edit.save?.saving ? (
+          <span
+            className="inline-flex items-center gap-1.5"
+            style={{ ...STATUS_FONT, color: "var(--text-3)" }}
+          >
+            <Icon name="refresh" size={14} strokeWidth={2.2} />
+            Speichere…
+          </span>
+        ) : edit.autoSave?.saved || (edit.save?.saved && !edit.save.dirty) ? (
+          <span
+            className="inline-flex items-center gap-1.5"
+            style={{ ...STATUS_FONT, color: "var(--positive)" }}
+          >
+            <Icon name="check" size={14} strokeWidth={2.6} />
+            Gespeichert
+          </span>
+        ) : null}
+      </div>
+    </section>
+  ) : null;
 
   return (
     <main
@@ -637,6 +1030,22 @@ export default function PlanView({
             >
               {shown.name || (edit ? "Neues Workout" : "Workout")}
             </h1>
+            {/* Herkunft eines freigegebenen Trainer-Plans (Leon 31.08.) —
+                bei mehreren Trainern muss erkennbar sein, von wem er ist */}
+            {sharedBy && (
+              <span
+                className="mt-1 inline-flex items-center gap-1.5 self-start rounded-badge px-2 py-1"
+                style={{
+                  ...META_FONT,
+                  background: "var(--accent-subtle)",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent-text)",
+                }}
+              >
+                <Icon name="users" size={12} strokeWidth={2.2} />
+                Von {sharedBy}
+              </span>
+            )}
             {shown.description && (
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                 {shown.description}
@@ -662,70 +1071,8 @@ export default function PlanView({
       </section>
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
-        {/* Editier-Kopf: Name (+ ggf. Disziplin/Level) + Speicher-Status */}
-        {edit && (
-          <section className="flex flex-col gap-3">
-            <label className="flex flex-col gap-2">
-              <span className="t-label">Name</span>
-              <input
-                type="text"
-                maxLength={60}
-                value={shown.name}
-                onChange={(e) => edit.onNameChange(e.target.value)}
-                placeholder="z. B. Mein Boxprogramm"
-                className="t-interactive w-full min-h-hit rounded-field px-3.5"
-                style={{
-                  font: "var(--type-body)",
-                  background: "var(--surface-raised)",
-                  border: "1px solid var(--line)",
-                  color: "var(--text-body)",
-                  outline: "none",
-                }}
-              />
-            </label>
-            {edit.error && (
-              <div
-                className="rounded-field px-3.5 py-2.5"
-                style={{
-                  font: "var(--type-sub)",
-                  background:
-                    "color-mix(in oklab, var(--negative) 12%, transparent)",
-                  border:
-                    "1px solid color-mix(in oklab, var(--negative) 40%, transparent)",
-                  color: "var(--negative)",
-                }}
-              >
-                {edit.error}
-              </div>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                {edit.autoSave
-                  ? "Änderungen werden automatisch gespeichert."
-                  : edit.create
-                    ? `„Plan speichern" legt den Plan unter „Meine Workouts" an.`
-                    : "Änderungen werden nicht automatisch gespeichert — das Herz speichert sie als eigenen Plan."}
-              </span>
-              {edit.autoSave?.saving ? (
-                <span
-                  className="inline-flex items-center gap-1.5"
-                  style={{ ...STATUS_FONT, color: "var(--text-3)" }}
-                >
-                  <Icon name="refresh" size={14} strokeWidth={2.2} />
-                  Speichere…
-                </span>
-              ) : edit.autoSave?.saved ? (
-                <span
-                  className="inline-flex items-center gap-1.5"
-                  style={{ ...STATUS_FONT, color: "var(--positive)" }}
-                >
-                  <Icon name="check" size={14} strokeWidth={2.6} />
-                  Gespeichert
-                </span>
-              ) : null}
-            </div>
-          </section>
-        )}
+        {/* Editier-Kopf — standardmäßig ganz oben */}
+        {!editHeadBelowStats && editHead}
 
         {/* Eckdaten + Aktionen */}
         <section className="flex flex-col gap-5">
@@ -753,34 +1100,25 @@ export default function PlanView({
               </button>
             ) : (
               <>
-                {totalExercises > 0 ? (
-                  <Link
-                    href={sessionHref}
-                    className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
-                    style={{
-                      ...BTN_FONT,
-                      background: "var(--accent)",
-                      color: "var(--on-accent)",
-                      boxShadow: "var(--accent-glow)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <Icon name="play" size={13} strokeWidth={2.2} />
-                    Workout starten
-                  </Link>
-                ) : (
+                {!startBelowBlocks && startAction}
+                {/* Trainer auf fremdem Trainer-Plan (Leon 31.08.): statt
+                    Herz ein benannter Knopf — der Entwurf wird ein NEUER
+                    eigener Trainer-Plan, den er selbst freigeben kann */}
+                {draftAction && draft !== null && !editing && draftDirty && (
                   <button
                     type="button"
-                    disabled
-                    className="inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5 opacity-50"
+                    onClick={() => void saveDraftAsOwn()}
+                    disabled={savingDraft}
+                    className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5 disabled:opacity-50"
                     style={{
                       ...BTN_FONT,
-                      background: "var(--accent)",
-                      color: "var(--on-accent)",
+                      background: "var(--surface-raised)",
+                      border: "1px solid var(--accent)",
+                      color: "var(--accent-text)",
                     }}
                   >
-                    <Icon name="play" size={13} strokeWidth={2.2} />
-                    Workout starten
+                    <Icon name={draftAction.icon} size={13} strokeWidth={2.2} />
+                    {savingDraft ? "Speichere…" : draftAction.label}
                   </button>
                 )}
                 {/* Herz gegenüber dem Start-Button (Leons Vorgabe 2026-08-28):
@@ -789,7 +1127,7 @@ export default function PlanView({
                     Gym-Plan → leeres Herz speichert den Entwurf als eigenen
                     Plan (ersetzt „Als eigenen Plan speichern" + „Verwerfen") */}
                 {(editing?.favorite ||
-                  (draft !== null && !editing && draftDirty)) && (
+                  (!draftAction && draft !== null && !editing && draftDirty)) && (
                   <button
                     type="button"
                     onClick={
@@ -825,6 +1163,42 @@ export default function PlanView({
                     />
                   </button>
                 )}
+                {/* Expliziter Speichern/Verwerfen-Weg (Trainer-Plan):
+                    erscheint erst bei einer Änderung — bewusster
+                    Veröffentlichen-Moment statt Auto-Save */}
+                {editing?.save && editing.save.dirty && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={editing.save.onDiscard}
+                      disabled={editing.save.saving}
+                      className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4 disabled:opacity-50"
+                      style={{
+                        ...BTN_FONT,
+                        background: "var(--surface-raised)",
+                        border: "1px solid var(--line)",
+                        color: "var(--text-2)",
+                      }}
+                    >
+                      Verwerfen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={editing.save.onSave}
+                      disabled={editing.save.saving}
+                      className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5 disabled:opacity-50"
+                      style={{
+                        ...BTN_FONT,
+                        background: "var(--accent)",
+                        color: "var(--on-accent)",
+                        boxShadow: "var(--accent-glow)",
+                      }}
+                    >
+                      <Icon name="check" size={13} strokeWidth={2.4} />
+                      {editing.save.saving ? "Speichere…" : "Speichern"}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -839,6 +1213,12 @@ export default function PlanView({
             </p>
           )}
         </section>
+
+        {/* Seiten-spezifische Sektion (Trainer-Plan: Freigabe) */}
+        {belowStats}
+
+        {/* Editier-Kopf unter der Freigabe (Leon 30.08., Trainer-Detail) */}
+        {editHeadBelowStats && editHead}
 
         {/* Blöcke — pro Block EINE Karte mit Haarlinien-Trennern */}
         <div className="flex flex-col gap-8">
@@ -868,8 +1248,21 @@ export default function PlanView({
                 ? dropTarget.index
                 : null;
             const endOrdinal = rows.length - (draggedInBlock !== null ? 1 : 0);
+            // Block-Verschieben (Leon 30.08.): Slot-Position in Ordinal-
+            // Koordinaten OHNE die gezogene Rubrik; Ziel = Ausgangsplatz
+            // zeigt keinen Slot
+            const blockGrab = Boolean(edit?.onMoveBlock);
+            const sectionOrdinal =
+              blockDragFrom !== null && idx > blockDragFrom ? idx - 1 : idx;
+            const showBlockSlotBefore =
+              blockDragFrom !== null &&
+              blockDropTarget !== null &&
+              idx !== blockDragFrom &&
+              blockDropTarget !== blockDragFrom &&
+              sectionOrdinal === blockDropTarget;
             return (
               <Fragment key={`${block.phase}-${idx}`}>
+                {showBlockSlotBefore && <DropSlot />}
                 {/* Zwischen-Rubrik-Pause — als Chip ZWISCHEN den Rubriken
                     (Leons Vorgabe 2026-08-28); Tippen öffnet das Pausen-Rad.
                     Der Wert liegt am Block DAVOR (restAfterSeconds). */}
@@ -928,7 +1321,22 @@ export default function PlanView({
                     />
                   </div>
                 )}
-              <section className="flex flex-col gap-3">
+              <section
+                data-plan-section={idx}
+                onPointerDown={
+                  blockGrab ? (e) => beginBlockHold(idx, e) : undefined
+                }
+                onDoubleClick={
+                  edit?.onBlockTitleChange
+                    ? (e) => handleSectionDoubleClick(idx, e)
+                    : undefined
+                }
+                className={`relative flex flex-col gap-3${
+                  blockGrab ? " plan-section-grab" : ""
+                }${blockDragFrom === idx ? " plan-section-lifted" : ""}${
+                  editingTitleBlock === idx ? " plan-section-focus" : ""
+                }`}
+              >
                 <div className="flex items-baseline gap-3">
                   <span
                     className="tabular-nums"
@@ -936,17 +1344,65 @@ export default function PlanView({
                   >
                     {String(idx + 1).padStart(2, "0")}
                   </span>
-                  <h2
-                    style={{
-                      font: "var(--type-h2)",
-                      letterSpacing: "var(--ls-display)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {block.title}
-                  </h2>
+                  {/* Rubrik-Titel — im Trainer-Editor öffnet EIN Klick auf
+                      die freie Blockfläche die Eingabe (handleSectionClick);
+                      der nächste Klick (egal wohin) speichert per Blur */}
+                  {edit?.onBlockTitleChange && editingTitleBlock === idx ? (
+                    <input
+                      type="text"
+                      maxLength={40}
+                      value={block.title}
+                      autoFocus
+                      onChange={(e) =>
+                        edit.onBlockTitleChange?.(idx, e.target.value)
+                      }
+                      onBlur={() => {
+                        titleClosedAtRef.current = Date.now();
+                        setEditingTitleBlock(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Escape") {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      placeholder="Rubrik-Name"
+                      aria-label={`Name der Rubrik ${idx + 1}`}
+                      className="plan-block-title-input min-w-0 flex-1"
+                      style={{
+                        font: "var(--type-h2)",
+                        letterSpacing: "var(--ls-display)",
+                        textTransform: "uppercase",
+                        color: "var(--text-body)",
+                      }}
+                    />
+                  ) : (
+                    <h2
+                      style={{
+                        font: "var(--type-h2)",
+                        letterSpacing: "var(--ls-display)",
+                        textTransform: "uppercase",
+                        ...(block.title ? {} : { color: "var(--text-3)" }),
+                      }}
+                    >
+                      {block.title ||
+                        (edit?.onBlockTitleChange ? "Rubrik-Name" : "")}
+                    </h2>
+                  )}
                   {/* Keine Pausen-Anzeige mehr im Kopf: die Rundenpause ist
                       PRO ÜBUNG (Übungsdetails), nicht mehr pro Rubrik */}
+                  {/* Rubrik löschen (Leon 30.08.) — nur wo der Editor einen
+                      Verwerfen-Weg hat (Trainer-Seiten reichen den Handler) */}
+                  {edit?.onRemoveBlock && (
+                    <button
+                      type="button"
+                      aria-label={`Rubrik „${block.title}" löschen`}
+                      onClick={() => edit.onRemoveBlock?.(idx)}
+                      className="t-interactive ml-auto flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-field"
+                      style={{ color: "var(--gesture-delete)" }}
+                    >
+                      <Icon name="trash" size={20} strokeWidth={2} />
+                    </button>
+                  )}
                 </div>
                 <div data-plan-block={idx} className="t-card px-3.5 py-0.5">
                   {rows.length === 0 && edit && (
@@ -982,11 +1438,12 @@ export default function PlanView({
                           if (isSelected || isRemoving) return;
                           setDetailExercise({ exercise: ex, block: idx });
                         }}
-                        className={`t-interactive relative flex min-h-hit cursor-pointer flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:gap-4${
+                        // -mx-2/px-2: die Hover-/Auswahl-Fläche nutzt den
+                        // seitlichen Freiraum der Karte (Leon 30.08.) —
+                        // der Text bleibt an Ort und Stelle
+                        className={`t-interactive relative -mx-2 flex min-h-hit cursor-pointer flex-col gap-1.5 rounded-field px-2 py-2.5 sm:flex-row sm:items-center sm:gap-4${
                           isRemoving ? " animate-remove-row" : ""
-                        }${flashTick !== null ? " animate-add-glow" : ""}${
-                          isSelected ? " rounded-field px-2" : ""
-                        }`}
+                        }${flashTick !== null ? " animate-add-glow" : ""}`}
                         style={
                           isSelected
                             ? {
@@ -1114,11 +1571,53 @@ export default function PlanView({
               </Fragment>
             );
           })}
+          {/* Slot am Listenende — Rubrik ganz nach unten ziehen */}
+          {blockDragFrom !== null &&
+            blockDropTarget !== null &&
+            blockDropTarget !== blockDragFrom &&
+            blockDropTarget === shown.blocks.length - 1 && <DropSlot />}
         </div>
+
+        {/* „+ Block" unter dem letzten Block (Leon 30.08.) */}
+        {edit?.onAddBlock && (
+          <button
+            type="button"
+            onClick={edit.onAddBlock}
+            className="t-interactive -mt-4 flex min-h-hit w-full items-center gap-2 rounded-field px-1 text-left"
+            style={{ color: "var(--accent-text)" }}
+          >
+            <Icon name="plus" size={15} strokeWidth={2.2} />
+            <span style={{ font: "var(--type-body-strong)" }}>
+              Block hinzufügen
+            </span>
+          </button>
+        )}
+
+        {/* „Workout starten" unter dem letzten Block (Leon 30.08.,
+            Trainer-Plan-Detail) */}
+        {startBelowBlocks && !edit?.create && (
+          <div className="flex">{startAction}</div>
+        )}
+
+        {/* Seiten-spezifische Sektion ganz unten (Trainer-Plan: Löschen) */}
+        {belowBlocks}
 
         {/* „Kopie löschen" ist raus (Leon 2026-08-28): entfernt wird über
             das Herz oben bzw. per Links-Wisch in „Meine Workouts" */}
       </div>
+
+      {/* Abdunkelung hinter dem Titel-Fokus-Block (Leon 31.08.) — der
+          Klick darauf nimmt der Eingabe den Fokus → Blur speichert */}
+      {editingTitleBlock !== null && (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-30"
+          style={{
+            background: "var(--overlay)",
+            animation: "fade-in 0.2s ease-out both",
+          }}
+        />
+      )}
 
       {/* Übungs-Picker — gesamte Bibliothek, Ziel ist der gewählte Block */}
       {edit && pickerBlock !== null && shown.blocks[pickerBlock] && (
