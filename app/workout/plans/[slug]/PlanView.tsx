@@ -28,7 +28,7 @@ import RestWheel, { formatRest } from "@/components/RestWheel";
 import SwipeAction from "@/components/SwipeAction";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { getExerciseById } from "@/lib/exercises";
@@ -271,7 +271,7 @@ export default function PlanView({
   const router = useRouter();
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
   // Herz-Farbe nach Gender im Athleten-Profil (wie Hub/Fertig-Screen)
   const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 

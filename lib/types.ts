@@ -8,6 +8,8 @@
  * brechen zu müssen.
  */
 
+import type { RoleSet } from "./roles";
+
 // ─── Disziplinen ───────────────────────────────────────────────────────────
 
 export type Category = "boxing" | "wrestling" | "bjj" | "muay-thai";
@@ -479,8 +481,23 @@ export interface UserProfile {
   displayName: string | null;
   /** Reserviert für spätere Community-Funktionen — eindeutig, optional */
   username?: string | null;
-  /** Optionale Rolle — wird manuell in Firebase Console gesetzt */
-  role?: UserRole;
+  /**
+   * Die Rechte dieses Kontos (Multi-Gym Phase 2, Checkpoint 3): drei
+   * unabhängige Häkchen statt eines `role`-Wertes — `trainer`, `verwaltung`,
+   * `admin`, Plattform-Rang bereits eingerechnet. Siehe lib/roles.ts.
+   *
+   * AUTORITATIV IST DER CUSTOM CLAIM. `lib/auth-context.tsx` setzt dieses
+   * Feld aus dem ID-Token; die gleichnamigen Felder am users-Dokument sind
+   * nur der Abfrage-Spiegel (Claims sind nicht abfragbar, sonst ließe sich
+   * „hat dieses Gym noch eine Verwaltung?" nicht beantworten). Geschrieben
+   * wird beides ausschließlich von /api/members/role — die Firestore-Regeln
+   * verbieten dem Client alle vier Felder.
+   *
+   * In Komponenten NICHT direkt lesen, sondern `useRights()` aus dem
+   * Auth-Context: Der Hook liefert denselben Wert und beantwortet den
+   * Ladezustand mit „noch keine Rechte" statt mit `undefined`.
+   */
+  rights: RoleSet;
   /**
    * Gym-Zugehörigkeit (Slug, z. B. "tidal-athletics"). Steuert, welche
    * gym-geteilten Daten (Gegner-DNA, Wettkämpfe) ein Trainer sieht.
@@ -488,22 +505,6 @@ export interface UserProfile {
    * Default-Gym (siehe lib/gym.ts). Für späteres Multi-Gym vorbereitet.
    */
   gymId?: string | null;
-  /**
-   * Gym-Verwaltungsrecht (Multi-Gym Phase 2, Checkpoint 2) — additiver Claim
-   * NEBEN `role`, bewusst kein Wert von `role`: `admin` ist der
-   * PLATTFORM-Admin und überspringt in den Regeln jeden Gym-Vergleich. Ein
-   * Häkchen in der Mitgliederliste darf niemals so weit reichen.
-   *
-   * Autoritativ ist der Custom Claim (auth-context spiegelt ihn hierher);
-   * das gleichnamige Feld am users-Dokument ist nur der Abfrage-Spiegel,
-   * damit „wie viele Verwaltungen hat dieses Gym noch?" überhaupt zählbar
-   * ist — Claims sind nicht abfragbar. Geschrieben wird beides ausschließlich
-   * von /api/members/role (Rules verbieten es dem Client wie bei `role`).
-   *
-   * Checkpoint 3 löst `role` in ein Set auf (`{ trainer, verwaltung }`) —
-   * dieses Feld wandert dann dorthin, ohne dass die Bedeutung sich ändert.
-   */
-  verwaltung?: boolean;
   /** Beitritt zum Gym — serverseitig beim Einlösen der Einladung gesetzt. */
   gymJoinedAt?: Date | null;
   settings: UserSettings;
@@ -555,6 +556,13 @@ export interface Badge {
 
 // ─── Stundenplan & Bibliothek ──────────────────────────────────────────────
 
+/**
+ * Der alte Rollenwert. Seit Checkpoint 3 nur noch der ÜBERGANGS-SPIEGEL des
+ * Rollen-Sets (`lib/roles.ts`, `legacyRole()`): Er wird weiter in Claims und
+ * users-Dokument geschrieben, damit ein Rollback der Firestore-Regeln keine
+ * Aussperrung ist — gelesen wird er als Quelle nirgends mehr. Fällt mit dem
+ * Rückfall zusammen weg (Backlog-Punkt in CLAUDE.md).
+ */
 export type UserRole = "user" | "trainer" | "admin";
 
 export interface TrainingBlock {

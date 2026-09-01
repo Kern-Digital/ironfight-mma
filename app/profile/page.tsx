@@ -16,7 +16,7 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import AchievementsPanel from "@/components/AchievementsPanel";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { greetingFor } from "@/lib/greeting";
@@ -363,7 +363,7 @@ function ProfileContent() {
   const { user, profile, profileLoading, logOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const timer = useTimerSettings();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const greeting = greetingFor(profile?.displayName);
 

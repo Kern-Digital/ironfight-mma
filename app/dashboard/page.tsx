@@ -11,7 +11,7 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import QuickAction from "@/components/dashboard/QuickAction";
 import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { dashboardGreetingFor, trainerGreetingFor } from "@/lib/greeting";
 import { CATEGORY_LABEL } from "@/lib/techniques";
@@ -180,7 +180,7 @@ function DashboardContent() {
   // Verwaltungsrecht OHNE Trainer-Haekchen: Diese Seite ist fuer sie der
   // einzige Einstieg, denn die Top-Navigation ist hier ausgeblendet
   // (AthleteChromeGate). Trainer/Admin landen gar nicht in diesem Dashboard.
-  const isPureVerwaltung = profile?.verwaltung === true;
+  const isPureVerwaltung = useRights().verwaltung;
   // Kein Gym: entweder von der Verwaltung entfernt (/api/members/remove setzt
   // den gymId-Claim auf null) oder ohne Einladung registriert (die Regeln
   // verbieten dem Client, sich selbst ein Gym zu setzen). Beides sah bisher
@@ -429,7 +429,7 @@ function DashboardContent() {
           <section className="flex flex-col gap-2 lg:col-span-2">
             <span className="t-label">Dein Gym</span>
             <Link
-              href="/trainer/mitglieder"
+              href="/verwaltung/mitglieder"
               className="t-card t-interactive flex items-center gap-3.5 p-4"
               style={{ textDecoration: "none" }}
             >
@@ -742,7 +742,7 @@ function DashboardContent() {
 function TrainerDashboardContent() {
   const { user, profile } = useAuth();
   const greeting = trainerGreetingFor(profile?.displayName);
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = useRights().admin;
 
   const weekId = getWeekIdentifier();
   const todayWeekday = getCurrentWeekday();
@@ -1037,7 +1037,10 @@ function TrainerDashboardContent() {
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
 function DashboardRouter() {
-  const { profile, profileLoading } = useAuth();
+  const { profileLoading } = useAuth();
+  // VOR dem frühen Return: Hooks laufen bei jedem Render, sonst bricht die
+  // Reihenfolge, sobald das Profil fertig geladen ist.
+  const rights = useRights();
 
   if (profileLoading) {
     return (
@@ -1051,8 +1054,7 @@ function DashboardRouter() {
     );
   }
 
-  const isTrainer =
-    profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = rights.trainer;
 
   return isTrainer ? <TrainerDashboardContent /> : <DashboardContent />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
+import { useRights } from "@/lib/auth-context";
 import { useTrainerHint } from "@/lib/use-trainer-hints";
 
 /**
@@ -23,8 +23,8 @@ export default function TrainerHint({
   title?: string;
   children: React.ReactNode;
 }) {
-  const { profile } = useAuth();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  
+  const isTrainer = useRights().trainer;
   const { seen, dismiss } = useTrainerHint(id);
 
   if (!isTrainer) return null;

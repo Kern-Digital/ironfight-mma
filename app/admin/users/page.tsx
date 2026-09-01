@@ -9,6 +9,7 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
 import { listAllUsers, type AdminUserEntry } from "@/lib/admin";
 import type { UserRole } from "@/lib/types";
+import { legacyRole } from "@/lib/roles";
 import { useCallback, useEffect, useState } from "react";
 
 // ─── Rollen-Konfiguration ──────────────────────────────────────────────────
@@ -41,6 +42,17 @@ function roleMeta(role: UserRole | undefined) {
   return ROLES.find((r) => r.value === (role ?? "user")) ?? ROLES[0];
 }
 
+/**
+ * Diese Konsole zeigt weiter die grobe Dreiteilung Athlet/Trainer/Admin.
+ * Seit Checkpoint 3 liegt am Konto ein Rollen-SET; `legacyRole` faltet es auf
+ * den höchsten Rang zusammen. Das Gym-Verwaltungsrecht taucht hier bewusst
+ * nicht auf — es ist ein Recht IM Gym und gehört in die Mitgliederliste des
+ * jeweiligen Gyms, nicht in die Plattform-Übersicht.
+ */
+function roleOf(entry: AdminUserEntry): UserRole {
+  return legacyRole(entry.rights);
+}
+
 // ─── Initialen ────────────────────────────────────────────────────────────
 
 function initials(entry: AdminUserEntry): string {
@@ -62,7 +74,7 @@ function UserRow({
   entry: AdminUserEntry;
   isSelf: boolean;
 }) {
-  const meta = roleMeta(entry.role);
+  const meta = roleMeta(roleOf(entry));
 
   return (
     <div
@@ -187,7 +199,7 @@ function AdminUsersContent() {
   // Filter + Suche
   const filtered = (users ?? []).filter((u) => {
     const matchesFilter =
-      filter === "all" || (u.role ?? "user") === filter;
+      filter === "all" || roleOf(u) === filter;
     const q = search.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -200,9 +212,9 @@ function AdminUsersContent() {
   // Zähler für Tabs
   const counts = {
     all: (users ?? []).length,
-    admin: (users ?? []).filter((u) => u.role === "admin").length,
-    trainer: (users ?? []).filter((u) => u.role === "trainer").length,
-    user: (users ?? []).filter((u) => (u.role ?? "user") === "user").length,
+    admin: (users ?? []).filter((u) => roleOf(u) === "admin").length,
+    trainer: (users ?? []).filter((u) => roleOf(u) === "trainer").length,
+    user: (users ?? []).filter((u) => roleOf(u) === "user").length,
   };
 
   return (

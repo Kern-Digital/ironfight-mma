@@ -4,21 +4,31 @@
  *
  * Token-Check über die Identity-Toolkit-API (accounts:lookup): bestätigt,
  * dass das Token gültig und nicht abgelaufen ist, und liefert uid + die
- * Custom Claims (customAttributes). Die Rolle kommt — wie in firestore.rules
- * und im Client — AUTORITATIV aus den Auth Custom Claims (`role`), die
- * ausschließlich per Admin-SDK gesetzt werden (scripts/set-role.mjs).
+ * Custom Claims (customAttributes). Die Rechte kommen — wie in
+ * firestore.rules und im Client — AUTORITATIV aus den Auth Custom Claims
+ * (Rollen-Set `trainer`/`verwaltung`/`admin`, siehe lib/roles.ts), die
+ * ausschließlich per Admin-SDK gesetzt werden.
  *
  * Damit können nur eingeloggte Trainer/Admins die kostenpflichtigen
  * KI-Routen aufrufen.
  */
 
 import { DEFAULT_GYM_ID } from "@/lib/gym";
+import { readRoleSet, effectiveRights, type RoleSet } from "@/lib/roles";
 
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 export interface VerifiedUser {
   uid: string;
-  role: string | null;
+  /**
+   * Die gespeicherten Häkchen — OHNE eingerechneten Plattform-Rang.
+   * Wer nur wissen will, was jemand darf, nimmt `isTrainerOrAdmin()` /
+   * `canManageGym()`; roh gebraucht wird das Set von /api/members/role, die
+   * entscheiden muss, was sie schreibt.
+   */
+  stored: RoleSet;
+  /** Was der Aufrufer TATSÄCHLICH darf (Plattform-Rang eingerechnet). */
+  rights: RoleSet;
   /**
    * Gym aus dem Claim. `null` = kein Claim gesetzt (Bestand vor der
    * Migration und Signups ohne Einladung). Fuer die Gym-Zuordnung gilt dann
@@ -26,13 +36,6 @@ export interface VerifiedUser {
    * Client (resolveGymId).
    */
   gymId: string | null;
-  /**
-   * Gym-Verwaltungsrecht (Checkpoint 2) — additiver Claim NEBEN `role`.
-   * Bewusst kein Wert von `role`: `admin` ist der PLATTFORM-Admin und
-   * ueberspringt in den Regeln jeden Gym-Vergleich; ein Haekchen in der
-   * Mitgliederliste darf niemals so weit reichen.
-   */
-  verwaltung: boolean;
 }
 
 /** Extrahiert das Bearer-Token aus dem Authorization-Header. */
@@ -61,39 +64,34 @@ export async function verifyUser(idToken: string): Promise<VerifiedUser | null> 
     const user = data.users?.[0];
     if (!user?.localId) return null;
 
-    let role: string | null = null;
-    let gymId: string | null = null;
-    let verwaltung = false;
+    let claims: Record<string, unknown> = {};
     if (user.customAttributes) {
       try {
-        const claims = JSON.parse(user.customAttributes) as {
-          role?: string;
-          gymId?: string;
-          verwaltung?: boolean;
-        };
-        role = claims.role ?? null;
-        gymId = claims.gymId ?? null;
-        verwaltung = claims.verwaltung === true;
+        claims = JSON.parse(user.customAttributes) as Record<string, unknown>;
       } catch {
-        role = null;
-        gymId = null;
-        verwaltung = false;
+        claims = {};
       }
     }
-    return { uid: user.localId, role, gymId, verwaltung };
+    const stored = readRoleSet(claims);
+    return {
+      uid: user.localId,
+      stored,
+      rights: effectiveRights(stored),
+      gymId: typeof claims.gymId === "string" ? claims.gymId : null,
+    };
   } catch {
     return null;
   }
 }
 
-/** True, wenn der User Trainer oder Admin ist. */
+/** True, wenn der User die Trainer-Werkzeuge hat (Admin eingeschlossen). */
 export function isTrainerOrAdmin(user: VerifiedUser | null): boolean {
-  return !!user && (user.role === "trainer" || user.role === "admin");
+  return user?.rights.trainer === true;
 }
 
 /** True, wenn der User Plattform-Admin ist (gym-uebergreifend). */
 export function isAdmin(user: VerifiedUser | null): boolean {
-  return user?.role === "admin";
+  return user?.rights.admin === true;
 }
 
 /**
@@ -130,6 +128,6 @@ export function canManageGym(
 ): boolean {
   if (!user) return false;
   if (isAdmin(user)) return true;
-  if (!user.verwaltung) return false;
+  if (!user.rights.verwaltung) return false;
   return gymId === undefined || userGymId(user) === gymId;
 }

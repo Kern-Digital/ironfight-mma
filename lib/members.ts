@@ -8,13 +8,10 @@
  * sind unabhängig voneinander: der Cheftrainer hat beide, eine Bürokraft nur
  * das zweite, ein Kursleiter nur das erste, alle anderen keins.
  *
- * WARUM `verwaltung` NICHT ÜBER `role` LÄUFT: `role` kennt heute
- * `user | trainer | admin`, und `admin` ist der PLATTFORM-Admin — in
- * firestore.rules überspringt er jeden Gym-Vergleich (`isAdmin()` ohne
- * sameGym). Würde das Verwaltungs-Häkchen `role="admin"` setzen, gäbe ein
- * Klick in der Mitgliederliste Zugriff auf FREMDE Gyms. Deshalb ist
- * `verwaltung` ein eigener, additiver Custom Claim. Checkpoint 3 löst `role`
- * ohnehin in ein Set auf; dieses Feld wandert dann unverändert mit.
+ * Die Form der Rechte selbst liegt seit Checkpoint 3 in `lib/roles.ts`
+ * (`RoleSet`, drei unabhängige Häkchen statt eines `role`-Wertes) — hier
+ * steht nur, was diese Rechte in der MITGLIEDERLISTE bedeuten: Beschriftung,
+ * Erklärtexte, Gruppierung, Zugehörigkeitsdauer, Suche.
  *
  * SICHERHEITSMODELL: Der Client zeigt Häkchen — entschieden wird
  * ausschließlich in `/api/members/role` (Admin-SDK): gültiges Token,
@@ -24,42 +21,23 @@
  */
 
 import type { StudentEntry } from "./admin";
-import type { UserRole } from "./types";
+import type { RoleSet } from "./roles";
 
-/** Die zwei Häkchen. Beide leer = Athlet (kein Recht, kein Häkchen). */
-export interface MemberRights {
-  trainer: boolean;
-  verwaltung: boolean;
-}
-
-/** Rechte, wie sie heute an einem Mitglied stehen. */
-export function rightsOf(entry: {
-  role: UserRole | undefined;
-  verwaltung: boolean;
-}): MemberRights {
-  return {
-    // Der Plattform-Admin hat alle Werkzeuge — in der Anzeige zählt er
-    // deshalb als Trainer UND Verwaltung, auch ohne gesetzte Häkchen.
-    trainer: entry.role === "trainer" || entry.role === "admin",
-    verwaltung: entry.verwaltung || entry.role === "admin",
-  };
-}
+/**
+ * Die zwei Häkchen, die eine Gym-Verwaltung setzen darf. Bewusst NICHT das
+ * volle `RoleSet`: Der Plattform-Rang `admin` steht dort ebenfalls, wird hier
+ * aber nie verändert — weder vergeben (der Body von /api/members/role kann es
+ * nicht ausdrücken) noch entzogen (die Route antwortet mit 403).
+ */
+export type MemberRights = Pick<RoleSet, "trainer" | "verwaltung">;
 
 /** Plattform-Admin: seine Rechte werden hier nie verändert (Server: 403). */
-export function isPlatformAdmin(entry: { role: UserRole | undefined }): boolean {
-  return entry.role === "admin";
+export function isPlatformAdmin(entry: { rights: RoleSet }): boolean {
+  return entry.rights.admin;
 }
 
 export function sameRights(a: MemberRights, b: MemberRights): boolean {
   return a.trainer === b.trainer && a.verwaltung === b.verwaltung;
-}
-
-/** Kurzform für Listenzeilen: „Athlet", „Trainer", „Trainer · Verwaltung". */
-export function rightsLabel(rights: MemberRights): string {
-  const parts: string[] = [];
-  if (rights.trainer) parts.push("Trainer");
-  if (rights.verwaltung) parts.push("Verwaltung");
-  return parts.length ? parts.join(" · ") : "Athlet";
 }
 
 /**
@@ -101,9 +79,8 @@ export function memberName(entry: {
  * nach Menschen, nicht nach Beitrittsdaten.
  */
 export function memberGroupOf(entry: StudentEntry): "verwaltung" | "trainer" | "athlet" {
-  const rights = rightsOf(entry);
-  if (rights.verwaltung) return "verwaltung";
-  if (rights.trainer) return "trainer";
+  if (entry.rights.verwaltung) return "verwaltung";
+  if (entry.rights.trainer) return "trainer";
   return "athlet";
 }
 
@@ -217,8 +194,11 @@ export function memberMatches(entry: StudentEntry, needle: string): boolean {
 export interface SetMemberRightsResult {
   ok: boolean;
   uid: string;
-  role: UserRole;
+  /** Die Rechte, wie sie danach am Konto stehen. */
+  trainer: boolean;
   verwaltung: boolean;
+  /** Nichts zu tun gewesen — kein Schreibvorgang, kein Protokolleintrag. */
+  unchanged?: boolean;
 }
 
 /**

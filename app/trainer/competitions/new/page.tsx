@@ -41,7 +41,7 @@ function studentLabel(s: StudentEntry): string {
 function athleteSubLabel(s: StudentEntry): string | null {
   const level = s.athlete?.level ? ATHLETE_LEVEL_LABEL[s.athlete.level] : null;
   if (!isStaffEntry(s)) return level;
-  const role = s.role === "admin" ? "Admin" : "Trainer";
+  const role = s.rights.admin ? "Admin" : "Trainer";
   return level ? `${role} · ${level}` : role;
 }
 

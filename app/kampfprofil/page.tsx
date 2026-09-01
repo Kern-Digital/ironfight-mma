@@ -28,7 +28,7 @@ import FightProfileView from "@/components/trainer/FightProfileView";
 import VideoAnalysisResult from "@/components/trainer/VideoAnalysisResult";
 import Skeleton from "@/components/ui/Skeleton";
 import Icon from "@/components/ui/Icon";
-import { useAuth, useFighterName } from "@/lib/auth-context";
+import { useAuth, useFighterName, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   getFightProfile,
@@ -126,7 +126,7 @@ function KampfprofilContent() {
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const fighterName = useFighterName();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
   const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);

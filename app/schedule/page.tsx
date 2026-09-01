@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
@@ -228,10 +228,10 @@ const TRAINER_BLOCK_DESCRIPTION =
 // ─── Hauptkomponente ───────────────────────────────────────────────────────
 
 export default function SchedulePage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const todayWeekday = getCurrentWeekday();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [modal, setModal] = useState<ModalState>({ phase: "idle" });
   const [attending, setAttending] = useState(false);

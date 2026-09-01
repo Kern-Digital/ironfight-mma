@@ -1,33 +1,46 @@
 /**
- * Die Verwaltungs-Seiten (Multi-Gym Phase 2, Checkpoint 2) — eine Liste,
- * drei Leser.
+ * Der Verwaltungsbereich — eine Liste, mehrere Leser.
  *
- * Sie liegen unter `/trainer`, gehören aber NICHT dem Trainer: Sie folgen dem
- * Verwaltungsrecht. Deshalb muss dieselbe Liste an drei Stellen bekannt sein,
- * und genau darum steht sie hier und nicht dreimal:
- *   1. `middleware.ts`            — der serverseitige Navigations-Gate
- *   2. `components/TrainerRoute`  — der Client-Guard des /trainer-Layouts
- *   3. `app/trainer/layout.tsx`   — blendet die Trainer-Bereichsnavigation aus
- * Dazu kommen die Firestore-Regeln, die den Datenzugriff erzwingen; die drei
+ * Seit Checkpoint 3 liegt er unter einer EIGENEN Adresse (`/verwaltung`)
+ * statt unter `/trainer`. Das ist kein Umbenennen, sondern die Auflösung
+ * einer Falle: Solange die Seiten unter `/trainer` lagen, mussten drei
+ * Türsteher (Middleware, `components/TrainerRoute`, das `/trainer`-Layout)
+ * jeweils eine Ausnahme kennen — und eine reine Verwaltung ohne
+ * Trainer-Häkchen kam durch die Middleware, um eine Zehntelsekunde später
+ * clientseitig auf `/dashboard` zu fliegen. Getrennte Adressen brauchen keine
+ * Ausnahmen: `/trainer` gehört dem Trainer, `/verwaltung` der Verwaltung.
+ *
+ * Gelesen wird das hier von:
+ *   1. `middleware.ts`                  — serverseitiger Navigations-Gate
+ *   2. `components/VerwaltungRoute.tsx` — Client-Guard des Bereichs-Layouts
+ * Dazu kommen die Firestore-Regeln, die den DATENzugriff erzwingen; die zwei
  * hier sind Navigation, nicht Sicherheit.
- *
- * Warum die Seiten nicht einfach unter `/verwaltung` liegen: `/trainer/
- * einladungen` existiert seit Checkpoint 1B und ist bereits verlinkt und
- * verschickt worden. Ein Umzug wäre ein eigener Vorgang mit Weiterleitungen —
- * er gehört in Checkpoint 3, wenn die Rollen ohnehin umgestellt werden.
  *
  * KEINE React-/Node-Abhängigkeiten hier: middleware.ts läuft auf der Edge.
  */
 
-export const VERWALTUNG_PREFIXES = [
-  "/trainer/mitglieder",
-  "/trainer/einladungen",
-  "/trainer/neuigkeiten",
-] as const;
+/** Wurzel des Bereichs. Alles darunter folgt dem Verwaltungsrecht. */
+export const VERWALTUNG_ROOT = "/verwaltung";
 
 /** Gehört dieser Pfad zum Verwaltungsbereich? */
 export function isVerwaltungPath(pathname: string): boolean {
-  return VERWALTUNG_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/"),
+  return (
+    pathname === VERWALTUNG_ROOT || pathname.startsWith(VERWALTUNG_ROOT + "/")
   );
 }
+
+/**
+ * Die alten Adressen aus Checkpoint 1B/2 — `/trainer/mitglieder`,
+ * `/trainer/einladungen`, `/trainer/neuigkeiten` — leiten auf die neuen
+ * weiter. Diese Weiterleitung steht in `next.config.mjs` (`redirects()`),
+ * NICHT hier und nicht in der Middleware.
+ *
+ * Der Grund steht dort ausführlich; kurz: `redirects()` läuft vor der
+ * Middleware (sonst würfe das Trainer-Gate eine reine Verwaltung auf
+ * /dashboard, bevor sie ihr neues Ziel sähe), vor jedem Rendern (ein
+ * `redirect()` in einer Seite unter einem Client-Layout greift nicht) und
+ * auch bei gesetztem Not-Aus `MIDDLEWARE_AUTH=off`.
+ *
+ * Verschickte Einladungs-LINKS sind nicht betroffen — die zeigen auf
+ * `/beitreten/{code}`.
+ */

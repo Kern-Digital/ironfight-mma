@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
 import { generateWorkout } from "@/lib/workout-generator";
@@ -253,7 +253,7 @@ export default function WorkoutHubPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   // Eigene Workoutpläne + letzte Workouts (Teilschritt 3): null = lädt noch —
   // die Bereiche erscheinen erst mit dem Ergebnis (kein Leer-Blitz).

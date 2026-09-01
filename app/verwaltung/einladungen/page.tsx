@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * Einladungen des Gyms (Multi-Gym Phase 2, Checkpoint 1B) — Übersicht im
- * Token-Look (DESIGN-BRIEF), Aufbau nach app/trainer/plans/page.tsx:
- * Ambient-Kopf, t-card-Zeilen, BTN_FONT, META_BASE/META_SIZE, ein Symbol
- * rechts in der Zeile.
+ * Einladungen des Gyms (Multi-Gym Phase 2) — Übersicht im Token-Look
+ * (DESIGN-BRIEF), Aufbau nach app/trainer/plans/page.tsx: Ambient-Kopf,
+ * t-card-Zeilen, BTN_FONT, META_BASE/META_SIZE, ein Symbol rechts in der
+ * Zeile.
  *
- * RECHTE: Einladen darf nur die Verwaltung (Leon 31.08.). Die Rolle
- * `verwaltung` entsteht erst in Checkpoint 3 — bis dahin steht `admin`
- * stellvertretend, hier wie in den Server-Routen und den Firestore-Regeln.
- * Ein Trainer ohne dieses Recht sieht deshalb nicht nur keinen Knopf: er darf
- * die Codes auch gar nicht lesen (Regel `gyms/{gymId}/invites`), denn wer die
- * Codes sieht, kann sie weiterreichen — und damit einladen.
+ * RECHTE: Einladen darf nur die Verwaltung (Leon 31.08.) — geprüft über das
+ * Verwaltungs-Häkchen des Rollen-Sets (lib/roles.ts). Ein Trainer ohne dieses
+ * Recht sieht deshalb nicht nur keinen Knopf: er darf die Codes auch gar
+ * nicht lesen (Regel `gyms/{gymId}/invites`), denn wer die Codes sieht, kann
+ * sie weiterreichen — und damit einladen.
  *
  * Gelesen wird per listGymInvites; GESCHRIEBEN wird ausschließlich über die
  * Server-Routen /api/invites/create und /revoke (lib/invites.ts).
@@ -21,7 +20,7 @@ import InviteCreateSheet from "@/components/InviteCreateSheet";
 import InviteDetailSheet from "@/components/InviteDetailSheet";
 import InviteStatusChip from "@/components/InviteStatusChip";
 import Icon from "@/components/ui/Icon";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
 import { resolveGymId } from "@/lib/gym";
 import {
@@ -60,7 +59,7 @@ const DATE_FMT = new Intl.DateTimeFormat("de-DE", {
 export default function TrainerInvitesPage() {
   const { user, profile, profileLoading } = useAuth();
   // Bis Checkpoint 3 ist `admin` die Verwaltung (siehe Kopf).
-  const isVerwaltung = profile?.role === "admin";
+  const isVerwaltung = useRights().admin;
 
   const [invites, setInvites] = useState<GymInvite[] | null>(null);
   const [error, setError] = useState(false);

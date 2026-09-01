@@ -20,7 +20,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import SwipeAction from "@/components/SwipeAction";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   addTechniqueToLibrary,
@@ -106,9 +106,9 @@ export default function LibraryPage() {
 }
 
 function LibraryContent() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [entries, setEntries] = useState<EnrichedEntry[]>([]);
   const [loading, setLoading] = useState(true);

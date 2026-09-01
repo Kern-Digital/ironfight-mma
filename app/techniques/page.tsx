@@ -20,7 +20,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth } from "@/lib/auth-context";
+import { useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   ALL_TECHNIQUES,
@@ -150,9 +150,9 @@ function levelLabel(t: Technique): string {
 // ─── Seite ────────────────────────────────────────────────────────────────────
 
 export default function TechniquesPage() {
-  const { profile } = useAuth();
+  
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [search, setSearch] = useState("");
   const [activeDiscipline, setActiveDiscipline] = useState<Discipline | "all">(

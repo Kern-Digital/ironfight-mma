@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import { TechniqueViewTracker } from "@/components/TechniqueViewTracker";
-import { useAuth } from "@/lib/auth-context";
+import { useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   CATEGORY_LABEL,
@@ -74,9 +74,9 @@ function SectionTitle({
 // ─── Ansicht ──────────────────────────────────────────────────────────────────
 
 export default function TechniqueDetailView({ id }: { id: string }) {
-  const { profile } = useAuth();
+  
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   // Existenz ist serverseitig geprüft (page.tsx → notFound)
   const t = getTechniqueById(id);

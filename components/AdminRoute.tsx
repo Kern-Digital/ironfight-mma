@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import Skeleton from "@/components/ui/Skeleton";
 
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, profileLoading } = useAuth();
+  const { user, loading, profileLoading } = useAuth();
   const router = useRouter();
 
   const isReady = !loading && !profileLoading;
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = useRights().admin;
 
   useEffect(() => {
     if (!isReady) return;

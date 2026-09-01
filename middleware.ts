@@ -6,7 +6,8 @@ import {
   importX509,
   jwtVerify,
 } from "jose";
-import { VERWALTUNG_PREFIXES } from "@/lib/verwaltung-routes";
+import { rightsFromClaims, type RoleSet } from "@/lib/roles";
+import { isVerwaltungPath } from "@/lib/verwaltung-routes";
 
 /**
  * Serverseitiger Auth-Gate (Edge) — MIT Signaturprüfung (seit 2026-08-20).
@@ -16,11 +17,12 @@ import { VERWALTUNG_PREFIXES } from "@/lib/verwaltung-routes";
  * Cookie (siehe lib/auth-context.tsx), das diese Middleware liest.
  *
  * Prüfung: Das JWT wird gegen Googles öffentliche Zertifikate verifiziert
- * (RS256, Issuer/Audience = Firebase-Projekt). Zusätzlich werden die Custom
- * Claims (role, verwaltung) fürs Routen-Gating gelesen:
- *   /admin/*   → nur role=admin, sonst 404 (Existenz verbergen)
- *   /trainer/* → nur trainer/admin, sonst Redirect /dashboard
- *   die drei Verwaltungs-Seiten darunter → nur verwaltung/admin (s. u.)
+ * (RS256, Issuer/Audience = Firebase-Projekt). Zusätzlich wird das Rollen-Set
+ * aus den Custom Claims (`trainer`, `verwaltung`, `admin`; Checkpoint 3,
+ * lib/roles.ts) fürs Routen-Gating gelesen:
+ *   /admin/*      → nur der Plattform-Rang, sonst 404 (Existenz verbergen)
+ *   /verwaltung/* → nur mit Verwaltungsrecht, sonst Redirect /dashboard
+ *   /trainer/*    → nur mit Trainer-Werkzeugen, sonst Redirect /dashboard
  *
  * Fail-Open-Ausnahme (bewusst): Sind Googles Zertifikate NICHT erreichbar
  * (Netzfehler), fällt der Gate auf den unverifizierten exp-Check zurück,
@@ -34,19 +36,14 @@ import { VERWALTUNG_PREFIXES } from "@/lib/verwaltung-routes";
 const ADMIN_PREFIXES = ["/admin"];
 const TRAINER_PREFIXES = ["/trainer"];
 /**
- * Die Verwaltungs-Seiten (Liste in lib/verwaltung-routes.ts) liegen UNTER
- * /trainer, gehören aber NICHT dem Trainer.
- *
- * Sie brauchen ein eigenes Gate in BEIDE Richtungen. Nach unten, weil eine
- * reine Verwaltung ohne Trainer-Häkchen (role="user" + verwaltung=true) vom
- * /trainer-Gate sonst auf /dashboard geworfen würde, bevor sie ihre eigene
- * Seite sieht. Nach oben, weil ein Trainer ohne Verwaltungsrecht hier nichts
- * verloren hat — die Firestore-Regeln weisen ihn ohnehin ab, aber eine leere
- * Seite mit Fehlermeldung ist keine Antwort.
- *
- * Reihenfolge im Gate zählt: Diese Prüfung läuft VOR der Trainer-Prüfung.
- * Dieselbe Liste liest der Client-Guard (components/TrainerRoute.tsx) —
- * sonst hält die Middleware auf und React wirft gleich danach wieder raus.
+ * Der Verwaltungsbereich hat seit Checkpoint 3 eine eigene Adresse
+ * (`/verwaltung`, siehe lib/verwaltung-routes.ts) und deshalb ein eigenes,
+ * schlichtes Gate. Vorher lagen die Seiten unter `/trainer` und brauchten
+ * eine Ausnahme in BEIDE Richtungen — nach unten, damit eine reine
+ * Verwaltung nicht vom Trainer-Gate auf /dashboard flog, und nach oben,
+ * damit ein Trainer ohne Verwaltungsrecht nicht auf einer Seite landete, die
+ * ihm die Firestore-Regeln ohnehin verwehren. Getrennte Adressen erledigen
+ * beides ohne Sonderfall.
  */
 const SESSION_COOKIE = "__session";
 
@@ -85,7 +82,13 @@ async function fetchGoogleCerts(force = false): Promise<Record<string, string>> 
 
 // ─── Token-Verifikation ─────────────────────────────────────────────────────
 
-type SessionClaims = { role?: string; verwaltung?: boolean };
+/**
+ * Für den Gate zählt nur, was jemand DARF — der Plattform-Rang ist dabei
+ * schon eingerechnet (`rightsFromClaims`). Der Rückfall auf das alte `role`
+ * steckt ebenfalls dort: Tokens leben bis zu einer Stunde, und in dieser
+ * Stunde laufen beide Claim-Formen durch diese Prüfung.
+ */
+type SessionClaims = RoleSet;
 
 type VerifyResult =
   | { status: "valid"; claims: SessionClaims }
@@ -115,10 +118,7 @@ async function verifySession(token: string): Promise<VerifyResult> {
     }
     return {
       status: "valid",
-      claims: {
-        role: typeof payload.role === "string" ? payload.role : undefined,
-        verwaltung: payload.verwaltung === true,
-      },
+      claims: rightsFromClaims(payload as Record<string, unknown>),
     };
   } catch (err) {
     if (err instanceof CertFetchError) return { status: "unavailable" };
@@ -133,10 +133,7 @@ function unverifiedSession(token: string): SessionClaims | null {
     if (typeof payload.exp === "number" && payload.exp * 1000 < Date.now()) {
       return null;
     }
-    return {
-      role: typeof payload.role === "string" ? payload.role : undefined,
-      verwaltung: payload.verwaltung === true,
-    };
+    return rightsFromClaims(payload as Record<string, unknown>);
   } catch {
     return null;
   }
@@ -158,11 +155,22 @@ function deny(req: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(url);
 }
 
+function toDashboard(req: NextRequest): NextResponse {
+  const url = req.nextUrl.clone();
+  url.pathname = "/dashboard";
+  url.search = "";
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(req: NextRequest) {
   // Optionaler Not-Aus (z. B. waehrend eines Cutovers): MIDDLEWARE_AUTH=off
   if (process.env.MIDDLEWARE_AUTH === "off") return NextResponse.next();
 
   const { pathname } = req.nextUrl;
+  // Der Umzug der alten /trainer-Adressen passiert VOR dieser Middleware in
+  // next.config.mjs (redirects()) — genau deshalb, damit das Trainer-Gate
+  // unten eine reine Verwaltung nicht abfaengt, bevor sie ihr neues Ziel
+  // erreicht.
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return deny(req, pathname);
 
@@ -177,28 +185,17 @@ export async function middleware(req: NextRequest) {
   }
   if (!claims) return deny(req, pathname);
 
-  // Rollen-Gating (Claims aus dem verifizierten Token)
-  if (matchesPrefix(pathname, ADMIN_PREFIXES) && claims.role !== "admin") {
+  // Rechte-Gating (Rollen-Set aus dem verifizierten Token). Der
+  // Plattform-Rang ist in `claims` bereits eingerechnet — ein Admin faellt
+  // deshalb durch keine dieser Pruefungen.
+  if (matchesPrefix(pathname, ADMIN_PREFIXES) && !claims.admin) {
     return deny(req, pathname); // 404 — Existenz verbergen
   }
-  // Verwaltungs-Seiten ZUERST: Sie liegen unter /trainer, folgen aber einem
-  // anderen Recht (siehe VERWALTUNG_PREFIXES).
-  if (matchesPrefix(pathname, [...VERWALTUNG_PREFIXES])) {
-    if (claims.verwaltung !== true && claims.role !== "admin") {
-      const url = req.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
+  if (isVerwaltungPath(pathname) && !claims.verwaltung) {
+    return toDashboard(req);
   }
-  if (
-    matchesPrefix(pathname, TRAINER_PREFIXES) &&
-    claims.role !== "trainer" &&
-    claims.role !== "admin"
-  ) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  if (matchesPrefix(pathname, TRAINER_PREFIXES) && !claims.trainer) {
+    return toDashboard(req);
   }
 
   return NextResponse.next();
@@ -221,5 +218,6 @@ export const config = {
     "/library/:path*",
     "/profile/:path*",
     "/trainer/:path*",
+    "/verwaltung/:path*",
   ],
 };

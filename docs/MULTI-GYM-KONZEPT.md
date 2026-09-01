@@ -23,7 +23,11 @@ Plattform-Admin (admin) — wenige Personen, gym-übergreifend, verwaltet die Ap
   beides.
 - Claims werden vom einzelnen Rollenwert auf ein Set umgestellt, z. B.
   `{ gymId, trainer: true, verwaltung: true }` — Kombinationen müssen sauber
-  abbildbar sein.
+  abbildbar sein. **UMGESETZT 2026-09-01** (Checkpoint 3): drei unabhängige
+  Häkchen `trainer` / `verwaltung` / `admin`; der Plattform-Rang wurde dabei
+  ebenfalls zu einem eigenen Claim, weil er sonst weiter mit `trainer` um
+  denselben Platz konkurriert hätte. Eine Datei baut und liest sie:
+  `lib/roles.ts` (Node-Zwilling: `scripts/lib/role-claims.mjs`).
 - **Ein User gehört genau EINEM Gym** (bewusste Vereinfachung für den Start).
 - `gymId` gehört in die **Custom Claims** (wie `role` heute), nicht nur ins
   Profil-Dokument — nur so ist die Trennung serverseitig hart.
@@ -68,8 +72,10 @@ Gelten für JEDES neue Feature dieses Ausbaus:
 
 ## 4. Rollenvergabe & Mitgliederbereich
 
-- UI: Mitgliederliste (nur Verwaltung), pro Mitglied zwei Häkchen:
-  `[ ] Trainer  [ ] Verwaltung`. Athlet ist implizit immer.
+- UI: Mitgliederliste (nur Verwaltung, `/verwaltung/mitglieder`), pro
+  Mitglied zwei Häkchen: `[ ] Trainer  [ ] Verwaltung`. Athlet ist implizit
+  immer. Der Plattform-Rang `admin` ist im Body von `/api/members/role` nicht
+  ausdrückbar — er wird nie über eine Gym-Oberfläche vergeben oder entzogen.
 - Der Klick ruft eine Server-API (z. B. `POST /api/members/role`), die HART
   prüft: gültiges signaturgeprüftes Token; Aufrufer ist Verwaltung DESSELBEN
   Gyms (oder Plattform-Admin); Verwaltung vergibt nur trainer/verwaltung im
@@ -176,8 +182,11 @@ Beschlossenes Modell: **Fixbetrag + Kontingent + Nachkauf.**
 3. **REDESIGN** (siehe `docs/DESIGN-BRIEF.md`) — bewusst HIER: nach dem
    Unterbau, VOR den neuen Oberflächen, damit jeder neue Screen nur einmal
    gebaut wird. Architektur- und Optik-Umbau nie vermischen.
-4. **Phase 2** — Verwaltungsebene: Rollen-Set-Claims + Rollen-API,
-   Einladungssystem, Mitgliederbereich, Verwaltungs-Dashboard.
+4. **Phase 2** — Verwaltungsebene. Checkpoint 1 (Einladungssystem),
+   Checkpoint 2 (Mitgliederbereich, Rollen-API, Neuigkeiten) und Checkpoint 3
+   (Rollen-Set-Claims + Umzug nach `/verwaltung`) sind gebaut — Stand
+   2026-09-01. Das Verwaltungs-Dashboard (Kennzahlen, Kontingent) hängt an
+   Phase 3.
 5. **Phase 3** — Betrieb: Wochenplan-Mehrplan-Modell, Pro-Gym-KI-Kontingent,
    Admin-Konsole (Gyms anlegen/sperren, gym-übergreifende Kennzahlen).
 6. **Phase 4** — Monetarisierung: Stripe pro Gym (Fixbetrag + Nachkauf),

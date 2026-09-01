@@ -2,29 +2,26 @@
 
 import TrainerRoute from "@/components/TrainerRoute";
 import TrainerSubnav from "@/components/trainer/TrainerSubnav";
-import { useAuth } from "@/lib/auth-context";
 
 /**
  * Layout für den gesamten Trainerbereich: Guard + Bereichs-Navigation an
  * EINER Stelle — die einzelnen Seiten brauchen kein eigenes <TrainerRoute>.
  *
- * Die Bereichs-Navigation zeigt Schüler, DeepFight und Wettkampf — lauter
- * Trainer-Werkzeuge. Eine reine Verwaltung (Verwaltungsrecht ohne
- * Trainer-Häkchen, Checkpoint 2) besucht hier nur ihre eigenen Seiten und
- * bekommt die Leiste deshalb nicht: Sie führte ausschließlich zu Ansichten,
- * die die Firestore-Regeln ihr verwehren.
+ * Die Leiste steht seit Checkpoint 3 wieder BEDINGUNGSLOS. Solange die
+ * Verwaltungs-Seiten hier unten lagen, konnte eine reine Verwaltung ohne
+ * Trainer-Häkchen im Trainerbereich landen — die Leiste hätte ihr dann
+ * ausschließlich Ansichten angeboten, die die Firestore-Regeln ihr verwehren,
+ * und musste deshalb ausgeblendet werden. Der Umzug nach `/verwaltung` hat
+ * diesen Fall abgeschafft: Wer hier ankommt, ist Trainer (`TrainerRoute`).
  */
 export default function TrainerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { profile } = useAuth();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
-
   return (
     <TrainerRoute>
-      {isTrainer && <TrainerSubnav />}
+      <TrainerSubnav />
       {children}
     </TrainerRoute>
   );

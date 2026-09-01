@@ -31,7 +31,8 @@ import {
   markOnboarded as markProfileOnboarded,
   markTrainerOnboarded as markProfileTrainerOnboarded,
 } from "./user-profile";
-import type { UserProfile, UserRole } from "./types";
+import { NO_RIGHTS, rightsFromClaims, type RoleSet } from "./roles";
+import type { UserProfile } from "./types";
 
 type AuthContextValue = {
   user: User | null;
@@ -53,6 +54,29 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * Rechte UND Gym kommen autoritativ aus den Auth Custom Claims, nicht aus
+ * Firestore (dort liegt nur der Abfrage-Spiegel). Das passiert an drei
+ * Stellen — beim Anmelden, beim Neuladen des Profils und beim erzwungenen
+ * Token-Refresh — und steht deshalb genau einmal hier: Drei Kopien wären drei
+ * Gelegenheiten, ein Recht zu vergessen.
+ *
+ * Der Rückfall auf das alte `role` steckt in `rightsFromClaims` (lib/roles.ts)
+ * und trägt die Stunde, in der noch Tokens von vor Checkpoint 3 unterwegs
+ * sind.
+ */
+function claimsToProfile<T extends UserProfile>(
+  base: T,
+  claims: Record<string, unknown>,
+  fallbackGymId: string | null,
+): T {
+  return {
+    ...base,
+    rights: rightsFromClaims(claims),
+    gymId: (typeof claims.gymId === "string" ? claims.gymId : null) ?? fallbackGymId,
+  };
+}
 
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -94,17 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfileLoading(true);
       try {
         const p = await ensureUserProfile(u);
-        // Rolle UND Gym kommen autoritativ aus den Auth Custom Claims,
-        // nicht aus Firestore (dort nur Anzeige-Spiegel).
         const { claims } = await u.getIdTokenResult();
-        setProfile({
-          ...p,
-          role: claims.role as UserRole | undefined,
-          gymId: (claims.gymId as string | undefined) ?? p.gymId ?? null,
-          // Verwaltungsrecht kommt wie role/gymId aus dem Claim, nicht aus
-          // dem Dokument (dort nur der Abfrage-Spiegel fuer Zaehlungen).
-          verwaltung: claims.verwaltung === true,
-        });
+        setProfile(claimsToProfile(p, claims, p.gymId ?? null));
       } catch (err) {
         console.warn("[TidalAthletics] ensureUserProfile failed:", err);
         setProfile(null);
@@ -139,10 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const p = await getUserProfile(user.uid);
       const { claims } = await user.getIdTokenResult();
-      const role = claims.role as UserRole | undefined;
-      const gymId = (claims.gymId as string | undefined) ?? p?.gymId ?? null;
-      const verwaltung = claims.verwaltung === true;
-      setProfile(p ? { ...p, role, gymId, verwaltung } : p);
+      setProfile(p ? claimsToProfile(p, claims, p.gymId ?? null) : p);
     } finally {
       setProfileLoading(false);
     }
@@ -157,13 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshRole = useCallback(async () => {
     if (!user) return;
     const { claims } = await user.getIdTokenResult(true);
-    const role = claims.role as UserRole | undefined;
-    const claimGymId = claims.gymId as string | undefined;
-    const verwaltung = claims.verwaltung === true;
     setProfile((prev) =>
-      prev
-        ? { ...prev, role, gymId: claimGymId ?? prev.gymId, verwaltung }
-        : prev,
+      prev ? claimsToProfile(prev, claims, prev.gymId ?? null) : prev,
     );
   }, [user]);
 
@@ -290,4 +297,24 @@ export function useAuth() {
 export function useFighterName(): string {
   const { profile } = useAuth();
   return profile?.displayName?.trim() || "Flex";
+}
+
+/**
+ * Die Rechte des angemeldeten Kontos — `trainer`, `verwaltung`, `admin`, mit
+ * eingerechnetem Plattform-Rang (Checkpoint 3, lib/roles.ts).
+ *
+ * ER LÖST DEN AUSDRUCK `profile?.role === "trainer" || profile?.role ===
+ * "admin"` AB, der vor Checkpoint 3 in gut zwanzig Komponenten stand. Jede
+ * dieser Kopien war eine Stelle, an der ein neues Recht hätte vergessen
+ * werden können — und `verwaltung` musste 2026-08-31 genau deshalb einzeln
+ * nachgetragen werden.
+ *
+ * WÄHREND DES LADENS SIND ALLE HÄKCHEN AUS. Das ist die sichere Richtung:
+ * Die Oberfläche zeigt kurz weniger, statt kurz zu viel. Wer den Unterschied
+ * zwischen „lädt noch" und „darf nicht" braucht (Guards), fragt zusätzlich
+ * `profileLoading` ab.
+ */
+export function useRights(): RoleSet {
+  const { profile } = useAuth();
+  return profile?.rights ?? NO_RIGHTS;
 }

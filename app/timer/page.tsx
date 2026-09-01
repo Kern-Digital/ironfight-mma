@@ -24,7 +24,7 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import RestWheel, { formatRest } from "@/components/RestWheel";
 import Icon from "@/components/ui/Icon";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
@@ -335,10 +335,10 @@ function WheelField({
 
 function TimerView() {
   const params = useSearchParams();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { settings } = useTimerSettings();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const initial = useMemo<TimerConfig>(
     () => ({

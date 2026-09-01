@@ -2,7 +2,7 @@
  * POST /api/invites/redeem — Einladung einlösen und dem Gym beitreten.
  *
  * Body:    { code }
- * Antwort: { ok: true, gymId, gymName, role }
+ * Antwort: { ok: true, gymId, gymName, trainer }
  *
  * Das ist der Vorgang, der die Mandantentrennung überhaupt herstellt
  * (Konzept §5): Er setzt den `gymId`-Custom-Claim — serverseitig, per
@@ -45,6 +45,14 @@ import {
   type InviteRole,
 } from "@/lib/invites";
 import { DEFAULT_GYM_LABEL } from "@/lib/gym";
+import {
+  claimsWithRights,
+  legacyRole,
+  NO_RIGHTS,
+  readRoleSet,
+  rightsMirror,
+  type RoleSet,
+} from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -52,12 +60,16 @@ export const runtime = "nodejs";
  * Eine Einladung hebt Rechte an, senkt sie aber nie: Löst ein Trainer einen
  * Athleten-Code ein, bleibt er Trainer. Sonst könnte ein weitergereichter
  * Link jemanden versehentlich degradieren.
+ *
+ * Vor Checkpoint 3 brauchte das eine Rangleiter (`user < trainer < admin`),
+ * weil `role` nur EINEN Wert tragen konnte und „Trainer" und „Admin" um
+ * denselben Platz konkurrierten. Mit dem Rollen-Set ist es schlicht eine
+ * Vereinigung: Was gesetzt war, bleibt gesetzt; was die Einladung mitbringt,
+ * kommt dazu. Senken kann eine Einladung damit strukturell nicht mehr — es
+ * gibt keinen Ausdruck dafür.
  */
-const RANK: Record<string, number> = { user: 0, trainer: 1, admin: 2 };
-
-function mergedRole(existing: string | null, invited: InviteRole): string {
-  const current = existing ?? "user";
-  return (RANK[current] ?? 0) >= (RANK[invited] ?? 0) ? current : invited;
+function withInvitedRight(current: RoleSet, invited: InviteRole): RoleSet {
+  return { ...current, trainer: current.trainer || invited === "trainer" };
 }
 
 export async function POST(req: Request) {
@@ -156,15 +168,18 @@ export async function POST(req: Request) {
     });
 
     // ─── 2. Claims setzen (mergen!) ─────────────────────────────────────
-    const role = mergedRole(user.role, invitedRole);
+    // Frisch aus dem Admin-SDK gelesen statt aus dem (bis zu eine Stunde
+    // alten) Token des Aufrufers: Die Rechte, die hier fortgeschrieben
+    // werden, müssen der aktuelle Stand sein.
+    let nextRights: RoleSet = NO_RIGHTS;
     try {
       const existing = (await adminAuth().getUser(user.uid)).customClaims ?? {};
+      nextRights = withInvitedRight(readRoleSet(existing), invitedRole);
       // setCustomUserClaims ERSETZT alle Claims — bestehende müssen
       // gemergt werden (gleiche Lektion wie in scripts/set-role.mjs).
       await adminAuth().setCustomUserClaims(user.uid, {
-        ...existing,
+        ...claimsWithRights(existing, nextRights),
         gymId,
-        role,
       });
     } catch (claimErr) {
       if (!alreadyRedeemed) {
@@ -188,7 +203,10 @@ export async function POST(req: Request) {
     // dabei. Bei einem erneuten Einlösen (alreadyRedeemed) bleibt der ERSTE
     // Zeitpunkt stehen — sonst würde ein Neuladen die Zugehörigkeit
     // zurücksetzen.
-    const memberDoc: Record<string, unknown> = { gymId, role };
+    const memberDoc: Record<string, unknown> = {
+      ...rightsMirror(nextRights),
+      gymId,
+    };
     const existingDoc = await db.collection("users").doc(user.uid).get();
     if (!existingDoc.get("gymJoinedAt")) {
       memberDoc.gymJoinedAt = FieldValue.serverTimestamp();
@@ -214,11 +232,16 @@ export async function POST(req: Request) {
         targetUid: user.uid,
         targetName: joinerName,
         code,
-        details: { role },
+        details: { role: legacyRole(nextRights) },
       });
     }
 
-    return NextResponse.json({ ok: true, gymId, gymName, role });
+    return NextResponse.json({
+      ok: true,
+      gymId,
+      gymName,
+      trainer: nextRights.trainer,
+    });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {
       return NextResponse.json(

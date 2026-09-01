@@ -2,14 +2,14 @@
  * POST /api/members/role — Rechte eines Mitglieds setzen (Verwaltung).
  *
  * Body:    { uid, trainer: boolean, verwaltung: boolean }
- * Antwort: { ok: true, uid, role, verwaltung }
+ * Antwort: { ok: true, uid, trainer, verwaltung }
  *
  * Das ist die Rollen-API aus Konzept §4 — die Ablösung des Hand-Scripts
  * `scripts/set-role.mjs` für alles, was ein Gym selbst entscheiden darf.
  *
  * WAS DER BODY NICHT KANN, IST DER HALBE SCHUTZ: Er trägt genau zwei
- * Wahrheitswerte und eine uid. Es gibt kein Feld für `role` (also auch keins
- * für „admin") und keins für `gymId`. Beides ist damit nicht bloß verboten,
+ * Wahrheitswerte und eine uid. Es gibt kein Feld für den Plattform-Rang
+ * (`admin`) und keins für `gymId`. Beides ist damit nicht bloß verboten,
  * sondern nicht ausdrückbar. Der Rest sind die harten Prüfungen unten.
  *
  * Reihenfolge und ihre Begründung:
@@ -42,6 +42,12 @@ import {
   verifyUser,
 } from "@/lib/server/verify-user";
 import { DEFAULT_GYM_ID } from "@/lib/gym";
+import {
+  claimsWithRights,
+  readRoleSet,
+  rightsMirror,
+  type RoleSet,
+} from "@/lib/roles";
 import type { Firestore } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
@@ -69,7 +75,14 @@ async function countRemainingManagers(
   let count = 0;
   for (const doc of snap.docs) {
     if (doc.id === excludeUid) continue;
-    if (doc.get("verwaltung") === true || doc.get("role") === "admin") {
+    // Der Spiegel traegt seit Checkpoint 3 `verwaltung` und `admin` als
+    // eigene Felder; `role === "admin"` ist der Rueckfall fuer Dokumente,
+    // die die Migration noch nicht gesehen haben.
+    if (
+      doc.get("verwaltung") === true ||
+      doc.get("admin") === true ||
+      doc.get("role") === "admin"
+    ) {
       count += 1;
     }
   }
@@ -128,12 +141,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const targetRole =
-      typeof targetClaims.role === "string" ? targetClaims.role : "user";
+    // Roh gelesen (ohne eingerechneten Plattform-Rang): Diese Route
+    // entscheidet, was GESCHRIEBEN wird — sie braucht die tatsaechlich
+    // gesetzten Haekchen, nicht die abgeleiteten.
+    const targetRights = readRoleSet(targetClaims);
     const targetGymId =
       (typeof targetClaims.gymId === "string" && targetClaims.gymId.trim()) ||
       DEFAULT_GYM_ID;
-    const targetVerwaltung = targetClaims.verwaltung === true;
 
     // Fremdes Gym: Die Verwaltung entscheidet über IHR Gym. Der
     // Plattform-Admin darf gym-übergreifend handeln (Konzept §1); er wirkt
@@ -147,24 +161,33 @@ export async function POST(req: Request) {
 
     // Plattform-Rechte werden nie über eine Gym-Oberfläche verändert — weder
     // vergeben (der Body kann es nicht) noch entzogen (hier).
-    if (targetRole === "admin") {
+    if (targetRights.admin) {
       return NextResponse.json(
         { error: "Plattform-Rechte werden hier nicht verändert." },
         { status: 403 },
       );
     }
 
-    const nextRole = wantTrainer ? "trainer" : "user";
+    // `admin: false` ist hier keine Entscheidung, sondern eine Feststellung:
+    // Die Zeile darüber hat gerade ausgeschlossen, dass das Ziel den
+    // Plattform-Rang trägt. Vergeben kann ihn diese Route ohnehin nicht — er
+    // steht nicht im Body.
+    const nextRights: RoleSet = {
+      trainer: wantTrainer,
+      verwaltung: wantVerwaltung,
+      admin: false,
+    };
     const unchanged =
-      nextRole === targetRole && wantVerwaltung === targetVerwaltung;
+      nextRights.trainer === targetRights.trainer &&
+      nextRights.verwaltung === targetRights.verwaltung;
     if (unchanged) {
       // Kein Schreibvorgang, kein Protokolleintrag — sonst füllt jeder
       // versehentlich geöffnete und wieder gespeicherte Dialog die Neuigkeiten.
       return NextResponse.json({
         ok: true,
         uid,
-        role: nextRole,
-        verwaltung: wantVerwaltung,
+        trainer: nextRights.trainer,
+        verwaltung: nextRights.verwaltung,
         unchanged: true,
       });
     }
@@ -174,7 +197,7 @@ export async function POST(req: Request) {
     // Verwaltungsrecht entzieht: ein Gym ohne Verwaltung kann niemanden
     // mehr einladen und sich selbst nicht mehr helfen — wer den Klick
     // gemacht hat, ändert daran nichts.
-    if (targetVerwaltung && !wantVerwaltung) {
+    if (targetRights.verwaltung && !wantVerwaltung) {
       const remaining = await countRemainingManagers(db, targetGymId, uid);
       if (remaining < 1) {
         return NextResponse.json(
@@ -188,29 +211,25 @@ export async function POST(req: Request) {
     }
 
     // ─── Claims setzen (MERGEN!) ────────────────────────────────────────
-    // setCustomUserClaims ERSETZT alle Claims. Ohne Merge verlöre das
-    // Mitglied hier seinen `gymId` — und damit die Gym-Zugehörigkeit
-    // (gleiche Lektion wie in /api/invites/redeem und scripts/set-role.mjs).
-    // `gymId` wird bewusst NICHT gesetzt, nur durchgereicht.
-    await adminAuth().setCustomUserClaims(uid, {
-      ...targetClaims,
-      role: nextRole,
-      verwaltung: wantVerwaltung,
-    });
+    // `claimsWithRights` reicht alle fremden Claims durch — insbesondere
+    // `gymId`: setCustomUserClaims ERSETZT alles, und ohne Merge verlöre das
+    // Mitglied hier seine Gym-Zugehörigkeit (gleiche Lektion wie in
+    // /api/invites/redeem und scripts/set-role.mjs). Entzogene Häkchen
+    // löscht dieselbe Funktion — auch das gehört zum Merge.
+    await adminAuth().setCustomUserClaims(
+      uid,
+      claimsWithRights(targetClaims, nextRights),
+    );
 
     // ─── Spiegel im users-Dokument ──────────────────────────────────────
     try {
       await db
         .collection("users")
         .doc(uid)
-        .set({ role: nextRole, verwaltung: wantVerwaltung }, { merge: true });
+        .set(rightsMirror(nextRights), { merge: true });
     } catch (mirrorErr) {
       await adminAuth()
-        .setCustomUserClaims(uid, {
-          ...targetClaims,
-          role: targetRole,
-          verwaltung: targetVerwaltung,
-        })
+        .setCustomUserClaims(uid, claimsWithRights(targetClaims, targetRights))
         .catch(() => {});
       throw mirrorErr;
     }
@@ -227,18 +246,18 @@ export async function POST(req: Request) {
       targetUid: uid,
       targetName,
       details: {
-        trainer: wantTrainer,
-        verwaltung: wantVerwaltung,
-        trainerBefore: targetRole === "trainer",
-        verwaltungBefore: targetVerwaltung,
+        trainer: nextRights.trainer,
+        verwaltung: nextRights.verwaltung,
+        trainerBefore: targetRights.trainer,
+        verwaltungBefore: targetRights.verwaltung,
       },
     });
 
     return NextResponse.json({
       ok: true,
       uid,
-      role: nextRole,
-      verwaltung: wantVerwaltung,
+      trainer: nextRights.trainer,
+      verwaltung: nextRights.verwaltung,
     });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {

@@ -13,7 +13,7 @@ import Reveal from "@/components/dashboard/Reveal";
 import CompetitionCard, {
   competitionGroup,
 } from "@/components/trainer/CompetitionCard";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { belongsToGym, resolveGymId } from "@/lib/gym";
 import {
   campOpponentId,
@@ -88,7 +88,7 @@ export default function TrainerDashboardPage() {
   const gymId = resolveGymId(profile);
   // Verwaltungsrecht aus dem Custom Claim (Checkpoint 2); der Plattform-Admin
   // verwaltet jedes Gym.
-  const isVerwaltung = profile?.verwaltung === true || profile?.role === "admin";
+  const isVerwaltung = useRights().verwaltung;
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [opponents, setOpponents] = useState<Opponent[] | null>(null);
@@ -182,19 +182,19 @@ export default function TrainerDashboardPage() {
           {isVerwaltung && (
             <>
               <Link
-                href="/trainer/mitglieder"
+                href="/verwaltung/mitglieder"
                 className="btn-secondary px-4 py-2 text-xs"
               >
                 Mitglieder
               </Link>
               <Link
-                href="/trainer/einladungen"
+                href="/verwaltung/einladungen"
                 className="btn-secondary px-4 py-2 text-xs"
               >
                 Einladungen
               </Link>
               <Link
-                href="/trainer/neuigkeiten"
+                href="/verwaltung/neuigkeiten"
                 className="btn-secondary px-4 py-2 text-xs"
               >
                 Neuigkeiten

@@ -19,7 +19,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   copyAsOwnTrainerPlan,
@@ -42,7 +42,7 @@ const BTN_FONT: React.CSSProperties = {
 export default function GymPlanPage({ slug }: { slug: string }) {
   const router = useRouter();
   const { user, profile, loading: authLoading, profileLoading } = useAuth();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   // Trainer-Plan-Herkunft: null = Gym-/Start-Plan

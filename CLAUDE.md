@@ -114,27 +114,44 @@
   Spiegelt das ID-Token in ein `__session`-Cookie (für die Middleware).
 
 ### Rollen & Berechtigungen (Sicherheits-kritisch)
-- Rollen (`user` | `trainer` | `admin`), das **Gym-Verwaltungsrecht**
-  (`verwaltung: true`, seit 2026-08-31) UND `gymId` liegen **autoritativ in
-  Firebase Auth Custom Claims**, NICHT im Firestore-Dokument (dort nur
-  Anzeige-/Query-Spiegel).
-- **`verwaltung` ist ein eigener, additiver Claim NEBEN `role` — bewusst KEIN
-  Wert von `role`.** `admin` ist der PLATTFORM-Admin und überspringt in den
-  Regeln überall den Gym-Vergleich (`isAdmin()` ohne `sameGym`); ein Häkchen
-  in der Mitgliederliste darf nie so weit reichen. Das Rollenmodell des
-  Konzepts (§1) lautet damit im Code: Athlet = Grundzustand, `role=trainer`
-  = Werkzeuge, `verwaltung=true` = Gym führen; der Cheftrainer hat beides.
-  Checkpoint 3 löst `role` in ein Set auf, `verwaltung` wandert unverändert
-  mit.
-- Client liest alles via `getIdTokenResult()` (`claims.role`, `claims.gymId`,
-  `claims.verwaltung`) — siehe `auth-context.tsx` (`refreshRole()` erzwingt
-  Token-Refresh nach Claim-Änderung; nach `/api/members/role` PFLICHT, wenn
-  man die eigenen Rechte geändert hat).
+- **Das Rollen-SET (seit 2026-09-01, Checkpoint 3, `lib/roles.ts`):** Rechte
+  sind DREI unabhängige Häkchen in den Custom Claims — `trainer` (Werkzeuge),
+  `verwaltung` (Gym führen), `admin` (Plattform-Rang) — plus `gymId`. Alles
+  autoritativ in Firebase Auth Custom Claims, NICHT im Firestore-Dokument
+  (dort nur Abfrage-Spiegel). Athlet ist KEIN Häkchen, sondern der
+  Grundzustand; der Cheftrainer hat `trainer` + `verwaltung`.
+- **Warum kein `role`-Wert mehr:** `role` konnte immer nur EINES ausdrücken.
+  Deshalb musste `verwaltung` 2026-08-31 schon daneben entstehen (ein
+  Häkchen, das `role="admin"` gesetzt hätte, gäbe Zugriff auf FREMDE Gyms —
+  `isAdmin()` überspringt in den Regeln jeden Gym-Vergleich), und `trainer`
+  konkurrierte mit `admin` um denselben Platz.
+- **EINE Datei baut und liest die Claims: `lib/roles.ts`.** `readRoleSet`
+  (gespeicherte Häkchen), `effectiveRights` (Plattform-Rang eingerechnet),
+  `claimsWithRights` (Claims bauen — reicht `gymId` durch, LÖSCHT entzogene
+  Häkchen), `rightsMirror` (users-Dokument). Node-Scripts haben eine
+  Zwillingsfassung in `scripts/lib/role-claims.mjs` (sie können kein TS
+  importieren) — Änderungen IMMER in beiden.
+- **Geschrieben wird nur, was wahr ist:** fehlender Claim = kein Recht. Am
+  users-Dokument stehen dagegen ALLE vier Felder ausdrücklich, sonst ließe
+  ein `set(merge:true)` ein entzogenes Häkchen stehen.
+- **ÜBERGANGS-SPIEGEL `role` (fällt wieder weg):** Claims und Dokument tragen
+  weiter ein abgeleitetes `role` (`admin ? "admin" : trainer ? "trainer" :
+  "user"`), und alle Leser haben einen Rückfall darauf. Grund ist die
+  Stunde, die ausgestellte ID-Tokens leben, UND die Rücknahme: Ein Rollback
+  der Firestore-Regeln auf den Stand vor Checkpoint 3 wäre ohne Spiegel eine
+  Aussperrung aller Trainer. Backlog-Punkt zum Entfernen steht unten.
+- Client liest alles via `getIdTokenResult()` — siehe `auth-context.tsx`
+  (`claimsToProfile` an EINER Stelle; `refreshRole()` erzwingt Token-Refresh
+  nach Claim-Änderung, nach `/api/members/role` PFLICHT, wenn man die eigenen
+  Rechte geändert hat). **In Komponenten IMMER `useRights()`** aus dem
+  Auth-Context statt eigener Vergleiche — der Hook löste rund zwanzig Kopien
+  von `profile?.role === "trainer" || profile?.role === "admin"` ab, von denen
+  jede eine Stelle war, an der ein neues Recht vergessen werden konnte.
 - Claims werden **ausschließlich serverseitig** per Admin-SDK gesetzt — seit
   2026-08-31 gibt es dafür eine echte API statt nur Hand-Scripts:
   - `POST /api/members/role` (Rollen-API, Konzept §4): Body trägt NUR
-    `{ uid, trainer, verwaltung }`, also weder `role:"admin"` noch `gymId` —
-    beides ist nicht ausdrückbar, nicht bloß verboten. Prüft hart: Aufrufer
+    `{ uid, trainer, verwaltung }`, also weder den Plattform-Rang `admin`
+    noch `gymId` — beides ist nicht ausdrückbar, nicht bloß verboten. Prüft hart: Aufrufer
     ist Verwaltung DESSELBEN Gyms (`canManageGym`), Ziel existiert, Ziel im
     eigenen Gym, Ziel ist kein Plattform-Admin, **Aussperr-Schutz** (das
     letzte Verwaltungsrecht eines Gyms lässt sich nicht entziehen; gezählt
@@ -151,15 +168,22 @@
     strikt → das Gym verliert damit den Lesezugriff auf Kampfprofil,
     Analysen und Wettkämpfe). **Diese Route löscht KEIN Konto** — siehe
     „Konto vs. Mitgliedschaft" unten.
-  - `node scripts/set-role.mjs <uid> <role>` (mergt, gymId bleibt erhalten)
-    bzw. `node scripts/migrate-multi-gym.mjs` (gymId-Backfill; braucht
-    `GOOGLE_APPLICATION_CREDENTIALS`).
-- `firestore.rules` liest `request.auth.token.role`/`.gymId`/`.verwaltung`
-  (`isVerwaltung()`, `canManageGymId(gymId)`); Clients dürfen `role`,
-  `verwaltung` und `gymId` im users-Dokument nie schreiben (Privilege-
-  Escalation und Gym-Wechsel geschlossen). Der `verwaltung`-Spiegel am
-  Dokument existiert NUR, weil Custom Claims nicht abfragbar sind — ohne ihn
-  ließe sich „hat dieses Gym noch eine Verwaltung?" nicht beantworten.
+  - `node scripts/set-role.mjs <uid> <user|trainer|admin>
+    [--verwaltung|--keine-verwaltung]` — das Hand-Werkzeug für den
+    PLATTFORM-Rang, den die API bewusst nicht kann. Mergt; `gymId` und (ohne
+    Schalter) das Verwaltungsrecht bleiben unangetastet. Credentials kommen
+    aus `.env.local` (`scripts/lib/admin-app.mjs`), kein
+    `GOOGLE_APPLICATION_CREDENTIALS` mehr nötig.
+  - `node scripts/migrate-role-set.mjs [--dry-run]` — Cutover auf das
+    Rollen-Set (Claims + users-Spiegel, idempotent; Reihenfolge im
+    Script-Kopf). `scripts/migrate-multi-gym.mjs` bleibt für gymId-Backfills.
+- `firestore.rules` liest das Set aus dem Token (`isTrainerOrAdmin()`,
+  `isVerwaltung()`, `isAdmin()`, `canManageGymId(gymId)`, Rückfall
+  `legacyRole()`); Clients dürfen `role`, `trainer`, `verwaltung`, `admin`
+  und `gymId` im users-Dokument nie schreiben (Privilege-Escalation und
+  Gym-Wechsel geschlossen). Der Spiegel am Dokument existiert NUR, weil
+  Custom Claims nicht abfragbar sind — ohne ihn ließe sich „hat dieses Gym
+  noch eine Verwaltung?" nicht beantworten.
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
@@ -183,24 +207,33 @@ Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
   Zustand hat, wer sich ohne Einladung registriert.
 
 ### Route-Schutz (zweischichtig)
+- **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
+  `/admin/*` = Plattform-Rang · `/trainer/*` = Trainer-Werkzeuge ·
+  `/verwaltung/*` = Gym-Verwaltung. Bis dahin lagen die Verwaltungs-Seiten
+  UNTER `/trainer` und brauchten in jedem Türsteher eine Ausnahme — eine
+  reine Verwaltung kam durch die Middleware und flog eine Zehntelsekunde
+  später clientseitig auf `/dashboard`. Getrennte Adressen brauchen keine
+  Ausnahme. **Neue Verwaltungs-Seiten gehören unter `/verwaltung`**, dann
+  greifen Middleware und `VerwaltungRoute` automatisch.
 - **Server:** `middleware.ts` (Edge) verifiziert das `__session`-Cookie
   **kryptografisch** (jose/RS256 gegen Googles Firebase-Zertifikate, Issuer +
-  Audience = Projekt) und gated per Claim: `/admin/*` nur role=admin (sonst
-  404, Existenz verbergen), `/trainer/*` nur trainer/admin (sonst Redirect
-  `/dashboard`), übrige geschützte Bereiche → Redirect `/login`.
-  **Ausnahme seit 2026-08-31:** Die drei Verwaltungs-Seiten unter `/trainer`
-  (`lib/verwaltung-routes.ts` → Einladungen, Mitglieder, Neuigkeiten) folgen
-  dem Verwaltungsrecht statt dem Trainer-Recht — geprüft VOR der
-  Trainer-Prüfung. **Dieselbe Liste liest der Client-Guard**
-  (`components/TrainerRoute.tsx`) und das `/trainer`-Layout (blendet die
-  Trainer-Bereichsnavigation für eine reine Verwaltung aus). Wird eine Seite
-  ergänzt, gehört sie in `lib/verwaltung-routes.ts` — sonst lässt die
-  Middleware durch und React wirft direkt danach wieder raus. Bewusster
+  Audience = Projekt) und gated per Rollen-Set: `/admin/*` (sonst 404,
+  Existenz verbergen), `/verwaltung/*` und `/trainer/*` (sonst Redirect
+  `/dashboard`), übrige geschützte Bereiche → Redirect `/login`. Bewusster
   Fail-Open NUR wenn Googles Zertifikat-Endpoint nicht erreichbar ist
   (unverifizierter exp-Check statt Aussperrung — Datensicherheit liegt bei
   den Firestore-Regeln); ungültige Signaturen werden IMMER abgewiesen.
   Not-Aus via `MIDDLEWARE_AUTH=off`.
-- **Client:** `<ProtectedRoute>` als zusätzlicher UI-Guard.
+- **Client:** `<ProtectedRoute>` (allgemein), `<TrainerRoute>`,
+  `<VerwaltungRoute>` (in den jeweiligen Bereichs-Layouts) als UI-Guards.
+- **Umzüge von Adressen gehören in `next.config.mjs` → `redirects()`**, nicht
+  in die Middleware und nicht in eine Seite. Nur dort laufen sie VOR der
+  Middleware (sonst fängt ein Bereichs-Gate den Aufrufer ab, bevor er sein
+  neues Ziel erreicht), vor jedem Rendern und auch bei gesetztem Not-Aus.
+  **Ein `redirect()` in einer Seite unter einem Client-Layout greift NICHT**
+  (nachgemessen 2026-09-01: 200 statt Weiterleitung, weil der Guard darüber
+  während des Ladens einen Platzhalter rendert und die Seite gar nicht
+  drankommt).
 
 ## Design-System
 - Dark als Default, **zusätzlich Light-Theme** über `lib/theme-context.tsx`.
@@ -218,8 +251,9 @@ gyms/{gymId}/invites/{code}       — Einladungen (Code = Dokument-ID; write:fal
 gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UND Quelle
                                     des Neuigkeiten-Bereichs (write:false, nur
                                     lib/server/audit.ts; Lesen nur die Verwaltung)
-users/{uid}                       — Profil (role+verwaltung+gymId NUR via Custom
-                                    Claims, nie Client-Write; fightProfile nur
+users/{uid}                       — Profil (Rollen-Set trainer/verwaltung/admin
+                                    + role-Spiegel + gymId NUR via Custom Claims,
+                                    nie Client-Write; fightProfile nur
                                     Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
@@ -574,18 +608,25 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       gewesen und der Überlauf hätte bis 1600 px gereicht. Echte Lösung:
       Umbruch-Strategie (Burger bis ~1400 px, darüber so viele Punkte wie
       passen) — eigener Vorgang, nicht nebenbei.
-- [ ] **Hülle für eine reine Verwaltung** (offen seit Checkpoint 2): Wer
-      Verwaltungsrecht ohne Trainer-Häkchen hat, ist `role="user"` und läuft
-      damit in die Athleten-Hülle (`AthleteChromeGate` blendet auf
-      `/dashboard` & Co. die Top-Navigation aus, `AthleteTabBar` übernimmt).
-      Als Tür dient heute eine Kachel „Gym verwalten" im Athleten-Dashboard.
-      Ob diese Person die Athleten- oder die Trainer-Hülle bekommen soll, ist
-      eine GESTALTUNGSfrage für Leon — technisch wären es
-      `AthleteChromeGate` plus die `!isTrainer`-Bedingungen in fünf Seiten.
-- [ ] Multi-Gym Phase 2, Checkpoint 3: `role` → Rollen-Set-Claims
-      (`{trainer, verwaltung}`), Middleware + auth-context + alle
-      Rollenprüfungen gemeinsam umstellen. Checkpoint 1 (Einladungen) und
-      Checkpoint 2 (Mitgliederbereich, Rollen-API, Neuigkeiten) sind gebaut.
+- [ ] **Hülle für eine reine Verwaltung** (offen seit Checkpoint 2, GESTALTUNGS-
+      frage für Leon): Wer Verwaltungsrecht ohne Trainer-Häkchen hat, hat kein
+      Trainer-Recht und läuft damit in die Athleten-Hülle
+      (`AthleteChromeGate` blendet auf `/dashboard` & Co. die Top-Navigation
+      aus, `AthleteTabBar` übernimmt). Als Tür dient eine Kachel „Gym
+      verwalten" im Athleten-Dashboard; unter `/verwaltung/*` bekommt sie die
+      normale Top-Navigation mit der Rubrik „Verwaltung". Ob diese Person
+      überall die Athleten- oder die Trainer-Hülle sehen soll, ist offen —
+      technisch wären es `AthleteChromeGate` plus die `rights.trainer`-
+      Bedingungen in fünf Seiten.
+- [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
+      länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
+      in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`
+      (`lib/roles.ts` UND `scripts/lib/role-claims.mjs`), `next.role = …` in
+      `claimsWithRights`, `role` in `rightsMirror`, das Feld in `ProfileDoc`
+      und der Typ `UserRole` in `lib/types.ts`. Er steht nur, damit ein
+      Rollback der Regeln keine Aussperrung ist und Tokens von vor der
+      Migration ihre Stunde zu Ende leben können. Danach ist `role` weder in
+      Claims noch im Dokument noch in den Regeln zu finden.
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
       Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)

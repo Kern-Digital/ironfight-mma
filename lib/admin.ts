@@ -17,20 +17,25 @@ import {
   where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
-import type { AthleteProfile, UserRole } from "./types";
+import { effectiveRights, readRoleSet, type RoleSet } from "./roles";
+import type { AthleteProfile } from "./types";
 
 export type AdminUserEntry = {
   uid: string;
   email: string | null;
   displayName: string | null;
   authProviderName: string | null;
-  role: UserRole | undefined;
   /**
-   * Gym-Verwaltungsrecht (Checkpoint 2). Abfrage-Spiegel des Custom Claims —
-   * autoritativ ist der Claim, hier steht er, weil Claims nicht abfragbar
-   * sind und die Mitgliederliste ihn anzeigen muss.
+   * Rechte aus dem Abfrage-Spiegel am users-Dokument (Checkpoint 3,
+   * lib/roles.ts) — Plattform-Rang eingerechnet.
+   *
+   * AUTORITATIV IST DER CUSTOM CLAIM; hier steht der Spiegel, weil Claims
+   * nicht abfragbar sind und die Mitgliederliste die Häkchen anzeigen muss.
+   * Geschrieben wird er ausschliesslich von /api/members/role, die dabei
+   * Claim und Spiegel gemeinsam setzt (und die Claims zurücknimmt, wenn der
+   * Spiegel fehlschlägt).
    */
-  verwaltung: boolean;
+  rights: RoleSet;
   /**
    * Beitritt zum Gym (gesetzt von /api/invites/redeem). Fehlt bei
    * Bestandsmitgliedern, die es vor dem Einladungssystem schon gab — dann
@@ -88,8 +93,7 @@ function decodeStudentEntry(
     email: (data.email as string | null) ?? null,
     displayName: (data.displayName as string | null) ?? null,
     authProviderName: (data.authProviderName as string | null) ?? null,
-    role: data.role as UserRole | undefined,
-    verwaltung: data.verwaltung === true,
+    rights: effectiveRights(readRoleSet(data)),
     gymJoinedAt: (data.gymJoinedAt as Timestamp | undefined)?.toDate(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
     athlete: decodeAthlete(data.athlete as AthleteDoc | undefined),
@@ -97,8 +101,8 @@ function decodeStudentEntry(
 }
 
 /** Trainer- oder Admin-Account (im Kampfkontext trotzdem ein Athlet). */
-export function isStaffEntry(entry: { role: UserRole | undefined }): boolean {
-  return entry.role === "trainer" || entry.role === "admin";
+export function isStaffEntry(entry: { rights: RoleSet }): boolean {
+  return entry.rights.trainer;
 }
 
 /**
@@ -115,7 +119,7 @@ export async function getStudentEntry(uid: string): Promise<StudentEntry | null>
 /**
  * Lädt alle registrierten Nutzer (absteigend nach Registrierungsdatum).
  * NUR für Plattform-Admins: die Firestore-Regeln erlauben die ungefilterte
- * users-Query ausschließlich mit role=admin (gym-übergreifend).
+ * users-Query ausschließlich dem Plattform-Rang (gym-übergreifend).
  */
 export async function listAllUsers(): Promise<AdminUserEntry[]> {
   const q = query(
@@ -130,8 +134,7 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
       email: data.email ?? null,
       displayName: data.displayName ?? null,
       authProviderName: data.authProviderName ?? null,
-      role: data.role as UserRole | undefined,
-      verwaltung: data.verwaltung === true,
+      rights: effectiveRights(readRoleSet(data)),
       gymJoinedAt: data.gymJoinedAt?.toDate() as Date | undefined,
       createdAt: data.createdAt?.toDate() as Date | undefined,
     };

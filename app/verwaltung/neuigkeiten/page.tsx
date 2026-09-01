@@ -14,16 +14,17 @@
  * ist, wessen Rechte sich geändert haben, wer das Gym verlassen hat. Die
  * Einladungs-Buchhaltung (erstellt, zurückgezogen, Notiz geändert) stand hier
  * bis zum 01.09. unter „Alle Vorgänge" — sie ist aber kein Ereignis, sondern
- * der Zustand einer Einladung, und den zeigt /trainer/einladungen an jeder
+ * der Zustand einer Einladung, und den zeigt /verwaltung/einladungen an jeder
  * Zeile. Nebenbei führte diese Ansicht die Codes im Klartext mit.
  *
  * RECHTE: nur die Verwaltung. Die Middleware gated die Route
- * (VERWALTUNG_PREFIXES), die Firestore-Regeln das Lesen — die Einträge führen
- * die Einladungscodes im Klartext.
+ * (lib/verwaltung-routes.ts), `VerwaltungRoute` das Layout, die
+ * Firestore-Regeln das Lesen — die Einträge führen die Einladungscodes im
+ * Klartext.
  */
 
 import Icon from "@/components/ui/Icon";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   auditDetail,
@@ -56,7 +57,7 @@ const META_BASE: React.CSSProperties = {
 
 export default function TrainerNewsPage() {
   const { user, profile, profileLoading } = useAuth();
-  const isVerwaltung = profile?.verwaltung === true || profile?.role === "admin";
+  const isVerwaltung = useRights().verwaltung;
   const gymId = resolveGymId(profile);
 
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);

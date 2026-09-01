@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { useRights } from "@/lib/auth-context";
 
 /**
  * Blendet die alte Top-Navigation und den Footer auf Seiten aus, die bereits
@@ -23,8 +23,7 @@ const ATHLETE_SHELL_ROUTES = [
 
 export default function AthleteChromeGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { profile } = useAuth();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
   const athleteShell = ATHLETE_SHELL_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(r + "/")
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 
 /**
  * Erst-Login-Onboarding speziell für Trainer.
@@ -79,13 +79,14 @@ const STEPS = [
 
 export default function TrainerOnboardingModal() {
   const { user, profile, profileLoading, finishTrainerOnboarding } = useAuth();
+  // VOR den frühen Returns: Hooks müssen bei jedem Render in derselben
+  // Reihenfolge laufen.
+  const rights = useRights();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
 
   if (!user || profileLoading || !profile) return null;
-
-  const isTrainer = profile.role === "trainer" || profile.role === "admin";
-  if (!isTrainer) return null;
+  if (!rights.trainer) return null;
 
   // Erst zeigen, wenn der Fighter-Name-Flow erledigt ist
   if (!profile.onboarded) return null;

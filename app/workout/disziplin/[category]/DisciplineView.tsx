@@ -13,7 +13,7 @@
 
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { EQUIPMENT } from "@/lib/equipment";
@@ -63,7 +63,7 @@ export default function DisciplineView({
 }) {
   const { user, profile, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
 
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
 

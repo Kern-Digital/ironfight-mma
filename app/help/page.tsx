@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 
 // ─── Inhalts-Definitionen ──────────────────────────────────────────────────
 
@@ -191,8 +191,8 @@ function HelpItemCard({ item }: { item: HelpItem }) {
 }
 
 export default function HelpPage() {
-  const { profile, profileLoading } = useAuth();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const { profileLoading } = useAuth();
+  const isTrainer = useRights().trainer;
 
   // Trainer sehen ihre Sektion zuerst, können aber auch die Schüler-Sicht ansehen.
   const [tab, setTab] = useState<"trainer" | "student">(

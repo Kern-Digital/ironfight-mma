@@ -46,6 +46,12 @@ import {
   verifyUser,
 } from "@/lib/server/verify-user";
 import { DEFAULT_GYM_ID } from "@/lib/gym";
+import {
+  claimsWithRights,
+  NO_RIGHTS,
+  readRoleSet,
+  rightsMirror,
+} from "@/lib/roles";
 import type { Firestore } from "firebase-admin/firestore";
 
 export const runtime = "nodejs";
@@ -60,7 +66,11 @@ async function countRemainingManagers(
   let count = 0;
   for (const doc of snap.docs) {
     if (doc.id === excludeUid) continue;
-    if (doc.get("verwaltung") === true || doc.get("role") === "admin") {
+    if (
+      doc.get("verwaltung") === true ||
+      doc.get("admin") === true ||
+      doc.get("role") === "admin"
+    ) {
       count += 1;
     }
   }
@@ -160,12 +170,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const targetRole =
-      typeof targetClaims.role === "string" ? targetClaims.role : "user";
+    const targetRights = readRoleSet(targetClaims);
     const targetGymId =
       (typeof targetClaims.gymId === "string" && targetClaims.gymId.trim()) ||
       DEFAULT_GYM_ID;
-    const targetVerwaltung = targetClaims.verwaltung === true;
 
     if (!isAdmin(user) && targetGymId !== userGymId(user)) {
       return NextResponse.json(
@@ -173,7 +181,7 @@ export async function POST(req: Request) {
         { status: 403 },
       );
     }
-    if (targetRole === "admin") {
+    if (targetRights.admin) {
       return NextResponse.json(
         { error: "Plattform-Konten werden hier nicht entfernt." },
         { status: 403 },
@@ -182,7 +190,7 @@ export async function POST(req: Request) {
 
     // Aussperr-Schutz greift auch hier: Wer geht, nimmt sein
     // Verwaltungsrecht mit — das letzte darf nicht mitgehen.
-    if (targetVerwaltung) {
+    if (targetRights.verwaltung) {
       const remaining = await countRemainingManagers(db, targetGymId, uid);
       if (remaining < 1) {
         return NextResponse.json(
@@ -201,21 +209,21 @@ export async function POST(req: Request) {
     const revokedShares = await revokeShares(db, targetGymId, uid);
 
     // ─── 2. Claims: gehört zu keinem Gym mehr ───────────────────────────
+    // Alle Gym-Rechte fallen weg — sie galten IN diesem Gym, und das ist
+    // vorbei. Der Plattform-Rang ist hier nie betroffen: Ein Admin kommt bis
+    // hierher gar nicht (403 oben).
     await adminAuth().setCustomUserClaims(uid, {
-      ...targetClaims,
+      ...claimsWithRights(targetClaims, NO_RIGHTS),
       gymId: null,
-      role: "user",
-      verwaltung: false,
     });
 
     // ─── 3. Spiegel: gymId LÖSCHEN (Dokument-Seite ist strikt) ──────────
     try {
       await db.collection("users").doc(uid).set(
         {
+          ...rightsMirror(NO_RIGHTS),
           gymId: FieldValue.delete(),
           gymJoinedAt: FieldValue.delete(),
-          role: "user",
-          verwaltung: false,
         },
         { merge: true },
       );
@@ -234,8 +242,8 @@ export async function POST(req: Request) {
       targetUid: uid,
       targetName,
       details: {
-        trainerBefore: targetRole === "trainer",
-        verwaltungBefore: targetVerwaltung,
+        trainerBefore: targetRights.trainer,
+        verwaltungBefore: targetRights.verwaltung,
         revokedShares,
       },
     });

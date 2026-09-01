@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Mitgliederbereich (Multi-Gym Phase 2, Checkpoint 2; Konzept §4) — die
- * Liste aller Menschen im Gym mit den beiden Rechte-Häkchen.
+ * Mitgliederbereich (Multi-Gym Phase 2, Konzept §4) — die Liste aller
+ * Menschen im Gym mit den beiden Rechte-Häkchen.
  *
- * Aufbau im Token-Look nach app/trainer/einladungen/page.tsx: Ambient-Kopf,
- * `.t-card`-Zeilen, BTN_FONT, META_BASE/META_SIZE.
+ * Aufbau im Token-Look nach app/verwaltung/einladungen/page.tsx:
+ * Ambient-Kopf, `.t-card`-Zeilen, BTN_FONT, META_BASE/META_SIZE.
  *
  * RECHTE: Sichtbar nur für die Verwaltung. Ein Trainer ohne Verwaltungsrecht
  * kommt hier gar nicht an — die Middleware schickt ihn auf /dashboard
- * (VERWALTUNG_PREFIXES), und die Firestore-Regeln würden die Liste ohnehin
- * abweisen. Die Prüfung hier ist die dritte Schicht und dient der Anzeige.
+ * (lib/verwaltung-routes.ts), `VerwaltungRoute` im Bereichs-Layout ebenso,
+ * und die Firestore-Regeln würden die Liste ohnehin abweisen.
  *
  * GRUPPIERUNG statt Sortierung nach Beitrittsdatum: Wer diese Seite öffnet,
  * sucht entweder eine bestimmte Person (dafür das Suchfeld) oder will sehen,
@@ -20,7 +20,7 @@
 import MemberRoleSheet from "@/components/MemberRoleSheet";
 import Icon from "@/components/ui/Icon";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   MEMBER_GROUP_LABEL,
@@ -29,9 +29,8 @@ import {
   memberName,
   membershipShort,
   memberSince,
-  rightsLabel,
-  rightsOf,
 } from "@/lib/members";
+import { rightsLabel } from "@/lib/roles";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -58,7 +57,7 @@ export default function TrainerMembersPage() {
   const { user, profile, profileLoading } = useAuth();
   // Verwaltungsrecht kommt aus dem Custom Claim (auth-context spiegelt ihn);
   // der Plattform-Admin verwaltet jedes Gym.
-  const isVerwaltung = profile?.verwaltung === true || profile?.role === "admin";
+  const isVerwaltung = useRights().verwaltung;
   const gymId = resolveGymId(profile);
 
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
@@ -107,7 +106,7 @@ export default function TrainerMembersPage() {
     let trainer = 0;
     let verwaltung = 0;
     for (const m of all) {
-      const r = rightsOf(m);
+      const r = m.rights;
       if (r.trainer) trainer += 1;
       if (r.verwaltung) verwaltung += 1;
     }
@@ -240,7 +239,7 @@ export default function TrainerMembersPage() {
                   dazu — mit einer Einladung dauert das eine Minute.
                 </p>
                 <Link
-                  href="/trainer/einladungen"
+                  href="/verwaltung/einladungen"
                   className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
                   style={{
                     ...BTN_FONT,
@@ -272,7 +271,7 @@ export default function TrainerMembersPage() {
                         {MEMBER_GROUP_LABEL[key]} · {list.length}
                       </span>
                       {list.map((member) => {
-                        const rights = rightsOf(member);
+                        const rights = member.rights;
                         const isSelf = member.uid === user?.uid;
                         return (
                           <button

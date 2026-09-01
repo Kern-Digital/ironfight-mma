@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import WorkoutLogSheet, { WorkoutLogTile } from "@/components/WorkoutLogSheet";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { toggleWorkoutFavorite } from "@/lib/workout-plans";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
@@ -31,7 +31,7 @@ const MAX_ENTRIES = 100;
 export default function WorkoutHistoryPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = profile?.role === "trainer" || profile?.role === "admin";
+  const isTrainer = useRights().trainer;
   const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 
   const [sessions, setSessions] = useState<WorkoutSession[] | null>(null);

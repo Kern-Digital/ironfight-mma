@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { getFirestoreDb } from "./firebase";
+import { NO_RIGHTS, readRoleSet } from "./roles";
 import {
   DEFAULT_USER_SETTINGS,
   type AthleteProfile,
@@ -68,10 +69,16 @@ type ProfileDoc = {
   authProviderName: string | null;
   displayName: string | null;
   username?: string | null;
+  /**
+   * Abfrage-Spiegel des Rollen-Sets (siehe UserProfile.rights). Autoritativ
+   * sind die Custom Claims; hier stehen die Felder nur, weil Claims nicht
+   * abfragbar sind. `role` ist der Übergangs-Spiegel (lib/roles.ts).
+   */
   role?: UserRole;
-  gymId?: string | null;
-  /** Abfrage-Spiegel des Verwaltungs-Claims (siehe UserProfile.verwaltung). */
+  trainer?: boolean;
   verwaltung?: boolean;
+  admin?: boolean;
+  gymId?: string | null;
   /** Beitritt zum Gym (serverseitig, /api/invites/redeem). */
   gymJoinedAt?: Timestamp | null;
   settings: UserSettings;
@@ -98,9 +105,11 @@ export async function getUserProfile(
     authProviderName: data.authProviderName,
     displayName: data.displayName,
     username: data.username ?? null,
-    role: data.role,
+    // Aus dem SPIEGEL gelesen — er kann dem Claim nachhinken. Der
+    // Auth-Context überschreibt das Feld direkt danach mit dem Wert aus dem
+    // ID-Token; hier steht der beste Wert, den ein reiner Dokument-Leser hat.
+    rights: readRoleSet(data as Record<string, unknown>),
     gymId: data.gymId ?? null,
-    verwaltung: data.verwaltung === true,
     gymJoinedAt: data.gymJoinedAt?.toDate() ?? null,
     settings: { ...DEFAULT_USER_SETTINGS, ...(data.settings ?? {}) },
     onboarded: data.onboarded === true,
@@ -132,9 +141,8 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       authProviderName: user.displayName ?? data.authProviderName,
       displayName: data.displayName,
       username: data.username ?? null,
-      role: data.role,
+      rights: readRoleSet(data as Record<string, unknown>),
       gymId: data.gymId ?? null,
-      verwaltung: data.verwaltung === true,
       gymJoinedAt: data.gymJoinedAt?.toDate() ?? null,
       settings: { ...DEFAULT_USER_SETTINGS, ...(data.settings ?? {}) },
       onboarded: data.onboarded === true,
@@ -161,6 +169,9 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     authProviderName: user.displayName ?? null,
     displayName: null,
     username: null,
+    // Frisch angelegt heisst: noch kein Recht. Die Regeln verbieten dem
+    // Client ohnehin, eines der vier Felder selbst zu setzen.
+    rights: NO_RIGHTS,
     settings: DEFAULT_USER_SETTINGS,
     onboarded: false,
   };

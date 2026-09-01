@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { useAuth, useFighterName } from "@/lib/auth-context";
+import { useAuth, useFighterName, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 
@@ -193,9 +193,10 @@ const trainerNavGroup: NavGroup = {
 };
 
 /**
- * Verwaltungs-Seiten (Multi-Gym Phase 2, Checkpoint 2). Sie folgen dem
- * VERWALTUNGSRECHT, nicht dem Trainer-Recht — durchgesetzt in der Middleware
- * (VERWALTUNG_PREFIXES) und in den Firestore-Regeln.
+ * Verwaltungs-Seiten (Multi-Gym Phase 2). Sie folgen dem VERWALTUNGSRECHT,
+ * nicht dem Trainer-Recht, und liegen seit Checkpoint 3 unter einer eigenen
+ * Adresse — durchgesetzt in der Middleware (lib/verwaltung-routes.ts) und in
+ * den Firestore-Regeln.
  *
  * WARUM SIE KEINE EIGENE TOP-LEVEL-RUBRIK SIND: Der Balken ist voll. Gemessen
  * mit einem Admin-Konto trägt er ab 1024 px bereits 1305 px Inhalt bei 1232 px
@@ -209,20 +210,20 @@ const trainerNavGroup: NavGroup = {
  */
 const verwaltungNavChildren: NavChild[] = [
   {
-    href: "/trainer/mitglieder",
+    href: "/verwaltung/mitglieder",
     label: "Mitglieder",
-    activePattern: /^\/trainer\/mitglieder/,
+    activePattern: /^\/verwaltung\/mitglieder/,
     section: "Verwaltung",
   },
   {
-    href: "/trainer/einladungen",
+    href: "/verwaltung/einladungen",
     label: "Einladungen",
-    activePattern: /^\/trainer\/einladungen/,
+    activePattern: /^\/verwaltung\/einladungen/,
   },
   {
-    href: "/trainer/neuigkeiten",
+    href: "/verwaltung/neuigkeiten",
     label: "Neuigkeiten",
-    activePattern: /^\/trainer\/neuigkeiten/,
+    activePattern: /^\/verwaltung\/neuigkeiten/,
   },
 ];
 
@@ -271,14 +272,14 @@ function initialsOf(name: string): string {
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, logOut, profile } = useAuth();
+  const { user, loading, logOut } = useAuth();
   const fighterName = useFighterName();
   const { theme, toggleTheme } = useTheme();
-  const isAdmin = profile?.role === "admin";
-  const isTrainer = profile?.role === "trainer" || isAdmin;
-  // Verwaltungsrecht kommt aus dem Custom Claim (Checkpoint 2), nicht aus
-  // `role` — der Plattform-Admin verwaltet ohnehin jedes Gym.
-  const isVerwaltung = profile?.verwaltung === true || isAdmin;
+  // Ein Rollen-Set statt dreier Einzelvergleiche (Checkpoint 3,
+  // lib/roles.ts). Der Plattform-Rang ist eingerechnet: Ein Admin ist hier
+  // Trainer UND Verwaltung, ohne dass es an seinem Konto Häkchen bräuchte.
+  const { trainer: isTrainer, verwaltung: isVerwaltung, admin: isAdmin } =
+    useRights();
   // EIN Platz im Balken für beide Rollen (Begründung bei verwaltungNavChildren):
   // Trainer sehen ihre Werkzeuge, mit Verwaltungsrecht zusätzlich dessen
   // Seiten; eine reine Verwaltung sieht ausschließlich diese.

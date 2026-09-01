@@ -27,12 +27,11 @@ import {
   memberSince,
   removeMemberRequest,
   RIGHT_EXPLAIN,
-  rightsLabel,
-  rightsOf,
   sameRights,
   setMemberRightsRequest,
   type MemberRights,
 } from "@/lib/members";
+import { rightsLabel } from "@/lib/roles";
 import { useEffect, useState } from "react";
 
 const BTN_FONT: React.CSSProperties = {
@@ -121,7 +120,7 @@ export default function MemberRoleSheet({
   onClose: () => void;
 }) {
   const { user, refreshRole } = useAuth();
-  const current = rightsOf(member);
+  const current = member.rights;
   const [rights, setRights] = useState<MemberRights>(current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,29 +1,47 @@
 /**
- * Admin-SDK Rollenscript
+ * Rechte setzen (Admin-SDK) — das Hand-Werkzeug für alles, was KEINE
+ * Gym-Oberfläche darf.
  *
- * Benoetigte Umgebung:
- *   GOOGLE_APPLICATION_CREDENTIALS=/pfad/zum/service-account.json
+ * Für Trainer- und Verwaltungs-Häkchen im eigenen Gym gibt es seit dem
+ * 31.08.2026 die Rollen-API (`POST /api/members/role`, Mitgliederliste).
+ * Dieses Script bleibt für den PLATTFORM-Rang `admin`, den die API bewusst
+ * nicht ausdrücken kann, und für Notfälle ohne Oberfläche.
  *
- * Cutover-Reihenfolge:
- *   1. `node scripts/set-role.mjs --backfill` ausfuehren, BEVOR die neuen
- *      firestore.rules deployed werden.
- *   2. Neue firestore.rules deployen, damit Rollen aus Auth Custom Claims
- *      gelesen werden.
- *   3. Nutzer muessen ihr ID-Token aktualisieren oder sich neu anmelden, damit
- *      der neue Claim im Client ankommt.
+ * Credentials: `FIREBASE_SERVICE_ACCOUNT_KEY` aus `.env.local` (Rückfall:
+ * `GOOGLE_APPLICATION_CREDENTIALS`). Nichts davon steht in dieser Datei.
  *
- * Keine Credentials oder Projekt-IDs in diesem Script hinterlegen.
+ * Aufrufe:
+ *   node scripts/set-role.mjs <uid> <user|trainer|admin> [--verwaltung|--keine-verwaltung]
+ *   node scripts/set-role.mjs --backfill
+ *
+ * SEIT CHECKPOINT 3 SETZT DER ROLLEN-ARGUMENT EIN SET. `user|trainer|admin`
+ * ist als Eingabe geblieben, weil es eingeübt und in CLAUDE.md dokumentiert
+ * ist — geschrieben werden aber die Häkchen `trainer`/`admin` (siehe
+ * scripts/lib/role-claims.mjs). Das Verwaltungsrecht ist davon unabhängig und
+ * bleibt UNANGETASTET, solange keiner der beiden Schalter fällt: Wer hier
+ * jemanden zum Trainer macht, soll ihm nicht versehentlich das Gym-Recht
+ * nehmen.
+ *
+ * `--backfill` schreibt jedem Konto seine heutigen Rechte in der neuen Form
+ * zurück — idempotent. Für den Checkpoint-3-Cutover gibt es das gezieltere
+ * `scripts/migrate-role-set.mjs` (mit `--dry-run` und users-Spiegel).
  */
 
-import { applicationDefault, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { initAdmin } from "./lib/admin-app.mjs";
+import {
+  claimsWithRights,
+  readRoleSet,
+  rightsMirror,
+  rightsText,
+} from "./lib/role-claims.mjs";
 
 const VALID_ROLES = new Set(["user", "trainer", "admin"]);
+const DEFAULT_GYM_ID = "tidal-athletics";
 
-initializeApp({
-  credential: applicationDefault(),
-});
+const { source, projectId } = initAdmin();
+console.log(`Credentials: ${source} · Projekt ${projectId}`);
 
 function assertRole(role) {
   if (!VALID_ROLES.has(role)) {
@@ -34,55 +52,100 @@ function assertRole(role) {
   return role;
 }
 
-async function setRole(uid, role) {
-  const validatedRole = assertRole(role);
+/** Rechte-Set aus dem Rollen-Argument — `verwaltung` bleibt, wie es war. */
+function rightsFromArg(role, existingRights, verwaltungOverride) {
+  return {
+    trainer: role === "trainer",
+    admin: role === "admin",
+    verwaltung:
+      verwaltungOverride === undefined
+        ? existingRights.verwaltung
+        : verwaltungOverride,
+  };
+}
 
-  // setCustomUserClaims ERSETZT alle Claims — bestehende (insb. gymId)
-  // muessen gemergt werden, sonst verliert der Nutzer sein Gym.
+async function setRole(uid, role, verwaltungOverride) {
+  const validatedRole = assertRole(role);
   const existing = (await getAuth().getUser(uid)).customClaims ?? {};
+  const rights = rightsFromArg(
+    validatedRole,
+    readRoleSet(existing),
+    verwaltungOverride,
+  );
+
+  // gymId wird nur ERGAENZT, wenn keines da ist — ein Wechsel findet hier
+  // nicht statt (dafuer gibt es Einladung und /api/members/remove).
   const claims = {
-    ...existing,
-    role: validatedRole,
-    gymId: existing.gymId ?? "tidal-athletics",
+    ...claimsWithRights(existing, rights),
+    gymId: existing.gymId ?? DEFAULT_GYM_ID,
   };
   await getAuth().setCustomUserClaims(uid, claims);
   await getFirestore()
     .doc(`users/${uid}`)
-    .set({ role: validatedRole, gymId: claims.gymId }, { merge: true });
+    .set({ ...rightsMirror(rights), gymId: claims.gymId }, { merge: true });
 
-  console.log(`${uid}: role=${validatedRole} gymId=${claims.gymId}`);
+  console.log(`${uid}: ${rightsText(rights)} · gymId=${claims.gymId}`);
 }
 
-async function backfillRoles() {
-  const snap = await getFirestore().collection("users").get();
-
-  for (const doc of snap.docs) {
-    const data = doc.data();
-    const role = assertRole(data.role ?? "user");
-    await setRole(doc.id, role);
-  }
-
-  console.log(`Backfill abgeschlossen: ${snap.size} Nutzer verarbeitet.`);
+/**
+ * Schreibt jedem Konto seine heutigen Rechte neu — die Quelle ist der CLAIM,
+ * nicht das Dokument. Das Dokument ist nur der Spiegel; läse man es als
+ * Quelle, könnte ein von Hand verstellter Wert echte Rechte überschreiben.
+ */
+async function backfill() {
+  const auth = getAuth();
+  let processed = 0;
+  let pageToken;
+  do {
+    const page = await auth.listUsers(1000, pageToken);
+    for (const user of page.users) {
+      const existing = user.customClaims ?? {};
+      const rights = readRoleSet(existing);
+      await auth.setCustomUserClaims(user.uid, {
+        ...claimsWithRights(existing, rights),
+        gymId: existing.gymId ?? DEFAULT_GYM_ID,
+      });
+      await getFirestore()
+        .doc(`users/${user.uid}`)
+        .set(rightsMirror(rights), { merge: true });
+      processed += 1;
+      console.log(`  ${user.uid}: ${rightsText(rights)}`);
+    }
+    pageToken = page.pageToken;
+  } while (pageToken);
+  console.log(`Backfill abgeschlossen: ${processed} Konten verarbeitet.`);
 }
 
 async function main() {
-  const [, , uidOrFlag, role] = process.argv;
+  const args = process.argv.slice(2);
+  const flags = new Set(args.filter((a) => a.startsWith("--")));
+  const positional = args.filter((a) => !a.startsWith("--"));
 
-  if (uidOrFlag === "--backfill") {
-    if (role !== undefined) {
+  if (flags.has("--verwaltung") && flags.has("--keine-verwaltung")) {
+    throw new Error("--verwaltung und --keine-verwaltung schliessen sich aus.");
+  }
+  const verwaltungOverride = flags.has("--verwaltung")
+    ? true
+    : flags.has("--keine-verwaltung")
+      ? false
+      : undefined;
+
+  if (flags.has("--backfill")) {
+    if (positional.length) {
       throw new Error("Usage: node scripts/set-role.mjs --backfill");
     }
-    await backfillRoles();
+    await backfill();
     return;
   }
 
-  if (!uidOrFlag || !role) {
+  const [uid, role] = positional;
+  if (!uid || !role) {
     throw new Error(
-      "Usage: node scripts/set-role.mjs <uid> <role> | node scripts/set-role.mjs --backfill",
+      "Usage: node scripts/set-role.mjs <uid> <user|trainer|admin> [--verwaltung|--keine-verwaltung]\n" +
+        "       node scripts/set-role.mjs --backfill",
     );
   }
-
-  await setRole(uidOrFlag, role);
+  await setRole(uid, role, verwaltungOverride);
 }
 
 main().catch((err) => {

@@ -2,36 +2,51 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Identität: ausschliesslich aus signierten Auth Custom Claims ───────
-    // (per Admin-SDK gesetzt — kein Client kann role oder gymId schreiben)
+    // ─── Identitaet: ausschliesslich aus signierten Auth Custom Claims ─────
+    // (per Admin-SDK gesetzt — kein Client kann ein Recht oder gymId schreiben)
 
-    function userRole() {
+    // ROLLEN-SET (Checkpoint 3, Konzept §1): drei unabhaengige Haekchen
+    // `trainer`, `verwaltung`, `admin` statt eines `role`-Wertes. Der alte
+    // Wert konnte immer nur EINES davon ausdruecken — deshalb musste
+    // `verwaltung` 2026-08-31 schon daneben entstehen, und `trainer` und
+    // `admin` konkurrierten um denselben Platz.
+    // Serverseitige Entsprechung: lib/roles.ts.
+    //
+    // legacyRole() IST DER MIGRATIONSPFAD, KEINE ZWEITE QUELLE: Ausgestellte
+    // ID-Tokens leben bis zu einer Stunde, in der Tokens beider Formen durch
+    // diese Regeln laufen. Faellt der Rueckfall weg, verliert jeder Trainer
+    // mit noch gueltigem Token schlagartig seinen Zugriff. Er verschwindet,
+    // sobald die Produktion laenger als eine Stunde neu laeuft.
+    function legacyRole() {
       return ("role" in request.auth.token) ? request.auth.token.role : "user";
     }
-    function isTrainerOrAdmin() {
-      return userRole() in ["trainer", "admin"];
-    }
     function isAdmin() {
-      return userRole() == "admin";
+      return (("admin" in request.auth.token) && request.auth.token.admin == true)
+             || legacyRole() == "admin";
+    }
+    function isTrainerOrAdmin() {
+      return (("trainer" in request.auth.token) && request.auth.token.trainer == true)
+             || legacyRole() == "trainer"
+             || isAdmin();
     }
     // Gym aus dem Token. Fehlender Claim = Default-Gym (Bestand vor Migration
     // und frische Signups ohne Einladung — Phase 2 setzt Claims via Invite).
     function userGymId() {
       return ("gymId" in request.auth.token) ? request.auth.token.gymId : "tidal-athletics";
     }
-    // Gym-Verwaltungsrecht (Checkpoint 2) — additiver Claim NEBEN `role`,
-    // gesetzt ausschliesslich von /api/members/role. BEWUSST kein Wert von
-    // `role`: `admin` ist der PLATTFORM-Admin und ueberspringt hier unten
-    // ueberall den Gym-Vergleich; ein Haekchen in der Mitgliederliste darf
-    // niemals so weit reichen.
+    // Gym-Verwaltungsrecht — gesetzt ausschliesslich von /api/members/role.
+    // BEWUSST kein Wert von `role` (und heute eines von drei Haekchen):
+    // `admin` ist der PLATTFORM-Rang und ueberspringt hier unten ueberall den
+    // Gym-Vergleich; ein Haekchen in der Mitgliederliste darf niemals so weit
+    // reichen. Kein legacyRole()-Rueckfall noetig — dieser Claim hiess schon
+    // vor Checkpoint 3 so.
     function isVerwaltung() {
       return ("verwaltung" in request.auth.token)
              && request.auth.token.verwaltung == true;
     }
-    // „Darf dieses Gym verwalten" — Plattform-Admin oder Verwaltung DIESES
-    // Gyms. Bis Checkpoint 2 stand an den betroffenen Stellen stellvertretend
-    // isAdmin(), weil es die Rolle `verwaltung` noch nicht gab.
-    // Serverseitige Entsprechung: canManageGym() in lib/server/verify-user.ts.
+    // „Darf dieses Gym verwalten" — Plattform-Rang oder Verwaltung DIESES
+    // Gyms. Serverseitige Entsprechung: canManageGym() in
+    // lib/server/verify-user.ts.
     function canManageGymId(gymId) {
       return isAdmin() || (isVerwaltung() && userGymId() == gymId);
     }
@@ -67,34 +82,38 @@ service cloud.firestore {
                       || ((isTrainerOrAdmin() || isVerwaltung())
                           && (resource == null || sameGym(resource.data))));
 
-      // Eigenes Profil anlegen (Signup) — niemals selbst `role`, `gymId` oder
-      // `verwaltung` setzen (alles autoritativ serverseitig; gymId kommt per
-      // Einladung, verwaltung per Rollen-API).
+      // Eigenes Profil anlegen (Signup) — niemals selbst ein Recht oder
+      // `gymId` setzen (alles autoritativ serverseitig; gymId kommt per
+      // Einladung, die Rechte per Rollen-API). Die vier Rechte-Felder sind
+      // nur der Abfrage-SPIEGEL der Custom Claims; wer sie selbst schriebe,
+      // gewaenne damit zwar keinen Zugriff (diese Regeln lesen ausschliesslich
+      // Claims), koennte aber den Aussperr-Schutz verfaelschen, der ueber den
+      // Spiegel zaehlt.
       allow create: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.keys().hasAny(["role", "gymId", "verwaltung", "gymJoinedAt"]);
+                    && !request.resource.data.keys().hasAny(["role", "trainer", "verwaltung", "admin", "gymId", "gymJoinedAt"]);
 
-      // Eigenes Profil aktualisieren — aber NIEMALS `role` (Privilege-
-      // Escalation), `verwaltung` (dito — der Spiegel darf den Claim nicht
-      // ueberholen), `gymId` (Gym-Wechsel nur serverseitig), `gymJoinedAt`
-      // (das Beitrittsdatum setzt der Server beim Einloesen; selbst gesetzt
-      // waere es eine erfundene Zugehoerigkeit) oder `fightProfile`
-      // (kuratieren ausschliesslich Trainer/Admins).
+      // Eigenes Profil aktualisieren — aber NIEMALS eines der vier
+      // Rechte-Felder (`role`, `trainer`, `verwaltung`, `admin`: der Spiegel
+      // darf den Claim nicht ueberholen), `gymId` (Gym-Wechsel nur
+      // serverseitig), `gymJoinedAt` (das Beitrittsdatum setzt der Server beim
+      // Einloesen; selbst gesetzt waere es eine erfundene Zugehoerigkeit) oder
+      // `fightProfile` (kuratieren ausschliesslich Trainer/Admins).
       allow update: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "gymId", "verwaltung", "gymJoinedAt", "fightProfile"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "trainer", "verwaltung", "admin", "gymId", "gymJoinedAt", "fightProfile"]);
 
       // Trainer pflegen das Kampfprofil ihrer Athleten (und ihr eigenes) —
       // nur im eigenen Gym, Update ausschliesslich auf `fightProfile`.
       allow update: if request.auth != null && isGymStaffFor(resource.data)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["fightProfile"]);
 
-      // Admin verwaltet Profile (inkl. gymId-Zuordnung), aber Rolle UND
-      // Verwaltungsrecht werden AUSSCHLIESSLICH per Admin-SDK (Custom Claims)
-      // gesetzt — der Spiegel im Dokument darf nie von Hand vom Claim
-      // abweichen, sonst zaehlt der Aussperr-Schutz falsch.
+      // Admin verwaltet Profile (inkl. gymId-Zuordnung), aber ALLE Rechte
+      // werden AUSSCHLIESSLICH per Admin-SDK (Custom Claims) gesetzt — der
+      // Spiegel im Dokument darf nie von Hand vom Claim abweichen, sonst
+      // zaehlt der Aussperr-Schutz falsch.
       allow create: if request.auth != null && isAdmin()
-                    && !request.resource.data.keys().hasAny(["role", "verwaltung"]);
+                    && !request.resource.data.keys().hasAny(["role", "trainer", "verwaltung", "admin"]);
       allow update: if request.auth != null && isAdmin()
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "verwaltung"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "trainer", "verwaltung", "admin"]);
       allow delete: if request.auth != null && isAdmin();
 
       // Generische Subcollections (workouts, …).

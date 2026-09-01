@@ -336,8 +336,11 @@ export interface RedeemInviteResult {
   ok: boolean;
   gymId: string;
   gymName: string;
-  /** Rolle NACH dem Beitritt — eine Einladung senkt nie bestehende Rechte. */
-  role: string;
+  /**
+   * Trainer-Recht NACH dem Beitritt — eine Einladung fügt nur hinzu, sie
+   * senkt nie bestehende Rechte (siehe `withInvitedRight` in der Route).
+   */
+  trainer: boolean;
 }
 
 /**
