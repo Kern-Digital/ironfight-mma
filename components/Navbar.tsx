@@ -51,6 +51,16 @@ function IconAdmin() {
   );
 }
 
+function IconMembers() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20v-1.5A5 5 0 0 1 8 13.5h2A5 5 0 0 1 15 18.5V20" />
+      <path d="M16.5 5.6a3.2 3.2 0 0 1 0 6.2M18 13.8a5 5 0 0 1 3 4.7V20" />
+    </svg>
+  );
+}
+
 function IconClipboard() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -100,6 +110,12 @@ interface NavChild {
   href: string;
   label: string;
   activePattern?: RegExp;
+  /**
+   * Zwischenüberschrift ÜBER diesem Eintrag — trennt in der Trainer-Rubrik
+   * die Werkzeuge des Trainers von den Verwaltungs-Seiten (Checkpoint 2).
+   * Sie folgen einem anderen Recht und sollen nicht in einer Reihe stehen.
+   */
+  section?: string;
 }
 
 interface NavGroup {
@@ -176,6 +192,40 @@ const trainerNavGroup: NavGroup = {
   ],
 };
 
+/**
+ * Verwaltungs-Seiten (Multi-Gym Phase 2, Checkpoint 2). Sie folgen dem
+ * VERWALTUNGSRECHT, nicht dem Trainer-Recht — durchgesetzt in der Middleware
+ * (VERWALTUNG_PREFIXES) und in den Firestore-Regeln.
+ *
+ * WARUM SIE KEINE EIGENE TOP-LEVEL-RUBRIK SIND: Der Balken ist voll. Gemessen
+ * mit einem Admin-Konto trägt er ab 1024 px bereits 1305 px Inhalt bei 1232 px
+ * Platz — er läuft also schon vor Checkpoint 2 über (eigener Punkt fürs
+ * Backlog). Eine achte Rubrik hätte daraus 1478 px gemacht und den Überlauf
+ * bis 1600 px ausgeweitet. Deshalb hängen sie am vorhandenen Platz:
+ *   • Wer Trainer UND Verwaltung ist, findet sie unter „Trainer", abgesetzt
+ *     durch eine Zwischenüberschrift.
+ *   • Wer NUR Verwaltung ist (Bürokraft ohne Trainer-Häkchen), bekommt
+ *     dieselbe Rubrik unter dem Namen „Verwaltung" — und nichts sonst.
+ */
+const verwaltungNavChildren: NavChild[] = [
+  {
+    href: "/trainer/mitglieder",
+    label: "Mitglieder",
+    activePattern: /^\/trainer\/mitglieder/,
+    section: "Verwaltung",
+  },
+  {
+    href: "/trainer/einladungen",
+    label: "Einladungen",
+    activePattern: /^\/trainer\/einladungen/,
+  },
+  {
+    href: "/trainer/neuigkeiten",
+    label: "Neuigkeiten",
+    activePattern: /^\/trainer\/neuigkeiten/,
+  },
+];
+
 // DeepFight als eigener Menüpunkt — nur für Trainer/Admins sichtbar.
 // Alle drei Richtungen: Gegner (Bibliothek), eigene Schüler, sich selbst.
 const deepFightNavGroup: NavGroup = {
@@ -226,13 +276,36 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const isAdmin = profile?.role === "admin";
   const isTrainer = profile?.role === "trainer" || isAdmin;
+  // Verwaltungsrecht kommt aus dem Custom Claim (Checkpoint 2), nicht aus
+  // `role` — der Plattform-Admin verwaltet ohnehin jedes Gym.
+  const isVerwaltung = profile?.verwaltung === true || isAdmin;
+  // EIN Platz im Balken für beide Rollen (Begründung bei verwaltungNavChildren):
+  // Trainer sehen ihre Werkzeuge, mit Verwaltungsrecht zusätzlich dessen
+  // Seiten; eine reine Verwaltung sieht ausschließlich diese.
+  const staffNavGroup: NavGroup | null = isTrainer
+    ? {
+        ...trainerNavGroup,
+        children: [
+          ...(trainerNavGroup.children ?? []),
+          ...(isVerwaltung ? verwaltungNavChildren : []),
+        ],
+      }
+    : isVerwaltung
+      ? {
+          id: "verwaltung",
+          label: "Verwaltung",
+          icon: <IconMembers />,
+          // Ohne Trainer-Punkte darüber braucht es keine Zwischenüberschrift.
+          children: verwaltungNavChildren.map(({ section, ...rest }) => rest),
+        }
+      : null;
   const visibleGroups: NavGroup[] = [
     trainingNavGroup,
     lernenNavGroup,
     // DeepFight steht als dritter Punkt direkt unter "Lernen".
     ...(isTrainer ? [deepFightNavGroup] : []),
     profilNavGroup,
-    ...(isTrainer ? [trainerNavGroup] : []),
+    ...(staffNavGroup ? [staffNavGroup] : []),
     helpNavGroup,
     ...(isAdmin ? [adminNavGroup] : []),
   ];
@@ -393,8 +466,20 @@ export default function Navbar() {
                       {group.children.map((child) => {
                         const childActive = isChildActive(child);
                         return (
+                          <div key={child.href}>
+                          {child.section && (
+                            <div
+                              className="mt-1 border-t px-4 pb-1 pt-2 text-[9px] font-bold uppercase"
+                              style={{
+                                ...monoStyle,
+                                borderColor: "var(--ink-5)",
+                                color: "var(--fg-4)",
+                              }}
+                            >
+                              {child.section}
+                            </div>
+                          )}
                           <Link
-                            key={child.href}
                             href={child.href}
                             onClick={() => setOpenDesktopGroup(null)}
                             className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
@@ -421,6 +506,7 @@ export default function Navbar() {
                             )}
                             {child.label}
                           </Link>
+                          </div>
                         );
                       })}
                     </div>
@@ -601,8 +687,16 @@ export default function Navbar() {
                           {group.children?.map((child) => {
                             const childActive = isChildActive(child);
                             return (
+                              <div key={child.href}>
+                              {child.section && (
+                                <div
+                                  className="px-4 pb-1 pt-3 text-[9px] font-bold uppercase"
+                                  style={{ ...monoStyle, color: "var(--fg-4)" }}
+                                >
+                                  {child.section}
+                                </div>
+                              )}
                               <Link
-                                key={child.href}
                                 href={child.href}
                                 onClick={() => setMobileOpen(false)}
                                 className="px-4 py-2.5 font-bold uppercase transition-colors"
@@ -614,6 +708,7 @@ export default function Navbar() {
                               >
                                 {child.label}
                               </Link>
+                              </div>
                             );
                           })}
                         </div>

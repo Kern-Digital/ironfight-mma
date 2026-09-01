@@ -86,6 +86,9 @@ function OpponentMiniCard({ opponent }: { opponent: Opponent }) {
 export default function TrainerDashboardPage() {
   const { profile } = useAuth();
   const gymId = resolveGymId(profile);
+  // Verwaltungsrecht aus dem Custom Claim (Checkpoint 2); der Plattform-Admin
+  // verwaltet jedes Gym.
+  const isVerwaltung = profile?.verwaltung === true || profile?.role === "admin";
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [opponents, setOpponents] = useState<Opponent[] | null>(null);
@@ -172,16 +175,31 @@ export default function TrainerDashboardPage() {
           <Link href="/trainer/plans" className="btn-secondary px-4 py-2 text-xs">
             Workout-Pläne
           </Link>
-          {/* Einladen darf nur die Verwaltung (Multi-Gym Phase 2) — bis
-              Checkpoint 3 vertreten durch `admin`. Server und Firestore-Regeln
-              setzen das hart durch; hier verschwindet nur der Einstieg. */}
-          {profile?.role === "admin" && (
-            <Link
-              href="/trainer/einladungen"
-              className="btn-secondary px-4 py-2 text-xs"
-            >
-              Einladungen
-            </Link>
+          {/* Verwaltungs-Einstiege (Multi-Gym Phase 2): Mitglieder, Einladungen
+              und Neuigkeiten folgen dem Verwaltungsrecht, nicht dem
+              Trainer-Recht. Durchgesetzt wird das in der Middleware und in den
+              Firestore-Regeln; hier verschwindet nur der Einstieg. */}
+          {isVerwaltung && (
+            <>
+              <Link
+                href="/trainer/mitglieder"
+                className="btn-secondary px-4 py-2 text-xs"
+              >
+                Mitglieder
+              </Link>
+              <Link
+                href="/trainer/einladungen"
+                className="btn-secondary px-4 py-2 text-xs"
+              >
+                Einladungen
+              </Link>
+              <Link
+                href="/trainer/neuigkeiten"
+                className="btn-secondary px-4 py-2 text-xs"
+              >
+                Neuigkeiten
+              </Link>
+            </>
           )}
         </div>
       </DashboardHero>

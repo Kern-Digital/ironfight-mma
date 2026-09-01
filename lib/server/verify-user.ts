@@ -26,6 +26,13 @@ export interface VerifiedUser {
    * Client (resolveGymId).
    */
   gymId: string | null;
+  /**
+   * Gym-Verwaltungsrecht (Checkpoint 2) — additiver Claim NEBEN `role`.
+   * Bewusst kein Wert von `role`: `admin` ist der PLATTFORM-Admin und
+   * ueberspringt in den Regeln jeden Gym-Vergleich; ein Haekchen in der
+   * Mitgliederliste darf niemals so weit reichen.
+   */
+  verwaltung: boolean;
 }
 
 /** Extrahiert das Bearer-Token aus dem Authorization-Header. */
@@ -56,20 +63,24 @@ export async function verifyUser(idToken: string): Promise<VerifiedUser | null> 
 
     let role: string | null = null;
     let gymId: string | null = null;
+    let verwaltung = false;
     if (user.customAttributes) {
       try {
         const claims = JSON.parse(user.customAttributes) as {
           role?: string;
           gymId?: string;
+          verwaltung?: boolean;
         };
         role = claims.role ?? null;
         gymId = claims.gymId ?? null;
+        verwaltung = claims.verwaltung === true;
       } catch {
         role = null;
         gymId = null;
+        verwaltung = false;
       }
     }
-    return { uid: user.localId, role, gymId };
+    return { uid: user.localId, role, gymId, verwaltung };
   } catch {
     return null;
   }
@@ -91,4 +102,34 @@ export function isAdmin(user: VerifiedUser | null): boolean {
  */
 export function userGymId(user: VerifiedUser): string {
   return user.gymId?.trim() || DEFAULT_GYM_ID;
+}
+
+/**
+ * Darf dieser Aufrufer das Gym verwalten — einladen, Einladungen stoppen,
+ * Rechte vergeben, Mitglieder und Protokoll lesen?
+ *
+ * Das ist die EINE Stelle, an der die Frage beantwortet wird. Sie loest die
+ * Platzhalter-Pruefung `isAdmin(user)` ab, die bis Checkpoint 2 in
+ * /api/invites/create, /revoke und /note stand: Damals gab es die Rolle
+ * `verwaltung` noch nicht, und `admin` war der einzige Rang ueber dem
+ * Trainer. Seit dem Verwaltungs-Claim ist der Zielzustand echt.
+ *
+ * Zwei Wege hinein — und nur diese zwei:
+ *   • Plattform-Admin (gym-uebergreifend, deshalb ohne Gym-Vergleich),
+ *   • Verwaltungs-Claim IM EIGENEN Gym.
+ * Ein Trainer ohne Verwaltungsrecht faellt durch; das ist Leons
+ * Entscheidung vom 31.08.2026 („Einladen darf nur die Verwaltung").
+ *
+ * `gymId` weglassen heisst „irgendein Gym" — dann prueft nur, DASS ein
+ * Verwaltungsrecht besteht; das betroffene Gym muss der Aufrufer danach
+ * selbst vergleichen.
+ */
+export function canManageGym(
+  user: VerifiedUser | null,
+  gymId?: string,
+): boolean {
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  if (!user.verwaltung) return false;
+  return gymId === undefined || userGymId(user) === gymId;
 }

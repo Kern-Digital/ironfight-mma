@@ -114,27 +114,88 @@
   Spiegelt das ID-Token in ein `__session`-Cookie (für die Middleware).
 
 ### Rollen & Berechtigungen (Sicherheits-kritisch)
-- Rollen (`user` | `trainer` | `admin`) UND `gymId` liegen **autoritativ in
+- Rollen (`user` | `trainer` | `admin`), das **Gym-Verwaltungsrecht**
+  (`verwaltung: true`, seit 2026-08-31) UND `gymId` liegen **autoritativ in
   Firebase Auth Custom Claims**, NICHT im Firestore-Dokument (dort nur
   Anzeige-/Query-Spiegel).
-- Client liest beides via `getIdTokenResult()` (`claims.role`, `claims.gymId`)
-  — siehe `auth-context.tsx` (`refreshRole()` erzwingt Token-Refresh nach
-  Claim-Änderung).
-- Claims werden **ausschließlich serverseitig** per Admin-SDK gesetzt:
-  `node scripts/set-role.mjs <uid> <role>` (mergt, gymId bleibt erhalten)
-  bzw. `node scripts/migrate-multi-gym.mjs` (gymId-Backfill; braucht
-  `GOOGLE_APPLICATION_CREDENTIALS`). **Kein In-App-Pfad** schreibt `role`
-  oder `gymId`.
-- `firestore.rules` liest `request.auth.token.role`/`.gymId`; Clients dürfen
-  `role`/`gymId` im users-Dokument nie schreiben (Privilege-Escalation und
-  Gym-Wechsel geschlossen).
+- **`verwaltung` ist ein eigener, additiver Claim NEBEN `role` — bewusst KEIN
+  Wert von `role`.** `admin` ist der PLATTFORM-Admin und überspringt in den
+  Regeln überall den Gym-Vergleich (`isAdmin()` ohne `sameGym`); ein Häkchen
+  in der Mitgliederliste darf nie so weit reichen. Das Rollenmodell des
+  Konzepts (§1) lautet damit im Code: Athlet = Grundzustand, `role=trainer`
+  = Werkzeuge, `verwaltung=true` = Gym führen; der Cheftrainer hat beides.
+  Checkpoint 3 löst `role` in ein Set auf, `verwaltung` wandert unverändert
+  mit.
+- Client liest alles via `getIdTokenResult()` (`claims.role`, `claims.gymId`,
+  `claims.verwaltung`) — siehe `auth-context.tsx` (`refreshRole()` erzwingt
+  Token-Refresh nach Claim-Änderung; nach `/api/members/role` PFLICHT, wenn
+  man die eigenen Rechte geändert hat).
+- Claims werden **ausschließlich serverseitig** per Admin-SDK gesetzt — seit
+  2026-08-31 gibt es dafür eine echte API statt nur Hand-Scripts:
+  - `POST /api/members/role` (Rollen-API, Konzept §4): Body trägt NUR
+    `{ uid, trainer, verwaltung }`, also weder `role:"admin"` noch `gymId` —
+    beides ist nicht ausdrückbar, nicht bloß verboten. Prüft hart: Aufrufer
+    ist Verwaltung DESSELBEN Gyms (`canManageGym`), Ziel existiert, Ziel im
+    eigenen Gym, Ziel ist kein Plattform-Admin, **Aussperr-Schutz** (das
+    letzte Verwaltungsrecht eines Gyms lässt sich nicht entziehen; gezählt
+    wird über den users-Spiegel, Plattform-Admins zählen mit), Audit-Eintrag.
+    Claims werden GEMERGT, das users-Dokument gespiegelt — schlägt der
+    Spiegel fehl, werden die Claims zurückgenommen (ein Recht, das niemand
+    zählen kann, wäre schlimmer als ein sichtbar fehlgeschlagener Klick).
+  - `POST /api/members/remove` (Mitgliedschaft beenden): dreht `/redeem`
+    zurück — nimmt Freigaben (`opponents.sharedWith`,
+    `trainerPlans.audienceUids`) zurück, setzt `gymId` im Claim auf **null**
+    (bewusst null statt „Claim weg": ohne Claim fiele `userGymId()` in den
+    Regeln aufs Default-Gym zurück, und der Ausgetretene wäre wieder Mitglied
+    genau dort) und LÖSCHT `gymId` am users-Dokument (Dokument-Seite ist
+    strikt → das Gym verliert damit den Lesezugriff auf Kampfprofil,
+    Analysen und Wettkämpfe). **Diese Route löscht KEIN Konto** — siehe
+    „Konto vs. Mitgliedschaft" unten.
+  - `node scripts/set-role.mjs <uid> <role>` (mergt, gymId bleibt erhalten)
+    bzw. `node scripts/migrate-multi-gym.mjs` (gymId-Backfill; braucht
+    `GOOGLE_APPLICATION_CREDENTIALS`).
+- `firestore.rules` liest `request.auth.token.role`/`.gymId`/`.verwaltung`
+  (`isVerwaltung()`, `canManageGymId(gymId)`); Clients dürfen `role`,
+  `verwaltung` und `gymId` im users-Dokument nie schreiben (Privilege-
+  Escalation und Gym-Wechsel geschlossen). Der `verwaltung`-Spiegel am
+  Dokument existiert NUR, weil Custom Claims nicht abfragbar sind — ohne ihn
+  ließe sich „hat dieses Gym noch eine Verwaltung?" nicht beantworten.
+
+### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
+Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
+- **Das Konto gehört dem Menschen.** Darin liegen seine Workouts, sein
+  Verlauf, sein Kampfprofil und der Weg in ein künftiges Gym. Ein Gym darf es
+  weder löschen noch sperren: DSGVO Art. 17 (Löschung) ist ein RECHT der
+  betroffenen Person, keine Befugnis Dritter, und eine Sperre schnitte sie von
+  ihren eigenen Rechten nach Art. 15/17/20 ab.
+- **Die Mitgliedschaft gehört dem Gym.** Es darf sie jederzeit beenden
+  (`/api/members/remove`). Der Mensch behält alles, das GYM verliert den
+  Zugriff.
+- **Ein ausgetretenes Mitglied darf NICHT als Gegner weitergeführt werden.**
+  Die Idee, das Kampfprofil eines Ehemaligen für späteres Scouting zu behalten,
+  ist Zweckentfremdung (Art. 5 Abs. 1 lit. b) ohne Rechtsgrundlage nach Ende
+  des Vertrags (Art. 6) — und technisch ausgeschlossen, weil das Profil an
+  `users/{uid}` hängt und die Gym-Prüfung der Regeln nach dem Entfernen nicht
+  mehr greift. Wer jemanden scouten will, legt ein normales
+  `opponents/{id}`-Profil aus beobachtbarem Material an.
+- **Zustand „kein Gym"**: `gymId`-Claim null → Athleten-Dashboard zeigt
+  „Du gehörst gerade zu keinem Gym" plus Weg zu `/beitreten`. Denselben
+  Zustand hat, wer sich ohne Einladung registriert.
 
 ### Route-Schutz (zweischichtig)
 - **Server:** `middleware.ts` (Edge) verifiziert das `__session`-Cookie
   **kryptografisch** (jose/RS256 gegen Googles Firebase-Zertifikate, Issuer +
   Audience = Projekt) und gated per Claim: `/admin/*` nur role=admin (sonst
   404, Existenz verbergen), `/trainer/*` nur trainer/admin (sonst Redirect
-  `/dashboard`), übrige geschützte Bereiche → Redirect `/login`. Bewusster
+  `/dashboard`), übrige geschützte Bereiche → Redirect `/login`.
+  **Ausnahme seit 2026-08-31:** Die drei Verwaltungs-Seiten unter `/trainer`
+  (`lib/verwaltung-routes.ts` → Einladungen, Mitglieder, Neuigkeiten) folgen
+  dem Verwaltungsrecht statt dem Trainer-Recht — geprüft VOR der
+  Trainer-Prüfung. **Dieselbe Liste liest der Client-Guard**
+  (`components/TrainerRoute.tsx`) und das `/trainer`-Layout (blendet die
+  Trainer-Bereichsnavigation für eine reine Verwaltung aus). Wird eine Seite
+  ergänzt, gehört sie in `lib/verwaltung-routes.ts` — sonst lässt die
+  Middleware durch und React wirft direkt danach wieder raus. Bewusster
   Fail-Open NUR wenn Googles Zertifikat-Endpoint nicht erreichbar ist
   (unverifizierter exp-Check statt Aussperrung — Datensicherheit liegt bei
   den Firestore-Regeln); ungültige Signaturen werden IMMER abgewiesen.
@@ -152,8 +213,14 @@
 ```
 gyms/{gymId}                      — Gym-Stammdaten (Multi-Gym; Mitglieder lesen ihr
                                     eigenes Gym, Schreiben nur Admin/serverseitig)
-users/{uid}                       — Profil (role+gymId NUR via Custom Claims, nie
-                                    Client-Write; fightProfile nur Trainer/Admin-Write)
+gyms/{gymId}/invites/{code}       — Einladungen (Code = Dokument-ID; write:false,
+                                    nur /api/invites; Lesen nur die Verwaltung)
+gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UND Quelle
+                                    des Neuigkeiten-Bereichs (write:false, nur
+                                    lib/server/audit.ts; Lesen nur die Verwaltung)
+users/{uid}                       — Profil (role+verwaltung+gymId NUR via Custom
+                                    Claims, nie Client-Write; fightProfile nur
+                                    Trainer/Admin-Write)
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
                                     + Lücken aus opponents/{opponentId}, s.o.)
@@ -480,8 +547,45 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Tokens setzen. Zu tun bleibt: Feld im Branding-Kit befüllbar machen
       (Konzept §8) und prüfen, ob ein sehr helles Gym-Logo auf dem dunklen
       Panel eine neutrale Hinterlegung braucht.
-- [ ] Multi-Gym Phase 2: Rollen-Set-Claims (verwaltung/trainer), Rollen-API,
-      Einladungssystem, Mitgliederbereich (siehe docs/MULTI-GYM-KONZEPT.md)
+- [ ] **Konto-Löschung durch die betroffene Person fehlt** (Lücke, benannt
+      2026-09-01): `/api/members/remove` beendet die Mitgliedschaft, aber es
+      gibt keinen Weg, ein Konto samt aller Daten zu löschen — weder für den
+      Nutzer selbst noch überhaupt. Das ist DSGVO Art. 17 und gehört ins
+      Paket „vor der ersten Zahlung fällig" (AVV, Impressum, AGB, siehe
+      Kostenkarte). Zu bauen: „Konto löschen" in `/profile` mit Tippbestätigung
+      → Server-Route, die per Admin-SDK rekursiv löscht (`users/{uid}` samt
+      workouts/fightCamps/videoAnalyses/workoutPlans, uid aus allen
+      `sharedWith`/`audienceUids`/`invites.usedBy`, danach der Auth-Account).
+      Protokoll: KEIN auditLog-Eintrag mit Namen — sonst überlebt genau das
+      die Löschung.
+- [ ] **Mitgliedschaft pausieren** (Idee 2026-09-01, bewusst zurückgestellt):
+      Leons „Account deaktivieren" ist als KONTO-Sperre nicht zulässig (siehe
+      „Konto vs. Mitgliedschaft"), als MITGLIEDSCHAFTS-Status dagegen sinnvoll
+      — Beitrag offen, Verletzungspause, Hausverbot. Als Feld am
+      users-Dokument (`membershipPaused`) plus Filter in der Mitgliederliste;
+      hängt an Phase 4, wo die Abrechnung aktive Mitglieder zählt.
+- [ ] **Navigationsbalken läuft über** (gemessen 2026-08-31 mit einem
+      Admin-Konto, Playwright): Ab 1024 px trägt `components/Navbar.tsx`
+      1305 px Inhalt bei 1232 px Platz (`max-w-7xl` minus Padding) — Marke
+      und erster Menüpunkt überlappen. Der Zustand ist ÄLTER als Checkpoint 2
+      und betrifft nur Trainer/Admins (sieben Rubriken). Deshalb hängen die
+      Verwaltungs-Seiten am vorhandenen Platz statt an einer achten Rubrik
+      (siehe `verwaltungNavChildren`); mit einer achten wären es 1478 px
+      gewesen und der Überlauf hätte bis 1600 px gereicht. Echte Lösung:
+      Umbruch-Strategie (Burger bis ~1400 px, darüber so viele Punkte wie
+      passen) — eigener Vorgang, nicht nebenbei.
+- [ ] **Hülle für eine reine Verwaltung** (offen seit Checkpoint 2): Wer
+      Verwaltungsrecht ohne Trainer-Häkchen hat, ist `role="user"` und läuft
+      damit in die Athleten-Hülle (`AthleteChromeGate` blendet auf
+      `/dashboard` & Co. die Top-Navigation aus, `AthleteTabBar` übernimmt).
+      Als Tür dient heute eine Kachel „Gym verwalten" im Athleten-Dashboard.
+      Ob diese Person die Athleten- oder die Trainer-Hülle bekommen soll, ist
+      eine GESTALTUNGSfrage für Leon — technisch wären es
+      `AthleteChromeGate` plus die `!isTrainer`-Bedingungen in fünf Seiten.
+- [ ] Multi-Gym Phase 2, Checkpoint 3: `role` → Rollen-Set-Claims
+      (`{trainer, verwaltung}`), Middleware + auth-context + alle
+      Rollenprüfungen gemeinsam umstellen. Checkpoint 1 (Einladungen) und
+      Checkpoint 2 (Mitgliederbereich, Rollen-API, Neuigkeiten) sind gebaut.
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
       Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)

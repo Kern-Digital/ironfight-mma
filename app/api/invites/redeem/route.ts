@@ -30,7 +30,8 @@ import {
   adminAuth,
   adminDb,
 } from "@/lib/server/firebase-admin";
-import { findInviteByCode, writeAudit } from "@/lib/server/invites";
+import { findInviteByCode } from "@/lib/server/invites";
+import { displayNameFor, writeAudit } from "@/lib/server/audit";
 import {
   clearInviteMisses,
   inviteAttemptGate,
@@ -180,20 +181,38 @@ export async function POST(req: Request) {
     }
 
     // ─── 3. users-Dokument spiegeln ─────────────────────────────────────
-    await db
-      .collection("users")
-      .doc(user.uid)
-      .set({ gymId, role }, { merge: true });
+    // `gymJoinedAt` ist der Zeitpunkt, ab dem jemand zum Gym gehört — die
+    // Grundlage für „seit 3 Monaten dabei" in der Mitgliederliste. Das
+    // Registrierungsdatum taugt dafür nicht: Wer sein Konto im Januar
+    // angelegt und im September ein Gym betreten hat, ist seit September
+    // dabei. Bei einem erneuten Einlösen (alreadyRedeemed) bleibt der ERSTE
+    // Zeitpunkt stehen — sonst würde ein Neuladen die Zugehörigkeit
+    // zurücksetzen.
+    const memberDoc: Record<string, unknown> = { gymId, role };
+    const existingDoc = await db.collection("users").doc(user.uid).get();
+    if (!existingDoc.get("gymJoinedAt")) {
+      memberDoc.gymJoinedAt = FieldValue.serverTimestamp();
+    }
+    await db.collection("users").doc(user.uid).set(memberDoc, { merge: true });
 
     const gym = await db.collection("gyms").doc(gymId).get();
     const gymName =
       (gym.get("name") as string | undefined)?.trim() || DEFAULT_GYM_LABEL;
 
     if (!alreadyRedeemed) {
+      // Der Name steht MIT im Eintrag: Aus genau dieser Zeile wird im
+      // Neuigkeiten-Bereich „X ist deinem Gym beigetreten" (Checkpoint 2).
+      // Ihn erst beim Anzeigen nachzuschlagen hiesse, für jede Zeile ein
+      // fremdes users-Dokument zu lesen — und ein Protokoll soll ohnehin
+      // festhalten, wie es DAMALS war. Fallback ist bewusst neutral: Wer
+      // gerade erst beitritt, hat oft noch keinen Fighter-Namen.
+      const joinerName = await displayNameFor(db, user.uid, "Ein neues Mitglied");
       await writeAudit(db, gymId, {
         type: "invite.redeem",
         actorUid: user.uid,
+        actorName: joinerName,
         targetUid: user.uid,
+        targetName: joinerName,
         code,
         details: { role },
       });

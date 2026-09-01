@@ -25,6 +25,18 @@ export type AdminUserEntry = {
   displayName: string | null;
   authProviderName: string | null;
   role: UserRole | undefined;
+  /**
+   * Gym-Verwaltungsrecht (Checkpoint 2). Abfrage-Spiegel des Custom Claims —
+   * autoritativ ist der Claim, hier steht er, weil Claims nicht abfragbar
+   * sind und die Mitgliederliste ihn anzeigen muss.
+   */
+  verwaltung: boolean;
+  /**
+   * Beitritt zum Gym (gesetzt von /api/invites/redeem). Fehlt bei
+   * Bestandsmitgliedern, die es vor dem Einladungssystem schon gab — dann
+   * gilt `createdAt` (siehe memberSince in lib/members.ts).
+   */
+  gymJoinedAt: Date | undefined;
   createdAt: Date | undefined;
 };
 
@@ -77,6 +89,8 @@ function decodeStudentEntry(
     displayName: (data.displayName as string | null) ?? null,
     authProviderName: (data.authProviderName as string | null) ?? null,
     role: data.role as UserRole | undefined,
+    verwaltung: data.verwaltung === true,
+    gymJoinedAt: (data.gymJoinedAt as Timestamp | undefined)?.toDate(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
     athlete: decodeAthlete(data.athlete as AthleteDoc | undefined),
   } satisfies StudentEntry;
@@ -117,6 +131,8 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
       displayName: data.displayName ?? null,
       authProviderName: data.authProviderName ?? null,
       role: data.role as UserRole | undefined,
+      verwaltung: data.verwaltung === true,
+      gymJoinedAt: data.gymJoinedAt?.toDate() as Date | undefined,
       createdAt: data.createdAt?.toDate() as Date | undefined,
     };
   });

@@ -101,6 +101,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...p,
           role: claims.role as UserRole | undefined,
           gymId: (claims.gymId as string | undefined) ?? p.gymId ?? null,
+          // Verwaltungsrecht kommt wie role/gymId aus dem Claim, nicht aus
+          // dem Dokument (dort nur der Abfrage-Spiegel fuer Zaehlungen).
+          verwaltung: claims.verwaltung === true,
         });
       } catch (err) {
         console.warn("[TidalAthletics] ensureUserProfile failed:", err);
@@ -138,23 +141,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { claims } = await user.getIdTokenResult();
       const role = claims.role as UserRole | undefined;
       const gymId = (claims.gymId as string | undefined) ?? p?.gymId ?? null;
-      setProfile(p ? { ...p, role, gymId } : p);
+      const verwaltung = claims.verwaltung === true;
+      setProfile(p ? { ...p, role, gymId, verwaltung } : p);
     } finally {
       setProfileLoading(false);
     }
   }, [user]);
 
   /**
-   * Erzwingt ein Token-Refresh, damit ein frisch per Admin-SDK-Script gesetzter
-   * Rollen-Claim sofort im Client ankommt (ohne Re-Login).
+   * Erzwingt ein Token-Refresh, damit ein frisch per Admin-SDK gesetzter
+   * Rollen-Claim sofort im Client ankommt (ohne Re-Login) — nach
+   * /api/invites/redeem und nach /api/members/role, wenn man die eigenen
+   * Rechte geaendert hat.
    */
   const refreshRole = useCallback(async () => {
     if (!user) return;
     const { claims } = await user.getIdTokenResult(true);
     const role = claims.role as UserRole | undefined;
     const claimGymId = claims.gymId as string | undefined;
+    const verwaltung = claims.verwaltung === true;
     setProfile((prev) =>
-      prev ? { ...prev, role, gymId: claimGymId ?? prev.gymId } : prev,
+      prev
+        ? { ...prev, role, gymId: claimGymId ?? prev.gymId, verwaltung }
+        : prev,
     );
   }, [user]);
 

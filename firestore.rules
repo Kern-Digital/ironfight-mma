@@ -19,6 +19,22 @@ service cloud.firestore {
     function userGymId() {
       return ("gymId" in request.auth.token) ? request.auth.token.gymId : "tidal-athletics";
     }
+    // Gym-Verwaltungsrecht (Checkpoint 2) — additiver Claim NEBEN `role`,
+    // gesetzt ausschliesslich von /api/members/role. BEWUSST kein Wert von
+    // `role`: `admin` ist der PLATTFORM-Admin und ueberspringt hier unten
+    // ueberall den Gym-Vergleich; ein Haekchen in der Mitgliederliste darf
+    // niemals so weit reichen.
+    function isVerwaltung() {
+      return ("verwaltung" in request.auth.token)
+             && request.auth.token.verwaltung == true;
+    }
+    // „Darf dieses Gym verwalten" — Plattform-Admin oder Verwaltung DIESES
+    // Gyms. Bis Checkpoint 2 stand an den betroffenen Stellen stellvertretend
+    // isAdmin(), weil es die Rolle `verwaltung` noch nicht gab.
+    // Serverseitige Entsprechung: canManageGym() in lib/server/verify-user.ts.
+    function canManageGymId(gymId) {
+      return isAdmin() || (isVerwaltung() && userGymId() == gymId);
+    }
     // Dokument-Seite BEWUSST strikt (kein Fallback): nur so bleiben
     // where("gymId","==",…)-Queries fuer die Rules-Engine beweisbar.
     // Altbestaende werden vor dem Rules-Deploy migriert
@@ -38,37 +54,47 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // Lesen: eigenes Profil, Trainer desselben Gyms oder Admin.
+      // Lesen: eigenes Profil, Trainer desselben Gyms, Verwaltung desselben
+      // Gyms (Mitgliederbereich, Checkpoint 2) oder Admin.
+      // Die Verwaltung steht hier EIGENSTAENDIG neben dem Trainer: Sie kann
+      // eine reine Buerokraft ohne Trainer-Haekchen sein — ohne diese Zeile
+      // koennte sie ihre eigene Mitgliederliste nicht lesen.
       // resource == null: get() auf nicht existentes Dokument bleibt erlaubt
       // (liefert exists:false; verhindert Fehlwuerfe in Detailansichten).
       allow read: if request.auth != null
                   && (request.auth.uid == uid
                       || isAdmin()
-                      || (isTrainerOrAdmin()
+                      || ((isTrainerOrAdmin() || isVerwaltung())
                           && (resource == null || sameGym(resource.data))));
 
-      // Eigenes Profil anlegen (Signup) — niemals selbst `role` oder `gymId`
-      // setzen (beides autoritativ serverseitig; gymId kommt per Einladung).
+      // Eigenes Profil anlegen (Signup) — niemals selbst `role`, `gymId` oder
+      // `verwaltung` setzen (alles autoritativ serverseitig; gymId kommt per
+      // Einladung, verwaltung per Rollen-API).
       allow create: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.keys().hasAny(["role", "gymId"]);
+                    && !request.resource.data.keys().hasAny(["role", "gymId", "verwaltung", "gymJoinedAt"]);
 
       // Eigenes Profil aktualisieren — aber NIEMALS `role` (Privilege-
-      // Escalation), `gymId` (Gym-Wechsel nur serverseitig) oder
-      // `fightProfile` (kuratieren ausschliesslich Trainer/Admins).
+      // Escalation), `verwaltung` (dito — der Spiegel darf den Claim nicht
+      // ueberholen), `gymId` (Gym-Wechsel nur serverseitig), `gymJoinedAt`
+      // (das Beitrittsdatum setzt der Server beim Einloesen; selbst gesetzt
+      // waere es eine erfundene Zugehoerigkeit) oder `fightProfile`
+      // (kuratieren ausschliesslich Trainer/Admins).
       allow update: if request.auth != null && request.auth.uid == uid
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "gymId", "fightProfile"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "gymId", "verwaltung", "gymJoinedAt", "fightProfile"]);
 
       // Trainer pflegen das Kampfprofil ihrer Athleten (und ihr eigenes) —
       // nur im eigenen Gym, Update ausschliesslich auf `fightProfile`.
       allow update: if request.auth != null && isGymStaffFor(resource.data)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["fightProfile"]);
 
-      // Admin verwaltet Profile (inkl. gymId-Zuordnung), aber die Rolle wird
-      // AUSSCHLIESSLICH per Admin-SDK (Custom Claims) gesetzt.
+      // Admin verwaltet Profile (inkl. gymId-Zuordnung), aber Rolle UND
+      // Verwaltungsrecht werden AUSSCHLIESSLICH per Admin-SDK (Custom Claims)
+      // gesetzt — der Spiegel im Dokument darf nie von Hand vom Claim
+      // abweichen, sonst zaehlt der Aussperr-Schutz falsch.
       allow create: if request.auth != null && isAdmin()
-                    && !("role" in request.resource.data);
+                    && !request.resource.data.keys().hasAny(["role", "verwaltung"]);
       allow update: if request.auth != null && isAdmin()
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"]);
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "verwaltung"]);
       allow delete: if request.auth != null && isAdmin();
 
       // Generische Subcollections (workouts, …).
@@ -146,22 +172,23 @@ service cloud.firestore {
       //
       // LESEN NUR DIE VERWALTUNG (Leon 31.08.): Wer die Codes sieht, kann sie
       // weiterreichen — also einladen. Ein Trainer ohne Einladungsrecht darf
-      // die Liste deshalb nicht lesen. Die Rolle `verwaltung` entsteht erst in
-      // Checkpoint 3; bis dahin steht `admin` stellvertretend, danach wird aus
-      // isAdmin() hier: isAdmin() || (isVerwaltung() && userGymId() == gymId).
+      // die Liste deshalb nicht lesen. Bis Checkpoint 2 stand hier
+      // stellvertretend isAdmin(), weil es den Verwaltungs-Claim noch nicht
+      // gab; seither prueft canManageGymId() den Zielzustand.
       // Eingeladene brauchen ohnehin keinen Lesezugriff — der Beitritt laeuft
       // serverseitig ueber /api/invites/redeem.
       match /invites/{code} {
-        allow read: if request.auth != null && isAdmin();
+        allow read: if request.auth != null && canManageGymId(gymId);
         allow write: if false;
       }
 
-      // Protokoll rechteveraendernder Vorgaenge (Konzept §4). Ebenfalls rein
+      // Protokoll rechteveraendernder Vorgaenge (Konzept §4) und zugleich
+      // Quelle des Neuigkeiten-Bereichs (Checkpoint 2). Ebenfalls rein
       // serverseitig geschrieben — ein Protokoll, das der Betroffene aendern
       // kann, ist keines. Lesen wie bei den Einladungen nur die Verwaltung:
       // die Eintraege enthalten die Codes im Klartext.
       match /auditLog/{entryId} {
-        allow read: if request.auth != null && isAdmin();
+        allow read: if request.auth != null && canManageGymId(gymId);
         allow write: if false;
       }
 

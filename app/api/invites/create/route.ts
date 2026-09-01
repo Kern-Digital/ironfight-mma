@@ -1,18 +1,18 @@
 /**
- * POST /api/invites/create — Einladung ausstellen (Trainer/Admin).
+ * POST /api/invites/create — Einladung ausstellen (Verwaltung).
  *
  * Body:    { role?, maxUses?, days?, note?, gymId? }
  * Antwort: { code, gymId, role, expiresAt, maxUses }
  *
  * Schutzregeln (Konzept §4 „Rechte vergeben darf nur, wer sie selbst hat"):
- *   • EINLADEN DARF NUR DIE VERWALTUNG (Leon 31.08.). Die Rolle `verwaltung`
- *     entsteht erst in Checkpoint 3 (Claims-Set statt einzelnem `role`) —
- *     bis dahin ist `admin` der einzige Rang über dem Trainer und steht
- *     hier stellvertretend. Beim Umstieg wird aus `isAdmin(user)` an genau
- *     dieser Stelle `isAdmin(user) || verwaltung im eigenen Gym`; ein
- *     Trainer MIT Verwaltungsrecht darf dann einladen, ein Trainer ohne
- *     weiterhin nicht. Dieselbe Kante steht in /revoke und in den Rules
- *     (Lesen der Einladungen) — wer die Codes sieht, kann einladen.
+ *   • EINLADEN DARF NUR DIE VERWALTUNG (Leon 31.08.) — geprüft über
+ *     `canManageGym`: Plattform-Admin oder Verwaltungs-Claim im eigenen Gym.
+ *     Bis Checkpoint 2 stand hier stellvertretend `isAdmin(user)`, weil es
+ *     die Rolle `verwaltung` noch nicht gab; seit dem Verwaltungs-Claim ist
+ *     die Prüfung echt. Ein Trainer MIT Verwaltungsrecht darf einladen, ein
+ *     Trainer ohne nicht. Dieselbe Kante steht in /revoke, /note, in
+ *     /api/members/role und in den Rules (Lesen der Einladungen) — wer die
+ *     Codes sieht, kann einladen.
  *   • Verwaltung/Admin lädt nur ins EIGENE Gym ein.
  *   • role="admin" ist gar nicht erst vorgesehen — Plattform-Rechte werden
  *     niemals über einen Link vergeben.
@@ -31,6 +31,7 @@ import {
 } from "@/lib/server/invites";
 import {
   bearerToken,
+  canManageGym,
   isAdmin,
   userGymId,
   verifyUser,
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  if (!isAdmin(user)) {
+  if (!canManageGym(user)) {
     return NextResponse.json(
       { error: "Nur die Gym-Verwaltung kann einladen." },
       { status: 403 },
@@ -71,11 +72,12 @@ export async function POST(req: Request) {
   }
 
   const role: InviteRole = body.role === "trainer" ? "trainer" : "user";
-  // Solange nur der Admin überhaupt einladen darf, kann das hier nicht
-  // greifen — die Kante bleibt trotzdem stehen: mit der Rolle `verwaltung`
-  // (Checkpoint 3) wird die Prüfung oben durchlässiger, und dann muss
-  // weiterhin entschieden sein, WER Trainer-Rechte per Link vergeben darf.
-  if (role === "trainer" && !isAdmin(user)) {
+  // Redundant zur Prüfung oben und trotzdem stehengeblieben: Sie hält die
+  // Antwort auf die Frage fest, WER Trainer-Rechte per Link vergeben darf —
+  // dieselben, die sie in der Mitgliederliste vergeben dürfen (Konzept §4,
+  // „Rechte vergeben darf nur, wer sie selbst hat"). Lockert sich die
+  // Prüfung oben je, bleibt diese Kante bestehen.
+  if (role === "trainer" && !canManageGym(user)) {
     return NextResponse.json(
       { error: "Trainer-Einladungen darf nur die Verwaltung ausstellen." },
       { status: 403 },

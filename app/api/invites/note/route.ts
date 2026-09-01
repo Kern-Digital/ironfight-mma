@@ -10,8 +10,8 @@
  * `revokedAt` erreichbar. Deshalb geht selbst eine harmlose Notiz über das
  * Admin-SDK, das genau EIN Feld schreibt.
  *
- * Rechte wie in /create und /revoke: nur die Verwaltung — bis Checkpoint 3
- * vertreten durch `admin` (Begründung im Kopf von create/route.ts).
+ * Rechte wie in /create und /revoke: nur die Verwaltung (`canManageGym`,
+ * Begründung im Kopf von create/route.ts).
  *
  * Die Notiz ist reine Innensicht (Übersicht der Verwaltung); der Eingeladene
  * sieht sie nie — /preview gibt sie nicht aus. Änderbar bleibt sie auch bei
@@ -24,6 +24,7 @@ import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { displayNameFor, findInviteByCode, writeAudit } from "@/lib/server/invites";
 import {
   bearerToken,
+  canManageGym,
   isAdmin,
   userGymId,
   verifyUser,
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  if (!isAdmin(user)) {
+  if (!canManageGym(user)) {
     return NextResponse.json(
       { error: "Nur die Gym-Verwaltung kann Einladungen bearbeiten." },
       { status: 403 },

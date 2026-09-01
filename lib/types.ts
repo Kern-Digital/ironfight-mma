@@ -488,6 +488,24 @@ export interface UserProfile {
    * Default-Gym (siehe lib/gym.ts). Für späteres Multi-Gym vorbereitet.
    */
   gymId?: string | null;
+  /**
+   * Gym-Verwaltungsrecht (Multi-Gym Phase 2, Checkpoint 2) — additiver Claim
+   * NEBEN `role`, bewusst kein Wert von `role`: `admin` ist der
+   * PLATTFORM-Admin und überspringt in den Regeln jeden Gym-Vergleich. Ein
+   * Häkchen in der Mitgliederliste darf niemals so weit reichen.
+   *
+   * Autoritativ ist der Custom Claim (auth-context spiegelt ihn hierher);
+   * das gleichnamige Feld am users-Dokument ist nur der Abfrage-Spiegel,
+   * damit „wie viele Verwaltungen hat dieses Gym noch?" überhaupt zählbar
+   * ist — Claims sind nicht abfragbar. Geschrieben wird beides ausschließlich
+   * von /api/members/role (Rules verbieten es dem Client wie bei `role`).
+   *
+   * Checkpoint 3 löst `role` in ein Set auf (`{ trainer, verwaltung }`) —
+   * dieses Feld wandert dann dorthin, ohne dass die Bedeutung sich ändert.
+   */
+  verwaltung?: boolean;
+  /** Beitritt zum Gym — serverseitig beim Einlösen der Einladung gesetzt. */
+  gymJoinedAt?: Date | null;
   settings: UserSettings;
   createdAt?: Date;
   /** Wurde der erste-Login-Onboarding-Flow durchlaufen? */

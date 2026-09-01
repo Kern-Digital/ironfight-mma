@@ -8,9 +8,9 @@
  * in der Übersicht und im Audit-Log nachvollziehbar bleibt, dass es den Code
  * gab und wer ihn gestoppt hat.
  *
- * Rechte wie in /create: nur die Verwaltung — bis Checkpoint 3 vertreten
- * durch `admin` (siehe Begründung im Kopf von create/route.ts). Wer nicht
- * einladen darf, soll auch fremde Einladungen nicht stoppen können.
+ * Rechte wie in /create: nur die Verwaltung (`canManageGym` — siehe
+ * Begründung im Kopf von create/route.ts). Wer nicht einladen darf, soll
+ * auch fremde Einladungen nicht stoppen können.
  */
 
 import { NextResponse } from "next/server";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/server/invites";
 import {
   bearerToken,
+  canManageGym,
   isAdmin,
   userGymId,
   verifyUser,
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  if (!isAdmin(user)) {
+  if (!canManageGym(user)) {
     return NextResponse.json(
       { error: "Nur die Gym-Verwaltung kann Einladungen zurückziehen." },
       { status: 403 },

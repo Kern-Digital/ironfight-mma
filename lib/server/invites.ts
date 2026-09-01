@@ -8,7 +8,7 @@
  * role="admin" ausstellen und einlösen — Rechteausweitung über Umwege.
  */
 
-import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore";
+import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { randomInt } from "node:crypto";
 import {
   INVITE_CODE_ALPHABET,
@@ -71,54 +71,11 @@ export async function findInviteByCode(db: Firestore, code: string) {
   return snap.empty ? null : snap.docs[0];
 }
 
-export type AuditType =
-  | "invite.create"
-  | "invite.revoke"
-  | "invite.redeem"
-  | "invite.note";
-
-/**
- * Protokolliert Vorgänge, die Rechte verändern (Konzept §4). Bewusst
- * best-effort: ein fehlgeschlagener Protokolleintrag darf einen erfolgreichen
- * Beitritt nicht rückgängig machen — der Nutzer hätte sonst einen Claim,
- * aber keine Einladung mehr.
- */
-export async function writeAudit(
-  db: Firestore,
-  gymId: string,
-  entry: {
-    type: AuditType;
-    actorUid: string;
-    actorName?: string;
-    targetUid?: string;
-    code?: string;
-    details?: Record<string, string | number | boolean | null>;
-  },
-): Promise<void> {
-  try {
-    await db.collection("gyms").doc(gymId).collection("auditLog").add({
-      ...entry,
-      actorName: entry.actorName ?? "",
-      at: FieldValue.serverTimestamp(),
-    });
-  } catch (err) {
-    console.warn("[TidalAthletics] Audit-Eintrag fehlgeschlagen:", err);
-  }
-}
-
-/**
- * Anzeigename des Aufrufers für die Denormalisierung. Fällt auf einen
- * neutralen Text zurück, damit ein fehlendes Profil keine Einladung blockiert.
- */
-export async function displayNameFor(
-  db: Firestore,
-  uid: string,
-): Promise<string> {
-  try {
-    const snap = await db.collection("users").doc(uid).get();
-    const name = snap.get("displayName");
-    return typeof name === "string" && name.trim() ? name.trim() : "Trainer";
-  } catch {
-    return "Trainer";
-  }
-}
+// Protokoll + Namensauflösung sind seit Checkpoint 2 gym-weit (auch die
+// Rollen-API schreibt hinein) und leben deshalb in lib/server/audit.ts.
+// Re-Export, damit die Einladungs-Routen ihren gewohnten Import behalten.
+export {
+  displayNameFor,
+  writeAudit,
+  type AuditType,
+} from "./audit";

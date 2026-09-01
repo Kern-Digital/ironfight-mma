@@ -6,6 +6,7 @@ import {
   importX509,
   jwtVerify,
 } from "jose";
+import { VERWALTUNG_PREFIXES } from "@/lib/verwaltung-routes";
 
 /**
  * Serverseitiger Auth-Gate (Edge) — MIT Signaturprüfung (seit 2026-08-20).
@@ -16,9 +17,10 @@ import {
  *
  * Prüfung: Das JWT wird gegen Googles öffentliche Zertifikate verifiziert
  * (RS256, Issuer/Audience = Firebase-Projekt). Zusätzlich werden die Custom
- * Claims (role) fürs Routen-Gating gelesen:
+ * Claims (role, verwaltung) fürs Routen-Gating gelesen:
  *   /admin/*   → nur role=admin, sonst 404 (Existenz verbergen)
  *   /trainer/* → nur trainer/admin, sonst Redirect /dashboard
+ *   die drei Verwaltungs-Seiten darunter → nur verwaltung/admin (s. u.)
  *
  * Fail-Open-Ausnahme (bewusst): Sind Googles Zertifikate NICHT erreichbar
  * (Netzfehler), fällt der Gate auf den unverifizierten exp-Check zurück,
@@ -31,6 +33,21 @@ import {
 // jede Anfrage hier IST also schutzbeduerftig.
 const ADMIN_PREFIXES = ["/admin"];
 const TRAINER_PREFIXES = ["/trainer"];
+/**
+ * Die Verwaltungs-Seiten (Liste in lib/verwaltung-routes.ts) liegen UNTER
+ * /trainer, gehören aber NICHT dem Trainer.
+ *
+ * Sie brauchen ein eigenes Gate in BEIDE Richtungen. Nach unten, weil eine
+ * reine Verwaltung ohne Trainer-Häkchen (role="user" + verwaltung=true) vom
+ * /trainer-Gate sonst auf /dashboard geworfen würde, bevor sie ihre eigene
+ * Seite sieht. Nach oben, weil ein Trainer ohne Verwaltungsrecht hier nichts
+ * verloren hat — die Firestore-Regeln weisen ihn ohnehin ab, aber eine leere
+ * Seite mit Fehlermeldung ist keine Antwort.
+ *
+ * Reihenfolge im Gate zählt: Diese Prüfung läuft VOR der Trainer-Prüfung.
+ * Dieselbe Liste liest der Client-Guard (components/TrainerRoute.tsx) —
+ * sonst hält die Middleware auf und React wirft gleich danach wieder raus.
+ */
 const SESSION_COOKIE = "__session";
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -68,7 +85,7 @@ async function fetchGoogleCerts(force = false): Promise<Record<string, string>> 
 
 // ─── Token-Verifikation ─────────────────────────────────────────────────────
 
-type SessionClaims = { role?: string };
+type SessionClaims = { role?: string; verwaltung?: boolean };
 
 type VerifyResult =
   | { status: "valid"; claims: SessionClaims }
@@ -98,7 +115,10 @@ async function verifySession(token: string): Promise<VerifyResult> {
     }
     return {
       status: "valid",
-      claims: { role: typeof payload.role === "string" ? payload.role : undefined },
+      claims: {
+        role: typeof payload.role === "string" ? payload.role : undefined,
+        verwaltung: payload.verwaltung === true,
+      },
     };
   } catch (err) {
     if (err instanceof CertFetchError) return { status: "unavailable" };
@@ -115,6 +135,7 @@ function unverifiedSession(token: string): SessionClaims | null {
     }
     return {
       role: typeof payload.role === "string" ? payload.role : undefined,
+      verwaltung: payload.verwaltung === true,
     };
   } catch {
     return null;
@@ -159,6 +180,16 @@ export async function middleware(req: NextRequest) {
   // Rollen-Gating (Claims aus dem verifizierten Token)
   if (matchesPrefix(pathname, ADMIN_PREFIXES) && claims.role !== "admin") {
     return deny(req, pathname); // 404 — Existenz verbergen
+  }
+  // Verwaltungs-Seiten ZUERST: Sie liegen unter /trainer, folgen aber einem
+  // anderen Recht (siehe VERWALTUNG_PREFIXES).
+  if (matchesPrefix(pathname, [...VERWALTUNG_PREFIXES])) {
+    if (claims.verwaltung !== true && claims.role !== "admin") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
   }
   if (
     matchesPrefix(pathname, TRAINER_PREFIXES) &&

@@ -70,6 +70,10 @@ type ProfileDoc = {
   username?: string | null;
   role?: UserRole;
   gymId?: string | null;
+  /** Abfrage-Spiegel des Verwaltungs-Claims (siehe UserProfile.verwaltung). */
+  verwaltung?: boolean;
+  /** Beitritt zum Gym (serverseitig, /api/invites/redeem). */
+  gymJoinedAt?: Timestamp | null;
   settings: UserSettings;
   onboarded: boolean;
   trainerOnboarded?: boolean;
@@ -96,6 +100,8 @@ export async function getUserProfile(
     username: data.username ?? null,
     role: data.role,
     gymId: data.gymId ?? null,
+    verwaltung: data.verwaltung === true,
+    gymJoinedAt: data.gymJoinedAt?.toDate() ?? null,
     settings: { ...DEFAULT_USER_SETTINGS, ...(data.settings ?? {}) },
     onboarded: data.onboarded === true,
     trainerOnboarded: data.trainerOnboarded === true,
@@ -128,6 +134,8 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       username: data.username ?? null,
       role: data.role,
       gymId: data.gymId ?? null,
+      verwaltung: data.verwaltung === true,
+      gymJoinedAt: data.gymJoinedAt?.toDate() ?? null,
       settings: { ...DEFAULT_USER_SETTINGS, ...(data.settings ?? {}) },
       onboarded: data.onboarded === true,
       trainerOnboarded: data.trainerOnboarded === true,
