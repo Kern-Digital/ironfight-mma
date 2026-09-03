@@ -1,5 +1,6 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -150,43 +151,11 @@ function OpponentsLibraryContent() {
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Header */}
-      <div
-        className="relative overflow-hidden border-b px-4 py-9 sm:px-6"
-        style={{
-          borderColor: "rgba(255,79,168,0.2)",
-          background:
-            "radial-gradient(420px 250px at 100% 50%, rgba(255,79,168,0.12), transparent 60%), linear-gradient(160deg, #140A12, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-2 flex items-center gap-2">
-            <span
-              className="font-mono-ta rounded px-2 py-0.5 text-[10px] font-black uppercase"
-              style={{
-                letterSpacing: "0.2em",
-                background: "rgba(255,79,168,0.12)",
-                border: "1px solid rgba(255,79,168,0.4)",
-                color: "var(--ta-pink)",
-              }}
-            >
-              Trainer
-            </span>
-          </div>
-          <h1
-            className="font-display-ta font-black uppercase leading-none"
-            style={{ fontSize: "clamp(28px, 5vw, 42px)", letterSpacing: "0.02em" }}
-          >
-            <DeepFightWordmark />
-          </h1>
-          <p
-            className="font-mono-ta mt-2 text-[11px]"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
-          >
-            KI-Gegneranalyse · gym-weit geteilt
-          </p>
-        </div>
-      </div>
+      <PageHead
+        lane="wide"
+        title={<DeepFightWordmark />}
+        description="KI-Gegneranalyse für dein ganzes Gym: Jedes Profil steht allen Trainern offen."
+      />
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
         <TrainerHint id="opponents-library" title="DeepFight-Bibliothek">

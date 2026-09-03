@@ -2012,3 +2012,521 @@ h1, h2 { overflow-wrap: anywhere; }
     display: inline;
   }
 }
+
+/* ─── Gooey-Suche (components/ui/GooeySearch.tsx) ───────────────────────────
+ *
+ * Leons Vorlage vom 03.09.2026, übersetzt in unser System. Die Vorlage brachte
+ * ihre elf Klassen NICHT mit — dieser Block ist der fehlende Teil, und er
+ * kommt deshalb gleich aus Tokens statt aus den Hex-Werten der Vorlage.
+ *
+ * WIE DER GOO-EFFEKT WIRKT: `filter: url(#ta-goo)` zeichnet alle Kinder weich
+ * und schwellt danach den Alphakanal hart. Zwei Formen, die sich nahe kommen,
+ * fließen dadurch ineinander wie Quecksilber — genau das passiert, wenn der
+ * Lupen-Tropfen aus der Pille heraustritt. Der Filter liegt auf `.goo-inner`
+ * und NICHT auf `.goo-wrap`: Wrap trägt den Abstand, der dem Filterbereich
+ * Luft gibt.
+ *
+ * DER FILTERBEREICH IST DIE FALLE: Ein SVG-Filter auf einem HTML-Element
+ * rechnet standardmäßig nur -10%/+120% der Elementbox. Die Treffer-Tropfen
+ * wandern bis 5 × 46 px nach unten und wären dort abgeschnitten. Deshalb
+ * `filter-region` über die Wrap-Polsterung plus `overflow: visible` auf allen
+ * Ebenen.
+ *
+ * DIE SCHRIFT BLEIBT SCHARF, weil der Filter das ungefilterte Original per
+ * feComposite `atop` wieder obenauf legt (siehe GooeySearch.tsx).           */
+.goo-wrap {
+  position: relative;
+  padding: 4px 0 4px 4px;
+  isolation: isolate;
+  z-index: 20;
+  /* Der Übergang gehört zur Polsterung: Beim Öffnen wächst rechts der Platz
+     für den Tropfen mit, statt zu springen. */
+  transition: padding-right var(--dur-med) var(--ease-out);
+}
+/* DER TROPFEN BRAUCHT EIGENEN PLATZ IN DER REIHE (gemessen 03.09.2026): Er
+   sitzt absolut außerhalb der Pille und lag dadurch ÜBER dem Nachbarfeld —
+   rechte Kante bei 630 px, „Alle Kurse" begann bei 594. Absolute Elemente
+   zählen für die Flex-Reihe nicht mit; die Polsterung holt den Platz zurück.
+   Nur im geöffneten Zustand: Zugeklappt gibt es keinen Tropfen, und 48 px
+   Leere neben einer 116-px-Pille sähen aus wie ein Fehler. */
+.goo-wrap[data-open] {
+  padding-right: 58px;
+}
+
+.goo-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--hit-min);
+  filter: url(#ta-goo);
+  /* Ohne das clippt der Filterbereich die Tropfen. */
+  overflow: visible;
+}
+/* Safari / Chrome auf iOS: Filter aus, alles andere bleibt. */
+.no-goo .goo-inner {
+  filter: none;
+}
+
+.goo-pill {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  height: var(--hit-min);
+  width: 100%;
+  cursor: pointer;
+  align-items: center;
+  border-radius: var(--r-pill);
+  padding: 0 18px;
+  background: var(--surface-raised);
+  /* Ein Rahmen würde vom Goo-Schwellwert zerfressen — die Kante kommt
+     deshalb als Innen-Schatten, den der Filter unangetastet lässt. */
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-body);
+}
+.goo-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+[data-open] .goo-pill {
+  cursor: text;
+}
+
+.goo-label {
+  font: 600 13px/1 var(--font-archivo), system-ui, sans-serif;
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.goo-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font: var(--type-body);
+  color: var(--text-body);
+  outline: none;
+}
+.goo-input::placeholder {
+  color: var(--text-3);
+}
+/* Das eigene „x" der Browser-Suche würde neben dem Tropfen doppelt stehen. */
+.goo-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* Der Tropfen. Er liegt UNTER der Pille (z-index 1), damit er beim
+   Heraustreten aus ihr hervorzukommen scheint statt über sie zu laufen. */
+/* DER TROPFEN STEHT IM RUHEZUSTAND FREI (Leon 03.09.2026: „die zwei
+   Elemente sind noch leicht verbunden"). Das ist eine Rechnung, kein Gefühl:
+   Bei `stdDeviation 5` und der Schwelle 0,5 trägt die Brücke zwischen zwei
+   Kanten im Abstand d, solange 2·Φ(−d/10) ≥ 0,5 gilt — also bis rund
+   6,7 px. Bei 4 px hing sie fest, bei 12 px reißt sie sicher ab.
+   VERSCHMOLZEN WIRD TROTZDEM: Der Tropfen startet INNERHALB der Pille
+   (x: −46) und wandert heraus — der Goo-Moment liegt in der Bewegung, nicht
+   im Endzustand. */
+.goo-drop {
+  position: absolute;
+  right: -50px;
+  z-index: 1;
+  display: flex;
+  height: 38px;
+  width: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.goo-spin {
+  display: flex;
+  animation: goo-spin 1.1s linear infinite;
+}
+@keyframes goo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goo-spin {
+    animation: none;
+  }
+}
+
+/* ─── Mehrfach-Filter (components/ui/MultiFilter.tsx) ───────────────────────
+ *
+ * Die Auswahlfelder über der Athletenliste (Leon 03.09.2026). Sie sprechen
+ * dieselbe Pillen-Sprache wie die Gooey-Suche daneben.
+ *
+ * DER RADIUS-FEHLER, DEN DAS HIER BEHEBT: Ein aufgeklapptes Pillen-Feld über
+ * einem geraden Panel ergibt keine gemeinsame Form. Die Pillen-Rundung
+ * (999 px, auf halbe Höhe geklemmt = 22 px) beschreibt über die volle
+ * Feldhöhe einen Bogen; das Panel darunter hat gerade Seiten. An der Naht
+ * knickt der Umriss deshalb sichtbar. Aufgeklappt wechselt das Feld deshalb
+ * auf --r-lg, dieselbe Rundung, die das Panel unten trägt — zusammen ein
+ * sauberes Rechteck mit runden Ecken. Die Pille bleibt dem Ruhezustand. */
+/* DIE BREITE SETZT DIE KOMPONENTE, NICHT DAS CSS: Sie wird animiert und
+   gehört damit in eine Hand (Begründung in ui/MultiFilter.tsx, „erst breit,
+   dann auf"). Hier steht nur der Deckel — auf einem schmalen Bildschirm darf
+   auch ein zweispaltiges Panel die Spalte nicht sprengen. */
+.mf-root {
+  position: relative;
+  max-width: 100%;
+  flex: 0 0 auto;
+  z-index: 15;
+}
+.mf-root[data-open] {
+  /* ÜBER DIE GESCHWISTER (gemessen 03.09.2026 auf 390 px): `.mf-root` ist
+     durch sein eigenes z-index ein Stapelkontext — das z-index des Panels
+     wirkt deshalb nur INNERHALB dieses Kontexts und kommt nicht an den
+     Nachbarfeldern vorbei. Bei umgebrochener Leiste malten die Felder der
+     nächsten Zeile über das geöffnete Panel. Der Rang muss also an die
+     WURZEL, nicht ans Panel. Höher als die Gooey-Suche (20), damit das
+     Panel auch über ihr liegt. */
+  z-index: 45;
+}
+
+.mf-trigger {
+  display: flex;
+  height: var(--hit-min);
+  width: 100%;
+  align-items: center;
+  /* Ohne Pfeil rechts steht die Beschriftung links und füllt den Rest. */
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface-raised);
+  font: var(--type-body);
+  color: var(--text-3);
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.mf-trigger:hover {
+  border-color: var(--line-strong);
+}
+.mf-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* DREI ZUSTÄNDE, DREI VERSCHIEDENE MITTEL (Leons Feinschliff 03.09.2026):
+ *
+ * 1. RUHE, nichts gewählt — normale Fläche, normale Kante. Nichts zu melden.
+ * 2. RUHE, etwas gewählt — „einfach durchgehend der Hintergrund farbig
+ *    hinterlegt reicht": gefüllte Fläche, aber KEIN stärkeres Leuchten. Die
+ *    Füllung sagt „hier ist etwas eingestellt", mehr braucht es nicht.
+ * 3. OFFEN — „der ganze Rahmen soll blau leuchten, aber der Hintergrund
+ *    dunkel": Kante und Schein am Akzent, Fläche bleibt Grund. Vorher war
+ *    das Feld gefüllt und das Panel darunter grau — zwei Flächen, die sich
+ *    widersprachen, obwohl sie EIN Element sind.
+ */
+.mf-root[data-aktiv] > .mf-trigger {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+.mf-root[data-open] > .mf-trigger {
+  /* Fläche bleibt dunkel — der Rahmen trägt den Zustand. */
+  background: var(--surface-raised);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-bottom-color: transparent;
+  /* Der Schein liegt NACH AUSSEN und nur nach oben/seitlich; unten stößt
+     das Panel an und setzt ihn dort fort. */
+  box-shadow: 0 -2px 18px -6px var(--accent);
+
+  /* ÜBER DEM PANEL (Leons Fehlerbild 03.09.2026: „im oberen Feld strahlt es
+     von unten her blau"). Der Schein des Panels ist rundum weich — auch nach
+     OBEN. Da das Panel mit seinem z-index über dem Feld lag, malte es diesen
+     Schein auf dessen Unterkante: eine helle Linie und ein Verlauf, der ins
+     Feld hineinlief. Nachgewiesen, indem der Panel-Schatten testweise
+     abgeschaltet wurde — damit war die Linie weg.
+     Das Feld steht jetzt eine Stufe HÖHER. Sein deckender Grund reicht bis
+     zur Rahmenkante (background-clip: border-box) und schneidet den Schein
+     dort sauber ab; unterhalb bleibt er, wo er hingehört. */
+  position: relative;
+  z-index: 41;
+}
+
+.mf-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Platz für das X. Die Polsterung liegt am FELD und nicht am X — nur so
+   zählt sie zur gemessenen Ruhebreite (das X selbst steht absolut und damit
+   außerhalb des Flusses). */
+.mf-trigger[data-mit-x] {
+  padding-right: 42px;
+}
+
+/* Das X: volle 44 px Fläche (DESIGN-BRIEF §1.8), sichtbar nur der Kreis. */
+.mf-clear {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  display: flex;
+  height: var(--hit-min);
+  width: var(--hit-min);
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+}
+.mf-clear-kreis {
+  display: flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.mf-clear:hover .mf-clear-kreis {
+  background: color-mix(in oklab, var(--accent) 26%, transparent);
+}
+.mf-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+  border-radius: var(--r-pill);
+}
+/* Das Panel setzt den Rahmen des Feldes fort: dieselbe Akzent-Kante,
+   derselbe Schein, dunkler Grund. Zusammen ergeben Feld und Panel EINEN
+   leuchtenden Rahmen um eine dunkle Fläche. */
+/* ZWEI EBENEN, WEIL DIE HÖHE ANIMIERT WIRD (Begründung in ui/MultiFilter.tsx,
+   „diagonal aufklappen"): Außen der Rahmen, der beim Wachsen CLIPPT; innen
+   der Scroller mit seiner Höchsthöhe. In einer Ebene blitzte mitten in der
+   Bewegung ein Rollbalken auf, weil `overflow-y: auto` schon greift, während
+   die Höhe noch klein ist. */
+.mf-panel {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: 40;
+  overflow: hidden;
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  background: var(--surface-card);
+  box-shadow: 0 6px 22px -6px var(--accent);
+}
+.mf-panel-inner {
+  display: flex;
+  max-height: min(340px, 50vh);
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+/* ZWEISPALTIG AB NEUN EINTRÄGEN (Leon 03.09.2026). `auto-fit` statt einer
+   festen Zwei: Deckelt `max-width: 100%` das Feld auf einem schmalen
+   Bildschirm, fällt das Raster von selbst auf EINE Spalte zurück, statt zwei
+   unlesbar schmale zu erzwingen. */
+.mf-panel-inner[data-zweispaltig] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-content: start;
+}
+/* „Alle" und die Trennlinie sind keine Kategorien, sondern deren
+   Aus-Schalter — sie laufen über die volle Breite. */
+.mf-panel-inner[data-zweispaltig] .mf-row-voll {
+  grid-column: 1 / -1;
+}
+
+/* „etwas schwächer hinterlegt" (Leon): Jede Zeile trägt eine Fläche, die
+   ungewählten eine zurückhaltende. So liest die Liste als Gruppe von
+   Schaltern und nicht als Textzeilen — und der gewählte Zustand ist ein
+   Wechsel der Fläche, nicht ihr Erscheinen. */
+.mf-row {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border-radius: var(--r-sm);
+  padding: 0 12px;
+  background: color-mix(in oklab, var(--surface-raised) 60%, transparent);
+  font: var(--type-body);
+  color: var(--text-2);
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.mf-row:hover {
+  background: var(--surface-raised);
+  color: var(--text-body);
+}
+.mf-row[data-gewaehlt] {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.mf-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Trennt „Alle" von den Kategorien — es ist keine Kategorie, sondern ihr
+   Aus-Schalter. */
+.mf-trenner {
+  height: 1px;
+  margin: 3px 6px;
+  background: var(--line);
+}
+
+/* ─── Auswahlmodus der Athletenliste ────────────────────────────────────────
+ *
+ * Leons Vorgabe 03.09.2026: „Im Auswahlmodus sollen die Rahmen der
+ * Namensfelder etwas hervorgehoben werden und der Hintergrund leicht
+ * abgedunkelt. Alle Funktionen und Buttons, die ich im Auswahlmodus brauche,
+ * sollen wie die Namensbox etwas hervorgehoben sein, der Rest etwas
+ * verdunkelt."
+ *
+ * DIE SCHICHT IST ANZEIGE UND BEDIENUNG ZUGLEICH: Sie dunkelt alles ab, was
+ * gerade nichts zu tun hat — und sie IST das „Leere", in das man klickt, um
+ * den Modus zu beenden. Ein zweiter Mechanismus dafür wäre eine zweite Stelle,
+ * die man vergessen kann.
+ *
+ * HERVORGEHOBEN WIRD DURCH HERAUSHEBEN, NICHT DURCH AUFHELLEN: Auswahlleiste,
+ * Filterleiste und die Namensfelder stehen ÜBER der Schicht und behalten damit
+ * ihre normale Helligkeit. Alles andere liegt darunter. Das hält die Farben
+ * unangetastet und funktioniert in beiden Themes ohne eigene Werte. */
+.auswahl-schleier {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--overlay);
+  animation: fade-in var(--dur-med) var(--ease-out);
+}
+
+/* Was im Auswahlmodus bedienbar bleibt, steht über der Schicht.
+ *
+ * DIE RÄNGE SIND GESTAFFELT UND GELTEN NUR IM AUSWAHLMODUS — beides musste
+ * sein (gefunden 03.09.2026, als das Filter-Panel plötzlich HINTER den
+ * Athleten-Karten lag):
+ *
+ * • GESTAFFELT: Filterleiste und Liste sind Geschwister. Bekommen beide
+ *   denselben Rang, gewinnt das spätere — also die Liste, und das
+ *   aufgeklappte Filter-Panel verschwindet dahinter. Die Filterleiste muss
+ *   deshalb ausdrücklich HÖHER stehen als die Liste.
+ * • NUR IM AUSWAHLMODUS: Ohne Auswahlmodus trägt die Liste gar keinen Rang,
+ *   und das Panel liegt schon deshalb oben, weil `.mf-root` selbst einen hat.
+ *   Ein dauerhafter Rang auf der Liste nähme ihm genau diesen Vorteil. */
+[data-auswahl-aktiv] .auswahl-vorn {
+  position: relative;
+  z-index: 32;
+}
+[data-auswahl-aktiv] .auswahl-vorn-filter {
+  z-index: 38;
+}
+.auswahl-leiste {
+  position: relative;
+  z-index: 40;
+}
+
+.auswahl-leiste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  /* Eine Ebene HÖHER als eine gewöhnliche Karte (Leon 03.09.2026: „das
+     Dunkelgrau ist zu dunkel"). `--surface-raised` ist im System genau das:
+     die nächsthöhere Fläche — im dunklen Theme heller, im hellen Theme
+     kräftiger. Ein aufgehellter Festwert hätte im hellen Theme das Gegenteil
+     bewirkt. */
+  background: var(--surface-raised);
+  padding: 14px;
+  box-shadow: var(--accent-glow);
+  animation: slide-up var(--dur-med) var(--ease-out);
+}
+
+/* Der Abbruch sitzt jetzt IN DER FILTERLEISTE, rechts außen, und trägt nur
+   noch das Papierkorb-Symbol (Leon 03.09.2026). Er ist quadratisch und genau
+   so hoch wie die Suchpille daneben — deshalb `--hit-min` in beiden Maßen
+   statt einer eigenen Zahl. */
+.auswahl-schliessen {
+  display: inline-flex;
+  height: var(--hit-min);
+  width: var(--hit-min);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.auswahl-schliessen:hover {
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.auswahl-schliessen:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Ein gewählter Athlet als Chip — Klick nimmt ihn wieder heraus. */
+.auswahl-chip {
+  display: inline-flex;
+  max-width: 220px;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  background: var(--accent-subtle);
+  padding: 0 10px;
+  font: var(--type-sub);
+  color: var(--accent-text);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.auswahl-chip:hover {
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.auswahl-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Die Namensfelder im Auswahlmodus: Rahmen deutlich, Gewählte gefüllt.
+   Der Ring liegt als Innen-Schatten an und nicht als border — ein Rahmen
+   würde die Karte um seine Breite verschieben und die Reihe zittern lassen. */
+/* UNGEWÄHLT NUR ANGEDEUTET (Leon 03.09.2026: „sollen nicht so stark blau
+   am Rahmen leuchten"): eine Haarlinie, die sagt „anklickbar", mehr nicht.
+   Der Unterschied zwischen den Zuständen entsteht durch die FLÄCHE der
+   gewählten Zeile, nicht durch zwei verschieden starke Rahmen. */
+.student-row[data-auswahlmodus] {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--accent) 18%, transparent);
+}
+.student-row[data-gewaehlt] {
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* Langer Druck auf dem Handy: kein System-Menü, keine Textmarkierung. */
+.student-row {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auswahl-schleier,
+  .auswahl-leiste {
+    animation: none;
+  }
+}

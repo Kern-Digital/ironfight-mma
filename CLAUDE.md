@@ -684,6 +684,104 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       zwingend am Umbau `aiUsage/summary` → `aiUsage/{gymId}`; vorher zeigte
       der Ring fremde Gyms mit. Empfohlene Reihenfolge: (a) → Zuordnung aus
       (b) → Auslastung → (c) mit Phase 3.
+- [ ] **3D-Technik-Viewer** (Idee 2026-09-03, mit Leon besprochen, NICHT
+      beschlossen — steht im Ideen-Becken der Roadmap): Zwei animierte
+      Kämpfer (Benutzer im Gym-Akzent, Gegner neutral) führen einzelne
+      Techniken im Loop vor — Pause, Zoom, freies Drehen (OrbitControls),
+      Zeitlupe, Phasen-Marker auf der Zeitleiste. Drei Bausteine mit sehr
+      ungleichem Aufwand: (a) **Viewer ist fast geschenkt** — R3F v8 + drei
+      stecken im Stack (Helix), glTF + AnimationMixer + Scrubbing sind
+      Standard, dockt an die Technik-Detailseiten; Charaktere/Clips als
+      Draco-komprimierte .glb (Charaktere einmalig, pro Technik nur der
+      Animationsclip). (b) **Charaktere einmalig**: stilisiert mit
+      Toon-Shading (bewusst nicht realistisch — Qualität ohne Uncanny
+      Valley, mobil flüssig), Quellen Mixamo (gratis, Auto-Rigging) oder
+      Kaufmodell (Sketchfab/CGTrader). (c) **ENGPASS = Animationsdaten für
+      Zwei-Personen-Techniken** — kaufbare Packs existieren praktisch nicht
+      (nur Einzel-Striking); Text-zu-Animation-KI (Kinetix & Co.) liefert
+      plausible, nicht KORREKTE Bewegung → für Unterricht unbrauchbar;
+      Mocap aus fremden Internet-Videos scheitert an Verdeckung bei
+      Körperkontakt. Realistischer Weg: EIGENE Trainer mit 2–3 Handykameras
+      filmen → markerloser KI-Mocap (Move.ai / Rokoko Video / DeepMotion)
+      → Cleanup in Blender oder Cascadeur (physik-gestützt, für
+      Kampfbewegung gebaut, Gratis-Stufe) → Retargeting auf die zwei
+      Standard-Charaktere → glTF; nach Pipeline-Aufbau ~1–3 h pro Technik.
+      Diese Daten wären der Burggraben des Features. Staffelung: Stand-up
+      zuerst (Clinch-Eintritt), Bodentechniken zuletzt (Verdeckung am
+      härtesten). iOS/Android: KEINE Engine, kein React-Native-Neubau —
+      three.js läuft im WebView; für Store-Präsenz die bestehende App in
+      Capacitor wrappen (eigenes, größeres Thema: Push, Store-Abo-Regeln).
+      (d) **ETAPPEN-PLAN Content-Produktion (2026-09-03):** E0 =
+      Null-Kosten-Pilot VOR allen Gesprächen (ein Drehtag, 3–5 Techniken —
+      davon Solo-Bewegungen wie Shrimping zuerst, einfachster Mocap-Fall;
+      fertige Loops als Handy-Demo; Abbruchkriterium: reicht die Qualität
+      nicht, stirbt die Idee hier für ~0 €). E1 = Gespräche MIT Demo, in
+      dieser Reihenfolge: ZUERST Verwaltung des eigenen Gyms
+      (Kooperationsvereinbarung: Gym stellt Matte + Trainerzeit, bekommt
+      dauerhafte Gründer-Konditionen/Partner-Status — ausdrücklich KEINE
+      Beteiligung an Tidal, keine Barzahlung), DANN Trainer einzeln (nicht
+      als Gruppenansage; Gegenleistung: Namensnennung „vorgeführt von X" +
+      DeepFight-Analysen-Guthaben; je Trainer 1-Seiten-Vereinbarung:
+      Nutzungsrechte an Aufnahmen UND abgeleiteten Bewegungsdaten zeitlich
+      unbegrenzt, auch nach Ausscheiden + DSGVO-Einwilligung — Rohvideo ist
+      personenbezogen, die abstrahierte Animation nicht). E2 = Grundstock
+      20–40 Fundamentals der eigenen Disziplinen in 2–3 GEBATCHTEN
+      Drehtagen (Drehliste vorher, 15–25 Techniken pro 2–3-h-Session, nie
+      einzeln über Wochen), läuft parallel zur Phase-3-Entwicklung; Budget
+      gesamt < ein paar hundert € (Stative, ggf. Kaufcharakter,
+      Mocap-Abo nur in Batch-Monaten). E3 = Markteintritt mit ehrlichem
+      Framing „wachsende Bibliothek, monatlich neue Techniken" — NICHT auf
+      Vollständigkeit warten; fehlende Disziplinen füllen Partner-Gyms über
+      dieselbe Content-Kooperation (Gegenleistung Freimonate/Nennung) →
+      dockt an den Rubriken-Ausbau in Phase 3 an. DREH-PRAXIS: 2–3
+      Smartphones auf Stativen (Front + Seite + 45°), Querformat, 60 fps,
+      Fokus/Belichtung gesperrt, Klatsch-Sync; enge kontrastierende
+      Kleidung (Rashguard statt Gi — Gi verdeckt den Körper fürs Mocap),
+      Technikname vor jedem Take in die Kamera sagen (Auto-Protokoll),
+      pro Technik 3–5 langsame + 2 normale Wiederholungen aus definierter
+      Startpose, Clips 10–20 s.
+- [ ] **Rollen-Chat „Tidal Coach"** (Idee 2026-09-03, mit Leon besprochen,
+      NICHT beschlossen — steht im Ideen-Becken der Roadmap): Chat-Eingabe
+      je Rolle (Athlet/Trainer/Verwaltung), Antworten kennen die eigenen
+      Daten. ARCHITEKTUR: neue Server-Route (z. B. `POST
+      /api/assistant/chat`), Streaming an den Client (SSE; Vercel-Hobby-
+      300-s-Grenze ist für Chat unkritisch), `ANTHROPIC_API_KEY` existiert.
+      Der Server verifiziert das Token (Middleware-Muster), liest das
+      Rollen-Set und baut den Kontext SERVERSEITIG pro Rolle aus GENAU den
+      Daten, die die Rolle sehen darf — dieselben Leser wie die Dashboards,
+      damit das Rechtemodell automatisch mitgeht (Athlet: eigenes Profil,
+      eigene participations, NUR sharedWithAthlete-Analysen, Kursplan,
+      eigene Pläne; Trainer: Kurs-Auslastung + Aggregate des eigenen Gyms;
+      Verwaltung: Wachstum/Einladungen/Kurs-Aggregate, KEINE
+      Einzel-Gesundheitsdaten). Aggregation VOR dem Prompt (Lektion aus
+      KI-Kursplan-Backlog). MODELL/KOSTEN: Standard-Chat ist ein Fall für
+      ein kleines Modell — Haiku 4.5 ($1/$5 je MTok) ≈ Zehntel-Cent pro
+      Frage, Opus 5 ($5/$25) für Trainer-/Verwaltungs-Beratung erwägbar;
+      Prompt-Caching auf System-Prompt + Gym-Kontext (statisch zuerst,
+      volatile Nutzerfrage zuletzt) macht aktive Chats nochmal billiger.
+      Kontingent: zählt auf aiUsage → sauber erst NACH Gym-Scoping
+      (Phase 3), plus Tageslimit je Nutzer (z. B. 20 Nachrichten) und
+      max_tokens-Deckel. RAHMEN/GUARDRAILS: System-Prompt begrenzt auf
+      Training/Fitness/Ernährung/Gym-Betrieb, alles andere freundlich
+      zurücklenken (kein Spaghetti-Rezept); KEINE medizinischen
+      Einzelratschläge („geh zum Arzt"-Regel bei Verletzung/Schmerz);
+      ACHTUNG Minderjährige (Kids-/Teens-Kurse!) — Ernährungs-/
+      Trainingsberatung altersgerecht allgemein halten oder Chat auf
+      Erwachsene gaten; Prompt-Injection ist niedrig-riskant, solange der
+      Chat KEINE Tools hat (schlimmster Fall: Off-Topic-Antwort auf eigene
+      Kosten). Verlauf: users/{uid}/assistantChats mit kurzem
+      History-Fenster. RAG/Vektor-DB unnötig — Gym-Daten sind klein,
+      Context-Stuffing reicht. BEISPIELFRAGEN Athlet: „Wie bereite ich
+      mich auf meinen ersten Wettkampf vor?", „Was esse ich vor dem
+      Training?", „Muskelkater — trainieren oder pausieren?"; Trainer:
+      „Welche meiner Kurse verlieren gerade Rückmeldungen?", „Bau mir
+      einen Aufwärmblock für Donnerstag", „Wer braucht gerade
+      Aufmerksamkeit?"; Verwaltung: „Formuliere die Ankündigung für die
+      Ferienzeiten", „Welcher Kurs trägt einen zweiten Termin?", „Wie
+      gewinne ich neue Mitglieder?". AUSBAUSTUFE (v2): Tool Use — der
+      Coach darf mit Nutzer-Bestätigung handeln („Trag mich Donnerstag
+      ein" → recordParticipation; Verwaltung: Ankündigungs-Entwurf →
+      vorbefüllter News-Post); erst nach stabilem v1.
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
       Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)

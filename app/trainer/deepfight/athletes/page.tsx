@@ -1,5 +1,6 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Skeleton from "@/components/ui/Skeleton";
@@ -74,33 +75,11 @@ export default function DeepFightAthletesPage() {
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Kopf */}
-      <div
-        className="relative overflow-hidden border-b px-4 py-8 sm:px-6"
-        style={{
-          borderColor: "rgba(157,123,250,0.25)",
-          background:
-            "radial-gradient(500px 250px at 100% 50%, rgba(157,123,250,0.12), transparent 60%), linear-gradient(160deg, #0B0716, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-7xl">
-          <h1
-            className="font-display-ta flex items-center gap-3 font-black uppercase leading-none"
-            style={{
-              fontSize: "clamp(24px, 4vw, 36px)",
-              letterSpacing: "0.02em",
-            }}
-          >
-            <DeepFightWordmark />
-          </h1>
-          <p
-            className="font-mono-ta mt-2 text-[11px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
-          >
-            Athleten-Analysen · Eigene Kämpfer auswerten
-          </p>
-        </div>
-      </div>
+      <PageHead
+        lane="wide"
+        title={<DeepFightWordmark />}
+        description="Werte deine eigenen Kämpfer aus — Athleten wie Trainer."
+      />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

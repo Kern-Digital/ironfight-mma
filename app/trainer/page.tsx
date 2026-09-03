@@ -493,7 +493,7 @@ export default function TrainerDashboardPage() {
             Einwand 02.09.: die Farbe passte nicht zur App. */}
         <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2">
           <Link
-            href="/trainer/students"
+            href="/trainer/athleten"
             className="t-interactive relative flex flex-col justify-between gap-6 overflow-hidden p-5 lg:row-span-2 lg:p-6"
             style={{
               borderRadius: "var(--r-xl)",

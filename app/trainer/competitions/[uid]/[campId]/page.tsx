@@ -1,5 +1,6 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -180,87 +181,65 @@ function CompetitionDetailContent({
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Header */}
-      <div
-        className="border-b px-4 py-7 sm:px-6"
-        style={{
-          borderColor: "rgba(255,79,168,0.2)",
-          background:
-            "radial-gradient(520px 220px at 100% 50%, rgba(255,79,168,0.12), transparent 60%), linear-gradient(160deg, #140A12, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-4xl">
-          <Link
-            href="/trainer/competitions"
-            className="font-mono-ta text-[10px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
-          >
-            ← Wettkampfbereich
-          </Link>
-          <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1
-                  className="font-display-ta font-black uppercase leading-none"
-                  style={{ fontSize: "clamp(22px, 4vw, 32px)", letterSpacing: "0.02em" }}
-                >
-                  {camp.competitionName}
-                </h1>
-                <span
-                  className="font-mono-ta rounded-md px-2 py-1 text-[9px] font-bold uppercase"
-                  style={{
-                    letterSpacing: "0.12em",
-                    background: "var(--ink-4)",
-                    border: `1px solid ${GROUP_ACCENT[group]}`,
-                    color: GROUP_ACCENT[group],
-                  }}
-                >
-                  {GROUP_LABEL[group]}
-                </span>
-              </div>
-              <p
-                className="font-mono-ta mt-2 text-[10px]"
-                style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
+      <PageHead
+        lane="detail"
+        back={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}
+        title={camp.competitionName}
+        description={
+          <>
+            <Link
+              href={`/trainer/athleten/${uid}`}
+              style={{ color: "var(--accent-text)" }}
+            >
+              {studentName}
+            </Link>{" "}
+            · vs {camp.opponent.name} · {formatDate(camp.competitionDate)}
+          </>
+        }
+        aside={
+          <>
+            {camp.opponent.opponentId && (
+              <Link
+                href={`/trainer/opponents/${camp.opponent.opponentId}`}
+                className="btn-secondary px-3 py-2 text-xs"
               >
-                <Link
-                  href={`/trainer/students/${uid}`}
-                  style={{ color: "var(--ta-cyan)" }}
-                >
-                  {studentName}
-                </Link>{" "}
-                · vs {camp.opponent.name} · {formatDate(camp.competitionDate)}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {camp.opponent.opponentId && (
-                <Link
-                  href={`/trainer/opponents/${camp.opponent.opponentId}`}
-                  className="btn-secondary px-3 py-2 text-xs"
-                >
-                  Geteiltes Profil
-                </Link>
-              )}
-              {group === "archived" ? (
-                <button
-                  onClick={() => setStatus("active")}
-                  disabled={busy}
-                  className="btn-secondary px-3 py-2 text-xs"
-                >
-                  Reaktivieren
-                </button>
-              ) : (
-                <button
-                  onClick={() => setStatus("archived")}
-                  disabled={busy}
-                  className="btn-secondary px-3 py-2 text-xs"
-                >
-                  Archivieren
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+                Geteiltes Profil
+              </Link>
+            )}
+            {group === "archived" ? (
+              <button
+                onClick={() => setStatus("active")}
+                disabled={busy}
+                className="btn-secondary px-3 py-2 text-xs"
+              >
+                Reaktivieren
+              </button>
+            ) : (
+              <button
+                onClick={() => setStatus("archived")}
+                disabled={busy}
+                className="btn-secondary px-3 py-2 text-xs"
+              >
+                Archivieren
+              </button>
+            )}
+          </>
+        }
+      >
+        <span
+          className="inline-flex w-fit rounded-badge px-2 py-1"
+          style={{
+            font: "var(--type-meta)",
+            letterSpacing: "var(--ls-label)",
+            textTransform: "uppercase",
+            background: "var(--surface-raised)",
+            border: `1px solid ${GROUP_ACCENT[group]}`,
+            color: GROUP_ACCENT[group],
+          }}
+        >
+          {GROUP_LABEL[group]}
+        </span>
+      </PageHead>
 
       <div className="mx-auto max-w-4xl px-4 py-7 sm:px-6">
         {error && (

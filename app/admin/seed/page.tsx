@@ -1,7 +1,7 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import AdminRoute from "@/components/AdminRoute";
-import DashboardHero from "@/components/dashboard/DashboardHero";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
@@ -270,7 +270,7 @@ function StudentSeedCard({
       {/* View link */}
       <div className="mt-3 text-center">
         <Link
-          href={`/trainer/students/${entry.uid}`}
+          href={`/trainer/athleten/${entry.uid}`}
           className="font-mono-ta text-[10px] uppercase"
           style={{ letterSpacing: "0.15em", color: "var(--ta-cyan)" }}
         >
@@ -378,11 +378,12 @@ function SeedContent() {
 
   return (
     <main className="min-h-screen">
-      <DashboardHero
-        badges={[{ label: "Admin · Demo", accent: "amber", icon: "shield" }]}
-        accent="amber"
+      <PageHead
+        lane="wide"
+        eyebrow="Plattform"
+        eyebrowIcon="shield"
         title="Demo-Daten verwalten"
-        subtitle={`Testschüler · Realistische Fortschrittsdaten · ${totalDemo} aktiv`}
+        description={`Füll ein Test-Konto mit erfundenen, aber realistischen Trainingsverläufen. Gerade ${totalDemo} aktiv.`}
       />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

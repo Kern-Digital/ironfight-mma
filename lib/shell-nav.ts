@@ -102,10 +102,10 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
       href: "/trainer",
       items: [
         {
-          href: "/trainer/students",
+          href: "/trainer/athleten",
           label: "Athleten",
           icon: "users",
-          isActive: under("/trainer/students"),
+          isActive: under("/trainer/athleten"),
         },
         {
           href: "/trainer/opponents",
@@ -397,7 +397,7 @@ export interface ShellCrumb {
  * vergisst. Die Gruppen-Überschrift ist bewusst KEIN Link: „Trainerbereich"
  * ist keine Adresse, sondern eine Schublade.
  *
- * TIEFERE SEITEN BEKOMMEN KEIN DRITTES GLIED. Auf `/trainer/students/abc123`
+ * TIEFERE SEITEN BEKOMMEN KEIN DRITTES GLIED. Auf `/trainer/athleten/abc123`
  * steht „Trainerbereich › Schüler" — der Name des Schülers stünde erst nach
  * dem Laden fest, und ein Pfad, der eine Sekunde später länger wird, springt.
  * Die H1 der Seite sagt ohnehin, wer gemeint ist.

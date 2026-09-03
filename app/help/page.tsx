@@ -53,7 +53,7 @@ const TRAINER_HELP: HelpItem[] = [
   {
     id: "students",
     title: "Athletenprofile",
-    href: "/trainer/students",
+    href: "/trainer/athleten",
     body: (
       <>
         Im Bereich <strong>Athleten</strong> findest du alle Mitglieder mit

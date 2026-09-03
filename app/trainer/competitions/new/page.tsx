@@ -1,7 +1,7 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
@@ -331,30 +331,11 @@ function NewCompetitionContent() {
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      <div
-        className="border-b px-4 py-7 sm:px-6"
-        style={{
-          borderColor: "rgba(255,79,168,0.2)",
-          background:
-            "radial-gradient(500px 220px at 100% 50%, rgba(255,79,168,0.1), transparent 60%), linear-gradient(160deg, #140A12, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-3xl">
-          <Link
-            href="/trainer/competitions"
-            className="font-mono-ta text-[10px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
-          >
-            ← Wettkampfbereich
-          </Link>
-          <h1
-            className="font-display-ta mt-3 font-black uppercase leading-none"
-            style={{ fontSize: "clamp(24px, 4vw, 34px)", letterSpacing: "0.02em" }}
-          >
-            Neuer Wettkampf
-          </h1>
-        </div>
-      </div>
+      <PageHead
+        lane="narrow"
+        back={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}
+        title="Neuer Wettkampf"
+      />
 
       <div className="mx-auto max-w-3xl px-4 py-7 sm:px-6">
         {error && (

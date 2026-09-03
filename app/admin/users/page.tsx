@@ -1,9 +1,9 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import AdminRoute from "@/components/AdminRoute";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
-import DashboardHero from "@/components/dashboard/DashboardHero";
 import SectionCard from "@/components/dashboard/SectionCard";
 import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
@@ -219,11 +219,15 @@ function AdminUsersContent() {
 
   return (
     <main className="min-h-screen">
-      <DashboardHero
-        badges={[{ label: "Admin", accent: "amber", icon: "shield" }]}
-        accent="amber"
+      {/* Schild + „Plattform" wie auf /admin: Die Bereichsfarbe darf nie
+          allein tragen (globals.css, Bereichsfarben) — ein Gym kann sich
+          selbst eine rote Akzentfarbe geben. */}
+      <PageHead
+        lane="wide"
+        eyebrow="Plattform"
+        eyebrowIcon="shield"
         title="Nutzerverwaltung"
-        subtitle="Mitglieder & Trainer einsehen · Rollen werden per Script vergeben"
+        description="Alle Mitglieder und Trainer auf einen Blick. Rechte vergibst du serverseitig per Script."
       />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

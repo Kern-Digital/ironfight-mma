@@ -16,9 +16,9 @@ const ITEMS: SubnavItem[] = [
   // Verwaltungs-Seiten, wo Menüpunkt und H1 dasselbe Wort tragen).
   { href: "/trainer", label: "Übersicht", isActive: (p) => p === "/trainer" },
   {
-    href: "/trainer/students",
+    href: "/trainer/athleten",
     label: "Athleten",
-    isActive: (p) => p.startsWith("/trainer/students"),
+    isActive: (p) => p.startsWith("/trainer/athleten"),
   },
   {
     href: "/trainer/opponents",

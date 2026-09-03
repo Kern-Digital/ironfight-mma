@@ -48,6 +48,24 @@ const nextConfig = {
         destination: "/verwaltung/neuigkeiten/:pfad*",
         permanent: true,
       },
+      /**
+       * Athletenliste: `/trainer/students` → `/trainer/athleten` (Leon
+       * 03.09.2026). Im UI heißt seit dem 02.09. jeder „Athlet"; die Adresse
+       * war das letzte Wort, das noch „students" sagte.
+       *
+       * NUR DIE ADRESSE ZIEHT UM. Die Code-Namen bleiben — `StudentEntry`,
+       * `listAllStudents()`, `student-progress.ts`. Die Begründung von
+       * CLAUDE.md gilt unverändert: Eine Umbenennung der Typen wäre eine
+       * Migration ohne Gegenwert, und dasselbe Muster trägt schon DeepFight
+       * (UI-Name neu, Datenmodell unangetastet).
+       *
+       * `:pfad*` nimmt die Detailseite `/trainer/students/{uid}` mit.
+       */
+      {
+        source: "/trainer/students/:pfad*",
+        destination: "/trainer/athleten/:pfad*",
+        permanent: true,
+      },
       // FRÜHER STAND HIER `/verwaltung` → `/verwaltung/mitglieder`, weil die
       // nackte Bereichs-Adresse keinen eigenen Inhalt hatte. Seit dem
       // 02.09.2026 hat sie einen (`app/verwaltung/page.tsx`), und die Zeile

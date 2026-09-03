@@ -1,5 +1,6 @@
 "use client";
 
+import PageHead from "@/components/shell/PageHead";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Skeleton from "@/components/ui/Skeleton";
@@ -100,112 +101,71 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   }
 
   const athlete = entry?.athlete;
-  const profileHref = isSelf ? "/kampfprofil" : `/trainer/students/${uid}`;
+  const profileHref = isSelf ? "/kampfprofil" : `/trainer/athleten/${uid}`;
   const profileLabel = isSelf ? "Mein Kampfprofil" : "Athletenprofil";
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
-      {/* Kopf */}
-      <div
-        className="relative overflow-hidden border-b px-4 py-8 sm:px-6"
-        style={{
-          borderColor: "rgba(157,123,250,0.25)",
-          background:
-            "radial-gradient(500px 250px at 100% 50%, rgba(157,123,250,0.12), transparent 60%), linear-gradient(160deg, #0B0716, #080512)",
-        }}
-      >
-        <div className="mx-auto max-w-7xl">
+      <PageHead
+        lane="wide"
+        back={{ href: "/trainer/deepfight/athletes", label: "Athleten-Analysen" }}
+        initials={entry ? initialsOf(entry) : undefined}
+        title={<DeepFightWordmark />}
+        description={entry ? labelOf(entry) : undefined}
+        aside={
           <Link
-            href="/trainer/deepfight/athletes"
-            className="font-mono-ta text-[10px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
+            href={profileHref}
+            className="btn-secondary hidden px-4 py-2 text-xs sm:inline-flex"
           >
-            ← Athleten-Analysen
+            <Icon name="users" size={14} />
+            {profileLabel}
           </Link>
-
-          {!entry ? (
-            <Skeleton className="mt-3 h-14 w-64 rounded-2xl" />
-          ) : (
-            <div className="mt-3 flex items-start gap-4">
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl font-display-ta text-lg font-black"
+        }
+      >
+        {entry && (
+          <div className="flex flex-wrap gap-1.5">
+            {isSelf && (
+              <span
+                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
                 style={{
-                  background: "rgba(157,123,250,0.1)",
+                  letterSpacing: "0.12em",
+                  background: "rgba(157,123,250,0.18)",
                   border: "1px solid rgba(157,123,250,0.4)",
                   color: "#9D7BFA",
                 }}
               >
-                {initialsOf(entry)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1
-                  className="font-display-ta flex items-center font-black uppercase leading-none"
-                  style={{
-                    fontSize: "clamp(22px, 3.6vw, 32px)",
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  <DeepFightWordmark />
-                </h1>
-                <p
-                  className="mt-2 truncate text-sm font-bold"
-                  style={{ color: "var(--fg-2)" }}
-                >
-                  {labelOf(entry)}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {isSelf && (
-                    <span
-                      className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                      style={{
-                        letterSpacing: "0.12em",
-                        background: "rgba(157,123,250,0.18)",
-                        border: "1px solid rgba(157,123,250,0.4)",
-                        color: "#9D7BFA",
-                      }}
-                    >
-                      Selbstanalyse
-                    </span>
-                  )}
-                  {athlete?.primaryDiscipline && (
-                    <span
-                      className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                      style={{
-                        letterSpacing: "0.12em",
-                        background: "rgba(157,123,250,0.1)",
-                        border: "1px solid rgba(157,123,250,0.3)",
-                        color: "#9D7BFA",
-                      }}
-                    >
-                      {DISCIPLINE_LABEL[athlete.primaryDiscipline]}
-                    </span>
-                  )}
-                  {athlete?.weightClass && (
-                    <span
-                      className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
-                      style={{
-                        letterSpacing: "0.12em",
-                        background: "var(--ink-4)",
-                        border: "1px solid var(--ink-5)",
-                        color: "var(--fg-3)",
-                      }}
-                    >
-                      {WEIGHT_CLASS_LABEL[athlete.weightClass]}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <Link
-                href={profileHref}
-                className="btn-secondary hidden shrink-0 px-4 py-2 text-xs sm:inline-flex"
+                Selbstanalyse
+              </span>
+            )}
+            {athlete?.primaryDiscipline && (
+              <span
+                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
+                style={{
+                  letterSpacing: "0.12em",
+                  background: "rgba(157,123,250,0.1)",
+                  border: "1px solid rgba(157,123,250,0.3)",
+                  color: "#9D7BFA",
+                }}
               >
-                <Icon name="users" size={14} />
-                {profileLabel}
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+                {DISCIPLINE_LABEL[athlete.primaryDiscipline]}
+              </span>
+            )}
+            {athlete?.weightClass && (
+              <span
+                className="font-mono-ta rounded px-1.5 py-0.5 text-[10px] uppercase"
+                style={{
+                  letterSpacing: "0.12em",
+                  background: "var(--ink-4)",
+                  border: "1px solid var(--ink-5)",
+                  color: "var(--fg-3)",
+                }}
+              >
+                {WEIGHT_CLASS_LABEL[athlete.weightClass]}
+              </span>
+            )}
+          </div>
+        )}
+      </PageHead>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <Link
