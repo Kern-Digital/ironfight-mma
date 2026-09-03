@@ -185,6 +185,36 @@
   Custom Claims nicht abfragbar sind — ohne ihn ließe sich „hat dieses Gym
   noch eine Verwaltung?" nicht beantworten.
 
+### Privates Athletenprofil (Entscheidung 2026-09-03, LIVE)
+Ein Trainer sieht das Persönliche eines **Kollegen** nur mit dessen Freigabe:
+Athletenprofil, Kampfprofil, Workouts, Wettkämpfe, KI-Analysen **samt
+Auswertung**. Bei **Athleten** bleibt es wie bisher — alle Trainer ihres Gyms.
+**Standard ist privat**, ohne Backfill: eine fehlende Freigabeliste IST die
+Sperre (Deny-by-Default, Konzept §3).
+- **Warum die Daten umzogen:** Firestore-Regeln verbergen keine einzelnen
+  Felder, nur ganze Dokumente. Das users-Dokument muss lesbar bleiben, sonst
+  fehlt in jeder Liste der Name. Also wanderten `athlete` und `fightProfile`
+  vom Dokument in Unter-Sammlungen (`scripts/migrate-private-profile.mjs`,
+  gelaufen 2026-09-03).
+- **Die Regel:** `canAccessMemberData(uid)` in `firestore.rules` (ersetzt
+  `isStaffForUser`) — Admin immer · **sich selbst immer** (ein Trainer
+  analysiert sich „exakt wie einen Schüler"; ohne diese Klausel sperrt ihn sein
+  eigenes Gate aus) · sonst eigenes Gym UND (kein Stab-Konto ODER in
+  `users/{uid}.profileSharedWith`).
+- **`node scripts/check-privacy-gate.mjs` ist der Regressionstest** — REST mit
+  echten ID-Tokens, 8 Fälle. Nach JEDER Regeländerung laufen lassen; das
+  Admin-SDK umgeht Regeln und beweist nichts.
+- **Dual-Read als Übergang** (`lib/user-profile.ts`, `lib/fight-profile.ts`):
+  erst Unter-Sammlung, dann altes Feld — aber NUR bei „Dokument fehlt", nie bei
+  „Zugriff verweigert". Sonst unterliefe der Rückfall genau das Gate.
+- **Listen tragen kein Athletenprofil mehr.** `StudentEntry.athlete` füllt nur
+  `getStudentEntry()`; `getMemberEntry()` liefert die reine Identität und
+  bleibt auch bei gesperrtem Profil lesbar.
+- **Noch offen:** Freigabe-Knopf im Kampfprofil · Anfrage + Benachrichtigung
+  (es gibt heute KEINEN Benachrichtigungsweg — `auditLog` ist das
+  Gym-Protokoll, nur die Verwaltung liest, kein Postfach) · Trainer mit
+  „Trainer"-Vermerk in der Athletenliste (bewusst zuletzt).
+
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
 - **Das Konto gehört dem Menschen.** Darin liegen seine Workouts, sein
@@ -251,10 +281,14 @@ gyms/{gymId}/invites/{code}       — Einladungen (Code = Dokument-ID; write:fal
 gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UND Quelle
                                     des Neuigkeiten-Bereichs (write:false, nur
                                     lib/server/audit.ts; Lesen nur die Verwaltung)
-users/{uid}                       — Profil (Rollen-Set trainer/verwaltung/admin
-                                    + role-Spiegel + gymId NUR via Custom Claims,
-                                    nie Client-Write; fightProfile nur
-                                    Trainer/Admin-Write)
+users/{uid}                       — IDENTITÄT (Name, E-Mail, Rollen-Set-Spiegel,
+                                    gymId, profileSharedWith). Rechte + gymId NUR
+                                    via Custom Claims, nie Client-Write.
+                                    Für Trainer des Gyms IMMER lesbar — alles
+                                    Persönliche liegt darunter (s. u.)
+users/{uid}/athleteProfile/main   — Athleten-Profil (Disziplin, Level, Gewicht …)
+users/{uid}/fightProfile/main     — Kampfprofil = kuratierte DeepFight-Auswertung
+                                    (Owner liest, schreibt NIE; Trainer schreiben)
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
                                     + Lücken aus opponents/{opponentId}, s.o.)
@@ -423,11 +457,15 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Entscheidung 2026-09-02). In sichtbaren Texten heißt niemand mehr „Schüler":
   Sidebar, Überschriften, Hinweise, Fehlermeldungen sagen Athlet/Athleten
   (Singular „Athlet", Plural und Genitiv „Athleten"). Der Code behält
-  `StudentEntry`, `listAllStudents()`, `/trainer/students` — dasselbe Muster
+  `StudentEntry`, `listAllStudents()` — dasselbe Muster
   wie bei DeepFight (UI-Name neu, Datenmodell unangetastet), und aus demselben
   Grund: eine Umbenennung von Route und Typen wäre eine Migration ohne
   Gegenwert. Wer neue Oberfläche baut, schreibt „Athlet"; wer Code liest,
   findet weiter „student".
+- **Die ADRESSE heißt seit 2026-09-03 `/trainer/athleten`** (Leons Revision
+  seiner eigenen Festlegung vom 02.09.). Weiterleitung von `/trainer/students`
+  samt Unterseiten steht in `next.config.mjs`. Umgezogen ist NUR die Adresse —
+  die Code-Namen bleiben, die Begründung oben gilt unverändert.
 - **Sprache & Tonalität** (Leons Vorgabe 2026-09-02): modern, sportlich,
   selbstbewusst — der Ton eines guten Coaches, NICHT einer Behörde, eines
   Influencers oder eines „Bro-Coaches". Konsequent „du", kurze AKTIVE Sätze.
@@ -637,6 +675,14 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       überall die Athleten- oder die Trainer-Hülle sehen soll, ist offen —
       technisch wären es `AthleteChromeGate` plus die `rights.trainer`-
       Bedingungen in fünf Seiten.
+- [ ] **Übergang des privaten Athletenprofils ausbauen** (fällig, sobald die
+      Produktion sicher auf dem Stand vom 2026-09-03 läuft): der Rückfall aufs
+      alte Feld in `lib/user-profile.ts` (`readAthleteProfile`) und
+      `lib/fight-profile.ts` (`getFightProfile`), dazu die als ÜBERGANG
+      markierte `fightProfile`-Schreibregel am users-Dokument in
+      `firestore.rules`. Die Migration ist durch (Gegenprobe: kein Dokument
+      trägt die Felder mehr) — der Rückfall kann also weg. Danach mit
+      `scripts/check-privacy-gate.mjs` gegenprüfen.
 - [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
       länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
       in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`
