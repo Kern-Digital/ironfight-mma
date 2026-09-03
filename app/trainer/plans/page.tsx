@@ -49,7 +49,7 @@ function audienceLine(plan: TrainerWorkoutPlan): {
   const n = plan.audienceUids.length;
   if (n === 0) return { text: "Nicht freigegeben", shared: false };
   const courses = plan.audienceCourseIds.length;
-  const students = `${n} Schüler`;
+  const students = `${n} ${n === 1 ? "Athlet" : "Athleten"}`;
   if (courses === 0) return { text: students, shared: true };
   return {
     text: `${students} · ${courses} ${courses === 1 ? "Kurs" : "Kurse"}`,
@@ -143,7 +143,7 @@ export default function TrainerPlansPage() {
               Workout-Pläne
             </h1>
             <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Eigene Pläne erstellen und an Kurse oder einzelne Schüler
+              Eigene Pläne erstellen und an Kurse oder einzelne Athleten
               freigeben.
             </p>
           </div>
@@ -181,7 +181,7 @@ export default function TrainerPlansPage() {
             style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
           >
             Noch keine Trainer-Pläne — leg den ersten an und gib ihn an
-            deine Schüler frei.
+            deine Athleten frei.
           </p>
         ) : (
           <div className="flex flex-col gap-3">

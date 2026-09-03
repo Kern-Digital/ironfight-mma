@@ -28,7 +28,7 @@ import RestWheel, { formatRest } from "@/components/RestWheel";
 import SwipeAction from "@/components/SwipeAction";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { getExerciseById } from "@/lib/exercises";
@@ -271,7 +271,10 @@ export default function PlanView({
   const router = useRouter();
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
   // Herz-Farbe nach Gender im Athleten-Profil (wie Hub/Fertig-Screen)
   const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 
@@ -939,13 +942,13 @@ export default function PlanView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
           {edit.autoSave
-            ? "Änderungen werden automatisch gespeichert."
+            ? "Jede Änderung ist sofort gespeichert."
             : edit.create
               ? (edit.create.hint ??
-                `„Plan speichern" legt den Plan unter „Meine Workouts" an.`)
+                `Mit „Plan speichern" landet er unter „Meine Workouts".`)
               : edit.save
-                ? "Änderungen sind erst nach dem Speichern sichtbar — auch für freigegebene Schüler."
-                : "Änderungen werden nicht automatisch gespeichert — das Herz speichert sie als eigenen Plan."}
+                ? "Speichere, damit deine Athleten die neue Fassung sehen."
+                : "Pass den Plan an, wie du ihn brauchst — mit dem Herz speicherst du ihn als deinen eigenen."}
         </span>
         {edit.autoSave?.saving || edit.save?.saving ? (
           <span
@@ -970,7 +973,7 @@ export default function PlanView({
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich mit Ambient-Schicht */}
@@ -1052,7 +1055,7 @@ export default function PlanView({
               </p>
             )}
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -1664,7 +1667,7 @@ export default function PlanView({
         />
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

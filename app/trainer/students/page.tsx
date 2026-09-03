@@ -464,7 +464,7 @@ function StudentsContent() {
             className="font-display-ta font-black uppercase leading-none"
             style={{ fontSize: "clamp(28px, 5vw, 42px)", letterSpacing: "0.02em" }}
           >
-            Schüler & Fortschritt
+            Athleten & Fortschritt
           </h1>
           <p
             className="font-mono-ta mt-2 text-[11px]"
@@ -476,16 +476,16 @@ function StudentsContent() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        <TrainerHint id="students-overview" title="Schülerprofile">
-          Klicke auf einen Schüler, um Fortschritt, Athleten-Profil und letzte
-          Aktivität zu sehen. Daten, die noch nicht ausgefüllt wurden, werden
-          mit Platzhaltern angezeigt.
+        <TrainerHint id="students-overview" title="Athletenprofile">
+          Öffne einen Athleten und du siehst Fortschritt, Kampfdaten und
+          letzte Aktivität. Wo noch nichts eingetragen ist, steht ein
+          Platzhalter.
         </TrainerHint>
 
         {error && (
           <div className="mb-6">
             <ErrorState
-              title="Schüler konnten nicht geladen werden"
+              title="Athleten konnten nicht geladen werden"
               message={error}
               hint="Prüfe die Firestore-Regeln — Trainer brauchen Lesezugriff auf die users-Collection."
               onRetry={load}
@@ -513,7 +513,7 @@ function StudentsContent() {
               className="font-mono-ta mt-2 text-[10px]"
               style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
             >
-              {filtered.length} {filtered.length === 1 ? "Schüler" : "Schüler"}
+              {filtered.length} {filtered.length === 1 ? "Athlet" : "Athleten"}
               {filtered.length !== students.length && (
                 <span> von {students.length}</span>
               )}
@@ -540,8 +540,8 @@ function StudentsContent() {
           >
             <p className="text-sm" style={{ color: "var(--fg-4)" }}>
               {search
-                ? "Keine Schüler gefunden."
-                : "Noch keine Schüler registriert."}
+                ? "Keine Athleten gefunden."
+                : "Noch keine Athleten registriert."}
             </p>
           </div>
         )}

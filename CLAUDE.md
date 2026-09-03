@@ -419,6 +419,25 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 
 ## Konventionen
 - Deutsch in UI-Texten, Englisch im Code.
+- **„Athlet(en)" ist das UI-Wort, `student` bleibt der Code-Name** (Leons
+  Entscheidung 2026-09-02). In sichtbaren Texten heißt niemand mehr „Schüler":
+  Sidebar, Überschriften, Hinweise, Fehlermeldungen sagen Athlet/Athleten
+  (Singular „Athlet", Plural und Genitiv „Athleten"). Der Code behält
+  `StudentEntry`, `listAllStudents()`, `/trainer/students` — dasselbe Muster
+  wie bei DeepFight (UI-Name neu, Datenmodell unangetastet), und aus demselben
+  Grund: eine Umbenennung von Route und Typen wäre eine Migration ohne
+  Gegenwert. Wer neue Oberfläche baut, schreibt „Athlet"; wer Code liest,
+  findet weiter „student".
+- **Sprache & Tonalität** (Leons Vorgabe 2026-09-02): modern, sportlich,
+  selbstbewusst — der Ton eines guten Coaches, NICHT einer Behörde, eines
+  Influencers oder eines „Bro-Coaches". Konsequent „du", kurze AKTIVE Sätze.
+  Drei Formen sind verboten, weil sie den Behörden-Ton erzeugen:
+  (1) **Passiv** („Änderungen werden gespeichert"), (2) **Verneinung als
+  Erklärung** („wird NICHT automatisch gespeichert" → stattdessen sagen, was
+  man tun KANN), (3) **System-Subjekt** („Die App zeigt dir…"). Fehlermeldungen
+  und Regelwerk-Inhalte dürfen verneinen — dort beschreibt die Verneinung die
+  Sache selbst. MMA-/Fitness-Anglizismen sind erwünscht (Sparring, Ground Game,
+  Warm-up, Round, Skills), unnötiges Denglisch nicht.
 - Komponenten: Default-Export · Utilities: benannte Exports.
 - Env-Vars: ohne Anführungszeichen in `.env.local` (Vorlage: `.env.local.example`).
 - R3F: NIEMALS @react-three/fiber v9+ ohne React 19 — bleibt auf v8!
@@ -627,6 +646,44 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Rollback der Regeln keine Aussperrung ist und Tokens von vor der
       Migration ihre Stunde zu Ende leben können. Danach ist `role` weder in
       Claims noch im Dokument noch in den Regeln zu finden.
+- [ ] **Verwaltungs-Dashboard-Ausbau** (Ideensammlung 2026-09-02, mit Leon
+      besprochen, NOCH NICHT beschlossen — nichts davon umsetzen ohne Ansage):
+      Zusatz-Kennzahlen für `/verwaltung`, sortiert nach Vorarbeit.
+      (a) **Sofort machbar aus vorhandenen Daten:** Inaktivitäts-Frühwarnung
+      „lange nichts gehört von…" (letzte Rückmeldung > X Wochen je Mitglied —
+      wirtschaftlich wichtigste Zahl, Kündigungs-Vorbote; braucht nur die uid
+      im `ParticipationPoint`, sie steckt schon im Dokumentpfad von
+      `getParticipationsSince`, wird aber weggeworfen; Beschriftung streng als
+      Selbstauskunft, „hat sich lange nicht zurückgemeldet" ≠ „war nicht da");
+      Kurs-Trends (Pfeil steigend/fallend je Kurs, letzte 6 vs. vorige 6
+      Wochen, aus denselben geladenen Punkten); Stoßzeiten-Heatmap (Wochentag
+      × Uhrzeit der Rückmeldungen); Einladungs-Funnel (Einlöse-Quote +
+      Zeit bis Einlösung aus usedCount/maxUses/expiresAt + auditLog);
+      Betriebs-Warnungen-Karte, die NUR erscheint, wenn etwas ansteht (Kurse
+      mit null Rückmeldungen im ganzen Zeitraum, ungepflegte Kurseinheiten via
+      `weeklyCoverage`, nur noch eine Verwaltung im Gym, ablaufende
+      Einladungen) — das Dashboard hat viel „so ist es", wenig „das solltest
+      du tun".
+      (b) **Braucht Kurs→Trainer-Zuordnung** (Leons Wunsch Trainer-Auslastung):
+      `TRAINING_BLOCKS` ist statischer Code OHNE Trainer-Bezug, auch
+      Rückmeldungen tragen keinen Trainer — vorher ist keine Auslastung
+      rechenbar. Die Zuordnung kommt sauber mit dem Wochenplan-Mehrplan-Modell
+      (Konzept §7, Trainer-Zuweisungen sind dort vorgesehen; Phase 3);
+      Zwischenlösung wäre ein Mapping am Gym-Dokument (`trainingBlockId →
+      uid[]`), das die Verwaltung selbst pflegt — als eigenes Feature „Wer
+      gibt welchen Kurs" auch allein sinnvoll. Danach: Wochenstunden aus
+      Start-/Endzeiten + Kurszahl + Rückmeldungen in seinen Kursen je Trainer.
+      ACHTUNG Darstellung: Kennzahl über Menschen im Team — als
+      Kapazitätsplanung bauen (Balkenliste Stunden + Kurse), KEIN Ranking,
+      keine Vergleichs-Prozente, und Rückmeldungen nie wie gemessene
+      Teilnehmerzahlen aussehen lassen.
+      (c) **Braucht aiUsage-Gym-Scoping** (Phase 3): KI-Kontingent-Karte
+      (Ring „X von Y Analysen diesen Monat" + Warnung bei Knappheit, Phase 4
+      dann Nachkauf-Knopf) — ist im Konzept §6 als „Verbrauchs-Dashboard
+      (Kontingent-Stand, Nutzung je Trainer)" bereits BESCHLOSSEN, hängt aber
+      zwingend am Umbau `aiUsage/summary` → `aiUsage/{gymId}`; vorher zeigte
+      der Ring fremde Gyms mit. Empfohlene Reihenfolge: (a) → Zuordnung aus
+      (b) → Auslastung → (c) mit Phase 3.
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
       Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)

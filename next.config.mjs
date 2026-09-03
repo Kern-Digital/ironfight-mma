@@ -48,15 +48,12 @@ const nextConfig = {
         destination: "/verwaltung/neuigkeiten/:pfad*",
         permanent: true,
       },
-      // Die nackte Bereichs-Adresse hat keinen eigenen Inhalt: Der Bereich
-      // beginnt bei den Mitgliedern. Ein Verwaltungs-Dashboard (Kennzahlen,
-      // Kontingent, Wochenplan) kommt mit Phase 3 — dann wird daraus eine
-      // Seite und diese Zeile fällt weg.
-      {
-        source: "/verwaltung",
-        destination: "/verwaltung/mitglieder",
-        permanent: false,
-      },
+      // FRÜHER STAND HIER `/verwaltung` → `/verwaltung/mitglieder`, weil die
+      // nackte Bereichs-Adresse keinen eigenen Inhalt hatte. Seit dem
+      // 02.09.2026 hat sie einen (`app/verwaltung/page.tsx`), und die Zeile
+      // MUSSTE weg: `redirects()` läuft vor jedem Rendern — die neue Seite
+      // wäre sonst für niemanden erreichbar gewesen, auch nicht über den
+      // klickbaren Gruppentitel der Sidebar.
     ];
   },
 };

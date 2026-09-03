@@ -11,7 +11,7 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import QuickAction from "@/components/dashboard/QuickAction";
 import EmptyState from "@/components/dashboard/EmptyState";
 import Reveal from "@/components/dashboard/Reveal";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { dashboardGreetingFor, trainerGreetingFor } from "@/lib/greeting";
 import { CATEGORY_LABEL } from "@/lib/techniques";
@@ -181,6 +181,12 @@ function DashboardContent() {
   // einzige Einstieg, denn die Top-Navigation ist hier ausgeblendet
   // (AthleteChromeGate). Trainer/Admin landen gar nicht in diesem Dashboard.
   const isPureVerwaltung = useRights().verwaltung;
+  // Dieselbe Person hat seit dem 01.09.2026 die Stab-Hülle um sich: Sidebar am
+  // Desktop, Schublade und Bottom-Bar auf dem Handy. Diese Seite darf ihre
+  // eigene Leiste und ihren Hell/Dunkel-Knopf dann NICHT auch noch rendern —
+  // sonst stehen zwei Leisten übereinander. Für den Trainer stellt sich die
+  // Frage nicht: der landet in TrainerDashboardContent.
+  const hasStaffShell = useHasStaffShell();
   // Kein Gym: entweder von der Verwaltung entfernt (/api/members/remove setzt
   // den gymId-Claim auf null) oder ohne Einladung registriert (die Regeln
   // verbieten dem Client, sich selbst ein Gym zu setzen). Beides sah bisher
@@ -276,7 +282,7 @@ function DashboardContent() {
 
   return (
     <main
-      className="min-h-screen pb-32"
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich mit Ambient-Schicht (nur hier — nie hinter Listen).
@@ -301,18 +307,23 @@ function DashboardContent() {
               </h1>
             </div>
             {/* Mobil: Umschalter rechts, oben an der Datumszeile, Liquid Glass.
-                Desktop: sitzt stattdessen in der Bottom-Tab-Bar. */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={
-                theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
-              }
-              className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
-              style={{ color: "var(--text-2)" }}
-            >
-              <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
-            </button>
+                Desktop: sitzt stattdessen in der Bottom-Tab-Bar. In der
+                Stab-Hülle steht er in der Fußgruppe der Sidebar. */}
+            {!hasStaffShell && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={
+                  theme === "dark"
+                    ? "Helles Design aktivieren"
+                    : "Dunkles Design aktivieren"
+                }
+                className="t-glass t-interactive inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-field lg:hidden"
+                style={{ color: "var(--text-2)" }}
+              >
+                <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
+              </button>
+            )}
           </div>
 
           <div className="lg:w-[400px] lg:shrink-0">
@@ -732,7 +743,7 @@ function DashboardContent() {
         </section>
       </div>
 
-      <AthleteTabBar />
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }
@@ -947,15 +958,15 @@ function TrainerDashboardContent() {
                 <QuickAction
                   href="/schedule"
                   icon="calendar"
-                  title="Stundenplan"
-                  sub="Wochenplan & Übungen"
+                  title="Kursplan"
+                  sub="Deine Woche & Übungen"
                   accent="var(--ta-pink)"
                 />
                 <QuickAction
                   href="/trainer"
                   icon="trophy"
                   title="Wettkampf"
-                  sub="Schüler · DeepFight"
+                  sub="Athleten · DeepFight"
                   accent="var(--ta-cyan)"
                 />
                 <QuickAction
@@ -977,15 +988,15 @@ function TrainerDashboardContent() {
           </Reveal>
         </div>
 
-        {/* Heutiger Stundenplan */}
+        {/* Heutiger Kursplan */}
         <Reveal>
           <SectionCard
-            title="Heutiger Stundenplan"
+            title="Heute im Gym"
             eyebrow={WEEKDAY_LABELS[todayWeekday]}
             icon="calendar"
             accent="var(--ta-cyan)"
             moreHref="/schedule"
-            moreLabel="Wochenplan"
+            moreLabel="Ganze Woche"
             className="mt-4"
           >
             {todayBlocks.length === 0 ? (

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -17,11 +17,11 @@ type HelpItem = {
 const TRAINER_HELP: HelpItem[] = [
   {
     id: "schedule",
-    title: "Stundenplan",
+    title: "Kursplan",
     href: "/schedule",
     body: (
       <>
-        Der Stundenplan zeigt alle Trainings der Woche. Klicke auf einen Kurs,
+        Der Kursplan zeigt alle Trainings der Woche. Klicke auf einen Kurs,
         um Details zu öffnen — dort weist du Techniken für diese Woche zu.
       </>
     ),
@@ -45,18 +45,18 @@ const TRAINER_HELP: HelpItem[] = [
         Im Kurs-Modal klickst du auf{" "}
         <strong>„Techniken bearbeiten“</strong>. Du kannst nach Disziplin
         filtern, suchen und mehrere Techniken auswählen. Speichern überträgt
-        die Techniken in alle Bibliotheken der Schüler, die diesen Kurs
+        die Techniken in alle Bibliotheken der Athleten, die diesen Kurs
         abonniert haben.
       </>
     ),
   },
   {
     id: "students",
-    title: "Schülerprofile",
+    title: "Athletenprofile",
     href: "/trainer/students",
     body: (
       <>
-        Im Bereich <strong>Schüler</strong> findest du alle Mitglieder mit
+        Im Bereich <strong>Athleten</strong> findest du alle Mitglieder mit
         Profil-Basics, abonnierten Kursen und Trainings-Daten. Klick einen
         Eintrag an, um Fortschritt und Aktivität zu sehen.
       </>
@@ -67,20 +67,20 @@ const TRAINER_HELP: HelpItem[] = [
     title: "Fortschritt ansehen",
     body: (
       <>
-        Pro Schüler werden Workouts, Streak, Bibliotheks-Größe und letzte
-        Aktivität angezeigt. Fehlt eine Information, wird ein Platzhalter
-        angezeigt — kein Fehler.
+        Zu jedem Athleten siehst du Workouts, Streak, Bibliotheks-Größe und die
+        letzte Aktivität. Wo noch nichts eingetragen ist, steht ein Platzhalter
+        — kein Fehler.
       </>
     ),
   },
   {
     id: "library",
-    title: "Bibliothek der Schüler",
+    title: "Bibliothek der Athleten",
     body: (
       <>
-        Die Bibliothek ist die persönliche Sammlung jedes Schülers. Alles, was
-        du als Trainer einem Kurs zuweist, landet automatisch dort — wenn der
-        Schüler den Kurs abonniert hat oder bei „Ich nehme teil“ klickt.
+        Die Bibliothek ist die persönliche Sammlung jedes Athleten. Alles, was
+        du als Trainer einem Kurs zuweist, landet automatisch dort — sobald er
+        den Kurs abonniert oder auf „Ich nehme teil“ tippt.
       </>
     ),
   },
@@ -89,7 +89,7 @@ const TRAINER_HELP: HelpItem[] = [
 const STUDENT_HELP: HelpItem[] = [
   {
     id: "schedule",
-    title: "Stundenplan",
+    title: "Kursplan",
     href: "/schedule",
     body: (
       <>
@@ -194,7 +194,7 @@ export default function HelpPage() {
   const { profileLoading } = useAuth();
   const isTrainer = useRights().trainer;
 
-  // Trainer sehen ihre Sektion zuerst, können aber auch die Schüler-Sicht ansehen.
+  // Trainer sehen ihre Sektion zuerst, können aber auch die Athleten-Sicht ansehen.
   const [tab, setTab] = useState<"trainer" | "student">(
     isTrainer ? "trainer" : "student",
   );
@@ -208,7 +208,7 @@ export default function HelpPage() {
         title="Hilfe"
         description={
           isTrainer
-            ? "Kurzanleitung für deine Trainer-Funktionen — und wie es für deine Schüler aussieht."
+            ? "Kurzanleitung für deine Trainer-Funktionen — und wie es für deine Athleten aussieht."
             : "Kurze Erklärungen zu allen Bereichen der App."
         }
       />
@@ -251,7 +251,7 @@ export default function HelpPage() {
                 color: tab === "student" ? "var(--ta-cyan)" : "var(--fg-3)",
               }}
             >
-              Für Schüler
+              Für Athleten
             </button>
           </div>
         )}

@@ -31,7 +31,7 @@ import {
   markOnboarded as markProfileOnboarded,
   markTrainerOnboarded as markProfileTrainerOnboarded,
 } from "./user-profile";
-import { NO_RIGHTS, rightsFromClaims, type RoleSet } from "./roles";
+import { hasAnyRight, NO_RIGHTS, rightsFromClaims, type RoleSet } from "./roles";
 import type { UserProfile } from "./types";
 
 type AuthContextValue = {
@@ -317,4 +317,26 @@ export function useFighterName(): string {
 export function useRights(): RoleSet {
   const { profile } = useAuth();
   return profile?.rights ?? NO_RIGHTS;
+}
+
+/**
+ * Steht um diese Seite die STAB-HÜLLE (`components/shell/StaffShell`) — also
+ * am Desktop die Sidebar links, auf dem Handy Schublade und Bottom-Bar?
+ *
+ * DIE FRAGE IST NICHT „IST DAS EIN TRAINER". Bis zum 01.09.2026 war sie das
+ * zufällig: Die Hülle gab es noch nicht, und die einzige Stab-Rolle, die
+ * Athleten-Seiten aufrief, war der Trainer. Ein Dutzend Seiten prüfte deshalb
+ * `useRights().trainer`, um ihre eigene Bottom-Bar wegzulassen. Eine reine
+ * Verwaltung hat `trainer: false` — sie bekäme dort ZWEI Leisten
+ * übereinander, die der Seite und die der Hülle.
+ *
+ * Der Hook existiert, damit die Bedingung nicht zwölfmal nebeneinander steht:
+ * `AppShell` entscheidet damit, WELCHE Hülle er baut, und die Seiten fragen
+ * mit demselben Satz, ob sie ihre eigene Leiste, ihren mobilen
+ * Hell/Dunkel-Knopf und ihre Fuß-Polsterung noch brauchen. Zwei Kopien
+ * derselben Bedingung wären zwei Stellen, an denen ein viertes Recht
+ * vergessen werden könnte.
+ */
+export function useHasStaffShell(): boolean {
+  return hasAnyRight(useRights());
 }

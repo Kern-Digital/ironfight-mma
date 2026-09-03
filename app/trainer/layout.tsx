@@ -21,7 +21,15 @@ export default function TrainerLayout({
 }) {
   return (
     <TrainerRoute>
-      <TrainerSubnav />
+      {/* Am Desktop ist die Leiste seit der Sidebar-Hülle überflüssig: ihre
+          fünf Punkte stehen links im Menü, und dieselbe Liste zweimal auf
+          einer Seite ordnet nichts mehr. Auf dem Handy bleibt sie vorerst
+          stehen — Leon will erst die Schublade sehen und dann entscheiden
+          (01.09.2026). Danach fällt entweder dieses `lg:hidden` weg oder die
+          Leiste ganz. */}
+      <div className="lg:hidden">
+        <TrainerSubnav />
+      </div>
       {children}
     </TrainerRoute>
   );

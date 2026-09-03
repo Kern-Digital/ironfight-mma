@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import AthleteChromeGate from "@/components/AthleteChromeGate";
+import AppShell from "@/components/shell/AppShell";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
@@ -94,13 +92,11 @@ export default function RootLayout({
                 der alte Cache-First-SW servierte dauerhaft veraltete Stände.
                 public/sw.js bleibt als Kill-Switch für Bestandsclients. */}
             <PwaInstallPrompt />
-            <AthleteChromeGate>
-              <Navbar />
-            </AthleteChromeGate>
-            <main className="flex-1">{children}</main>
-            <AthleteChromeGate>
-              <Footer />
-            </AthleteChromeGate>
+            {/* Die Hüllen-Weiche (Sidebar-Etappe 01.09.2026): Stab-Rollen
+                bekommen die Sidebar links, Navbar und Footer entfallen für
+                sie ersatzlos; Athleten behalten alles wie bisher. Begründung
+                und die beiden Zweige in components/shell/AppShell.tsx. */}
+            <AppShell>{children}</AppShell>
             <FighterNameModal />
             <TrainerOnboardingModal />
             <SubscriptionAutoSync />

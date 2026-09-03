@@ -554,7 +554,7 @@ export default function AthleteProfileForm() {
         )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-            Änderungen werden automatisch gespeichert.
+            Jede Änderung ist sofort gespeichert.
           </span>
           {saving ? (
             <span

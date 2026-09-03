@@ -16,7 +16,7 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import AchievementsPanel from "@/components/AchievementsPanel";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { greetingFor } from "@/lib/greeting";
@@ -188,7 +188,7 @@ function FighterNameCard() {
   return (
     <div className="t-card flex flex-col gap-3 p-4 sm:p-6">
       <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-        So heißt du in der App. Lass das Feld leer, wenn du einfach „Flex"
+        So heißt du in der App. Lass das Feld leer, wenn du einfach „Flex“
         bleiben willst.
       </p>
       <input
@@ -227,7 +227,7 @@ function FighterNameCard() {
       )}
       <div className="flex min-h-5 flex-wrap items-center justify-between gap-3">
         <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-          Änderungen werden automatisch gespeichert.
+          Jede Änderung ist sofort gespeichert.
         </span>
         {saving ? (
           <span
@@ -363,13 +363,16 @@ function ProfileContent() {
   const { user, profile, profileLoading, logOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const timer = useTimerSettings();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   const greeting = greetingFor(profile?.displayName);
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich mit Ambient-Schicht (nur hier — nie hinter Listen).
@@ -395,7 +398,7 @@ function ProfileContent() {
             </p>
           </div>
           {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -540,8 +543,9 @@ function ProfileContent() {
                 </div>
               </div>
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                Dein Auth-Name (z. B. Google-Klarname) wird intern für die
-                Anmeldung gespeichert, aber niemals in der App angezeigt.
+                Deinen Anmeldenamen (z. B. den Google-Klarnamen) brauchen wir
+                nur zum Einloggen — in der App siehst du überall deinen
+                Fighter-Namen.
               </p>
               <button
                 type="button"
@@ -574,7 +578,7 @@ function ProfileContent() {
         )}
       </div>
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

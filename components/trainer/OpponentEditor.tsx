@@ -285,8 +285,8 @@ export default function OpponentEditor({
       <div>
         <FightDnaSplit split={dnaSplit} />
         <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
-          Der Fight-DNA-Split wird automatisch aus der KI-Video-Analyse
-          berechnet (gewichteter Mittelwert) und hier nicht manuell gepflegt.
+          Der Fight-DNA-Split kommt aus der KI-Video-Analyse — ein gewichteter
+          Mittelwert, der mit jedem Video schärfer wird.
         </p>
       </div>
 
@@ -294,8 +294,8 @@ export default function OpponentEditor({
       <div>
         <FightStatsBlock stats={actionStats} />
         <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
-          Die Technik-Statistik (Versuche/Treffer/Zone/Setup) wird automatisch
-          aus der KI-Video-Analyse gezählt und hier nicht manuell gepflegt.
+          Versuche, Treffer, Zone und Setup zählt die KI-Video-Analyse mit —
+          jedes weitere Video macht das Bild vollständiger.
         </p>
       </div>
 

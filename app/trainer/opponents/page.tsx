@@ -265,8 +265,8 @@ function OpponentsLibraryContent() {
             </p>
             {!search && (
               <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
-                Lege ein erstes Gegnerprofil an — es wird gym-weit für alle
-                Trainer geteilt.
+                Leg ein erstes Gegnerprofil an — dein ganzes Trainerteam
+                arbeitet damit.
               </p>
             )}
           </div>

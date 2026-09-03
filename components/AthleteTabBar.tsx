@@ -19,7 +19,18 @@ const TABS: { href: string; icon: IconName; label: string; activePrefix?: string
   { href: "/profile", icon: "user", label: "Profil" },
 ];
 
-export default function AthleteTabBar() {
+export default function AthleteTabBar({
+  /**
+   * Stab-Rollen (Sidebar-Hülle, 01.09.2026): Auf dem Handy hängt an derselben
+   * Leiste ein fünfter Platz, der die Menü-Schublade öffnet. Er steht hier und
+   * nicht als schwebender Knopf über dem Inhalt, weil es ohne Header oben
+   * keinen freien Platz gibt — und weil die Leiste mit dem Daumen erreichbar
+   * ist. Fehlt die Funktion (reine Athleten), fehlt der Platz.
+   */
+  onOpenMenu,
+}: {
+  onOpenMenu?: () => void;
+} = {}) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
 
@@ -71,6 +82,28 @@ export default function AthleteTabBar() {
             </Link>
           );
         })}
+        {onOpenMenu && (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            aria-label="Menü öffnen"
+            className="t-interactive flex min-h-[56px] flex-1 flex-col items-center justify-center gap-[3px] rounded-card lg:min-h-[64px] lg:gap-1 lg:[&_svg]:h-[22px] lg:[&_svg]:w-[22px]"
+            style={{ color: "var(--text-3)" }}
+          >
+            <Icon name="panel-left" size={20} strokeWidth={2} />
+            <span
+              className="text-[9px] leading-[1.2] lg:text-[11px]"
+              style={{
+                fontFamily: "var(--font-archivo), system-ui, sans-serif",
+                fontWeight: 600,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              Menü
+            </span>
+          </button>
+        )}
         {/* Desktop: Hell/Dunkel-Umschalter am Ende der Leiste (mobil sitzt er
             im Dashboard-Kopf) */}
         <button

@@ -57,6 +57,10 @@ function clonePlan(plan: TrainerWorkoutPlan): TrainerWorkoutPlan {
 
 /** Inhalts-Diff ohne Freigabe-Felder — nur er zählt für Speichern/Verwerfen. */
 function contentOf(plan: TrainerWorkoutPlan) {
+  // Die drei Felder werden bewusst herausdestrukturiert, um sie AUS dem
+  // Vergleich zu nehmen — sie heißen nur deshalb hier, damit `content` sie
+  // nicht enthält.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { audienceUids, audienceCourseIds, updatedAt, ...content } = plan;
   return JSON.stringify(content);
 }
@@ -393,7 +397,7 @@ export default function TrainerPlanDetailPage() {
                   <span
                     style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                   >
-                    Plan wirklich löschen? Persönliche Kopien der Schüler
+                    Plan wirklich löschen? Persönliche Kopien der Athleten
                     bleiben erhalten.
                   </span>
                   <button

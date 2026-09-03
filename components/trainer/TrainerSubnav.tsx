@@ -11,10 +11,13 @@ interface SubnavItem {
 }
 
 const ITEMS: SubnavItem[] = [
-  { href: "/trainer", label: "Dashboard", isActive: (p) => p === "/trainer" },
+  // „Übersicht" statt „Dashboard": deutsche UI-Texte sind Konvention, und der
+  // Punkt heißt jetzt genauso wie die Überschrift der Seite (wie bei den
+  // Verwaltungs-Seiten, wo Menüpunkt und H1 dasselbe Wort tragen).
+  { href: "/trainer", label: "Übersicht", isActive: (p) => p === "/trainer" },
   {
     href: "/trainer/students",
-    label: "Schüler",
+    label: "Athleten",
     isActive: (p) => p.startsWith("/trainer/students"),
   },
   {
@@ -29,33 +32,45 @@ const ITEMS: SubnavItem[] = [
     isActive: (p) => p.startsWith("/trainer/competitions"),
   },
   // Stundenplan lebt bewusst unter /schedule (URL-Stabilität) — nur verlinkt.
-  { href: "/schedule", label: "Stundenplan", isActive: () => false },
+  { href: "/schedule", label: "Kursplan", isActive: () => false },
 ];
 
-/** Schlanke Bereichs-Navigation für den Trainerbereich (unter der Haupt-Navbar). */
+/**
+ * Bereichs-Navigation des Trainerbereichs (unter der Haupt-Navigation).
+ *
+ * Token-Look (Coach-Redesign): Der aktive Punkt trägt die Gym-Akzentfarbe
+ * statt des festen Pinks — damit folgt die Leiste einem Gym-Branding, ohne
+ * dass jemand sie anfassen muss (DESIGN-BRIEF §1.1). Höhe ≥ 44 px, weil die
+ * Leiste auf dem Handy das meistbenutzte Ziel des Bereichs ist (§1.8).
+ */
 export default function TrainerSubnav() {
   const pathname = usePathname();
 
   return (
     <nav
       aria-label="Trainerbereich"
-      className="border-b"
-      style={{ background: "var(--ink-2)", borderColor: "var(--ink-4)" }}
+      style={{
+        background: "var(--surface-page)",
+        borderBottom: "1px solid var(--line)",
+      }}
     >
-      <div className="mx-auto flex max-w-7xl gap-5 overflow-x-auto px-4 sm:px-6">
+      <div className="no-scrollbar mx-auto flex w-full max-w-2xl gap-5 overflow-x-auto px-4 lg:max-w-5xl lg:px-6">
         {ITEMS.map((item) => {
           const active = item.isActive(pathname);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="font-mono-ta shrink-0 py-2.5 text-[10px] font-bold uppercase transition-colors"
+              aria-current={active ? "page" : undefined}
+              className="t-interactive flex min-h-hit shrink-0 items-center rounded-none"
               style={{
-                letterSpacing: "0.18em",
-                color: active ? "var(--ta-pink)" : "var(--fg-4)",
-                borderBottom: active
-                  ? "2px solid var(--ta-pink)"
-                  : "2px solid transparent",
+                font: "var(--type-label)",
+                letterSpacing: "var(--ls-label)",
+                textTransform: "uppercase",
+                color: active ? "var(--accent-text)" : "var(--text-3)",
+                // Die Linie liegt innen (box-shadow statt border), damit die
+                // Zeilenhöhe zwischen aktivem und ruhendem Punkt gleich bleibt.
+                boxShadow: active ? "inset 0 -2px 0 0 var(--accent)" : "none",
                 textDecoration: "none",
               }}
             >

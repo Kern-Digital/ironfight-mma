@@ -20,7 +20,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import SwipeAction from "@/components/SwipeAction";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   addTechniqueToLibrary,
@@ -108,7 +108,10 @@ export default function LibraryPage() {
 function LibraryContent() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   const [entries, setEntries] = useState<EnrichedEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +215,7 @@ function LibraryContent() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* ── Kopf — Muster der Referenzseiten ── */}
@@ -254,7 +257,7 @@ function LibraryContent() {
                   : `${entries.length} Technik${entries.length !== 1 ? "en" : ""} gespeichert`}
             </p>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -397,10 +400,10 @@ function LibraryContent() {
                   href="/schedule"
                   style={{ color: "var(--accent-text)", fontWeight: 600 }}
                 >
-                  Stundenplan
+                  Kursplan
                 </Link>{" "}
-                auf ein Training und wähle „Ich nehme teil" — alle Techniken
-                der Einheit werden automatisch hier gespeichert.
+                auf einen Kurs und tipp auf „Ich nehme teil“ — die Techniken
+                der Einheit landen dann automatisch hier.
               </p>
             </div>
           </>
@@ -595,7 +598,7 @@ function LibraryContent() {
         </div>
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }
@@ -753,8 +756,8 @@ function EmptyState() {
           Bibliothek leer
         </h2>
         <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-          Besuche ein Training im Stundenplan oder speichere Techniken über
-          „Techniken durchsuchen".
+          Geh zu einem Kurs im Kursplan oder speichere Techniken über
+          „Techniken durchsuchen“.
         </p>
       </div>
       <Link
@@ -768,7 +771,7 @@ function EmptyState() {
           textDecoration: "none",
         }}
       >
-        Zum Stundenplan
+        Zum Kursplan
       </Link>
     </div>
   );

@@ -24,7 +24,7 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import RestWheel, { formatRest } from "@/components/RestWheel";
 import Icon from "@/components/ui/Icon";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
@@ -338,7 +338,10 @@ function TimerView() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { settings } = useTimerSettings();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   const initial = useMemo<TimerConfig>(
     () => ({
@@ -441,7 +444,7 @@ function TimerView() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* ── Kopf — Muster der Disziplin-Seite (Ambient, Titel, Toggles) ── */}
@@ -486,7 +489,7 @@ function TimerView() {
             >
               <Icon name="fullscreen" size={20} />
             </button>
-            {!isTrainer && (
+            {!hasStaffShell && (
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -857,7 +860,7 @@ function TimerView() {
         </div>
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

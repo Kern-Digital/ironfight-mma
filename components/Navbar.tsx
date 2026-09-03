@@ -181,8 +181,8 @@ const trainerNavGroup: NavGroup = {
   icon: <IconClipboard />,
   children: [
     { href: "/trainer", label: "Dashboard", activePattern: /^\/trainer$/ },
-    { href: "/trainer/students", label: "Schüler", activePattern: /^\/trainer\/students/ },
-    { href: "/schedule", label: "Stundenplan" },
+    { href: "/trainer/students", label: "Athleten", activePattern: /^\/trainer\/students/ },
+    { href: "/schedule", label: "Kursplan" },
     {
       href: "/trainer/competitions",
       label: "Wettkampf",
@@ -240,7 +240,7 @@ const deepFightNavGroup: NavGroup = {
     },
     {
       href: "/trainer/deepfight/athletes",
-      label: "Schüler-Analysen",
+      label: "Athleten-Analysen",
       activePattern: /^\/trainer\/deepfight\/athletes/,
     },
     {
@@ -297,6 +297,8 @@ export default function Navbar() {
           label: "Verwaltung",
           icon: <IconMembers />,
           // Ohne Trainer-Punkte darüber braucht es keine Zwischenüberschrift.
+          // `section` wird nur benannt, damit `rest` es NICHT mehr enthält.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           children: verwaltungNavChildren.map(({ section, ...rest }) => rest),
         }
       : null;

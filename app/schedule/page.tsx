@@ -2,7 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
+import { resolveGymId } from "@/lib/gym";
 import { useTheme } from "@/lib/theme-context";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
@@ -116,6 +117,39 @@ function blockMeta(block: TrainingBlock): { dotColor: string; meta: string } {
   return { dotColor, meta };
 }
 
+/**
+ * Zerlegt einen Kurstitel an den Stellen, an denen er umbrechen DARF.
+ *
+ * Kurstitel sind keine normalen Wörter: „MMA/Kickboxen Sparring" und
+ * „(Fitness-)Kickboxen" haben für den Browser keinen einzigen regulären
+ * Umbruchpunkt — nach einem Schrägstrich bricht er nicht, und der Bindestrich
+ * in „(Fitness-)" ist durch die Klammer dahinter blockiert. In einer 145 px
+ * schmalen Tagesspalte kam deshalb erst gar kein Umbruch zustande (der Titel
+ * wurde bis 02.09. am Kartenrand abgeschnitten) und danach, mit
+ * `overflow-wrap: anywhere`, einer mitten im Wort: „MMA/Kickboxe | n".
+ *
+ * Die Rückgabe wird mit `<wbr />` verbunden — dem HTML-Element, das genau
+ * das sagt: „hier darfst du trennen, musst aber nicht". Anders als ein
+ * eingefügtes Nullbreiten-Leerzeichen landet es nicht im kopierten Text.
+ */
+function titleParts(title: string): string[] {
+  // Nach Schrägstrich, Bindestrich und schließender Klammer darf getrennt
+  // werden — das sind die Fugen, die ein Mensch selbst wählen würde. Echte
+  // Wortzwischenräume bleiben INNERHALB der Stücke: würde man auch an ihnen
+  // trennen, klebten die Wörter beim Zusammensetzen aneinander.
+  const parts: string[] = [];
+  let current = "";
+  for (const ch of title) {
+    current += ch;
+    if (ch === "/" || ch === "-" || ch === ")") {
+      parts.push(current);
+      current = "";
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
 // ─── Struktur-Hilfsfunktionen ──────────────────────────────────────────────
 
 /** Gibt geordnete Disziplinen zurück, die für einen Trainingsblock relevant sind. */
@@ -222,16 +256,44 @@ type ModalState =
       subscribed: boolean;
     };
 
-const TRAINER_BLOCK_DESCRIPTION =
-  "Füge diesem Kurs Techniken für diese Woche hinzu. Deine Schüler erhalten die Inhalte anschließend automatisch in ihrer Bibliothek.";
+/**
+ * Steht im Kurs-Fenster über dem Bearbeiten-Knopf. Bewusst OHNE „deine
+ * Schüler“: Den Satz liest seit 02.09. auch eine reine Verwaltung, die
+ * Kursinhalte pflegt, ohne selbst zu unterrichten.
+ */
+const EDIT_BLOCK_DESCRIPTION =
+  "Leg fest, was in dieser Einheit trainiert wird. Die Techniken landen automatisch in den Bibliotheken deiner Athleten.";
 
 // ─── Hauptkomponente ───────────────────────────────────────────────────────
 
 export default function SchedulePage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const todayWeekday = getCurrentWeekday();
-  const isTrainer = useRights().trainer;
+  // ZWEI FRAGEN, DIE NICHT DIESELBE SIND — bis 02.09.2026 beantwortete sie
+  // hier ein einziges `isTrainer`, und das war der Fehler:
+  //
+  // `canEditSessions` — wer die KURSINHALTE pflegen darf. Das sind Trainer UND
+  //   Verwaltung (Konzept §7: „Inhalte pflegen Verwaltung + Trainer,
+  //   Aktivieren nur Verwaltung"). `firestore.rules` lässt beide seit dem
+  //   01.09. an `trainingSessions` schreiben; dieses UI fragte danach weiter
+  //   allein nach dem Trainer-Häkchen. Eine reine Verwaltung sah den Plan
+  //   dadurch nur lesend, obwohl der Server ihr das Schreiben längst erlaubte
+  //   — ein versteckter Knopf, kein Schutz (Konzept §3.1: der Client zeigt an,
+  //   der Server entscheidet). Der Client darf WENIGER anbieten als die Regeln
+  //   zulassen, aber dann ist es eine Gestaltungsentscheidung und keine
+  //   vergessene Zeile.
+  //
+  // `isTrainer` — wer den Kurs GIBT, statt an ihm teilzunehmen. Daran hängen
+  //   die beiden Schüler-Funktionen im Kurs-Fenster (Abo, Teilnahme), die für
+  //   Trainer ausgeblendet sind. Eine reine Verwaltung ist Athletin ihres Gyms
+  //   und behält sie — sie bekommt die Pflege DAZU, nicht anstelle.
+  //
+  // `hasStaffShell` beantwortet nur die Frage nach der Umrandung.
+  const rights = useRights();
+  const canEditSessions = rights.trainer || rights.verwaltung;
+  const isTrainer = rights.trainer;
+  const hasStaffShell = useHasStaffShell();
 
   const [modal, setModal] = useState<ModalState>({ phase: "idle" });
   const [attending, setAttending] = useState(false);
@@ -323,7 +385,9 @@ export default function SchedulePage() {
         };
       }
 
-      await recordParticipation(user.uid, session, block.title);
+      // gymId muss MIT — sonst zählt die Teilnahme in keiner Gym-Kennzahl
+      // (Begründung an `Participation.gymId` in lib/types.ts).
+      await recordParticipation(user.uid, session, block.title, resolveGymId(profile));
 
       // Techniken bevorzugen (neues System), Übungen als Fallback (Altdaten)
       const techniqueCount = session.techniqueIds?.length ?? 0;
@@ -379,16 +443,22 @@ export default function SchedulePage() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
+      {/* `week-page` ist der Maßstab, an dem sich Lesespur und Wochenraster
+          ausrichten (globals.css, „Wochenplan-Raster"): Ob sieben Tage
+          nebeneinander passen, hängt am Platz NEBEN der Sidebar und nicht am
+          Fenster — dieselben 1100 px heißen für einen Athleten 1100 px Inhalt
+          und in der Stab-Hülle 772 px. */}
+      <div className="week-page">
       {/* Kopfbereich mit Ambient-Schicht — der Clip-Container umschließt NUR
           die Ambient-Ebene, nie die ganze Sektion (Muster der Referenzseite). */}
       <section className="relative">
         <div className="absolute inset-0 overflow-hidden" aria-hidden>
           <div data-ambient style={{ background: "var(--ambient)" }} />
         </div>
-        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-6 lg:max-w-7xl lg:px-6 lg:pb-7 lg:pt-8">
+        <div className="week-lane relative flex items-start gap-3 pb-5 pt-6 lg:pb-7 lg:pt-8">
           <div className="flex flex-1 flex-col gap-1">
             <span className="t-label">Diese Woche</span>
             <h1
@@ -401,13 +471,13 @@ export default function SchedulePage() {
               Kursplan
             </h1>
             <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-              {isTrainer
-                ? "Klicke auf einen Kurs, um Details zu öffnen und Techniken für diese Woche hinzuzufügen."
-                : "Klicke auf ein Training um teilzunehmen und Techniken in deine Bibliothek zu übernehmen."}
+              {canEditSessions
+                ? "Was diese Woche auf dem Plan steht. Öffne einen Kurs und leg die Techniken fest."
+                : "Deine Woche im Gym. Öffne einen Kurs, meld dich zurück und hol dir die Techniken in deine Bibliothek."}
             </p>
           </div>
           {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -424,18 +494,17 @@ export default function SchedulePage() {
       </section>
 
       {/* Trainer-Hinweis: Übersicht (nur einmal pro Browser) */}
-      {isTrainer && (
-        <div className="mx-auto w-full max-w-2xl px-4 lg:max-w-7xl lg:px-6">
+      {canEditSessions && (
+        <div className="week-lane">
           <TrainerHint id="schedule-overview" title="Kursplan">
-            Klicke auf einen Kurs, um Details zu sehen und Techniken für diese
-            Woche hinzuzufügen — sie landen automatisch in den Bibliotheken
-            deiner Schüler.
+            Öffne einen Kurs und leg fest, was diese Woche geübt wird. Die
+            Techniken landen automatisch in den Bibliotheken deiner Athleten.
           </TrainerHint>
         </div>
       )}
 
       {/* Wochengitter */}
-      <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-5 px-4 pt-1 sm:grid-cols-2 lg:max-w-7xl lg:grid-cols-7 lg:gap-2.5 lg:px-6">
+      <div className="week-lane week-grid pt-1">
         {Array.from({ length: 7 }, (_, i) => (
           <DayColumn
             key={i}
@@ -445,6 +514,7 @@ export default function SchedulePage() {
             label={WEEKDAY_LABELS[i]}
           />
         ))}
+      </div>
       </div>
 
       {/* Modal */}
@@ -471,6 +541,7 @@ export default function SchedulePage() {
                 subscribing={subscribing}
                 attendResult={attendResult}
                 attending={attending}
+                canEdit={canEditSessions}
                 isTrainer={isTrainer}
                 isLoggedIn={!!user}
                 editMode={editMode}
@@ -493,7 +564,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }
@@ -568,26 +639,45 @@ function BlockRow({
     <button
       type="button"
       onClick={onClick}
-      className="t-interactive flex min-h-hit w-full items-start gap-3 rounded-badge py-3 text-left"
+      className="week-row t-interactive flex min-h-hit w-full items-start gap-3 rounded-badge py-3 text-left"
     >
-      <div className="flex w-11 shrink-0 flex-col gap-0.5">
+      {/* Zeitspanne. In der Listen-Fassung eine schmale Spalte LINKS, im
+          Wochenraster eine Zeile ÜBER dem Titel (globals.css `.week-row`) —
+          die 56 px, die Spalte und Lücke dort kosten, fehlten dem Titel
+          genau dort, wo er am wenigsten Platz hat. */}
+      <div className="week-row-time flex w-11 shrink-0 flex-col gap-0.5">
         <span style={{ ...MONO_TIME, color: "var(--accent-text)" }}>
           {block.startTime}
         </span>
         <span
-          style={{
-            font: "500 11px/1.2 var(--font-mono), ui-monospace, monospace",
-            color: "var(--text-3)",
-          }}
+          className="week-row-dash"
+          aria-hidden
+          style={{ font: "var(--row-time-end)", color: "var(--text-3)" }}
         >
+          –
+        </span>
+        <span style={{ font: "var(--row-time-end)", color: "var(--text-3)" }}>
           {block.endTime}
         </span>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span style={{ font: "var(--type-body-strong)" }}>{block.title}</span>
+        {/* `anywhere`: Kurstitel wie „MMA/Kickboxen Sparring" haben in einer
+            schmalen Spalte keinen regulären Umbruchpunkt und wurden bis
+            02.09. am Kartenrand ABGESCHNITTEN (gemessen: 9 von 30 Titeln bei
+            1440 px). Lieber ein Umbruch mitten im Wort als ein halber Titel. */}
+        <span
+          style={{ font: "var(--type-body-strong)", overflowWrap: "anywhere" }}
+        >
+          {titleParts(block.title).map((part, i, all) => (
+            <Fragment key={i}>
+              {part}
+              {i < all.length - 1 && <wbr />}
+            </Fragment>
+          ))}
+        </span>
         {meta && (
           <span
-            className="inline-flex items-center gap-1.5"
+            className="flex items-center gap-1.5"
             style={{ ...META_FONT, color: "var(--text-3)" }}
           >
             <span
@@ -595,7 +685,9 @@ function BlockRow({
               style={{ background: dotColor }}
               aria-hidden
             />
-            {meta}
+            <span className="min-w-0" style={{ overflowWrap: "anywhere" }}>
+              {meta}
+            </span>
           </span>
         )}
       </div>
@@ -632,6 +724,7 @@ function ModalReady({
   subscribing,
   attendResult,
   attending,
+  canEdit,
   isTrainer,
   isLoggedIn,
   editMode,
@@ -656,6 +749,9 @@ function ModalReady({
   subscribing: boolean;
   attendResult: number | null;
   attending: boolean;
+  /** Darf Kursinhalte pflegen — Trainer ODER Verwaltung (Konzept §7). */
+  canEdit: boolean;
+  /** Gibt den Kurs, nimmt also nicht teil — blendet Abo und Teilnahme aus. */
   isTrainer: boolean;
   isLoggedIn: boolean;
   editMode: boolean;
@@ -688,16 +784,14 @@ function ModalReady({
     <div className="p-5">
       <ModalHeader block={block} onClose={onClose} />
 
-      {isTrainer && editMode ? (
+      {canEdit && editMode ? (
         // ── EDIT-MODUS: Strukturierter Technik-Picker ──────────────────────
         <>
           <TrainerHint id="course-edit-techniques" title="Techniken auswählen">
-            Wähle hier die Techniken aus, die deine Schüler diese Woche üben
-            sollen. Mit „Speichern" landen sie in den Bibliotheken aller
-            abonnierten Schüler.
+            Stell die Techniken zusammen, die diese Woche dran sind. Mit
+            „Speichern“ gehen sie an alle, die diesen Kurs abonniert haben.
           </TrainerHint>
           <TechniquePicker
-            block={block}
             relevantDisciplines={relevantDisciplines}
             activeDiscipline={editDiscipline}
             selectedIds={editIds}
@@ -713,7 +807,7 @@ function ModalReady({
       ) : (
         // ── ANZEIGE-MODUS ─────────────────────────────────────────────────
         <>
-          {isTrainer && (
+          {canEdit && (
             <div
               className="mt-4 rounded-field px-3.5 py-3"
               style={{
@@ -723,25 +817,25 @@ function ModalReady({
               }}
             >
               <span className="t-label mr-1.5" style={{ color: "var(--accent-text)" }}>
-                Trainer-Aktion:
+                Deine Einheit:
               </span>
-              {TRAINER_BLOCK_DESCRIPTION}
+              {EDIT_BLOCK_DESCRIPTION}
             </div>
           )}
 
-          {isTrainer && (
+          {canEdit && (
             <TrainerHint id="course-detail" title="Kurs-Details">
-              Hier siehst du alle Infos zu diesem Kurs. Über „Techniken
-              bearbeiten" weist du Inhalte für diese Woche zu.
+              Alles zu diesem Kurs auf einen Blick. Über „Techniken
+              bearbeiten“ legst du fest, was diese Woche dran ist.
             </TrainerHint>
           )}
 
           <div className="mt-4">
             {techniques.length === 0 ? (
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                {isTrainer
-                  ? "Noch keine Techniken für diese Einheit hinterlegt — füge sie über den Button unten hinzu."
-                  : "Für diese Einheit wurden noch keine Techniken hinterlegt."}
+                {canEdit
+                  ? "Für diese Einheit steht noch nichts fest. Stell sie unten zusammen."
+                  : "Für diese Einheit steht noch nichts fest."}
               </p>
             ) : (
               <div className="flex flex-col gap-2">
@@ -762,7 +856,7 @@ function ModalReady({
           </div>
 
           <div className="mt-5 flex flex-col gap-2">
-            {/* Schüler-Funktion: Kurs-Abo (nur für Nicht-Trainer) */}
+            {/* Athleten-Funktion: Kurs-Abo (nur für Nicht-Trainer) */}
             {isLoggedIn && !isTrainer && (
               <button
                 type="button"
@@ -786,20 +880,20 @@ function ModalReady({
                 }
                 title={
                   subscribed
-                    ? "Du bekommst neue Techniken aus diesem Kurs automatisch in deine Bibliothek"
-                    : "Folge diesem Kurs — neue Techniken landen automatisch in deiner Bibliothek"
+                    ? "Neue Techniken aus diesem Kurs landen automatisch in deiner Bibliothek"
+                    : "Bleib dran — neue Techniken aus diesem Kurs landen dann automatisch in deiner Bibliothek"
                 }
               >
                 <Icon name="star" size={14} strokeWidth={2.4} />
                 {subscribing
                   ? "…"
                   : subscribed
-                    ? "Kurs abonniert — Auto-Sync aktiv"
+                    ? "Du bist dran — Auto-Sync läuft"
                     : "Kurs abonnieren (Auto-Sync)"}
               </button>
             )}
 
-            {isTrainer && (
+            {canEdit && (
               <button
                 type="button"
                 onClick={onStartEdit}
@@ -816,7 +910,7 @@ function ModalReady({
               </button>
             )}
 
-            {/* Schüler-Funktion: Teilnahme (nur für Nicht-Trainer) */}
+            {/* Athleten-Funktion: Teilnahme (nur für Nicht-Trainer) */}
             {!isTrainer &&
               (isLoggedIn ? (
                 participated ? (
@@ -839,8 +933,8 @@ function ModalReady({
                           color: "var(--text-2)",
                         }}
                       >
-                        — {attendResult} Technik{attendResult !== 1 ? "en" : ""} zur
-                        Bibliothek hinzugefügt
+                        — {attendResult} Technik{attendResult !== 1 ? "en" : ""} in
+                        deiner Bibliothek
                       </span>
                     )}
                     {attendResult === 0 && (
@@ -852,7 +946,7 @@ function ModalReady({
                           color: "var(--text-3)",
                         }}
                       >
-                        (alle bereits in deiner Bibliothek)
+                        (hattest du schon alle)
                       </span>
                     )}
                   </div>
@@ -870,7 +964,7 @@ function ModalReady({
                     }}
                   >
                     {attending
-                      ? "Wird gespeichert…"
+                      ? "Einen Moment…"
                       : displayCount > 0
                         ? `Ich nehme teil — ${displayCount} Technik${displayCount !== 1 ? "en" : ""} übernehmen`
                         : "Ich nehme teil"}
@@ -889,7 +983,7 @@ function ModalReady({
                   }}
                   onClick={onClose}
                 >
-                  Anmelden zum Teilnehmen
+                  Anmelden und dabei sein
                 </Link>
               ))}
           </div>
@@ -902,7 +996,6 @@ function ModalReady({
 // ─── TechniquePicker ──────────────────────────────────────────────────────
 
 function TechniquePicker({
-  block: _block,
   relevantDisciplines,
   activeDiscipline,
   selectedIds,
@@ -914,7 +1007,6 @@ function TechniquePicker({
   onSave,
   onCancel,
 }: {
-  block: TrainingBlock;
   relevantDisciplines: Discipline[];
   activeDiscipline: string;
   selectedIds: string[];
@@ -1050,7 +1142,7 @@ function TechniquePicker({
             boxShadow: "var(--accent-glow)",
           }}
         >
-          {saving ? "Speichern…" : `Speichern (${selectedIds.length})`}
+          {saving ? "Einen Moment…" : `Speichern (${selectedIds.length})`}
         </button>
         <button
           type="button"

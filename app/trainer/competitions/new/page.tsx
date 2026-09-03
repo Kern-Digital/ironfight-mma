@@ -370,7 +370,7 @@ function NewCompetitionContent() {
           </div>
         ) : (
           <div className="flex flex-col gap-7">
-            {/* Schritt 1: Schüler */}
+            {/* Schritt 1: Athlet */}
             <section>
               <StepHeader n={1} title="Athlet" />
               <input
@@ -402,7 +402,7 @@ function NewCompetitionContent() {
                     onSelect={setStudentUid}
                   />
                   <AthleteGroup
-                    title="Schüler"
+                    title="Athlet"
                     accent="var(--fg-4)"
                     entries={studentEntries}
                     selectedUid={studentUid}
@@ -493,8 +493,9 @@ function NewCompetitionContent() {
               ) : (
                 <div className="mt-1">
                   <p className="mb-4 text-xs" style={{ color: "var(--fg-4)" }}>
-                    Neues Gegnerprofil — wird gym-weit geteilt und nach dem
-                    Speichern automatisch für diesen Wettkampf ausgewählt.
+                    Neues Gegnerprofil — dein ganzes Trainerteam arbeitet
+                    damit, und für diesen Wettkampf steht es nach dem Speichern
+                    schon bereit.
                   </p>
                   <OpponentEditor
                     busy={creatingOpp}

@@ -273,7 +273,7 @@ export default function VideoAnalysisResult({
         {conflictCount > 0 && canApply && (
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--ta-pink)" }}>
             {conflictCount} {conflictCount === 1 ? "Konflikt" : "Konflikte"} mit
-            bestehenden Antworten — diese werden nur einzeln übernommen.
+            bestehenden Antworten — die entscheidest du einzeln.
           </p>
         )}
         <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--fg-2)" }}>
@@ -453,7 +453,7 @@ export default function VideoAnalysisResult({
                                 className="mt-1 text-[10px]"
                                 style={{ color: "var(--ta-pink)" }}
                               >
-                                Konflikt — bisher: „{existingDna[f.questionId]}"
+                                Konflikt — bisher: „{existingDna[f.questionId]}“
                               </p>
                             )}
                             {f.evidence.length > 0 && (
@@ -722,9 +722,9 @@ export default function VideoAnalysisResult({
                 <b style={{ color: "var(--ta-pink)" }}>Widerspruch</b> —{" "}
                 {DNA_QUESTION_BY_ID.get(c.questionId)?.label ?? c.questionId}:
                 <br />
-                <span style={{ color: "var(--fg-4)" }}>Bisher: „{c.existing}"</span>
+                <span style={{ color: "var(--fg-4)" }}>Bisher: „{c.existing}“</span>
                 <br />
-                <span>Video zeigt: „{c.observed}"</span>
+                <span>Video zeigt: „{c.observed}“</span>
               </div>
             ))}
           </div>

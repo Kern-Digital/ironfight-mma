@@ -43,6 +43,25 @@ export type AdminUserEntry = {
    */
   gymJoinedAt: Date | undefined;
   createdAt: Date | undefined;
+  /**
+   * Gym des Kontos — `null` heißt NICHT „Default-Gym", sondern „gehört
+   * gerade zu keinem Gym" (CLAUDE.md, „Konto vs. Mitgliedschaft"): so sieht
+   * ein Konto nach `/api/members/remove` aus und jedes, das sich ohne
+   * Einladung registriert hat.
+   *
+   * NUR DIE PLATTFORM-ÜBERSICHT BRAUCHT DAS FELD. Eine Gym-Liste ist
+   * ohnehin nach `gymId` gefiltert — dort wäre die Angabe an jeder Zeile
+   * dieselbe. Erst plattformweit wird sie zur Frage: Wie verteilen sich die
+   * Konten auf die Gyms, und wie viele hängen an keinem?
+   */
+  gymId: string | null;
+  /**
+   * Marke der Demo-Mitglieder (`scripts/seed-demo-gym.mjs`). Sie sind
+   * users-Dokumente OHNE Auth-Konto — niemand meldet sich als Demo-Mitglied
+   * an. Ohne diese Marke wäre jede plattformweite Zahl um die Demo-Menge zu
+   * hoch, ohne dass es jemandem auffiele.
+   */
+  isDemo: boolean;
 };
 
 export type StudentEntry = AdminUserEntry & {
@@ -94,6 +113,8 @@ function decodeStudentEntry(
     displayName: (data.displayName as string | null) ?? null,
     authProviderName: (data.authProviderName as string | null) ?? null,
     rights: effectiveRights(readRoleSet(data)),
+    gymId: ((data.gymId as string | null | undefined) ?? null) || null,
+    isDemo: data.isDemo === true,
     gymJoinedAt: (data.gymJoinedAt as Timestamp | undefined)?.toDate(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
     athlete: decodeAthlete(data.athlete as AthleteDoc | undefined),
@@ -135,6 +156,8 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
       displayName: data.displayName ?? null,
       authProviderName: data.authProviderName ?? null,
       rights: effectiveRights(readRoleSet(data)),
+      gymId: ((data.gymId as string | null | undefined) ?? null) || null,
+      isDemo: data.isDemo === true,
       gymJoinedAt: data.gymJoinedAt?.toDate() as Date | undefined,
       createdAt: data.createdAt?.toDate() as Date | undefined,
     };

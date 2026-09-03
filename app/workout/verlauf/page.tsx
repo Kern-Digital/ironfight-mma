@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import WorkoutLogSheet, { WorkoutLogTile } from "@/components/WorkoutLogSheet";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { toggleWorkoutFavorite } from "@/lib/workout-plans";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
@@ -31,7 +31,10 @@ const MAX_ENTRIES = 100;
 export default function WorkoutHistoryPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
   const heartColor = GENDER_HEART_COLOR[profile?.athlete?.gender ?? "unset"];
 
   const [sessions, setSessions] = useState<WorkoutSession[] | null>(null);
@@ -78,7 +81,7 @@ export default function WorkoutHistoryPage() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       <section className="relative">
@@ -109,7 +112,7 @@ export default function WorkoutHistoryPage() {
               Details, das Herz speichert es als eigenen Plan.
             </p>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -177,7 +180,7 @@ export default function WorkoutHistoryPage() {
         />
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

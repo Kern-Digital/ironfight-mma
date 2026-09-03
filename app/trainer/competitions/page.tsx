@@ -20,8 +20,8 @@ import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
-  if (!entry) return "Schüler";
-  return entry.displayName ?? entry.authProviderName ?? entry.email ?? "Schüler";
+  if (!entry) return "Athlet";
+  return entry.displayName ?? entry.authProviderName ?? entry.email ?? "Athlet";
 }
 
 // ─── Gruppen-Sektion ─────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ function CompetitionsHubContent() {
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
         <TrainerHint id="competitions-hub" title="Wettkampfbereich">
           Hier legst du Wettkämpfe an und verfolgst sie — jeder Wettkampf
-          verbindet einen Schüler mit einem Gegner aus der
+          verbindet einen Athleten mit einem Gegner aus der
           DeepFight-Bibliothek und friert deren damaligen Stand ein. Die
           Bibliothek selbst findest du im Bereich &bdquo;DeepFight&ldquo;.
         </TrainerHint>
@@ -181,7 +181,7 @@ function CompetitionsHubContent() {
           </Link>
           <input
             type="search"
-            placeholder="Wettkampf, Gegner oder Schüler suchen…"
+            placeholder="Wettkampf, Gegner oder Athlet suchen…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="min-w-0 flex-1 rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
@@ -207,7 +207,7 @@ function CompetitionsHubContent() {
             hint={
               search
                 ? undefined
-                : "Lege deinen ersten Wettkampf an — wähle einen Schüler und einen Gegner."
+                : "Leg deinen ersten Wettkampf an — wähle einen Athleten und einen Gegner."
             }
           />
         ) : (

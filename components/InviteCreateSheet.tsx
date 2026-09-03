@@ -244,8 +244,8 @@ export default function InviteCreateSheet({
                       sonst liest man beim Athleten eine Trainer-Erklärung. */}
                   <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                     {role === "trainer"
-                      ? "Trainer sind dein Team — sie bekommen zusätzlich die Werkzeuge: DeepFight, Wettkämpfe und die Schülerliste."
-                      : "Athleten sind deine Schüler — sie sehen ihre Kurse, ihre Workout-Pläne und ihr eigenes Kampfprofil."}
+                      ? "Trainer sind dein Team — sie bekommen zusätzlich die Werkzeuge: DeepFight, Wettkämpfe und die Athletenliste."
+                      : "Athleten trainieren bei dir — sie sehen ihre Kurse, ihre Workout-Pläne und ihr eigenes Kampfprofil."}
                   </p>
                 </div>
               )}

@@ -603,6 +603,22 @@ export interface Participation {
   blockTitle: string;
   weekIdentifier: string;
   joinedAt: Date;
+  /**
+   * Das Gym, zu dem diese Teilnahme zählt (nachgetragen 2026-09-01).
+   *
+   * WARUM AM DOKUMENT UND NICHT ÜBER DEN BESITZER: Teilnahmen liegen unter
+   * `users/{uid}/participations/{sessionId}`. Für eine Kennzahl wie „wie viele
+   * Athleten waren diese Woche in den Kursen" muss man sie GYM-WEIT lesen, und
+   * das geht nur als collectionGroup-Abfrage. Eine solche Abfrage sieht den
+   * Elternpfad nicht — sie kann also nicht prüfen, zu welchem Gym der Besitzer
+   * gehört. Ohne dieses Feld ließe sich die Regel nicht schreiben, und die
+   * Trennung zwischen zwei Gyms wäre nicht durchsetzbar (Konzept §3.3, deny by
+   * default).
+   *
+   * Optional, weil Bestandsdokumente es nicht haben: Sie zählen dann nicht mit,
+   * statt die Abfrage scheitern zu lassen.
+   */
+  gymId?: string;
 }
 
 /**

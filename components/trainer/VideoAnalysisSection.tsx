@@ -1459,7 +1459,7 @@ export default function VideoAnalysisSection({
                             : " · Ins Kampfprofil übernommen")}
                         {mode === "athlete" &&
                           a.sharedWithAthlete &&
-                          " · Für Schüler freigegeben"}
+                          " · Für Athleten freigegeben"}
                       </div>
                     </div>
                   </div>
@@ -1498,8 +1498,8 @@ export default function VideoAnalysisSection({
                           style={{ color: "var(--fg-3)" }}
                         >
                           {a.sharedWithAthlete
-                            ? "Der Schüler sieht diese Auswertung in seinem Kampfprofil."
-                            : "Nur für Trainer sichtbar — bei Freigabe sieht der Schüler das Ergebnis in seinem Kampfprofil."}
+                            ? "Der Athlet sieht diese Auswertung in seinem Kampfprofil."
+                            : "Nur für Trainer sichtbar — mit der Freigabe sieht der Athlet das Ergebnis in seinem Kampfprofil."}
                         </span>
                         <button
                           onClick={() => toggleSharedWithAthlete(a)}
@@ -1521,7 +1521,7 @@ export default function VideoAnalysisSection({
                         >
                           {a.sharedWithAthlete
                             ? "Freigabe zurückziehen"
-                            : "Für Schüler freigeben"}
+                            : "Für Athleten freigeben"}
                         </button>
                       </div>
                     )}

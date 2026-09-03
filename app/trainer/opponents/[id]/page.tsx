@@ -135,7 +135,7 @@ function SharePanel({
   useEffect(() => {
     listAllStudents(gymId)
       .then(setStudents)
-      .catch(() => setError("Schülerliste konnte nicht geladen werden"));
+      .catch(() => setError("Athletenliste konnte nicht geladen werden"));
   }, [gymId]);
 
   function toggle(uid: string) {
@@ -180,11 +180,11 @@ function SharePanel({
             className="font-mono-ta text-[10px] font-bold uppercase"
             style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
           >
-            Für Schüler freigeben
+            Für Athleten freigeben
           </div>
           <p className="mt-1 text-[11px]" style={{ color: "var(--fg-4)" }}>
-            Freigegebene Schüler sehen dieses Gegnerprofil read-only in ihrem
-            Bereich „Mein DeepFight" — z. B. zur Vorbereitung auf den Kampf.
+            Freigegebene Athleten sehen dieses Gegnerprofil read-only in ihrem
+            Bereich „Mein DeepFight“ — z. B. zur Vorbereitung auf den Kampf.
           </p>
         </div>
         <button
@@ -217,7 +217,7 @@ function SharePanel({
         />
       ) : students.length === 0 ? (
         <p className="mt-3 text-xs" style={{ color: "var(--fg-4)" }}>
-          Keine Schüler gefunden.
+          Keine Athleten gefunden.
         </p>
       ) : (
         <div className="mt-3 grid gap-1.5 sm:grid-cols-2">

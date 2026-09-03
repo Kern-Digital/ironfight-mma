@@ -43,7 +43,7 @@ import { useCallback, useEffect, useState } from "react";
 const ROLE_EXPLAINER: Record<string, string> = {
   user: "Du steigst als Athlet ein — deine Kurse, deine Workout-Pläne und dein eigenes Kampfprofil warten hinter diesem Knopf.",
   trainer:
-    "Du steigst als Trainer ein — dein eigenes Training plus die Werkzeuge deines Teams: DeepFight, Wettkämpfe und die Schülerliste.",
+    "Du steigst als Trainer ein — dein eigenes Training plus die Werkzeuge deines Teams: DeepFight, Wettkämpfe und die Athletenliste.",
 };
 
 export default function JoinWithCodePage({

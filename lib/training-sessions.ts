@@ -289,6 +289,13 @@ export async function recordParticipation(
   uid: string,
   session: TrainingSession,
   blockTitle: string,
+  /**
+   * Das Gym des Teilnehmers. Ohne diese Angabe zählt die Teilnahme in keiner
+   * Gym-Kennzahl mit — siehe `Participation.gymId` in lib/types.ts: Eine
+   * collectionGroup-Abfrage sieht den Elternpfad nicht und kann die
+   * Zugehörigkeit sonst weder lesen noch in den Regeln prüfen.
+   */
+  gymId?: string,
 ): Promise<void> {
   const ref = participationDocRef(uid, session.id);
   const existing = await getDoc(ref);
@@ -300,6 +307,7 @@ export async function recordParticipation(
     blockTitle,
     weekIdentifier: session.weekIdentifier,
     joinedAt: serverTimestamp(),
+    ...(gymId ? { gymId } : {}),
   });
 }
 

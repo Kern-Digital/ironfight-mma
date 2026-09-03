@@ -89,8 +89,93 @@ export interface GymSubscription {
 export interface Gym {
   id: string;
   name: string;
+  /**
+   * Betriebszustand (Konzept §2: „Status (aktiv/gesperrt)"). Gesetzt beim
+   * Anlegen (`scripts/migrate-multi-gym.mjs`), geschrieben ausschließlich
+   * serverseitig. Fehlt das Feld, gilt das Gym als aktiv — ein Gym wegen
+   * eines fehlenden Feldes als gesperrt anzuzeigen wäre die teurere
+   * Falschaussage.
+   */
+  status?: "active" | "blocked" | null;
   /** Branding-Tokens (Konzept §8) — leer = kompletter Tidal-Look. */
   branding?: Record<string, string> | null;
   subscription?: GymSubscription | null;
   createdAt?: Date | null;
+}
+
+/**
+ * ALLE Gyms der Plattform — für die Plattform-Übersicht `/admin`.
+ *
+ * NUR DER PLATTFORM-RANG DARF DAS, und zwar nachgemessen: Ein Prüfkonto mit
+ * ausschließlich `admin: true` bekam per Firestore-REST auf
+ * `LIST gyms/` eine 200, dasselbe Konto mit ausschließlich `trainer: true`
+ * eine 403 (02.09.2026). Die Regel dahinter ist
+ * `allow read: isAdmin() || userGymId() == gymId` — der Admin-Zweig fragt
+ * kein `resource` ab und ist deshalb auch für eine LISTE beweisbar, der
+ * Gym-Zweig nicht. Ein Trainer, der diese Funktion aufruft, bekommt einen
+ * Fehler; das ist die richtige Antwort und kein Bug.
+ *
+ * KEIN CACHE (anders als `getGymName`): Diese Liste steht auf genau einer
+ * Seite, und wer sie öffnet, will den aktuellen Stand sehen.
+ */
+export async function listGyms(): Promise<Gym[]> {
+  const { collection, getDocs } = await import("firebase/firestore");
+  const { getFirestoreDb } = await import("./firebase");
+  const snap = await getDocs(collection(getFirestoreDb(), "gyms"));
+  return snap.docs.map((d) => {
+    const data = d.data() as Record<string, unknown>;
+    return {
+      id: d.id,
+      name: (data.name as string | undefined)?.trim() || d.id,
+      status: (data.status as Gym["status"]) ?? null,
+      branding: (data.branding as Gym["branding"]) ?? null,
+      subscription: (data.subscription as Gym["subscription"]) ?? null,
+      createdAt:
+        (data.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() ??
+        null,
+    } satisfies Gym;
+  });
+}
+
+/**
+ * Der ANZEIGENAME eines Gyms — für die Gym-Zeile der Sidebar-Hülle.
+ *
+ * WARUM MIT CACHE: Die Hülle steht auf JEDER Seite. Ohne Zwischenspeicher
+ * kostete jeder Seitenwechsel einen Firestore-Lesevorgang für einen Namen,
+ * der sich praktisch nie ändert. Der Cache lebt im Modul und damit genau so
+ * lange wie der Tab — ein umbenanntes Gym erscheint nach dem nächsten
+ * Neuladen, und das ist bei einem Namen die richtige Abwägung.
+ *
+ * FEHLER SIND KEIN FEHLER: Kann das Dokument nicht gelesen werden (Regeln,
+ * Netz, Gym-Dokument fehlt), kommt der Slug zurück. Eine Hülle, die wegen
+ * eines Namens leer bleibt, wäre schlimmer als ein technischer Name.
+ */
+const gymNameCache = new Map<string, string>();
+
+export async function getGymName(gymId: string): Promise<string> {
+  const cached = gymNameCache.get(gymId);
+  if (cached) return cached;
+  const fallback = gymId === DEFAULT_GYM_ID ? DEFAULT_GYM_LABEL : gymId;
+  try {
+    const { doc, getDoc } = await import("firebase/firestore");
+    const { getFirestoreDb } = await import("./firebase");
+    const snap = await getDoc(doc(getFirestoreDb(), "gyms", gymId));
+    const name = snap.exists() ? (snap.data().name as string | undefined) : undefined;
+    const value = name?.trim() || fallback;
+    gymNameCache.set(gymId, value);
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Zeichen für die Gym-Marke (32×32-Feld der Sidebar): ein bis zwei
+ * Anfangsbuchstaben. „Tidal Athletics" → „TA", „Ironfight" → „IR".
+ */
+export function gymInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "TA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
 }

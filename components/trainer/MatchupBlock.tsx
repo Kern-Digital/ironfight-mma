@@ -221,7 +221,7 @@ export default function MatchupBlock({
           className="mt-2 text-[11px]"
           style={{ color: "var(--fg-4)" }}
         >
-          Größe, Gewicht, Reichweite und Auslage des Schülers im
+          Größe, Gewicht, Reichweite und Auslage des Athleten im
           Athleten-Profil pflegen, um den Vergleich zu vervollständigen.
         </p>
       )}

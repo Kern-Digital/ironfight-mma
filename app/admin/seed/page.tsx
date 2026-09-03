@@ -274,7 +274,7 @@ function StudentSeedCard({
           className="font-mono-ta text-[10px] uppercase"
           style={{ letterSpacing: "0.15em", color: "var(--ta-cyan)" }}
         >
-          Schülerprofil öffnen →
+          Athletenprofil öffnen →
         </Link>
       </div>
     </div>
@@ -408,7 +408,7 @@ function SeedContent() {
               isDemo: true
             </code>{" "}
             — &bdquo;Demo löschen&ldquo; entfernt nur diese Einträge und tastet echte Daten
-            nicht an. Trainer können dann im Schülerprofil + Wettkampfbereich
+            nicht an. Trainer können dann im Athletenprofil + Wettkampfbereich
             sehen, wie Analysen mit echten Daten aussehen würden.
           </p>
           <p className="mt-2 text-xs" style={{ color: "var(--fg-4)" }}>
@@ -422,7 +422,7 @@ function SeedContent() {
         {error && (
           <div className="mb-6">
             <ErrorState
-              title="Schüler konnten nicht geladen werden"
+              title="Athleten konnten nicht geladen werden"
               message={error}
               onRetry={loadStudents}
             />
@@ -440,7 +440,7 @@ function SeedContent() {
         {students !== null && students.length === 0 && (
           <div className="py-10 text-center">
             <p className="text-sm" style={{ color: "var(--fg-4)" }}>
-              Noch keine Schüler registriert.
+              Noch keine Athleten registriert.
             </p>
           </div>
         )}

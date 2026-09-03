@@ -141,7 +141,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
         listFightCamps(uid).catch(() => [] as FightCamp[]),
         listVideoAnalyses("athlete", uid).catch(() => [] as VideoAnalysis[]),
       ]);
-      if (!e) throw new Error("Schüler nicht gefunden");
+      if (!e) throw new Error("Athlet nicht gefunden");
       setEntry(e);
       setWorkouts(w);
       setProgress(p);
@@ -188,7 +188,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <ErrorState
-          title="Schüler konnte nicht geladen werden"
+          title="Athlet konnte nicht geladen werden"
           message={error}
           onRetry={load}
         />
@@ -230,7 +230,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
             className="font-mono-ta text-[10px] uppercase"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
-            ← Schülerliste
+            ← Athletenliste
           </Link>
           <div className="mt-3 flex items-start gap-4">
             <div
@@ -260,7 +260,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 {entry.email ?? "—"} · Seit {formatDate(entry.createdAt)}
               </p>
 
-              {/* DeepFight-Einstieg für diesen Schüler — die Analyse selbst
+              {/* DeepFight-Einstieg für diesen Athleten — die Analyse selbst
                   lebt unter /trainer/deepfight/athletes/[uid]. */}
               <Link
                 id="deepfight"
@@ -359,11 +359,11 @@ function StudentDetailContent({ uid }: { uid: string }) {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        <TrainerHint id="student-detail" title="Schüler-Detail">
+        <TrainerHint id="student-detail" title="Athleten-Detail">
           Hier siehst du das volle Athleten-Profil und die Trainings-Analyse aus
           der App-Historie. Wettkämpfe inkl. DeepFight-Profil werden zentral im
           Wettkampfbereich verwaltet — unten kannst du direkt einen neuen
-          Wettkampf für diesen Schüler anlegen.
+          Wettkampf für diesen Athleten anlegen.
         </TrainerHint>
 
         {/* KPI-Kacheln */}
@@ -680,7 +680,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 }}
               >
                 <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-                  Noch kein Wettkampf für diesen Schüler.
+                  Noch kein Wettkampf für diesen Athleten.
                 </p>
                 <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
                   Lege einen Wettkampf an, wähle einen Gegner aus der

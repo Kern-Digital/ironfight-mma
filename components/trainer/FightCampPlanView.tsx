@@ -448,12 +448,11 @@ export default function FightCampPlanView({
 
       {/* Disclaimer */}
       <div className="text-[10px]" style={{ color: "var(--fg-4)" }}>
-        <strong style={{ color: "var(--fg-3)" }}>Methodischer Hinweis:</strong>{" "}
-        Der Plan wird automatisch aus der Trainings-Historie des Schülers und
-        dem Gegnerstil generiert (Heuristik, keine wissenschaftliche Aussage).
-        Trainer sollten Phasen-Inhalte vor dem Einsatz prüfen und ggf. an die
-        individuelle Belastbarkeit, Verletzungshistorie und Tages-Form
-        anpassen.
+        <strong style={{ color: "var(--fg-3)" }}>Zur Einordnung:</strong>{" "}
+        Dieser Plan entsteht aus der Trainings-Historie deines Athleten und dem
+        Stil des Gegners — eine Faustregel, kein wissenschaftliches Ergebnis.
+        Geh die Phasen durch, bevor du sie einsetzt, und pass sie an
+        Belastbarkeit, Verletzungen und Tagesform an.
       </div>
     </div>
   );

@@ -57,7 +57,14 @@ export type IconName =
   | "trash"
   | "heart"
   | "info"
-  | "search";
+  | "search"
+  // Sidebar-Hülle (docs/SIDEBAR-SPEC.md §3): fünf Symbole, die der Vorlage
+  // fehlten. Gleiche 24er-Box, gleiche Strichführung wie der Rest.
+  | "layout"
+  | "panel-left"
+  | "logout"
+  | "settings"
+  | "hash";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -347,6 +354,49 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="11" cy="11" r="6.5" />
       <path d="M20.5 20.5 15.7 15.7" />
+    </>
+  ),
+  // Vier Felder — Übersicht/Dashboard
+  layout: (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  // Rahmen mit abgeteilter linker Spalte — Menü ein-/ausblenden
+  "panel-left": (
+    <>
+      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+      <path d="M9.5 4.5v15" />
+    </>
+  ),
+  // Tür mit Pfeil hinaus — Abmelden
+  logout: (
+    <>
+      <path d="M9.5 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3.5" />
+      <path d="M15 8.5 19 12l-4 3.5" />
+      <path d="M19 12H9.5" />
+    </>
+  ),
+  // Sechskant mit Loch — Einstellungen.
+  // BEWUSST KEIN Zahnrad mit Strahlen: Ein Kranz aus radialen Strichen um
+  // einen Kreis ist bei 16 px nicht von `sun` zu unterscheiden, und beide
+  // stehen in der Sidebar-Fußgruppe direkt untereinander (Account /
+  // Hell-Dunkel-Umschalter). Die Silhouette muss die Unterscheidung tragen,
+  // nicht das Detail.
+  settings: (
+    <>
+      <path d="M12 3.2 19.2 7.4v9.2L12 20.8 4.8 16.6V7.4Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  // Raute — Marke eines Unterpunkts
+  hash: (
+    <>
+      <path d="M9 4.5 7.5 19.5M16.5 4.5 15 19.5" />
+      <path d="M4.5 9h15M4 15h15" />
     </>
   ),
 };

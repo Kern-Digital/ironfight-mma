@@ -101,7 +101,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
 
   const athlete = entry?.athlete;
   const profileHref = isSelf ? "/kampfprofil" : `/trainer/students/${uid}`;
-  const profileLabel = isSelf ? "Mein Kampfprofil" : "Schülerprofil";
+  const profileLabel = isSelf ? "Mein Kampfprofil" : "Athletenprofil";
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
@@ -120,7 +120,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
             className="font-mono-ta text-[10px] uppercase"
             style={{ letterSpacing: "0.2em", color: "var(--fg-4)" }}
           >
-            ← Schüler-Analysen
+            ← Athleten-Analysen
           </Link>
 
           {!entry ? (

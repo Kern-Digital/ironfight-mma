@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
 import { generateWorkout } from "@/lib/workout-generator";
@@ -253,7 +253,12 @@ export default function WorkoutHubPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  // Getrennt seit der Stab-Hülle (01.09.2026): `isTrainer` steuert die
+  // ANSPRACHE der Freigabe-Karte („Aus dem Team" statt „Vom Trainer für
+  // dich"), `hasStaffShell` die Hülle drumherum. Eine reine Verwaltung ist
+  // kein Trainer, hat aber die Sidebar — und bräuchte sonst zwei Bottom-Bars.
   const isTrainer = useRights().trainer;
+  const hasStaffShell = useHasStaffShell();
 
   // Eigene Workoutpläne + letzte Workouts (Teilschritt 3): null = lädt noch —
   // die Bereiche erscheinen erst mit dem Ergebnis (kein Leer-Blitz).
@@ -424,7 +429,7 @@ export default function WorkoutHubPage() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich mit Ambient-Schicht (nur hier — nie hinter Listen) */}
@@ -449,7 +454,7 @@ export default function WorkoutHubPage() {
               Zeit, Equipment und Disziplin bauen.
             </p>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -1222,7 +1227,7 @@ export default function WorkoutHubPage() {
         </div>
       )}
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

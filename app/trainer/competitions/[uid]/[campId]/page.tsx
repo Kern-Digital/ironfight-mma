@@ -45,7 +45,7 @@ const GROUP_LABEL = {
 const GROUP_ACCENT = {
   upcoming: "var(--ta-cyan)",
   past: "var(--fg-3)",
-  archived: "#9D7BFA",
+  archived: "var(--accent-2)",
 } as const;
 
 function CompetitionDetailContent({
@@ -176,7 +176,7 @@ function CompetitionDetailContent({
     student?.displayName ??
     student?.authProviderName ??
     student?.email ??
-    "Schüler";
+    "Athlet";
 
   return (
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
@@ -293,17 +293,18 @@ function CompetitionDetailContent({
               className="font-mono-ta mb-3 rounded-lg px-3 py-2 text-[10px]"
               style={{
                 letterSpacing: "0.1em",
-                background: "rgba(157,123,250,0.1)",
-                border: "1px solid rgba(157,123,250,0.3)",
-                color: "#9D7BFA",
+                background: "color-mix(in oklab, var(--accent-2) 10%, transparent)",
+                border:
+                  "1px solid color-mix(in oklab, var(--accent-2) 30%, transparent)",
+                color: "var(--accent-2)",
               }}
             >
               {addedDnaCount}{" "}
               {addedDnaCount === 1 ? "Antwort stammt" : "Antworten stammen"} aus
               dem verknüpften DeepFight-Profil und {addedDnaCount === 1 ? "kam" : "kamen"}{" "}
-              nach dem Anlegen dieses Wettkampfs dazu. Eigene Wettkampf-Notizen
-              bleiben unverändert. Beim Speichern wird dieser Stand fest
-              übernommen.
+              nach dem Anlegen dieses Wettkampfs dazu. Deine eigenen
+              Wettkampf-Notizen bleiben, wie sie sind. Mit dem Speichern frierst
+              du diesen Stand ein.
             </p>
           )}
 

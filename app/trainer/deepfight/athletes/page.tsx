@@ -68,7 +68,7 @@ export default function DeepFightAthletesPage() {
     return [
       { title: "Meine Analyse", accent: "#23C4CE", entries: self },
       { title: "Trainer & Coaches", accent: "#9D7BFA", entries: staff },
-      { title: "Schüler", accent: "var(--fg-4)", entries: students },
+      { title: "Athleten", accent: "var(--fg-4)", entries: students },
     ].filter((g) => g.entries.length > 0);
   }, [filtered, user?.uid]);
 
@@ -105,8 +105,8 @@ export default function DeepFightAthletesPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-xl text-xs" style={{ color: "var(--fg-4)" }}>
-            Wähle einen Athleten — Schüler wie Trainer: DeepFight wertet seine
-            Kampf-Videos aus, Ergebnisse lassen sich anschließend freigeben.
+            Wähle aus, wen du auswerten willst — Athleten wie Trainer:
+            DeepFight zerlegt die Kampf-Videos, freigeben kannst du danach.
           </p>
           <Link
             href="/trainer/opponents"

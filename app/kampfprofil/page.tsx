@@ -28,7 +28,12 @@ import FightProfileView from "@/components/trainer/FightProfileView";
 import VideoAnalysisResult from "@/components/trainer/VideoAnalysisResult";
 import Skeleton from "@/components/ui/Skeleton";
 import Icon from "@/components/ui/Icon";
-import { useAuth, useFighterName, useRights } from "@/lib/auth-context";
+import {
+  useAuth,
+  useFighterName,
+  useHasStaffShell,
+  useRights,
+} from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   getFightProfile,
@@ -126,7 +131,13 @@ function KampfprofilContent() {
   const { user, profile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const fighterName = useFighterName();
+  // ZWEI VERSCHIEDENE FRAGEN, die bis zum 01.09.2026 zufällig dieselbe
+  // Antwort hatten: „darf diese Person eine eigene Video-Analyse starten"
+  // (Trainer-Werkzeug, /trainer/deepfight/me) und „steht um diese Seite die
+  // Stab-Hülle" (dann kommen Menü, Bottom-Bar und Hell/Dunkel von dort).
+  // Für eine reine Verwaltung fallen sie auseinander.
   const isTrainer = useRights().trainer;
+  const hasStaffShell = useHasStaffShell();
 
   const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
   const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
@@ -165,7 +176,7 @@ function KampfprofilContent() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich mit Ambient-Schicht — DeepFight-Kontext, daher
@@ -219,7 +230,7 @@ function KampfprofilContent() {
             )}
           </div>
           {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -413,7 +424,7 @@ function KampfprofilContent() {
         </div>
       </div>
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

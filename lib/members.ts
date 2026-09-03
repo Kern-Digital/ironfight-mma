@@ -50,7 +50,7 @@ export const RIGHT_EXPLAIN: Record<
   { on: string; off: string }
 > = {
   trainer: {
-    on: "Trainer sind dein Team — sie bekommen zusätzlich die Werkzeuge: DeepFight, Wettkämpfe und die Schülerliste.",
+    on: "Trainer sind dein Team — sie bekommen zusätzlich die Werkzeuge: DeepFight, Wettkämpfe und die Athletenliste.",
     off: "Ohne Häkchen trainiert diese Person einfach mit: Kurse, Workout-Pläne und das eigene Kampfprofil.",
   },
   verwaltung: {

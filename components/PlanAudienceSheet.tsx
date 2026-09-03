@@ -44,7 +44,7 @@ const GROUP_FONT: React.CSSProperties = {
 };
 
 function studentLabel(s: StudentEntry): string {
-  return s.displayName ?? s.authProviderName ?? s.email ?? "Schüler";
+  return s.displayName ?? s.authProviderName ?? s.email ?? "Athlet";
 }
 
 function SectionTitle({ title }: { title: string }) {
@@ -136,7 +136,7 @@ export default function PlanAudienceSheet({
     return [
       { title: "Ich selbst", entries: me },
       { title: "Trainer & Coaches", entries: rest.filter(isStaffEntry) },
-      { title: "Schüler", entries: rest.filter((s) => !isStaffEntry(s)) },
+      { title: "Athleten", entries: rest.filter((s) => !isStaffEntry(s)) },
     ].filter((g) => g.entries.length > 0);
   }, [members, search, user?.uid]);
 
@@ -256,7 +256,7 @@ export default function PlanAudienceSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1">
-          {/* ── Kurse — Vorbelegung der Schüler-Auswahl ── */}
+          {/* ── Kurse — Vorbelegung der Athleten-Auswahl ── */}
           <SectionTitle title="Kurse" />
           <p
             className="px-2.5 pb-3"

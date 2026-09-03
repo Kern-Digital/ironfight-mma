@@ -340,8 +340,8 @@ function AdminUsersContent() {
                   {r.label}
                 </span>
                 <p className="mt-1 text-xs" style={{ color: "var(--fg-3)" }}>
-                  {r.value === "user" && "Kann trainieren, Techniken ansehen, am Stundenplan teilnehmen."}
-                  {r.value === "trainer" && "Zusätzlich: Übungen im Stundenplan hinterlegen, Trainer-Dashboard."}
+                  {r.value === "user" && "Kann trainieren, Techniken ansehen, am Kursplan teilnehmen."}
+                  {r.value === "trainer" && "Zusätzlich: Übungen im Kursplan hinterlegen, Trainer-Dashboard."}
                   {r.value === "admin" && "Vollzugriff: Trainer-Rechte + Nutzerverwaltung."}
                 </p>
               </div>

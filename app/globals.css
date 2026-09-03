@@ -316,6 +316,437 @@
   --dur-fast: 120ms; --dur-med: 220ms;
 }
 
+/* ─── Stab-Hülle: Sidebar + Header (docs/SIDEBAR-SPEC.md) ───────────────────
+   Die Maße als TOKENS, nicht als vierzig verstreute Literale in den
+   Komponenten. Wer die Hülle enger oder weiter will, dreht hier eine Zahl.
+
+   ZWEITE RUNDE, 01.09.2026 nachmittags (Leon am gebauten Zustand 1):
+   „mach die sidebar größer, die schrift darin größer — dann wirkt sie noch
+   etwas klobig, sie soll leichter wirken." Das zieht in zwei Richtungen,
+   denn größere Schrift wirkt für sich genommen SCHWERER. Aufgelöst in vier
+   Schritten, von denen nur der erste die Größe betrifft:
+     1. Typo hoch: 13 → 15 px, Symbole 16 → 18 px, Breite 260 → 288 px.
+     2. Gewicht runter: Gruppen-Überschriften 600 → 500.
+     3. FLÄCHE WEG — der größte Hebel. Die Sidebar lag als eigene Karte auf
+        dem Seitengrund (bg-card/50 der Vorlage) und las sich dadurch als
+        Block. Jetzt trägt sie denselben Grund wie die Seite; getrennt wird
+        allein durch die 1-px-Kante rechts.
+     4. Aktiv ohne Kasten: statt gefüllter Fläche ein 2-px-Balken am
+        Zeilenanfang plus Akzentfarbe (Leons Wahl). Ein gefülltes Rechteck
+        wäre bei 15 px genau das Klobige gewesen, das weg soll.
+
+   ACHTUNG, DIESE TOKENS DÜRFEN NICHT MITWACHSEN: Unsere Typo-Skala geht
+   mobil eine Stufe HOCH (@media max-width:640px weiter unten, Leon 26.08.).
+   Das ist für Fließtext richtig und für ein Menü falsch — die Schublade auf
+   dem Handy soll dieselben 15 px tragen wie die Sidebar am Desktop, sonst
+   passen die Zeilenhöhen nicht mehr zu den 18-px-Symbolen. Deshalb stehen
+   sie NUR hier und haben bewusst KEINE Entsprechung im Media-Query. */
+/* DRITTE RUNDE, 02.09.2026 (Leon): „sidebar und header sind mir noch etwas
+   zu klein … zu filigranes feeling … ich will es US-amerikanisch" — alles
+   eine Idee massiger: Breite 288 → 304, Menü-Typo 15 → 16, Symbole 18 → 20,
+   Kopf 56 → 64. Bewusst EINE Stufe, nicht zwei — „es fehlt nicht viel". */
+:root {
+  --sb-w: 304px;            /* Sidebar-Breite (war 260 → 288) */
+  --sb-pad: 12px;           /* Innenabstand */
+  --sb-row-y: 10px;         /* Zeilenpolsterung senkrecht (war 7 → 9) */
+  --sb-row-x: 12px;         /* Zeilenpolsterung waagerecht (war 10) */
+  --sb-icon: 20px;          /* Symbolgröße im Menü (war 16 → 18) */
+  --sb-gap: 10px;           /* Abstand Symbol → Text */
+  --r-nav: 8px;             /* Menüpunkt, Panel-Zeile (war 6) */
+  --r-nav-lg: 10px;         /* Konto-Zeile, Aufklapp-Panel (war 8) */
+  --r-kbd: 4px;             /* Tastenkürzel-Feld (vorerst ungenutzt, §5.3) */
+  /* Das aufgeploppte Feld des AKTIVEN Menüpunkts (Leon 02.09.: „ein
+     kleines bisschen größer aufploppen, solange ich darin bin" — Optik als
+     Glas-Lupe, siehe .sb-loupe weiter unten). Es wächst über negative
+     Seitenränder um --sb-pop über die Nachbarzeilen hinaus und zoomt
+     zusätzlich leicht (scale in .sb-loupe). */
+  --sb-pop: 3px;
+  /* Freiraum, den Menü-Scroller und Klapp-Behälter dem gepoppten Feld
+     lassen: Beide sind CLIP-KANTEN (overflow) — ohne diesen ausgleichenden
+     Innenabstand schnitten sie das über den Rand wachsende Glas-Feld
+     seitlich flach ab. 10px = 5px Pop + ~3px Zoom-Zuwachs + Luft. */
+  --sb-pop-clear: 10px;
+  /* Feder-Kurve fürs Aufploppen: leichtes Überschwingen, dann Ruhe. */
+  --ease-pop: cubic-bezier(0.3, 1.45, 0.45, 1);
+  --type-nav: 400 16px/1.25 var(--font-body);
+  /* In der Glas-Lupe ist die Schrift eine Stufe GRÖSSER als in den ruhenden
+     Zeilen (Leon 02.09.) — das ist die eigentliche Vergrößerung der Lupe;
+     das scale(1.02) obendrauf liefert nur den Zoom-Moment. */
+  --type-nav-active: 500 17px/1.25 var(--font-body);
+  --type-nav-heading-active: 600 17px/1.2 var(--font-body);
+  /* GRÖSSER ALS DIE PUNKTE DARUNTER (Leon 01.09.: „ich versteh nicht, wieso du
+     die Texte darunter größer als die eigentliche Überschrift machst"). Vorher
+     stand hier 11 px über 15-px-Zeilen — eine Überschrift, die kleiner ist als
+     ihr Inhalt, ordnet nichts. Jetzt 15 px in Versalien und im halbfetten
+     Schnitt: dieselbe Zahl wie die Zeilen, durch Großbuchstaben und Gewicht
+     aber deutlich darüber. Die gedämpfte Farbe (--text-label) hält sie
+     trotzdem im Hintergrund. */
+  --type-nav-heading: 600 16px/1.2 var(--font-body);
+  --type-nav-meta: 400 13px/1.2 var(--font-body);
+  /* Bei 15 px trägt die Laufweite der Vorlage (0.025em) zu weit auf — sie
+     war für 13 px gedacht. Überschriften bleiben weit, sie sind Versalien. */
+  --ls-nav: 0.01em;
+  --ls-nav-heading: 0.08em;
+  /* Fläche: Karte. Sie war kurz der Seitengrund (damit die Sidebar nicht als
+     aufgelegter Block liest) — seit sie FREI STEHT (Leon 01.09.: Rundungen an
+     allen Seiten, Abstand nach außen) braucht sie wieder eine eigene, sonst
+     wäre ein schwebendes Element ohne Umriss. Die Leichtigkeit kommt jetzt aus
+     dem Abstand ringsum, nicht aus der fehlenden Fläche. */
+  --sb-surface: var(--surface-card);
+  /* Hover ist die EINZIGE Fläche, die im Menü noch vorkommt — entsprechend
+     zurückhaltend, sonst konkurriert sie mit dem Akzent-Balken. */
+  --sb-hover: color-mix(in oklab, var(--surface-raised) 45%, transparent);
+  /* Führungslinie der Unterpunkte: sehr schwach, sie ordnet nur */
+  --sb-guide: color-mix(in oklab, var(--line) 70%, transparent);
+  /* shadow-xl der Vorlage (Konto-Panel, Schublade) */
+  --shadow-pop: 0 20px 25px -5px oklch(0 0 0 / 0.30), 0 8px 10px -6px oklch(0 0 0 / 0.28);
+
+  /* Header über dem Inhalt (Leon 01.09.: Pfad links, aktueller Kurs rechts).
+     Er sitzt RECHTS NEBEN der Sidebar, nicht darüber — die Sidebar bleibt
+     volle Fensterhöhe, der Kopf gehört zum Inhalt. Deshalb hat er auch
+     keinen eigenen Grund: Seitengrund plus 1-px-Unterkante, damit beim
+     Scrollen kein zweiter Balken über der Seite schwebt. */
+  --hd-h: 64px;
+  --hd-pad-x: 24px;
+
+  /* Die Hülle als freistehende Flächen (Leon 01.09.): Sidebar und Kopf sind
+     eigene Elemente mit Rundung an ALLEN Ecken und Abstand nach außen — zum
+     Bildschirmrand und zueinander. Vorher stießen sie stumpf aneinander, und
+     in der Ecke zwischen beiden entstand ein toter Winkel ohne Radius.
+     Fest bleiben sie trotzdem: die Sidebar klebt oben, der Kopf ebenfalls. */
+  --shell-gap: 12px;    /* Abstand nach außen UND zwischen Sidebar und Kopf */
+  --r-shell: 16px;      /* Radius der freistehenden Flächen */
+  /* Die kleinen Versal-Labels IM Kopf (Gym-Name, „JETZT"). Sie hatten sich
+     das Token der Sidebar-Überschriften geteilt — als das auf 15 px wuchs
+     (Leons Einwand: Überschrift darf nicht kleiner sein als ihre Punkte),
+     hätten sie den 56 px hohen Kopf gesprengt. Zwei verschiedene Aufgaben,
+     zwei Tokens. */
+  --type-hd-label: 600 12px/1.2 var(--font-body);
+
+  /* ─── Bereichsfarben (Leons Vorgabe 01.09.2026) ───────────────────────────
+     „Alle reinen Admin-Bereiche sollen rot sein, Verwaltung gelb, Trainer die
+     Tidal-blauen Akzente."
+
+     TRAINER HAT HIER BEWUSST KEINEN EINTRAG. Er bekommt keine eigene Farbe,
+     er IST die Gym-Farbe (--accent-h/--accent-c). Ein festes Tidal-Blau
+     bräche DESIGN-BRIEF §1.1: Ein Gym mit roter Marke hätte sonst blaue
+     Trainerwerkzeuge, und das Branding-Kit (Konzept §8) wäre an seiner
+     wichtigsten Stelle wirkungslos. Heute IST der Gym-Akzent dieses Blau —
+     es sieht also genau so aus wie gewünscht, ohne Sonderregel.
+
+     ROT UND BERNSTEIN SIND KEINE MARKENFARBEN, SONDERN WARNSTUFEN: „du
+     arbeitest gerade mit erhöhten Rechten". Damit stehen sie in derselben
+     Kategorie wie --positive/--negative/--warning und die Rubrik-Farben
+     --cat-*, die weiter oben schon ausdrücklich als „feste Hues, keine
+     Gym-Ableitung" geführt werden.
+
+     WARUM DAS ADMIN-ROT NICHT DAS ALARM-ROT IST: --negative liegt auf Hue 25.
+     Läge der Admin-Akzent daneben, sähe im Plattform-Bereich ein
+     „Löschen"-Knopf aus wie ein gewöhnlicher Akzent-Knopf — ausgerechnet
+     dort, wo Löschen am teuersten ist. Deshalb Karmin (Hue 10) mit höherer
+     Buntheit: klar rot, aber neben --negative unterscheidbar.
+
+     KEINE SPERRZONE IM BRANDING-KIT (Leons Entscheidung 01.09.): Ein Gym darf
+     jede Akzentfarbe wählen, auch eine rote. Dann sehen Trainer- und
+     Plattform-Bereich für dieses Gym gleich aus. Die Unterscheidung muss
+     deshalb IMMER auch ohne Farbe tragen — Gruppen-Überschrift („PLATTFORM"),
+     Schild-Symbol und die eigene Adresse /admin/*. Farbe kommt oben drauf,
+     sie steht nie allein (ohnehin WCAG-Pflicht). */
+  --area-admin-h: 10;         --area-admin-c: 0.17;
+  --area-verwaltung-h: 78;    --area-verwaltung-c: 0.14;
+}
+
+/* Ein Bereich färbt sich, indem er die ZWEI EINGABEN überschreibt — nicht
+   indem er eigene Farben mitbringt. Alles Weitere (--accent-text,
+   --accent-subtle, --ambient, Kontraste) leitet sich daraus wie gehabt ab.
+   Damit die Ableitungen neu gerechnet werden, MUSS am selben Element
+   zusätzlich data-theme stehen (siehe Kopf des Token-Systems) — nur dann
+   greift der Block, der die abgeleiteten Werte deklariert. Die Komponenten
+   setzen beides zusammen. */
+[data-area="admin"] {
+  --accent-h: var(--area-admin-h);
+  --accent-c: var(--area-admin-c);
+}
+[data-area="verwaltung"] {
+  --accent-h: var(--area-verwaltung-h);
+  --accent-c: var(--area-verwaltung-c);
+}
+
+/* Die Ableitungen NOCH EINMAL — als Nachfahren-Regel, nicht am Element selbst.
+ *
+ * WARUM NICHT data-theme MIT ANS ELEMENT (was der Kopf des Token-Systems als
+ * Weg beschreibt): Der Theme-Zustand lebt in React und startet bei jedem
+ * Aufbau auf „dark", bis der Effekt den gespeicherten Wert nachreicht. Ein
+ * data-theme aus dem Zustand wäre also für einen Frame falsch, und wer hell
+ * eingestellt ist, sähe den Bereich kurz in der dunklen Ableitung aufblitzen.
+ * Als Nachfahren-Regel entscheidet dagegen das data-theme am <html>, das das
+ * Inline-Skript in app/layout.tsx VOR dem ersten Bild setzt.
+ *
+ * NUR DIE AKZENT-FAMILIE, NICHT DIE FLÄCHEN: Grund, Linien und Textfarben
+ * bleiben die des Gyms. Ein Bereich, dessen Untergrund sich mitfärbt, läse
+ * sich wie eine Fehlerseite — und die Lesbarkeit wäre neu zu prüfen. Rot ist
+ * hier die Kennzeichnung, nicht der Alarm. Der Ambient-Schein färbt mit, weil
+ * er die „rot unterlegt"-Wirkung trägt, ohne Text zu berühren. */
+[data-area] {
+  --accent: oklch(0.78 var(--accent-c) var(--accent-h));
+  --accent-hover: oklch(0.84 calc(var(--accent-c)*0.85) var(--accent-h));
+  --accent-press: oklch(0.72 var(--accent-c) var(--accent-h));
+  --accent-subtle: oklch(0.26 calc(var(--accent-c)*0.38) var(--accent-h));
+  --accent-text: oklch(0.80 calc(var(--accent-c)*0.85) var(--accent-h));
+  --on-accent: oklch(0.16 calc(var(--accent-c)*0.3) var(--accent-h));
+  --accent-glow: 0 0 14px oklch(0.78 var(--accent-c) var(--accent-h) / 0.16);
+  --grad-progress: linear-gradient(90deg, oklch(0.62 calc(var(--accent-c)*0.95) var(--accent-h)), oklch(0.82 calc(var(--accent-c)*0.9) var(--accent-h)));
+  --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.62 var(--accent-c) var(--accent-h) / 0.46), oklch(0.62 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.50 calc(var(--accent-c)*0.85) var(--accent-h) / 0.32), oklch(0.50 calc(var(--accent-c)*0.85) var(--accent-h) / 0) 62%);
+  /* Muss mit, sonst bliebe die Gruppen-Überschrift auf dem Gym-Akzent stehen:
+     sie ist eine Mischung AUS --accent-text und wurde am :root schon
+     ausgerechnet. UND SIE MISCHT HIER KRÄFTIGER — 75 statt 40 Prozent. Am
+     :root ist die Überschrift ein zurückhaltender Akzent; in einem gefärbten
+     Bereich ist sie ein ERKENNUNGSMERKMAL („so dass ich gleich sehe, was zu
+     Admin gehört"). Mit 40 % blieb von Bernstein neben dem neutralen Grau
+     kaum etwas übrig — nachgemessen, nicht geschätzt. */
+  --text-label: color-mix(in oklab, var(--accent-text) 75%, var(--text-2));
+  /* Die getönte Fläche HINTER einer Rechte-Gruppe in der Sidebar (Leon
+     01.09.): „die Farbe soll auf der Fläche im Hintergrund unter dem Text
+     auch zu sehen sein." Sie steht hier und NICHT am :root — dort würde
+     --accent-subtle sofort auf den Gym-Wert ausgerechnet und die Tönung
+     wäre in allen drei Gruppen dieselbe. --accent-subtle statt --accent,
+     weil es die einzige Akzent-Abstufung ist, die in Dark UND Light als
+     FLÄCHE gedacht ist: dunkel getönt im dunklen Theme, hell getönt im
+     hellen. Ein gemischtes --accent würde Hell abdunkeln. */
+  --sb-group-tint:
+    radial-gradient(120% 95% at 0% 0%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 72%),
+    linear-gradient(155deg, color-mix(in oklab, var(--accent-subtle) 85%, transparent) 0%, color-mix(in oklab, var(--accent-subtle) 28%, transparent) 58%, transparent 100%);
+  --sb-group-edge: inset 0 0 0 1px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* ─── Das Admin-Rot im DUNKLEN Theme (Leons Ansage 02.09.2026) ──────────────
+ *
+ * „Mache anstatt Rosa ein Rot daraus, das sich trotz Dunkelmodus lesen lässt."
+ *
+ * WARUM ES ROSA WAR — nachgerechnet, nicht vermutet: Die allgemeine
+ * Ableitung oben legt jede Akzentfläche auf L 0.78. Bei Rot ist das keine
+ * Helligkeit, die sRGB noch hergibt — `oklch(0.78 0.17 10)` liegt AUSSERHALB
+ * des Farbraums, der Browser klemmt sie auf `#ff849e`, und das ist buchstäblich
+ * Rosa. Nicht die Farbwahl war falsch, sondern die Annahme, ein Akzent dürfe
+ * IMMER so hell sein. Für Cyan und Bernstein stimmt sie; für Rot nicht.
+ *
+ * DIE FLÄCHE MUSS DUNKLER WERDEN, ALSO DREHT SICH DIE SCHRIFT DARAUF UM.
+ * Bei L 0.58 trägt dunkle Schrift nur noch 4.0:1 — weiße dagegen 4.7:1
+ * (gemessen). Deshalb wird `--on-accent` hier hell statt dunkel; das ist der
+ * einzige Ort in der App, wo diese Umkehr nötig ist, und sie hängt an derselben
+ * Ursache wie alles andere hier.
+ *
+ * FARBTON 18 STATT 10: Bei 10 bleibt selbst die dunkle Fassung ein Himbeerton
+ * (`#e0065b`); 18 ergibt `#e20843` — Rot. Der Abstand zum Alarm-Rot
+ * `--negative` (Hue 25) trägt jetzt über die HELLIGKEIT statt über den
+ * Farbton: 0.58 gegen 0.70, `#e20843` gegen `#ff645f`. Ein Löschen-Knopf sieht
+ * damit weiter anders aus als ein Akzent-Knopf — der Grund für den Abstand
+ * bleibt erfüllt, nur der Weg dorthin ist ein anderer.
+ *
+ * NUR DUNKEL: Im hellen Theme stimmte die Farbe (Leon), und
+ * NUR DUNKEL, UND ZWAR ÜBER DEN SELEKTOR: Ein erster Versuch drehte
+ * `--area-admin-h` global von 10 auf 18 — das schlug ins helle Theme durch
+ * und schob das Admin-Rot dort auf `#c4002c`, praktisch deckungsgleich mit
+ * dem Alarm-Rot `#c53637` (1,17:1 — gemessen). Genau der Unfall, den der
+ * Farbton-Abstand verhindern soll. Farbton und Buntheit stehen deshalb HIER
+ * drin und gelten nur, wo das Problem war. Im hellen Theme bleibt alles wie
+ * vorher (Leon: „Im hellen Theme stimmt es"). */
+:root:not([data-theme="light"]) [data-area="admin"] {
+  --accent-h: 18;
+  --accent-c: 0.23;
+  --accent: oklch(0.58 var(--accent-c) var(--accent-h));
+  --accent-hover: oklch(0.64 var(--accent-c) var(--accent-h));
+  --accent-press: oklch(0.52 var(--accent-c) var(--accent-h));
+  --accent-text: oklch(0.68 calc(var(--accent-c)*0.83) var(--accent-h));
+  --on-accent: oklch(0.99 calc(var(--accent-c)*0.02) var(--accent-h));
+  --accent-glow: 0 0 14px oklch(0.58 var(--accent-c) var(--accent-h) / 0.22);
+  --grad-progress: linear-gradient(90deg, oklch(0.50 calc(var(--accent-c)*0.95) var(--accent-h)), oklch(0.66 calc(var(--accent-c)*0.9) var(--accent-h)));
+  --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.55 calc(var(--accent-c)*0.9) var(--accent-h) / 0.46), oklch(0.55 calc(var(--accent-c)*0.9) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.45 calc(var(--accent-c)*0.8) var(--accent-h) / 0.32), oklch(0.45 calc(var(--accent-c)*0.8) var(--accent-h) / 0) 62%);
+}
+
+[data-theme="light"] [data-area] {
+  --accent: oklch(0.50 var(--accent-c) var(--accent-h));
+  --accent-hover: oklch(0.44 var(--accent-c) var(--accent-h));
+  --accent-press: oklch(0.40 var(--accent-c) var(--accent-h));
+  --accent-subtle: oklch(0.93 calc(var(--accent-c)*0.25) var(--accent-h));
+  --accent-text: oklch(0.46 var(--accent-c) var(--accent-h));
+  --on-accent: oklch(0.99 calc(var(--accent-c)*0.02) var(--accent-h));
+  --accent-glow: 0 0 14px oklch(0.50 var(--accent-c) var(--accent-h) / 0.12);
+  --grad-progress: linear-gradient(90deg, oklch(0.40 var(--accent-c) var(--accent-h)), oklch(0.58 var(--accent-c) var(--accent-h)));
+  --ambient: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(55% 50% at 8% 42%, oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0.42), oklch(0.84 calc(var(--accent-c)*0.8) var(--accent-h) / 0) 62%);
+  --text-label: color-mix(in oklab, var(--accent-text) 75%, var(--text-2));
+  --sb-group-tint:
+    radial-gradient(120% 95% at 0% 0%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 72%),
+    linear-gradient(155deg, color-mix(in oklab, var(--accent-subtle) 85%, transparent) 0%, color-mix(in oklab, var(--accent-subtle) 28%, transparent) 58%, transparent 100%);
+  --sb-group-edge: inset 0 0 0 1px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* Konto-Panel der Sidebar (Vorlage: fade-in zoom-in-95, 100 ms). Der
+   Ursprung sitzt oben links, weil das Panel unter dem Konto-Block hängt —
+   mit mittigem Ursprung sähe es aus, als käme es aus der Mitte der Sidebar. */
+/* Die Grund-Schicht der Stab-Hülle (Leon 01.09.): „mach den Hintergrund einer
+   Seite direkt auf die ganze Höhe des Bildschirms, sodass Header und Sidebar
+   direkt auf dem gesamten Hintergrund liegen."
+
+   SIE MUSSTE IN DIE HÜLLE, NICHT IN DIE SEITEN. Jede Seite bringt ihre eigene
+   Ambient-Schicht mit, aber die beginnt zwangsläufig unter dem Kopf — sie ist
+   ja Teil des Inhalts. Als `fixed`-Schicht hinter allem deckt sie dagegen das
+   ganze Fenster ab, und das ist die Voraussetzung dafür, dass Glas überhaupt
+   etwas zu zeigen hat: Vor einer gleichmäßigen Fläche ist eine Milchscheibe
+   von einer Wand nicht zu unterscheiden.
+
+   DIE DRIFT IST AUSDRÜCKLICH ERLAUBT (DESIGN-BRIEF §3): 20–40 s, nur transform
+   und opacity — akkuschonend und native-tauglich —, und sie hält bei
+   `prefers-reduced-motion` an. Kein Canvas, kein WebGL. */
+.shell-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* EIN BREITER WASCHGANG VON OBEN, zusätzlich zum Schein in ::before.
+     Der Schein aus --ambient sitzt in zwei Brennpunkten (oben rechts, links
+     mittig) und läuft zu den übrigen Rändern auf null aus — der Streifen ÜBER
+     dem Kopf blieb dadurch tot schwarz und las sich als Rahmen (Leons
+     Einwand). Dieser Verlauf legt über die volle Breite eine leichte Tönung
+     an die Oberkante, sodass der Abstand ringsum als Teil des Grundes
+     erscheint und nicht als schwarze Fassung um zwei Kacheln.
+     --accent-subtle statt --accent: Es ist die Abstufung, die in BEIDEN
+     Themes als Fläche taugt (dunkel getönt im Dunklen, hell im Hellen). */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent-subtle) 55%, transparent) 0%,
+    transparent 45%
+  );
+}
+.shell-ambient::before {
+  content: "";
+  position: absolute;
+  /* Über den Rand hinaus, damit die Drift keine Kante hereinschiebt. */
+  inset: -18%;
+  background: var(--ambient);
+  animation: shell-drift 34s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes shell-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1.02); }
+  to   { transform: translate3d(2%, 2%, 0) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-ambient::before { animation: none; }
+}
+
+/* Weiche Unterkante am Menü-Scroller.
+   Der Scrollbalken ist versteckt (Vorlage), und auf dem Handy reicht die
+   Liste nicht mehr auf einen Bildschirm, seit die Rechte-Gruppen auf eigenen
+   Flächen liegen. Ohne Hinweis endete sie dort scheinbar bei „Timer" — die
+   Gruppe „Lernen" war unsichtbar und niemand hätte gewischt.
+   Die Maske liegt auf dem BEHÄLTER, nicht auf dem Inhalt: Sie bleibt beim
+   Blättern stehen, und wo nichts überläuft (Desktop) verblasst auch nichts,
+   weil dort unten schlicht kein Inhalt liegt. */
+/* IN DER STAB-HÜLLE GEHÖRT DER GRUND DER HÜLLE, NICHT DER SEITE.
+ *
+ * Leon am 01.09.2026: „unter dem Header ist der schwarze Balken, der dann nach
+ * unten geht … das sieht scheiße aus." Der Balken war kein Balken, sondern eine
+ * KANTE: 31 Stellen in 24 Dateien malen `background: var(--surface-page)`
+ * deckend auf ihr Wurzel-<main>. Diese Fläche legte sich über `.shell-ambient`
+ * und schnitt den Schein exakt dort ab, wo der Inhalt beginnt — sichtbar als
+ * schwarzes Rechteck, das unter dem Kopf anfängt.
+ *
+ * WARUM EINE REGEL UND NICHT 24 ÄNDERUNGEN: Zwei der Treffer brauchen ihren
+ * Grund wirklich (`TrainerSubnav` klebt beim Blättern oben, `JoinLayout` ist
+ * eine eigene Karte) — eine pauschale Streichung hätte sie durchsichtig
+ * gemacht. Und außerhalb der Hülle, im Athleten-Bereich, ist der deckende
+ * Grund weiter richtig. Die Regel wirkt deshalb NUR auf das unmittelbare Kind
+ * der Hülle.
+ *
+ * `!important` ist hier kein Kunstgriff, sondern notwendig: Die Seiten setzen
+ * die Farbe als INLINE-Stil, und den schlägt keine Regel ohne `!important`.
+ * Überschrieben wird bewusst nur `background-color` und nicht `background` —
+ * ein Verlaufsbild, das eine Seite zusätzlich mitbringt, bleibt so erhalten. */
+/* … UND DER SCHEIN AUCH.
+ *
+ * Leon am 01.09.2026: „oben im Hintergrund ist immer noch die dunkle Fläche."
+ * Die Kante saß exakt dort, wo der INHALT beginnt — nicht am Fensterrand. Der
+ * Grund: 16 Seiten legen oben ihre eigene Ambient-Fläche an
+ * (`<div data-ambient style="background: var(--ambient)">` in einem
+ * `overflow:hidden`-Behälter). Deren UNTERKANTE ist weich maskiert, ihre
+ * OBERKANTE dagegen hart abgeschnitten. Im Athleten-Bereich fällt das nicht
+ * auf, weil die Seite oben am Fensterrand beginnt. In der Stab-Hülle beginnt
+ * sie unter dem Kopf — und genau dort entstand die sichtbare Stufe: darüber
+ * nur der Schein der Hülle, darunter zwei Scheine übereinander.
+ *
+ * Dieselbe Regel wie beim Grund: In der Hülle gehört der Schein der HÜLLE.
+ * Sie deckt das ganze Fenster ab, also auch den Streifen hinter dem Kopf.
+ *
+ * `:not(:has([data-glow]))` trennt die beiden Nutzungen der Marke sauber: Die
+ * FLÄCHEN-Variante (hier gemeint) hat keine Kinder, die GLOW-Variante auf
+ * Karten trägt `[data-glow]`-Spans. Die bleibt unangetastet — sie ist Teil der
+ * Karte, nicht des Seitengrunds. Kennt ein Browser `:has()` nicht, greift die
+ * Regel schlicht nicht und es bleibt beim Zustand von vorher. */
+.staff-content [data-ambient]:not(:has([data-glow])) {
+  display: none;
+}
+
+/* DIE BEREICHS-HÜLLE ZÄHLT NICHT ALS EBENE (nachgemessen 02.09.2026):
+ * `app/admin/layout.tsx` legt ein `<div data-area="admin">` um die Seite, um
+ * den Bereich einzufärben. Damit war das Wurzel-<main> von /admin kein
+ * unmittelbares Kind der Hülle mehr, die Regel griff nicht — und der deckende
+ * Seitengrund schnitt den Schein der Hülle quer über die Inhaltsspalte ab
+ * (Leons „abgehackt vom Hintergrund"). Gemessen: `.staff-content >
+ * div[data-area=admin] > main` mit `background-color: oklch(0.15 0.0084 197)`.
+ *
+ * Der Nachbar-Selektor nennt genau diesen einen Fall und NICHT `main`
+ * allgemein: Ein Nachfahren-Selektor träfe auch `components/JoinLayout.tsx`,
+ * dessen <main> eine eigene Karte ist und seinen Grund braucht — ein
+ * eingeloggter Trainer sieht /beitreten in derselben Hülle. `[data-area]` ist
+ * der stabile Haken dafür, weil dieses Attribut nur an den Bereichs-Hüllen
+ * hängt und sonst nirgends. */
+.staff-content > main,
+.staff-content > [data-area] > main {
+  background-color: transparent !important;
+}
+
+.sb-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
+}
+
+/* Das AKTIVE Feld der Sidebar als GLAS-LUPE (Leon 02.09., Vorlage: die
+   iOS-Textlupe beim Textauswählen): Milchglas über dem Menü, Randring mit
+   Lichtkante oben, weicher Schatten und ein leichter Zoom. Fläche, Ring und
+   Schatten kommen aus den Glas-Tokens des Systems und folgen damit beiden
+   Themes und jedem Gym-Akzent. Der Ring liegt als Innen-Schatten an und
+   nicht als border — ein Rahmen würde die Zeile um seine Breite verschieben.
+   Ränder, Polsterung und transform stehen in der Zeilen-Transition
+   (StaffSidebar, ROW_BASE), damit die Lupe mit der Feder-Kurve aufploppt. */
+.sb-loupe {
+  background:
+    linear-gradient(180deg, var(--glass-highlight), transparent 55%),
+    color-mix(in oklab, var(--surface-raised) 45%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  /* Der Rahmen spricht die Sprache des Redesigns, nicht Apples (Leons
+     Revision 02.09., zweite Korrektur: „noch bisschen too much — reduziere
+     etwas"): eine feine Haarlinie, die den Akzent mit der Glas-Kante
+     mischt, die bekannte Lichtkante oben und NUR das weiche Akzent-Glühen
+     der Primär-Knöpfe (--accent-glow) — der große Glas-Schatten ist raus,
+     er machte aus der Zeile eine schwebende Karte. In den Rechte-Rubriken
+     färbt sich die Kante über data-area automatisch mit (Bernstein/Karmin).
+     Kein border — der würde die Zeile um seine Breite verschieben. */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--accent) 28%, var(--glass-border)),
+    inset 0 1px 0 var(--glass-highlight),
+    var(--accent-glow);
+  transform: scale(1.01);
+}
+
+@keyframes sb-pop {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.sb-pop-origin { transform-origin: top left; }
+
 /* Mobil ist der Primärfall und bekommt die GRÖSSERE Typo-Stufe (Leon
    2026-08-26): kleiner Screen, gleicher Lesabstand — komplette Skala eine
    Stufe rauf. Media-Query NUR hier auf den Tokens, nie in Komponenten. */
@@ -602,27 +1033,62 @@
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
 html, body {
-  background: var(--background);
+  /* Der Grund steht weiter unten (DER SEITENGRUND) und gilt für BEIDE. Hier
+     stand `var(--background)` — und das ist `var(--ink-0)`, also das alte
+     Lila #07040D. Weil <html> die Leinwand malt, blieb der Fensterhintergrund
+     lila, obwohl <body> längst auf dem Token lag: sichtbar als schwarzer
+     Streifen am oberen Rand (Leons Einwand, nachgemessen 01.09. — <html> gab
+     rgb(7,4,13) zurück, <body> oklch(0.15 0.0084 197)). */
   color: var(--foreground);
   font-family: var(--font-sans), "Inter", system-ui, sans-serif;
 }
 
+/* DER SEITENGRUND — EINE FARBE, AUS DEM TOKEN (Leon 01.09.2026).
+ *
+ * Hier stand bis dahin ein hartkodierter Verlauf `#07040D → #0D0820` mit drei
+ * Cyan-/Pink-/Violett-Schleiern darüber, und in Hell `#EEF2F8 → #E8EEF6` — der
+ * letzte große Rest des ALTEN Farbsystems, komplett an den Tokens vorbei. Das
+ * war das Lila, das app-weit durchschlug: fünf Literale, die keine
+ * Akzent-Variable je erreicht hätte. Der Abnahme-Test aus DESIGN-BRIEF §5
+ * („eine Variable ändern → die App folgt") wäre am Seitengrund selbst
+ * gescheitert.
+ *
+ * Jetzt ist es schlicht `--surface-page` — dieselbe Farbe, die auch die Seiten
+ * auf ihrem <main> tragen. Zwei Folgen, beide gewollt:
+ *  • Es gibt keine sichtbare Naht mehr zwischen Fenstergrund und Seite. Der
+ *    Hintergrund erstreckt sich über die ganze Anzeigefläche, während der
+ *    Inhalt weiter mittig in seiner Spalte steht (Leons Vorgabe).
+ *  • Die Stimmung kommt aus der Ambient-Schicht der einzelnen Seiten
+ *    (DESIGN-BRIEF §3), nicht mehr aus einem festen Verlauf am Fenster. Nur
+ *    so folgt sie der Gym-Farbe.
+ *
+ * Die Regel für Hell entfällt ersatzlos: --surface-page ist in beiden Themes
+ * definiert und braucht keine eigene Fassung mehr.
+ *
+ * <html> MUSS MIT (nachgetragen 01.09. abends): Es malt die Leinwand. Solange
+ * dort noch das alte `--background` (= --ink-0, #07040D) stand, war der
+ * Fensterhintergrund weiter lila-schwarz — auch wenn <body> längst richtig
+ * lag. Sichtbar wurde das als schwarzer Streifen am oberen Rand und überall,
+ * wo <body> nicht deckt. */
+html,
 body {
-  background-image:
-    radial-gradient(520px 300px at 90% -5%, rgba(35,196,206,.14), transparent 60%),
-    radial-gradient(520px 300px at 0% 105%, rgba(255,79,168,.10), transparent 60%),
-    radial-gradient(700px 380px at 50% 115%, rgba(157,123,250,.07), transparent 70%),
-    linear-gradient(180deg, #07040D 0%, #0D0820 100%);
-  background-attachment: fixed;
+  background: var(--surface-page);
+}
+body {
   min-height: 100vh;
 }
 
-[data-theme="light"] body {
-  background-image:
-    radial-gradient(420px 260px at 90% -5%, rgba(35,196,206,.07), transparent 60%),
-    radial-gradient(420px 260px at 0% 100%, rgba(255,79,168,.05), transparent 60%),
-    linear-gradient(180deg, #EEF2F8 0%, #E8EEF6 100%);
-}
+/* Notbremse für lange deutsche Komposita in Seitentiteln.
+   Gemessen am 01.09.2026 auf 390 px: „TRAINERBEREICH" ist bei
+   --type-display (mobil 38px) 382 px breit, die Spalte bietet 358 —
+   das eine Wort schob die GANZE Seite auf (scrollWidth 398 bei 390) und
+   erzeugte waagerechtes Scrollen. `anywhere` statt `break-word`, weil nur
+   `anywhere` in die MINDESTBREITE einfließt; ein Flex-Kind mit
+   `min-width:auto` bläht sich sonst trotzdem auf. Greift ausschließlich,
+   wenn ein Wort sonst nicht passt — kurze Titel bleiben unberührt.
+   Titel trotzdem kurz halten: ein umgebrochenes Wort ist die Rettung,
+   nicht das Ziel. */
+h1, h2 { overflow-wrap: anywhere; }
 
 /* Scrollbar gezielt ausblenden (z. B. RestWheel — Rad ohne sichtbaren Balken) */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
@@ -1441,4 +1907,108 @@ body {
 }
 [data-theme="light"] .join-slot:focus {
   border-color: oklch(0.55 var(--accent-c) var(--accent-h) / 0.85);
+}
+
+/* ─── Wochenplan-Raster (/schedule, Leons Entscheidung 02.09.2026) ───────────
+ *
+ * Die Seite füllt die Fläche der Stab-Hülle statt in der Athleten-Spalte zu
+ * stehen, und sieben Tage stehen IMMER nebeneinander — kein waagerechter
+ * Schieber (Leons Wahl 02.09.).
+ *
+ * WARUM CONTAINER-QUERIES UND KEINE BILDSCHIRM-UMBRUCHPUNKTE: Ob sieben
+ * Spalten passen, hängt nicht am Fenster, sondern am Platz NEBEN der Sidebar.
+ * Die kostet 328 px (`--sb-w` + `--shell-gap`), und dieselben 1100 px Fenster
+ * heißen für einen Athleten 1100 px Inhalt und für einen Trainer 772 px.
+ * Gemessen am 02.09.: bei 1100 px Fenster in der Hülle stand das Raster mit
+ * `lg:grid-cols-7` auf 97 px schmalen Spalten, in denen 24 von 30 Kurstiteln
+ * am Kartenrand ABGESCHNITTEN wurden. Ein `lg:`-Umbruchpunkt kann das nicht
+ * wissen; die Fläche selbst schon.
+ *
+ * DIE RECHNUNG (nicht ändern, ohne beide Zahlen zu ändern):
+ *   7 × --day-min + 6 × --day-gap = 7 × 140 + 6 × 10 = 1040 px Raster
+ *   + 2 × 24 px Seitenpolster                        =   48 px
+ *   ------------------------------------------------------------
+ *   = 1088 px — der Schwellwert der Abfrage unten.
+ * Bei 1440 px Fenster hat die Hülle 1124 px übrig: 36 px Luft, und jeder Tag
+ * bekommt 145 px. Bei 1920 px sind es 213 px statt der 167 px, auf die
+ * `lg:max-w-7xl` die Seite vorher gedeckelt hat.
+ *
+ * --day-min ist die schmalste Spalte, in der ein Kurstitel noch lesbar ist —
+ * GEMESSEN, nicht geschätzt: „Kickboxen" braucht 79 px, und die Kurszeile
+ * legt im schmalen Zustand nur noch die 28 px Innenpolster obendrauf (die
+ * Uhrzeit steht dort ÜBER dem Titel statt daneben, siehe .week-row). */
+:root {
+  --day-min: 140px;
+  --day-gap: 10px;
+  /* Endzeit der Kurszeile — in der Liste kleiner und leiser als die
+     Startzeit, im Raster gleich groß (siehe .week-row unten). */
+  --row-time-end: 500 11px/1.2 var(--font-mono), ui-monospace, monospace;
+}
+
+/* Der Gedankenstrich zwischen Start und Ende gehört nur zur einzeiligen
+   Fassung — untereinander wäre er ein Strich im Nichts. */
+.week-row-dash {
+  display: none;
+}
+
+.week-page {
+  container-type: inline-size;
+  container-name: wochenplan;
+}
+
+/* Die Lesespur: schmal wie jede Athleten-Seite, solange die Woche eine Liste
+   ist — und ohne Deckel, sobald sie ein Raster wird. */
+.week-lane {
+  width: 100%;
+  max-width: 42rem; /* = max-w-2xl, die Athleten-Spalte */
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+/* Zwischenzustand (Tablet, schmale Hülle): zwei Tage nebeneinander. */
+@container wochenplan (min-width: 40rem) {
+  .week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Die volle Woche. */
+@container wochenplan (min-width: 1088px) {
+  .week-lane {
+    max-width: none;
+    padding-inline: 1.5rem;
+  }
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(var(--day-min), 1fr));
+    gap: var(--day-gap);
+  }
+  /* Uhrzeit ÜBER den Titel statt daneben. Das ist die einzige Änderung, die
+     sieben Tage bei 1440 px überhaupt lesbar macht: Zeitspalte (44 px) und
+     Lücke (12 px) fielen dem Titel vorher vom schmalen Platz ab — 61 px für
+     ein Wort, das 79 px braucht. Gestapelt sind es 117 px.
+     In der Listen-Fassung bleibt die Zeit daneben: dort ist die Zeile breit,
+     und übereinander wäre sie nur hoch. */
+  .week-row {
+    flex-direction: column;
+    gap: 0.25rem;
+    /* Auf EINER Zeile darf die Endzeit nicht kleiner sein als die Startzeit —
+       gestaffelte Grade nebeneinander lesen sich als Versehen. In der
+       Listen-Fassung bleibt die Staffelung, dort stehen sie untereinander. */
+    --row-time-end: 600 13px/1.2 var(--font-mono), ui-monospace, monospace;
+  }
+  .week-row-time {
+    width: auto;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.3rem;
+  }
+  .week-row-dash {
+    display: inline;
+  }
 }

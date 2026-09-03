@@ -20,7 +20,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
-import { useRights } from "@/lib/auth-context";
+import { useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   ALL_TECHNIQUES,
@@ -152,7 +152,10 @@ function levelLabel(t: Technique): string {
 export default function TechniquesPage() {
   
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   const [search, setSearch] = useState("");
   const [activeDiscipline, setActiveDiscipline] = useState<Discipline | "all">(
@@ -224,7 +227,7 @@ export default function TechniquesPage() {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* ── Kopf — Muster der Referenzseiten (Ambient, Rücksprung, Titel) ── */}
@@ -259,7 +262,7 @@ export default function TechniquesPage() {
               Techniken
             </h1>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -534,7 +537,7 @@ export default function TechniquesPage() {
         </div>
       </div>
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

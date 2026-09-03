@@ -13,7 +13,7 @@
 
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { EQUIPMENT } from "@/lib/equipment";
@@ -63,7 +63,10 @@ export default function DisciplineView({
 }) {
   const { user, profile, profileLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
 
@@ -108,7 +111,7 @@ export default function DisciplineView({
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       {/* Kopfbereich — gleiche Sprache wie die Plan-Detail-Seite */}
@@ -160,7 +163,7 @@ export default function DisciplineView({
               {info.short}
             </p>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -286,7 +289,7 @@ export default function DisciplineView({
         )}
       </div>
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

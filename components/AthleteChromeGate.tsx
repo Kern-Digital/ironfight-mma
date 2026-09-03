@@ -6,9 +6,15 @@ import { useRights } from "@/lib/auth-context";
 /**
  * Blendet die alte Top-Navigation und den Footer auf Seiten aus, die bereits
  * im neuen Athleten-Layout mit Bottom-Tab-Bar laufen (Redesign-Rollout).
- * Trainer/Admin behalten überall die Desktop-Navigation.
- * Die Routen-Liste wächst mit dem Rollout; am Ende wird daraus die
- * endgültige App-Shell-Weiche.
+ * Die Routen-Liste wächst mit dem Rollout.
+ *
+ * ER IST NICHT MEHR DIE APP-SHELL-WEICHE — das ist seit dem 01.09.2026
+ * `components/shell/AppShell.tsx`. Wer eines der drei Häkchen trägt, kommt
+ * hier gar nicht mehr an: Für ihn gibt es keine Navbar und keinen Footer
+ * mehr, sondern die Sidebar. Diese Datei entscheidet nur noch innerhalb der
+ * ATHLETEN-Hülle. Die `isTrainer`-Prüfung unten ist damit historisch — sie
+ * kann nicht mehr wahr werden und fällt weg, sobald der Rollout jede Seite
+ * der Liste erfasst hat und der Gate ganz verschwindet.
  */
 const ATHLETE_SHELL_ROUTES = [
   "/dashboard",

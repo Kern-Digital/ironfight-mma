@@ -23,9 +23,9 @@ const STEPS = [
     body: (
       <>
         <p>
-          Schön, dass du dabei bist. In der App kannst du den Wochenplan
+          Schön, dass du dabei bist. In der App kannst du den Kursplan
           deiner Schule sehen, Kurse mit Inhalten füllen und den Fortschritt
-          deiner Schüler einsehen.
+          deiner Athleten einsehen.
         </p>
         <p className="mt-3">
           Diese Einführung dauert nur 30 Sekunden — danach kannst du direkt
@@ -40,7 +40,7 @@ const STEPS = [
     body: (
       <ul className="space-y-2">
         <li>
-          <strong>Stundenplan ansehen:</strong> alle Kurse der Woche auf einen
+          <strong>Kursplan ansehen:</strong> alle Kurse der Woche auf einen
           Blick.
         </li>
         <li>
@@ -52,20 +52,20 @@ const STEPS = [
           was diese Woche behandelt wird.
         </li>
         <li>
-          <strong>Schülerprofile:</strong> sieh dir Fortschritt, abonnierte
-          Kurse und Aktivität deiner Schüler an.
+          <strong>Athletenprofile:</strong> sieh dir Fortschritt, abonnierte
+          Kurse und Aktivität deiner Athleten an.
         </li>
       </ul>
     ),
   },
   {
-    eyebrow: "Wie deine Schüler profitieren",
+    eyebrow: "Was deine Athleten davon haben",
     title: "Inhalte landen automatisch in der Bibliothek",
     body: (
       <>
         <p>
           Sobald du einem Kurs Techniken hinzufügst, erscheinen diese in der
-          persönlichen Bibliothek aller Schüler, die diesen Kurs abonniert
+          persönlichen Bibliothek aller Athleten, die diesen Kurs abonniert
           haben — ganz ohne Extra-Klick.
         </p>
         <p className="mt-3">

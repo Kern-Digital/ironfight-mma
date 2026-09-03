@@ -161,6 +161,25 @@ service cloud.firestore {
                   && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));
     }
 
+    // CollectionGroup-Query: Kennzahlen des Gyms lesen Teilnahmen ueber ALLE
+    // Mitglieder (Trainer- und Verwaltungs-Uebersicht) — nur eigenes Gym,
+    // Admin gym-uebergreifend. Die Query braucht where("gymId","==",…).
+    //
+    // WARUM DIE VERWALTUNG EIGENSTAENDIG DANEBEN STEHT: Sie kann eine reine
+    // Buerokraft ohne Trainer-Haekchen sein; ohne diese Zeile saehe sie die
+    // Kennzahlen ihres eigenen Gyms nicht.
+    //
+    // SCHREIBEN IST HIER NICHT ERLAUBT — es bleibt beim Besitzer (Regel in
+    // der users-Subcollection oben). Eine Teilnahme ist eine Aussage ueber
+    // sich selbst; wer sie fuer andere setzen koennte, koennte Kennzahlen
+    // faelschen.
+    match /{path=**}/participations/{participationId} {
+      allow read: if request.auth != null
+                  && (isAdmin()
+                      || ((isTrainerOrAdmin() || isVerwaltung())
+                          && sameGym(resource.data)));
+    }
+
     // Gym-Stammdaten (Multi-Gym): Mitglieder lesen ihr eigenes Gym,
     // Admin verwaltet alle. Verwaltungs-Schreibrechte kommen in Phase 2
     // ausschliesslich ueber serverseitige APIs (Admin-SDK), nie per Client.
@@ -273,7 +292,17 @@ service cloud.firestore {
     // Wochenplan-Mehrplan-Modell (gyms/{gymId}/schedulePlans).
     match /trainingSessions/{document=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isTrainerOrAdmin();
+      // Pflegen duerfen Trainer UND Verwaltung (Konzept §7: „Inhalte pflegen
+      // Verwaltung + Trainer, Aktivieren nur Verwaltung"). Bis 2026-09-01 stand
+      // hier nur isTrainerOrAdmin() — eine reine Verwaltung sah den Wochenplan
+      // dadurch nur lesend, obwohl das Konzept ihr die Pflege ausdruecklich
+      // zuschreibt (Leons Freigabe 01.09.).
+      //
+      // NOCH NICHT GYM-GESCOPED: `trainingSessions` tragen kein gymId. Das ist
+      // Bestand und aendert sich mit dem Mehrplan-Modell in Phase 3
+      // (gyms/{gymId}/schedulePlans) — bis dahin gilt dieselbe Offenheit, die
+      // Trainer hier schon immer hatten.
+      allow write: if request.auth != null && (isTrainerOrAdmin() || isVerwaltung());
     }
 
     // Anonyme Technik-Aufruf-Zaehler: nur Hochzaehlen erlaubt (viewCount/lastViewed),

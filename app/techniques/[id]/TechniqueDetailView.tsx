@@ -11,7 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import { TechniqueViewTracker } from "@/components/TechniqueViewTracker";
-import { useRights } from "@/lib/auth-context";
+import { useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
   CATEGORY_LABEL,
@@ -76,7 +76,10 @@ function SectionTitle({
 export default function TechniqueDetailView({ id }: { id: string }) {
   
   const { theme, toggleTheme } = useTheme();
-  const isTrainer = useRights().trainer;
+  // Wer eines der drei Häkchen trägt, steht in der Stab-Hülle: Die bringt
+  // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
+  // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
+  const hasStaffShell = useHasStaffShell();
 
   // Existenz ist serverseitig geprüft (page.tsx → notFound)
   const t = getTechniqueById(id);
@@ -92,7 +95,7 @@ export default function TechniqueDetailView({ id }: { id: string }) {
 
   return (
     <main
-      className={isTrainer ? "min-h-screen pb-12" : "min-h-screen pb-32"}
+      className={hasStaffShell ? "min-h-screen pb-12" : "min-h-screen pb-32"}
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
       <TechniqueViewTracker techniqueId={t.id} />
@@ -148,7 +151,7 @@ export default function TechniqueDetailView({ id }: { id: string }) {
               {t.description}
             </p>
           </div>
-          {!isTrainer && (
+          {!hasStaffShell && (
             <button
               type="button"
               onClick={toggleTheme}
@@ -476,7 +479,7 @@ export default function TechniqueDetailView({ id }: { id: string }) {
         )}
       </div>
 
-      {!isTrainer && <AthleteTabBar />}
+      {!hasStaffShell && <AthleteTabBar />}
     </main>
   );
 }

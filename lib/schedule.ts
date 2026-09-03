@@ -65,3 +65,58 @@ export function getCurrentWeekday(): number {
 export function getBlocksForDay(weekday: number): TrainingBlock[] {
   return TRAINING_BLOCKS.filter((b) => b.weekday === weekday);
 }
+
+// ─── Aktueller / nächster Kurs (Header der Stab-Hülle, 01.09.2026) ───────────
+
+export interface CurrentBlock {
+  block: TrainingBlock;
+  /** Läuft der Kurs GERADE, oder ist er der nächste? */
+  state: "now" | "next";
+  /** 0 = heute, 1 = morgen, … — nur bei `state: "next"` interessant. */
+  dayOffset: number;
+}
+
+/** "18:30" → Minuten seit Mitternacht. Ungültiges → NaN. */
+function minutesOfDay(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Der Kurs, der gerade läuft — sonst der nächste, notfalls an einem der
+ * folgenden Tage.
+ *
+ * WARUM `now` HEREINGEREICHT WIRD und nicht in der Funktion entsteht: Der
+ * Header rendert auf dem Server vor und im Browser noch einmal. Läse die
+ * Funktion selbst die Uhr, stünden dort zwei verschiedene Zeiten und React
+ * meldete einen Hydrations-Fehler. Der Aufrufer bestimmt den Zeitpunkt —
+ * und ruft erst NACH dem Einhängen (siehe components/shell/StaffHeader).
+ *
+ * Die Woche ist heute eine Code-Konstante (TRAINING_BLOCKS). Mit dem
+ * Mehrplan-Modell aus Phase 3 (Konzept §7) wird daraus der aktive Wochenplan
+ * des Gyms — diese Funktion bleibt, nur ihre Quelle wechselt.
+ */
+export function getCurrentBlock(now: Date): CurrentBlock | null {
+  const today = (now.getDay() + 6) % 7;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+
+  const sorted = (weekday: number) =>
+    getBlocksForDay(weekday)
+      .slice()
+      .sort((a, b) => minutesOfDay(a.startTime) - minutesOfDay(b.startTime));
+
+  for (const block of sorted(today)) {
+    const start = minutesOfDay(block.startTime);
+    const end = minutesOfDay(block.endTime);
+    if (minutes >= start && minutes < end) return { block, state: "now", dayOffset: 0 };
+    if (minutes < start) return { block, state: "next", dayOffset: 0 };
+  }
+
+  // Feierabend: der erste Kurs des nächsten Tages, an dem überhaupt einer ist.
+  // Bis 7, nicht bis 6 — sonst fände ein Sonntagabend den Sonntag nicht wieder.
+  for (let offset = 1; offset <= 7; offset++) {
+    const [first] = sorted((today + offset) % 7);
+    if (first) return { block: first, state: "next", dayOffset: offset };
+  }
+  return null;
+}

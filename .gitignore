@@ -48,3 +48,6 @@ next-env.d.ts
 /.cowork/
 /.agents/
 /.codex/
+
+# Wegwerf-Dateien der Oberflaechen-Pruefung (Screenshots, Dev-Log)
+tmp-*

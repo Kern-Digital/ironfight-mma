@@ -407,7 +407,7 @@ function SessionRunner() {
   }
 
   function handleAbort() {
-    if (!confirm("Workout abbrechen? Fortschritt wird als 'abgebrochen' gespeichert.")) return;
+    if (!confirm("Workout abbrechen? Was du bis hier geschafft hast, bleibt als abgebrochenes Workout gespeichert.")) return;
     if (user && !loggedRef.current) {
       loggedRef.current = true;
       logWorkoutFull(user.uid, {
