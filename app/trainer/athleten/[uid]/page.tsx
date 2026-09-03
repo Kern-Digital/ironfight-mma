@@ -11,7 +11,12 @@ import CompetitionCard, {
 import MatchupBlock from "@/components/trainer/MatchupBlock";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Icon from "@/components/ui/Icon";
-import { getStudentEntry, type StudentEntry } from "@/lib/admin";
+import {
+  getMemberEntry,
+  getStudentEntry,
+  isPermissionDenied,
+  type StudentEntry,
+} from "@/lib/admin";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
 import { listVideoAnalyses, type VideoAnalysis } from "@/lib/video-analysis";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
@@ -181,6 +186,10 @@ function StudentDetailContent({ uid }: { uid: string }) {
   // Quelle als die Trainings-Analyse darüber und stehen nirgends sonst.
   const [usage, setUsage] = useState<StudentProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Der Kollege hat sein Persönliches nicht für uns freigegeben — kein
+  // Fehler, eine Entscheidung (Leon 03.09.2026: Trainer sind standardmäßig
+  // privat). Name kommt trotzdem an: das users-Dokument bleibt lesbar.
+  const [gesperrtFuer, setGesperrtFuer] = useState<string | null>(null);
   // Kampfbereiche sind standardmäßig zugeklappt — der Kopf der Seite bleibt
   // dadurch überschaubar, die Details holt man sich bei Bedarf.
   const [areasOpen, setAreasOpen] = useState(false);
@@ -193,16 +202,30 @@ function StudentDetailContent({ uid }: { uid: string }) {
     setCamps(null);
     setAnalyses(null);
     setUsage(null);
+    setGesperrtFuer(null);
     setOpponents(new Map());
     try {
-      const [e, w, p, c, a] = await Promise.all([
-        getStudentEntry(uid),
+      // Das users-Dokument zuerst und allein: Es ist immer lesbar und liefert
+      // den Namen — den brauchen wir auch dann, wenn alles Weitere gesperrt
+      // ist. Der Profil-Read in getStudentEntry ist der erste, an dem das
+      // Gate greifen kann.
+      let e: StudentEntry | null;
+      try {
+        e = await getStudentEntry(uid);
+      } catch (err) {
+        if (!isPermissionDenied(err)) throw err;
+        // Profil gesperrt → Name aus der Identität holen und aufhören.
+        const nurName = await getMemberEntry(uid).catch(() => null);
+        setGesperrtFuer(nurName ? displayLabel(nurName) : "Dieser Trainer");
+        return;
+      }
+      if (!e) throw new Error("Athlet nicht gefunden");
+      const [w, p, c, a] = await Promise.all([
         getRecentWorkouts(uid, 500),
         getAllProgress(uid).catch(() => [] as TechniqueProgress[]),
         listFightCamps(uid).catch(() => [] as FightCamp[]),
         listVideoAnalyses("athlete", uid).catch(() => [] as VideoAnalysis[]),
       ]);
-      if (!e) throw new Error("Athlet nicht gefunden");
       setEntry(e);
       setWorkouts(w);
       setProgress(p);
@@ -216,6 +239,10 @@ function StudentDetailContent({ uid }: { uid: string }) {
         .then(setUsage)
         .catch(() => setUsage(null));
     } catch (err) {
+      if (isPermissionDenied(err)) {
+        setGesperrtFuer("Dieser Trainer");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
   }, [uid]);
@@ -250,6 +277,35 @@ function StudentDetailContent({ uid }: { uid: string }) {
     );
     return upcoming[0] ?? null;
   }, [camps]);
+
+  if (gesperrtFuer) {
+    return (
+      <main
+        className="min-h-screen pb-12"
+        style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+      >
+        <PageHead
+          lane="wide"
+          back={{ href: "/trainer/athleten", label: "Athletenliste" }}
+          title={gesperrtFuer}
+          description="Ein Trainer entscheidet selbst, wer sein Athletenprofil sieht."
+        />
+        <div className="mx-auto w-full max-w-7xl px-4 pt-1 sm:px-6">
+          <div className="t-card flex flex-col gap-2 p-6">
+            <span className="t-label">Noch nicht freigegeben</span>
+            <p style={{ font: "var(--type-body-strong)" }}>
+              {gesperrtFuer} hat das eigene Athletenprofil noch nicht für dich
+              freigegeben.
+            </p>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Sobald du freigeschaltet bist, öffnet sich diese Seite wie jede
+              andere — mit Profil, Fortschritt und Wettkämpfen.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (error && !entry) {
     return (

@@ -11,7 +11,12 @@ import OpponentEditor, {
 } from "@/components/trainer/OpponentEditor";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
-import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
+import {
+  getStudentEntry,
+  isStaffEntry,
+  listAllMembers,
+  type StudentEntry,
+} from "@/lib/admin";
 import {
   createOpponent,
   getOpponent,
@@ -312,7 +317,11 @@ function NewCompetitionContent() {
         createdBy: user.uid,
         competitionDate: new Date(date),
         competitionName: name.trim(),
-        athleteLevel: selectedStudent?.athlete?.level ?? null,
+        // Das Level kommt aus dem EINZELN geladenen Profil — Listen tragen
+        // es nicht mehr (lib/admin.ts, StudentEntry.athlete). Ein Read.
+        athleteLevel:
+          (await getStudentEntry(studentUid).catch(() => null))?.athlete
+            ?.level ?? null,
         analysis,
         opponent: snapshot,
       });

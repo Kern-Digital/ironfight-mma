@@ -2,10 +2,19 @@
  * Kampfprofil (FightProfile) — die DeepFight-Daten eines eigenen Nutzers.
  *
  * Dieselbe Grundform wie beim Gegner (`opponents/{id}`: dna + dnaSplit +
- * actionStats), aber gespeichert als Feld `fightProfile` auf `users/{uid}`.
- * Damit haben Schüler, Trainer und Gegner denselben Basis-Aufbau:
+ * actionStats). Damit haben Schüler, Trainer und Gegner denselben Aufbau:
  *   • Gegner  → opponents/{id} (flach auf dem Dokument)
- *   • Nutzer  → users/{uid}.fightProfile (dieses Modul)
+ *   • Nutzer  → users/{uid}/fightProfile/main (dieses Modul)
+ *
+ * WARUM EINE UNTER-SAMMLUNG UND KEIN FELD MEHR (seit 03.09.2026): Das
+ * Kampfprofil ist die AUSWERTUNG der DeepFight-Analysen — und die soll ein
+ * Trainer bei einem KOLLEGEN nur mit dessen Freigabe sehen (Leon). Regeln
+ * können keine Felder verbergen, nur Dokumente; das users-Dokument muss aber
+ * für die Namensliste lesbar bleiben. Also eine Ebene tiefer, mit eigener
+ * Regel (firestore.rules, `canAccessMemberData`). Bis die Migration
+ * (`scripts/migrate-private-profile.mjs`) gelaufen ist, fällt `getFightProfile`
+ * auf das alte Feld zurück — NUR wenn das neue Dokument fehlt, nie bei
+ * verweigertem Zugriff.
  *
  * Das Kampfprofil ist das MERGE-ZIEL der KI-Video-Analysen im Athleten-Modus
  * (mode="athlete") — jede übernommene Analyse präzisiert es. Gepflegt wird es
@@ -100,11 +109,19 @@ function userRef(uid: string) {
   return doc(getFirestoreDb(), "users", uid);
 }
 
+/** Die Heimat des Kampfprofils (siehe Kopfkommentar). */
+export function fightProfileRef(uid: string) {
+  return doc(getFirestoreDb(), "users", uid, "fightProfile", "main");
+}
+
 /** Liest das Kampfprofil eines Nutzers (leer, wenn noch keins existiert). */
 export async function getFightProfile(uid: string): Promise<FightProfile> {
-  const snap = await getDoc(userRef(uid));
-  if (!snap.exists()) return emptyFightProfile();
-  return decode(snap.data().fightProfile as FightProfileDoc | undefined);
+  const snap = await getDoc(fightProfileRef(uid));
+  if (snap.exists()) return decode(snap.data() as FightProfileDoc);
+  // Übergang: altes Feld am users-Dokument (bis zur Migration).
+  const alt = await getDoc(userRef(uid));
+  if (!alt.exists()) return emptyFightProfile();
+  return decode(alt.data().fightProfile as FightProfileDoc | undefined);
 }
 
 /**
@@ -130,11 +147,7 @@ export async function updateFightProfile(
     actionStats,
     updatedBy: patch.updatedBy ?? current.updatedBy ?? null,
   };
-  // Feld komplett ersetzen (kein Nested-Merge) — sonst blieben gelöschte
+  // Dokument komplett ersetzen (kein Merge) — sonst blieben gelöschte
   // Antworten als Firestore-Map-Keys stehen.
-  await setDoc(
-    userRef(uid),
-    { fightProfile: { ...body, updatedAt: serverTimestamp() } },
-    { mergeFields: ["fightProfile"] },
-  );
+  await setDoc(fightProfileRef(uid), { ...body, updatedAt: serverTimestamp() });
 }

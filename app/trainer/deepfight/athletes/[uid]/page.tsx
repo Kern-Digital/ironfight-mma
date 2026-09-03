@@ -10,7 +10,12 @@ import DeepFightWordmark from "@/components/DeepFightWordmark";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import FightProfileView from "@/components/trainer/FightProfileView";
-import { getStudentEntry, type StudentEntry } from "@/lib/admin";
+import {
+  getMemberEntry,
+  getStudentEntry,
+  isPermissionDenied,
+  type StudentEntry,
+} from "@/lib/admin";
 import { buildHelixModel, diffHelixModels } from "@/lib/fight-dna-helix";
 import {
   getFightProfile,
@@ -46,6 +51,9 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
   const [grownQuestionIds, setGrownQuestionIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Kollege ohne Freigabe (Leon 03.09.2026: dieselbe Freigabe gilt auch
+  // für DeepFight — Analyse UND Auswertung).
+  const [gesperrt, setGesperrt] = useState<string | null>(null);
   const previousProfileRef = useRef<FightProfile | null>(null);
 
   const isSelf = user?.uid === uid;
@@ -74,12 +82,18 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
     setEntry(null);
     previousProfileRef.current = null;
     setGrownQuestionIds([]);
+    setGesperrt(null);
     try {
       const e = await getStudentEntry(uid);
       if (!e) throw new Error("Athlet nicht gefunden");
       setEntry(e);
       await loadFightProfile();
     } catch (err) {
+      if (isPermissionDenied(err)) {
+        const wer = await getMemberEntry(uid).catch(() => null);
+        setGesperrt(wer ? labelOf(wer) : "Dieser Trainer");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
   }, [uid, loadFightProfile]);
@@ -87,6 +101,36 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  if (gesperrt) {
+    return (
+      <main
+        className="min-h-screen pb-12"
+        style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+      >
+        <PageHead
+          lane="wide"
+          back={{ href: "/trainer/deepfight/athletes", label: "Athleten-Analysen" }}
+          title={gesperrt}
+          description="Ein Trainer entscheidet selbst, wer seine DeepFight-Analysen sieht."
+        />
+        <div className="mx-auto w-full max-w-7xl px-4 pt-1 sm:px-6">
+          <div className="t-card flex flex-col gap-2 p-6">
+            <span className="t-label">Noch nicht freigegeben</span>
+            <p style={{ font: "var(--type-body-strong)" }}>
+              {gesperrt} hat das eigene Athletenprofil noch nicht für dich
+              freigegeben — dazu gehören auch die DeepFight-Analysen und ihre
+              Auswertung.
+            </p>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+              Sobald du freigeschaltet bist, kannst du hier Videos hochladen
+              und Befunde übernehmen wie bei jedem Athleten.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (error) {
     return (

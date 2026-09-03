@@ -19,6 +19,7 @@ import {
 import { getFirestoreDb } from "./firebase";
 import { effectiveRights, readRoleSet, type RoleSet } from "./roles";
 import type { AthleteProfile } from "./types";
+import { readAthleteProfile, type AthleteDoc } from "./user-profile";
 
 export type AdminUserEntry = {
   uid: string;
@@ -65,43 +66,18 @@ export type AdminUserEntry = {
 };
 
 export type StudentEntry = AdminUserEntry & {
+  /**
+   * Das Athletenprofil — NUR bei `getStudentEntry()` gefüllt. Listen tragen
+   * es seit dem 03.09.2026 nicht mehr: Es liegt jetzt in einer
+   * Unter-Sammlung (`users/{uid}/athleteProfile/main`, Begründung in
+   * lib/user-profile.ts), und die für alle 32 Mitglieder mitzulesen wären 32
+   * Abfragen pro Seitenaufruf — für ein Level-Kürzel in einer Auswahlliste.
+   * Wer das Profil EINER Person braucht, holt sie einzeln.
+   */
   athlete?: AthleteProfile;
+  /** Trainer, die das Persönliche dieses Kontos sehen dürfen (uids). */
+  profileSharedWith: string[];
 };
-
-type AthleteDoc = {
-  primaryDiscipline?: AthleteProfile["primaryDiscipline"];
-  level?: AthleteProfile["level"];
-  trainingStartDate?: Timestamp | null;
-  weightKg?: number | null;
-  heightCm?: number | null;
-  reachCm?: number | null;
-  stance?: AthleteProfile["stance"];
-  weightClass?: AthleteProfile["weightClass"];
-  bjjBelt?: AthleteProfile["bjjBelt"];
-  gymName?: string | null;
-  trainerName?: string | null;
-  nextCompetitionDate?: Timestamp | null;
-  nextCompetitionName?: string | null;
-};
-
-function decodeAthlete(raw: AthleteDoc | undefined): AthleteProfile | undefined {
-  if (!raw) return undefined;
-  return {
-    primaryDiscipline: raw.primaryDiscipline ?? null,
-    level: raw.level ?? null,
-    trainingStartDate: raw.trainingStartDate?.toDate() ?? null,
-    weightKg: raw.weightKg ?? null,
-    heightCm: raw.heightCm ?? null,
-    reachCm: raw.reachCm ?? null,
-    stance: raw.stance ?? null,
-    weightClass: raw.weightClass ?? null,
-    bjjBelt: raw.bjjBelt ?? null,
-    gymName: raw.gymName ?? null,
-    trainerName: raw.trainerName ?? null,
-    nextCompetitionDate: raw.nextCompetitionDate?.toDate() ?? null,
-    nextCompetitionName: raw.nextCompetitionName ?? null,
-  };
-}
 
 function decodeStudentEntry(
   uid: string,
@@ -117,8 +93,26 @@ function decodeStudentEntry(
     isDemo: data.isDemo === true,
     gymJoinedAt: (data.gymJoinedAt as Timestamp | undefined)?.toDate(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
-    athlete: decodeAthlete(data.athlete as AthleteDoc | undefined),
+    profileSharedWith: Array.isArray(data.profileSharedWith)
+      ? (data.profileSharedWith as string[])
+      : [],
   } satisfies StudentEntry;
+}
+
+/**
+ * Hat das Gate zugeschlagen? Firestore meldet verweigerten Zugriff als
+ * FirebaseError mit code "permission-denied". Die Seiten zeigen dann statt
+ * einer roten Fehlerbox den Hinweis „noch nicht freigegeben" — es ist kein
+ * Fehler, es ist die Entscheidung des Kollegen (firestore.rules,
+ * canAccessMemberData).
+ */
+export function isPermissionDenied(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "permission-denied"
+  );
 }
 
 /** Trainer- oder Admin-Account (im Kampfkontext trotzdem ein Athlet). */
@@ -127,14 +121,34 @@ export function isStaffEntry(entry: { rights: RoleSet }): boolean {
 }
 
 /**
- * Lädt einen einzelnen Schüler inkl. Athleten-Profil (Trainer-Detailansicht).
+ * Nur die Identität — das users-Dokument ohne Athletenprofil. Bleibt auch
+ * dann lesbar, wenn das Persönliche eines Kollegen gesperrt ist: Die Seiten
+ * brauchen seinen Namen für den Hinweis „noch nicht freigegeben".
+ */
+export async function getMemberEntry(uid: string): Promise<StudentEntry | null> {
+  const snap = await getDoc(doc(getFirestoreDb(), "users", uid));
+  if (!snap.exists()) return null;
+  return decodeStudentEntry(snap.id, snap.data() as Record<string, unknown>);
+}
+
+/**
+ * Lädt einen einzelnen Athleten inkl. Athleten-Profil (Trainer-Detailansicht).
  * Wirft, wenn das Profil nicht existiert oder Lese-Zugriff fehlt.
  */
 export async function getStudentEntry(uid: string): Promise<StudentEntry | null> {
   const ref = doc(getFirestoreDb(), "users", uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
-  return decodeStudentEntry(snap.id, snap.data() as Record<string, unknown>);
+  const data = snap.data() as Record<string, unknown>;
+  const entry = decodeStudentEntry(snap.id, data);
+  // Das Profil liegt eine Ebene tiefer — und genau dort greift das Gate: Bei
+  // einem Kollegen ohne Freigabe wirft dieser Read `permission-denied`. Das
+  // ist gewollt und wird von den Seiten als „noch nicht freigegeben" gezeigt.
+  entry.athlete = await readAthleteProfile(
+    uid,
+    data.athlete as AthleteDoc | undefined,
+  );
+  return entry;
 }
 
 /**

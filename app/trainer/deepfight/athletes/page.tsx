@@ -10,7 +10,6 @@ import DeepFightWordmark from "@/components/DeepFightWordmark";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import { resolveGymId } from "@/lib/gym";
 import { useAuth } from "@/lib/auth-context";
-import { DISCIPLINE_LABEL } from "@/lib/types";
 
 function labelOf(s: StudentEntry): string {
   return s.displayName ?? s.authProviderName ?? s.email ?? s.uid;
@@ -177,9 +176,10 @@ export default function DeepFightAthletesPage() {
                             className="font-mono-ta block text-[9px] uppercase"
                             style={{ letterSpacing: "0.14em", color: "var(--fg-4)" }}
                           >
-                            {s.athlete?.primaryDiscipline
-                              ? DISCIPLINE_LABEL[s.athlete.primaryDiscipline]
-                              : "Analyse starten"}
+                            {/* Listen tragen kein Athletenprofil mehr
+                                (lib/admin.ts) — und bei Kollegen wäre die
+                                Disziplin ohne Freigabe ohnehin privat. */}
+                            Analyse öffnen
                           </span>
                         </span>
                         <span style={{ color: "var(--fg-4)", lineHeight: 0 }}>

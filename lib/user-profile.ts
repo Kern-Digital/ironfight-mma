@@ -17,8 +17,24 @@ import {
   type UserSettings,
 } from "./types";
 
-/** Firestore-Repräsentation des Athleten-Profils (Date → Timestamp) */
-type AthleteDoc = {
+/**
+ * Firestore-Repräsentation des Athleten-Profils (Date → Timestamp).
+ *
+ * WO ES LIEGT (seit 03.09.2026): in `users/{uid}/athleteProfile/main` — NICHT
+ * mehr als Feld `athlete` am users-Dokument. Grund ist Leons Vorgabe, dass
+ * Trainer das Athletenprofil eines KOLLEGEN nur mit dessen Freigabe sehen:
+ * Firestore-Regeln können keine einzelnen Felder verbergen, nur ganze
+ * Dokumente — und das users-Dokument muss lesbar bleiben, sonst fehlt in
+ * jeder Liste der Name. Also zieht das Persönliche eine Ebene tiefer, wo eine
+ * eigene Regel greift (firestore.rules, `canAccessMemberData`).
+ *
+ * RÜCKFALL AUF DAS ALTE FELD: Bis `scripts/migrate-private-profile.mjs`
+ * gelaufen ist, liest jeder Leser erst die Unter-Sammlung und dann das Feld.
+ * So bleibt Produktion in der Minute zwischen Code-Deploy und Migration
+ * heil. Der Rückfall greift NUR bei „Dokument fehlt", nie bei „Zugriff
+ * verweigert" — sonst würde er das Gate unterlaufen.
+ */
+export type AthleteDoc = {
   primaryDiscipline?: AthleteProfile["primaryDiscipline"];
   gender?: AthleteProfile["gender"];
   level?: AthleteProfile["level"];
@@ -85,11 +101,37 @@ type ProfileDoc = {
   onboarded: boolean;
   trainerOnboarded?: boolean;
   createdAt?: Timestamp;
+  /** ALT — nur noch als Rückfall gelesen, nie mehr geschrieben. */
   athlete?: AthleteDoc;
+  /**
+   * Wer außer dem Inhaber das Persönliche sehen darf (uids). Nur für
+   * Stab-Konten von Bedeutung: Athleten sind für alle Trainer ihres Gyms
+   * sichtbar wie bisher. Fehlt oder leer = privat (deny-by-default).
+   */
+  profileSharedWith?: string[];
 };
 
 function profileRef(uid: string) {
   return doc(getFirestoreDb(), "users", uid);
+}
+
+/** Die neue Heimat des Athletenprofils (siehe Kopfkommentar zu AthleteDoc). */
+export function athleteProfileRef(uid: string) {
+  return doc(getFirestoreDb(), "users", uid, "athleteProfile", "main");
+}
+
+/**
+ * Liest das Athletenprofil: zuerst die Unter-Sammlung, sonst das alte Feld
+ * (`fallback`, aus dem bereits geladenen users-Dokument). Wirft bei
+ * verweigertem Zugriff — das ist gewollt, siehe Kopfkommentar.
+ */
+export async function readAthleteProfile(
+  uid: string,
+  fallback?: AthleteDoc | null,
+): Promise<AthleteProfile | undefined> {
+  const snap = await getDoc(athleteProfileRef(uid));
+  if (snap.exists()) return athleteFromDoc(snap.data() as AthleteDoc);
+  return athleteFromDoc(fallback);
 }
 
 /** Liest das Profil aus Firestore. Erstellt es nicht. */
@@ -99,6 +141,7 @@ export async function getUserProfile(
   const snap = await getDoc(profileRef(uid));
   if (!snap.exists()) return null;
   const data = snap.data() as ProfileDoc;
+  const athlete = await readAthleteProfile(uid, data.athlete);
   return {
     uid,
     email: data.email,
@@ -115,7 +158,8 @@ export async function getUserProfile(
     onboarded: data.onboarded === true,
     trainerOnboarded: data.trainerOnboarded === true,
     createdAt: data.createdAt?.toDate(),
-    athlete: athleteFromDoc(data.athlete),
+    athlete,
+    profileSharedWith: data.profileSharedWith ?? [],
   };
 }
 
@@ -135,6 +179,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     if (data.authProviderName !== user.displayName && user.displayName) {
       await updateDoc(ref, { authProviderName: user.displayName });
     }
+    const athlete = await readAthleteProfile(user.uid, data.athlete);
     return {
       uid: user.uid,
       email: data.email,
@@ -148,7 +193,8 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       onboarded: data.onboarded === true,
       trainerOnboarded: data.trainerOnboarded === true,
       createdAt: data.createdAt?.toDate(),
-      athlete: athleteFromDoc(data.athlete),
+      athlete,
+      profileSharedWith: data.profileSharedWith ?? [],
     };
   }
 
@@ -211,10 +257,16 @@ export async function updateAthleteProfile(
   uid: string,
   patch: Partial<AthleteProfile>,
 ) {
-  const ref = profileRef(uid);
+  const ref = athleteProfileRef(uid);
   const snap = await getDoc(ref);
-  const current =
-    (snap.exists() ? (snap.data() as ProfileDoc).athlete : undefined) ?? {};
+  // Bestand: neue Ablage, sonst das alte Feld am users-Dokument (Übergang).
+  let current: AthleteDoc = {};
+  if (snap.exists()) {
+    current = snap.data() as AthleteDoc;
+  } else {
+    const alt = await getDoc(profileRef(uid));
+    current = (alt.exists() ? (alt.data() as ProfileDoc).athlete : undefined) ?? {};
+  }
 
   // Date-Felder zu Timestamp konvertieren, undefined → existing, null → null (clear)
   const next: AthleteDoc = { ...current };
@@ -243,7 +295,7 @@ export async function updateAthleteProfile(
     next.nextCompetitionName = patch.nextCompetitionName;
   }
 
-  await setDoc(ref, { athlete: next }, { merge: true });
+  await setDoc(ref, next, { merge: true });
 }
 
 /**

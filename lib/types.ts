@@ -482,6 +482,14 @@ export interface UserProfile {
   /** Reserviert für spätere Community-Funktionen — eindeutig, optional */
   username?: string | null;
   /**
+   * Trainer, die das Persönliche dieses Kontos sehen dürfen (uids) — das
+   * Athletenprofil, Workouts, Wettkämpfe, DeepFight-Analysen samt
+   * Auswertung. Nur für Stab-Konten von Bedeutung; Athleten bleiben für
+   * alle Trainer ihres Gyms sichtbar. Leer = privat (Leon 03.09.2026:
+   * „standardmäßig alle Trainer auf privat").
+   */
+  profileSharedWith?: string[];
+  /**
    * Die Rechte dieses Kontos (Multi-Gym Phase 2, Checkpoint 3): drei
    * unabhängige Häkchen statt eines `role`-Wertes — `trainer`, `verwaltung`,
    * `admin`, Plattform-Rang bereits eingerechnet. Siehe lib/roles.ts.
