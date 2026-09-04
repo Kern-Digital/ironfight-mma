@@ -196,24 +196,72 @@ Sperre (Deny-by-Default, Konzept §3).
   fehlt in jeder Liste der Name. Also wanderten `athlete` und `fightProfile`
   vom Dokument in Unter-Sammlungen (`scripts/migrate-private-profile.mjs`,
   gelaufen 2026-09-03).
-- **Die Regel:** `canAccessMemberData(uid)` in `firestore.rules` (ersetzt
-  `isStaffForUser`) — Admin immer · **sich selbst immer** (ein Trainer
+- **Die Regel:** `canAccessMemberData(uid, bereich)` in `firestore.rules`
+  (ersetzt `isStaffForUser`) — Admin immer · **sich selbst immer** (ein Trainer
   analysiert sich „exakt wie einen Schüler"; ohne diese Klausel sperrt ihn sein
   eigenes Gate aus) · sonst eigenes Gym UND (kein Stab-Konto ODER in
-  `users/{uid}.profileSharedWith`).
+  `users/{uid}.profileShares[bereich]`).
+- **GETRENNT JE BEREICH (Leons Revision 03.09. abends, LIVE):** Die Freigabe
+  ist kein einzelner Schalter, sondern eine Map je Bereich. Schlüssel,
+  Beschriftungen und Erklärtexte stehen an EINER Stelle —
+  `lib/profile-sharing.ts`; die Regeln schlagen exakt diese Schlüssel nach.
+  Eine Freigabe auf einen unbekannten Schlüssel wirkt einfach nicht, deshalb
+  dürfen sie nie auseinander laufen (Muster `lib/roles.ts`).
+
+  | Bereich | umfasst | Regelstelle |
+  |---|---|---|
+  | `athlet` | athleteProfile, workouts, participations, workoutPlans | users-Wildcard |
+  | `deepfight` | fightProfile **+** videoAnalyses (das eine IST die Auswertung des anderen) | zwei eigene Blöcke |
+  | `wettkampf` | fightCamps | eigener Block — **greift noch nicht, s. u.** |
+
+  **Der users-Wildcard nimmt jetzt `videoAnalyses`, `fightProfile` UND
+  `fightCamps` aus.** Solange EINE Freigabe für alles galt, war das egal — die
+  Bedingung war überall dieselbe. Ohne die Ausnahme öffnete das Häkchen
+  „Athletenprofil & Training" stillschweigend auch das Kampfprofil.
+- **DIE WETTKAMPF-LÜCKE (gemessen 03.09.2026, offen — Schritt 2b):**
+  `match /{path=**}/fightCamps/{campId}` matcht **nicht nur**
+  collectionGroup-Queries, sondern auch den direkten Pfad
+  `users/{uid}/fightCamps/{campId}` — und prüft dort nur `sameGym`. Weil
+  Firestore-Regeln ODER-verknüpft sind, gewinnt die großzügigere: Trainer A
+  liest das Camp von Trainer B mit **200**, ohne jede Freigabe, und eine
+  erteilte Freigabe ändert daran **nichts** (per REST mit echten ID-Tokens
+  belegt; `athleteProfile` desselben Kollegen ergab im selben Lauf 403, ein
+  Camp aus fremdem Gym ebenfalls 403). Deshalb vergibt die Oberfläche den
+  Bereich `wettkampf` NOCH NICHT — ein Häkchen, das nicht hält, wäre eine
+  falsche Sicherheitsaussage. Zu bauen: materialisiertes `ownerIsStaff` am
+  Camp (Muster `trainerPlans.audienceUids`; eine Query kann keinen `get()`
+  aufs Eltern-Dokument machen), die zwei Schreibstellen in
+  `lib/fight-camp.ts`, ein Nachziehen in `/api/members/role`, ein
+  Backfill-Script und der Umbau von `listAllFightCamps` auf „gym-weit nur
+  Athleten + Direktabfrage für freigegebene Kollegen".
 - **`node scripts/check-privacy-gate.mjs` ist der Regressionstest** — REST mit
-  echten ID-Tokens, 8 Fälle. Nach JEDER Regeländerung laufen lassen; das
-  Admin-SDK umgeht Regeln und beweist nichts.
+  echten ID-Tokens, **14 Fälle** (Gate, Bereichstrennung, Schreibrecht am
+  eigenen Dokument). Nach JEDER Regeländerung laufen lassen; das Admin-SDK
+  umgeht Regeln und beweist nichts. **Achtung beim Erweitern:**
+  `affectedKeys()` enthält nur Felder, die sich TATSÄCHLICH ändern — ein
+  Schreibvorgang mit dem bereits gespeicherten Wert ist ein No-Op, und dann
+  liefert `hasAny([...])` false und `hasOnly([...])` sogar true. Ein erster
+  Anlauf des Tests meldete dadurch 200, wo er 403 erwartete.
+- **Der Freigabe-Knopf (Schritt 2, LIVE):** `components/ProfileSharingSection`
+  auf `/kampfprofil`, direkt über „Athleten-Daten" — Karte mit Zustandssatz +
+  Sheet (`ProfileShareSheet`, Muster `MemberRoleSheet`), gruppiert nach MENSCH
+  statt nach Bereich. Sichtbar nur für Stab-Konten (bei Athleten bewirkt das
+  Feld nichts). Plattform-Admins stehen NICHT in der Liste (`isGhostAccount`
+  in `lib/admin.ts`, Leons Entscheidung 03.09. — siehe Backlog „Ghost-Konten
+  app-weit durchziehen").
+  Die Gegenrichtung („Mit dir geteilt") kostet keine zweite Abfrage —
+  `listAllMembers` trägt `profileShares` an jedem Eintrag — und erscheint nur
+  für Trainer, weil `canAccessMemberData` `isTrainerOrAdmin()` verlangt.
 - **Dual-Read als Übergang** (`lib/user-profile.ts`, `lib/fight-profile.ts`):
   erst Unter-Sammlung, dann altes Feld — aber NUR bei „Dokument fehlt", nie bei
   „Zugriff verweigert". Sonst unterliefe der Rückfall genau das Gate.
 - **Listen tragen kein Athletenprofil mehr.** `StudentEntry.athlete` füllt nur
   `getStudentEntry()`; `getMemberEntry()` liefert die reine Identität und
   bleibt auch bei gesperrtem Profil lesbar.
-- **Noch offen:** Freigabe-Knopf im Kampfprofil · Anfrage + Benachrichtigung
-  (es gibt heute KEINEN Benachrichtigungsweg — `auditLog` ist das
-  Gym-Protokoll, nur die Verwaltung liest, kein Postfach) · Trainer mit
-  „Trainer"-Vermerk in der Athletenliste (bewusst zuletzt).
+- **Noch offen:** Schritt 2b (Wettkampf-Lücke, s. o.) · Schritt 3 Anfrage +
+  Benachrichtigung (es gibt heute KEINEN Benachrichtigungsweg — `auditLog` ist
+  das Gym-Protokoll, nur die Verwaltung liest, kein Postfach) · Schritt 4
+  Trainer mit „Trainer"-Vermerk in der Athletenliste (bewusst zuletzt).
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
@@ -282,7 +330,7 @@ gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UN
                                     des Neuigkeiten-Bereichs (write:false, nur
                                     lib/server/audit.ts; Lesen nur die Verwaltung)
 users/{uid}                       — IDENTITÄT (Name, E-Mail, Rollen-Set-Spiegel,
-                                    gymId, profileSharedWith). Rechte + gymId NUR
+                                    gymId, profileShares). Rechte + gymId NUR
                                     via Custom Claims, nie Client-Write.
                                     Für Trainer des Gyms IMMER lesbar — alles
                                     Persönliche liegt darunter (s. u.)
@@ -683,6 +731,47 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       `firestore.rules`. Die Migration ist durch (Gegenprobe: kein Dokument
       trägt die Felder mehr) — der Rückfall kann also weg. Danach mit
       `scripts/check-privacy-gate.mjs` gegenprüfen.
+- [ ] **GHOST-KONTEN app-weit durchziehen** (Leons Entscheidung 2026-09-03:
+      „Admins sind Ghosts, die operative Eingriffe in der App unternehmen, die
+      sonst keiner mitbekommen soll"): Der Plattform-Rang ist die BETREIBER-
+      Ebene und darf in KEINER Gym-Oberfläche als Mitglied erscheinen. Wer als
+      Betreiber trainieren will, legt sich über eine Einladung ein eigenes
+      Mitgliedskonto an — die beiden Konten bleiben getrennt.
+      Der Helfer steht schon: `isGhostAccount()` in `lib/admin.ts`; angewandt
+      ist er bisher NUR im Freigabe-Knopf (`ProfileSharingSection`).
+      Nachzuziehen: `/verwaltung/mitglieder` (zeigt Admins heute als
+      „Trainer · Verwaltung"), `/trainer/athleten`,
+      `/trainer/deepfight/athletes`, „Neuer Wettkampf" (Schritt 1), das
+      Freigabe-Panel im Gegnerprofil und die Kennzahlen auf `/trainer` +
+      `/verwaltung` (ein Ghost darf keine Mitgliederzahl erhöhen).
+      **AUSDRÜCKLICH NICHT in `/admin/*`** — dort ist der Ort, an dem diese
+      Konten sichtbar sein müssen (`listAllUsers`).
+      ACHTUNG, zwei Fallen: (1) `effectiveRights` rechnet den Plattform-Rang in
+      `trainer` und `verwaltung` ein — ohne Filter ist ein Admin überall ein
+      vollwertiger Trainer. (2) Die NAMENSAUFLÖSUNG darf nicht mitgefiltert
+      werden: Hat ein Admin-Konto einen Wettkampf oder eine Analyse, braucht
+      die Anzeige weiter seinen Namen, sonst steht dort „Athlet".
+      Dazugehörig: Der Betreiber-Zugriff (`isAdmin()` überspringt in
+      `firestore.rules` jede Freigabe-Prüfung) verschwindet damit aus der
+      Oberfläche und MUSS in den Datenschutzhinweisen und im AVV stehen —
+      derselbe Punkt wie „vor der ersten Zahlung fällig".
+- [ ] **Schritt 2b — Wettkampf-Freigabe erzwingen** (Lücke gemessen
+      2026-09-03, Begründung und Messwerte im Abschnitt „Privates
+      Athletenprofil"): Die collectionGroup-Regel für `fightCamps` überstimmt
+      die strenge Regel darüber, weil `{path=**}` denselben Pfad matcht und nur
+      `sameGym` prüft. Zu bauen: (1) `ownerIsStaff: boolean` ans Camp-Dokument
+      (Muster `trainerPlans.audienceUids` — eine Query kann keinen `get()` aufs
+      Eltern-Dokument machen, die Regel muss allein aus dem Camp beweisbar
+      sein); (2) beide Schreibstellen in `lib/fight-camp.ts`
+      (`createFightCamp`, `updateFightCamp`); (3) Nachziehen in
+      `/api/members/role`, wenn jemand das Trainer-Häkchen bekommt oder
+      verliert; (4) Backfill-Script für den Bestand; (5)
+      `listAllFightCamps` auf „gym-weit nur Athleten-Camps + Direktabfrage für
+      die eigenen und die freigegebenen Kollegen" umbauen; (6) collectionGroup-
+      Regel um `resource.data.get("ownerIsStaff", false) == false` ergänzen;
+      (7) `SHARE_AREAS` in `lib/profile-sharing.ts` um `wettkampf` erweitern —
+      der Schlüssel steht in den Regeln schon. Danach
+      `scripts/check-privacy-gate.mjs` um die Camp-Fälle erweitern.
 - [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
       länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
       in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`

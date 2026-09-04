@@ -22,6 +22,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import AthleteProfileForm from "@/components/AthleteProfileForm";
+import ProfileSharingSection from "@/components/ProfileSharingSection";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
 import FightProfileView from "@/components/trainer/FightProfileView";
@@ -410,6 +411,12 @@ function KampfprofilContent() {
               </div>
             </section>
           )}
+
+          {/* Sichtbarkeit — wer aus dem Team mich sehen darf. Steht direkt
+              ÜBER den Athleten-Daten: Wer seine Körperdaten pflegt, stellt
+              sich von selbst die Frage, wer die eigentlich liest. Der Block
+              blendet sich bei Athleten aus (Begründung in der Komponente). */}
+          <ProfileSharingSection />
 
           {/* Athleten-Daten (editierbar) */}
           <section className="flex flex-col gap-3">

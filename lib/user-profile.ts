@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { getFirestoreDb } from "./firebase";
+import { readShares, type ProfileShares } from "./profile-sharing";
 import { NO_RIGHTS, readRoleSet } from "./roles";
 import {
   DEFAULT_USER_SETTINGS,
@@ -104,11 +105,12 @@ type ProfileDoc = {
   /** ALT — nur noch als Rückfall gelesen, nie mehr geschrieben. */
   athlete?: AthleteDoc;
   /**
-   * Wer außer dem Inhaber das Persönliche sehen darf (uids). Nur für
-   * Stab-Konten von Bedeutung: Athleten sind für alle Trainer ihres Gyms
-   * sichtbar wie bisher. Fehlt oder leer = privat (deny-by-default).
+   * Wer außer dem Inhaber das Persönliche sehen darf — je Bereich eine Liste
+   * von uids (`lib/profile-sharing.ts`). Nur für Stab-Konten von Bedeutung:
+   * Athleten sind für alle Trainer ihres Gyms sichtbar wie bisher. Fehlt oder
+   * leer = privat (deny-by-default).
    */
-  profileSharedWith?: string[];
+  profileShares?: ProfileShares;
 };
 
 function profileRef(uid: string) {
@@ -159,7 +161,7 @@ export async function getUserProfile(
     trainerOnboarded: data.trainerOnboarded === true,
     createdAt: data.createdAt?.toDate(),
     athlete,
-    profileSharedWith: data.profileSharedWith ?? [],
+    profileShares: readShares(data as unknown as Record<string, unknown>),
   };
 }
 
@@ -194,7 +196,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       trainerOnboarded: data.trainerOnboarded === true,
       createdAt: data.createdAt?.toDate(),
       athlete,
-      profileSharedWith: data.profileSharedWith ?? [],
+      profileShares: readShares(data as unknown as Record<string, unknown>),
     };
   }
 
@@ -296,6 +298,27 @@ export async function updateAthleteProfile(
   }
 
   await setDoc(ref, next, { merge: true });
+}
+
+/**
+ * Schreibt die Freigaben des eigenen Profils (`lib/profile-sharing.ts`).
+ *
+ * NUR DER INHABER SELBST — und das ist keine Client-Zusage, sondern die Regel:
+ * `allow update` am users-Dokument gilt für `request.auth.uid == uid` und
+ * sperrt nur `role/trainer/verwaltung/admin/gymId/gymJoinedAt/fightProfile`.
+ * `profileShares` steht bewusst nicht in dieser Sperrliste — wer sein Profil
+ * hergibt, entscheidet das selbst.
+ *
+ * `merge: true` schreibt die ganze Map neu, aber lässt den Rest des Dokuments
+ * stehen. Das ist hier richtig: Ein leerer Bereich muss als leere Liste
+ * ankommen, sonst bliebe eine zurückgenommene Freigabe stehen — dasselbe
+ * Argument wie beim Rechte-Spiegel in `rightsMirror` (lib/roles.ts).
+ */
+export async function setProfileShares(
+  uid: string,
+  shares: ProfileShares,
+): Promise<void> {
+  await setDoc(profileRef(uid), { profileShares: shares }, { merge: true });
 }
 
 /**

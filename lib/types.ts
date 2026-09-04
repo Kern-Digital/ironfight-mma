@@ -8,6 +8,7 @@
  * brechen zu müssen.
  */
 
+import type { ProfileShares } from "./profile-sharing";
 import type { RoleSet } from "./roles";
 
 // ─── Disziplinen ───────────────────────────────────────────────────────────
@@ -482,13 +483,16 @@ export interface UserProfile {
   /** Reserviert für spätere Community-Funktionen — eindeutig, optional */
   username?: string | null;
   /**
-   * Trainer, die das Persönliche dieses Kontos sehen dürfen (uids) — das
-   * Athletenprofil, Workouts, Wettkämpfe, DeepFight-Analysen samt
-   * Auswertung. Nur für Stab-Konten von Bedeutung; Athleten bleiben für
-   * alle Trainer ihres Gyms sichtbar. Leer = privat (Leon 03.09.2026:
-   * „standardmäßig alle Trainer auf privat").
+   * Wer dieses Konto sehen darf — je Bereich eine Liste von Trainer-uids
+   * (Leon 03.09.2026: „standardmäßig alle Trainer auf privat", getrennt nach
+   * Bereichen). Nur für Stab-Konten von Bedeutung; Athleten bleiben für alle
+   * Trainer ihres Gyms sichtbar. Fehlend oder leer = privat.
+   *
+   * Bereiche und Beschriftungen stehen in `lib/profile-sharing.ts` — die
+   * Schlüssel dort sind dieselben, die `hatFreigabe()` in `firestore.rules`
+   * nachschlägt.
    */
-  profileSharedWith?: string[];
+  profileShares?: ProfileShares;
   /**
    * Die Rechte dieses Kontos (Multi-Gym Phase 2, Checkpoint 3): drei
    * unabhängige Häkchen statt eines `role`-Wertes — `trainer`, `verwaltung`,

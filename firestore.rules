@@ -66,8 +66,22 @@ service cloud.firestore {
     // PRIVATES ATHLETENPROFIL (Leon 03.09.2026): Trainer sehen das Persoenliche
     // eines KOLLEGEN — Athletenprofil, Kampfprofil, Workouts, Wettkaempfe,
     // KI-Analysen — nur, wenn dieser Kollege sie freigegeben hat
-    // (`profileSharedWith` am users-Dokument, gepflegt vom Inhaber). Bei
+    // (`profileShares` am users-Dokument, gepflegt vom Inhaber). Bei
     // ATHLETEN bleibt es wie bisher: alle Trainer desselben Gyms.
+    //
+    // GETRENNT JE BEREICH (Leons Revision am selben Abend): Die Freigabe ist
+    // KEIN einzelner Schalter mehr, sondern eine Map von Bereich → uid-Liste:
+    //
+    //   users/{uid}.profileShares = {
+    //     athlet:    [uid, …],   // athleteProfile, workouts, participations, Plaene
+    //     deepfight: [uid, …],   // fightProfile + videoAnalyses
+    //     wettkampf: [uid, …]    // fightCamps — siehe WARNUNG unten
+    //   }
+    //
+    // Die Schluessel stehen EINMAL in lib/profile-sharing.ts; die Oberflaeche
+    // liest sie von dort. Eine Freigabe auf einen Schluessel, den diese Regel
+    // nicht kennt, wirkt einfach nicht — deshalb duerfen sie nie auseinander
+    // laufen.
     //
     // WARUM DAS AM ELTERN-DOKUMENT HAENGT UND NICHT AN DEN FELDERN: Regeln
     // koennen einzelne Felder nicht verbergen. Deshalb sind `athlete` und
@@ -75,15 +89,15 @@ service cloud.firestore {
     // (scripts/migrate-private-profile.mjs); das Dokument selbst bleibt fuer
     // die Namensliste lesbar, alles Persoenliche liegt hier darunter.
     //
-    // DENY BY DEFAULT: Fehlt `profileSharedWith` oder ist es leer, ist ein
-    // Stab-Konto privat — ohne Backfill, ohne Sonderfall (Konzept §3).
+    // DENY BY DEFAULT: Fehlt `profileShares` oder ist ein Bereich leer, ist ein
+    // Stab-Konto dort privat — ohne Backfill, ohne Sonderfall (Konzept §3).
     function istStabKonto(d) {
       return d.get("trainer", false) == true
              || d.get("verwaltung", false) == true
              || d.get("admin", false) == true;
     }
-    function hatFreigabe(d) {
-      return request.auth.uid in d.get("profileSharedWith", []);
+    function hatFreigabe(d, bereich) {
+      return request.auth.uid in d.get(["profileShares", bereich], []);
     }
     //
     // SICH SELBST DARF EIN TRAINER IMMER: Er analysiert sich „exakt wie einen
@@ -92,12 +106,13 @@ service cloud.firestore {
     // — er ist Stab-Konto und steht nicht in seiner eigenen Freigabeliste.
     // Bewusst an isTrainerOrAdmin() gebunden: Ein ATHLET schreibt sein
     // Kampfprofil weiterhin nie (Regel unten).
-    function canAccessMemberData(uid) {
+    function canAccessMemberData(uid, bereich) {
       let d = get(/databases/$(database)/documents/users/$(uid)).data;
       return isAdmin()
              || (isTrainerOrAdmin()
                  && (request.auth.uid == uid
-                     || (sameGym(d) && (!istStabKonto(d) || hatFreigabe(d)))));
+                     || (sameGym(d)
+                         && (!istStabKonto(d) || hatFreigabe(d, bereich)))));
     }
 
     match /users/{uid} {
@@ -155,18 +170,32 @@ service cloud.firestore {
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "trainer", "verwaltung", "admin"]);
       allow delete: if request.auth != null && isAdmin();
 
-      // Generische Subcollections (workouts, athleteProfile, …).
-      // WICHTIG: `videoAnalyses` und `fightProfile` sind hier BEWUSST
+      // Generische Subcollections (workouts, athleteProfile, participations …)
+      // — der Bereich „athlet" der Freigabe.
+      //
+      // WICHTIG: `videoAnalyses` und `fightProfile` sind im OWNER-Zweig BEWUSST
       // AUSGENOMMEN — der Owner darf rohe KI-Analysen ueber sich weder frei
       // lesen noch schreiben, und sein Kampfprofil (die kuratierte Auswertung)
       // nur lesen, nie schreiben (eigene Regeln unten).
-      // `athleteProfile` braucht KEINE eigene Regel: Owner liest und schreibt,
-      // Trainer lesen ueber canAccessMemberData — genau diese Zeilen.
+      //
+      // SEIT DER TRENNUNG JE BEREICH GILT DIESELBE AUSNAHME AUCH FUER DEN
+      // TRAINER-ZWEIG, und zusaetzlich fuer `fightCamps`: Solange EINE Freigabe
+      // fuer alles galt, war es gleichgueltig, ob dieser Wildcard die drei
+      // mitdeckt — die Bedingung war ueberall dieselbe. Jetzt nicht mehr. Ohne
+      // die Ausnahme oeffnete ein Haekchen bei „Athletenprofil & Training"
+      // stillschweigend auch Kampfprofil, Analysen und Wettkaempfe, weil
+      // Firestore-Regeln ODER-verknuepft sind und der grosszuegigere Zweig
+      // gewinnt. Genau diese Falle steckt weiter unten in der
+      // collectionGroup-Regel fuer fightCamps (dort noch offen, s. u.).
       match /{subcollection}/{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == uid
                            && subcollection != "videoAnalyses"
                            && subcollection != "fightProfile";
-        allow read: if request.auth != null && canAccessMemberData(uid);
+        allow read: if request.auth != null
+                    && subcollection != "videoAnalyses"
+                    && subcollection != "fightProfile"
+                    && subcollection != "fightCamps"
+                    && canAccessMemberData(uid, "athlet");
 
         // Admin schreibt in alle Sub-Collections (Demo-Seed)
         allow write: if request.auth != null && isAdmin();
@@ -181,17 +210,36 @@ service cloud.firestore {
       }
 
       // Trainer + Admin verwalten Wettkaempfe (fightCamps) — eigenes Gym,
-      // bei Kollegen nur mit Freigabe.
+      // bei Kollegen nur mit Freigabe im Bereich „wettkampf".
+      //
+      // ACHTUNG, DIESE ZEILE HAELT HEUTE NICHT (gemessen 03.09.2026 per REST):
+      // Die collectionGroup-Regel `match /{path=**}/fightCamps/{campId}` weiter
+      // unten matcht DENSELBEN Pfad und prueft dort nur `sameGym`. Weil
+      // Firestore-Regeln ODER-verknuepft sind, gewinnt die grosszuegigere —
+      // Trainer A liest das Camp von Trainer B mit 200, ohne jede Freigabe, und
+      // eine erteilte Freigabe aendert daran nichts.
+      //
+      // Deshalb vergibt die Oberflaeche den Bereich „wettkampf" NOCH NICHT
+      // (lib/profile-sharing.ts) — ein Haekchen, das nichts haelt, waere eine
+      // falsche Sicherheitsaussage. Die Zeile hier steht trotzdem richtig, weil
+      // sie greift, sobald die collectionGroup-Regel Stab-Camps aussortieren
+      // kann (materialisiertes `ownerIsStaff` am Camp, Muster
+      // `trainerPlans.audienceUids`) — Schritt 2b, Bauplan im CLAUDE.md-Backlog.
       match /fightCamps/{campId} {
-        allow read, write: if request.auth != null && canAccessMemberData(uid);
+        allow read, write: if request.auth != null
+                           && canAccessMemberData(uid, "wettkampf");
       }
 
       // Kampfprofil = kuratierte DeepFight-Auswertung (lib/fight-profile.ts).
       // Owner liest, schreibt NIE (Kuratieren ist Trainersache); Trainer
-      // lesen und schreiben — bei Kollegen nur mit Freigabe.
+      // lesen und schreiben — bei Kollegen nur mit Freigabe im Bereich
+      // „deepfight". Er umfasst Kampfprofil UND Analysen gemeinsam: Das eine
+      // IST die Auswertung des anderen, getrennt freizugeben ergaebe fachlich
+      // nichts.
       match /fightProfile/{docId} {
         allow read: if request.auth != null && request.auth.uid == uid;
-        allow read, write: if request.auth != null && canAccessMemberData(uid);
+        allow read, write: if request.auth != null
+                           && canAccessMemberData(uid, "deepfight");
       }
 
       // KI-Video-Analysen des Athleten (Konzept §6, mode=athlete).
@@ -200,13 +248,44 @@ service cloud.firestore {
       match /videoAnalyses/{analysisId} {
         allow read: if request.auth != null && request.auth.uid == uid
                     && resource.data.sharedWithAthlete == true;
-        allow read, write: if request.auth != null && canAccessMemberData(uid);
+        allow read, write: if request.auth != null
+                           && canAccessMemberData(uid, "deepfight");
       }
     }
 
     // CollectionGroup-Query: zentraler Wettkampfbereich liest fightCamps
     // gym-weit ueber alle Schueler — nur eigenes Gym (Query braucht
     // where("gymId","==",…)); Admin gym-uebergreifend.
+    //
+    // ═══ OFFENE LUECKE, GEMESSEN AM 03.09.2026 — Schritt 2b ═══════════════
+    // `{path=**}` matcht NICHT nur collectionGroup-Queries. Es matcht auch den
+    // direkten Pfad `users/{uid}/fightCamps/{campId}` — also genau den, den die
+    // strenge Regel oben mit `canAccessMemberData(uid, "wettkampf")` schuetzen
+    // soll. Firestore-Regeln sind ODER-verknuepft: Eine strengere Regel daneben
+    // schraenkt nichts ein, die grosszuegigere gewinnt. Hier steht nur
+    // `sameGym` — damit liest jeder Trainer des Gyms jedes Camp.
+    //
+    // Per REST mit echten ID-Tokens belegt (Trainer A auf Trainer B):
+    //   Camp von B direkt lesen, KEINE Freigabe   → 200  (soll 403 sein)
+    //   athleteProfile von B, KEINE Freigabe      → 403  (Gate wirkt dort)
+    //   Camp aus fremdem Gym                      → 403  (sameGym haelt)
+    //   Camp von B NACH erteilter Freigabe        → 200  (unveraendert)
+    //
+    // WARUM ES NICHT MIT EINER ZEILE ZU FLICKEN IST: Eine Query kann keinen
+    // `get()` auf das Eltern-Dokument machen — die Regel muss allein aus dem
+    // Camp-Dokument beweisbar sein. Der Weg ist deshalb ein materialisiertes
+    // Feld am Camp (`ownerIsStaff`, Muster `trainerPlans.audienceUids`), das
+    // hier `resource.data.get("ownerIsStaff", false) == false` verlangt; die
+    // Camps von Stab-Konten faenden dann nur noch ueber die strenge Regel oben
+    // ihren Weg. Dazu gehoeren: beide Schreibstellen in lib/fight-camp.ts, ein
+    // Nachziehen in /api/members/role, ein Backfill-Script und der Umbau von
+    // `listAllFightCamps` auf „gym-weit nur Athleten + Direktabfrage fuer
+    // freigegebene Kollegen". Bauplan im CLAUDE.md-Backlog.
+    //
+    // Bis dahin vergibt die Oberflaeche den Bereich „wettkampf" NICHT
+    // (lib/profile-sharing.ts) — sie behauptet lieber nichts, als etwas
+    // Falsches zu behaupten.
+    // ═════════════════════════════════════════════════════════════════════
     match /{path=**}/fightCamps/{campId} {
       allow read: if request.auth != null
                   && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));

@@ -17,6 +17,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
+import { readShares, type ProfileShares } from "./profile-sharing";
 import { effectiveRights, readRoleSet, type RoleSet } from "./roles";
 import type { AthleteProfile } from "./types";
 import { readAthleteProfile, type AthleteDoc } from "./user-profile";
@@ -75,8 +76,14 @@ export type StudentEntry = AdminUserEntry & {
    * Wer das Profil EINER Person braucht, holt sie einzeln.
    */
   athlete?: AthleteProfile;
-  /** Trainer, die das Persönliche dieses Kontos sehen dürfen (uids). */
-  profileSharedWith: string[];
+  /**
+   * Wer das Persönliche dieses Kontos sehen darf — je Bereich eine Liste von
+   * uids (`lib/profile-sharing.ts`). Steht an JEDEM Listeneintrag, weil das
+   * users-Dokument ohnehin geladen wird: Damit beantwortet dieselbe Abfrage
+   * auch die Gegenfrage „wer teilt sein Profil mit MIR" ohne einen zweiten
+   * Lesevorgang.
+   */
+  profileShares: ProfileShares;
 };
 
 function decodeStudentEntry(
@@ -93,9 +100,7 @@ function decodeStudentEntry(
     isDemo: data.isDemo === true,
     gymJoinedAt: (data.gymJoinedAt as Timestamp | undefined)?.toDate(),
     createdAt: (data.createdAt as Timestamp | undefined)?.toDate(),
-    profileSharedWith: Array.isArray(data.profileSharedWith)
-      ? (data.profileSharedWith as string[])
-      : [],
+    profileShares: readShares(data),
   } satisfies StudentEntry;
 }
 
@@ -118,6 +123,35 @@ export function isPermissionDenied(err: unknown): boolean {
 /** Trainer- oder Admin-Account (im Kampfkontext trotzdem ein Athlet). */
 export function isStaffEntry(entry: { rights: RoleSet }): boolean {
   return entry.rights.trainer;
+}
+
+/**
+ * GHOST-KONTEN: Plattform-Admins tauchen in Gym-Oberflächen NICHT auf
+ * (Leons Entscheidung 2026-09-03).
+ *
+ * „Admins sind Ghosts, die operative Eingriffe in der App unternehmen, die
+ * sonst keiner mitbekommen soll." Der Plattform-Rang ist die BETREIBER-Ebene,
+ * nicht die Gym-Ebene — er gehört keinem Team an, gibt keinen Kurs und ist für
+ * niemanden im Gym ein Kollege. Wer als Betreiber auch trainieren will, legt
+ * sich ein eigenes Mitgliedskonto über eine Einladung an; die beiden bleiben
+ * getrennt.
+ *
+ * DAS IST KEINE ANZEIGE-KOSMETIK, SONDERN EINE ABGRENZUNG: `effectiveRights`
+ * rechnet den Plattform-Rang in `trainer` und `verwaltung` ein (lib/roles.ts).
+ * Ohne diesen Filter erschiene ein Admin überall als vollwertiger Trainer des
+ * Gyms — in der Freigabe-Liste, in der Mitgliederliste, im DeepFight-Grid.
+ *
+ * WAS ER NICHT TUT: Er nimmt keinem Admin den Zugriff. `isAdmin()` steht in
+ * `firestore.rules` ganz vorn und überspringt jede Freigabe-Prüfung. Der
+ * Betreiber-Zugriff gehört deshalb in die Datenschutzhinweise und in den AVV
+ * (Backlog „vor der ersten Zahlung fällig") — dort steht er richtig, in einer
+ * Kollegen-Liste stünde er falsch.
+ *
+ * NICHT ANWENDEN in `/admin/*`: Die Plattform-Übersicht ist genau der Ort, an
+ * dem diese Konten sichtbar sein müssen (`listAllUsers`).
+ */
+export function isGhostAccount(entry: { rights: RoleSet }): boolean {
+  return entry.rights.admin;
 }
 
 /**
