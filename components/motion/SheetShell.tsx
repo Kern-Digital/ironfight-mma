@@ -43,6 +43,7 @@ export function SheetShell({
   panelStyle,
   zIndex = 50,
   stacked = false,
+  placement = "adaptive",
 }: {
   open: boolean;
   onClose: () => void;
@@ -55,6 +56,13 @@ export function SheetShell({
   zIndex?: number;
   /** Ein weiteres Sheet liegt davor → hinten anstellen (Kartei-Look). */
   stacked?: boolean;
+  /**
+   * `adaptive` (Standard): mobil Bottom-Sheet, ab `sm` zentriertes Fenster.
+   * `bottom`: auf JEDER Breite an der Unterkante in voller Breite — fuer
+   * Listen-Popups wie „Meine Workouts", die Leon bewusst so festgelegt hat.
+   * Die Bewegung ist dieselbe; nur die Ruhelage im Fenster unterscheidet sich.
+   */
+  placement?: "adaptive" | "bottom";
 }) {
   const { reduced } = useMotionCapability();
 
@@ -72,7 +80,11 @@ export function SheetShell({
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+          className={
+            placement === "bottom"
+              ? "fixed inset-0 flex flex-col justify-end"
+              : "fixed inset-0 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+          }
           style={{ zIndex }}
           role="dialog"
           aria-modal="true"

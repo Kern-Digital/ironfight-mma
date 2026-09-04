@@ -18,6 +18,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import SwipeAction from "@/components/SwipeAction";
+import { SheetShell } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import { useAuth, useHasStaffShell } from "@/lib/auth-context";
@@ -411,32 +412,17 @@ function LibraryContent() {
       </div>
 
       {/* ── Sheet „Techniken durchsuchen" (Muster Übungs-Picker) ── */}
-      {showBrowse && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Techniken durchsuchen"
-        >
-          <button
-            type="button"
-            aria-label="Durchsuchen schließen"
-            className="absolute inset-0"
-            style={{
-              background: "var(--overlay)",
-              animation: "fade-in 0.2s ease-out both",
-            }}
-            onClick={() => setShowBrowse(false)}
-          />
-          <div className="pointer-events-none relative flex w-full justify-center">
-            <div
-              className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
-              style={{
-                maxHeight: "80dvh",
-                background: "var(--surface-card)",
-                boxShadow: "var(--glass-shadow)",
-              }}
-            >
+      <SheetShell
+        open={showBrowse}
+        onClose={() => setShowBrowse(false)}
+        label="Techniken durchsuchen"
+        panelClassName="pointer-events-auto relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        panelStyle={{
+          maxHeight: "80dvh",
+          background: "var(--surface-card)",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
               <div className="flex items-center justify-between gap-3 px-5 pt-3">
                 <div className="flex min-w-0 flex-col items-start">
                   <div
@@ -593,10 +579,7 @@ function LibraryContent() {
                   </p>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </SheetShell>
 
       {!hasStaffShell && <AthleteTabBar />}
     </main>

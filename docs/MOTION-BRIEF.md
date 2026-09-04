@@ -101,11 +101,17 @@ dafür ist Framer da.
 | `STACK_SHRINK` | 0.92 | … und wird schmaler (nur `scaleX`, nie die Höhe) |
 
 **Sheets:** Jedes Sheet läuft über `SheetShell` (`open`, `onClose`, `label`,
-optional `zIndex` und `stacked`). Der Aufrufer rendert es IMMER und meldet
-„zu" über `open={false}` bzw. `x={null}` — nur so hat das Schließen eine
-Bewegung. `useLetzterWert` hält den Inhalt während der Austritts-Feder
-fest. `stacked` ist die Kartei-Choreografie (Übungs-Detail → Technik
-davor): dieselbe Feder wie Ein-/Austritt, nur mit anderer Ruhelage.
+optional `zIndex`, `stacked` und `placement`). Der Aufrufer rendert es IMMER
+und meldet „zu" über `open={false}` bzw. `x={null}` — nur so hat das
+Schließen eine Bewegung. `useLetzterWert` hält den Inhalt während der
+Austritts-Feder fest. `stacked` ist die Kartei-Choreografie (Übungs-Detail
+→ Technik davor): dieselbe Feder wie Ein-/Austritt, nur mit anderer
+Ruhelage. `placement="bottom"` hält ein Sheet auf JEDER Breite an der
+Unterkante (Listen-Popups wie „Meine Workouts"); Standard ist mobil unten,
+ab `sm` zentriert. Auch Seiten-Overlays, deren Inhalt inline im JSX steht,
+laufen über die Hülle — Achtung: Der Inhalt wird vom Aufrufer auch bei
+`open={false}` ausgewertet, `null`-Daten also im Ausdruck abfangen
+(`(liste ?? []).map(…)`).
 Sichtprüfung: `node scripts/motion-sheet-shots.mjs` gegen `/dev/motion-sheet`.
 
 **Links:** Die Grundhaptik greift bei `<a>` nur mit `data-press`

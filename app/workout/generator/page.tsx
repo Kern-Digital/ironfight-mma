@@ -18,6 +18,7 @@ import { generateWorkout } from "@/lib/workout-generator";
 import { WORKOUT_DISCIPLINES } from "@/lib/workout-plan-defaults";
 import { resolveGymId } from "@/lib/gym";
 import SwipeAction from "@/components/SwipeAction";
+import { SheetShell } from "@/components/motion";
 import {
   listPersonalWorkoutPlans,
   listSharedTrainerPlans,
@@ -751,32 +752,17 @@ export default function WorkoutHubPage() {
       {/* ── Popup „Auto-Generator" — die komplette Generator-Steuerung im
           Sheet (mobil unten, Desktop zentriert; Leons Vorschlag 2026-08-28,
           im Hub bleibt nur die Karte) ── */}
-      {genOpen && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Auto-Generator"
-        >
-          <button
-            type="button"
-            aria-label="Auto-Generator schließen"
-            className="absolute inset-0"
-            style={{
-              background: "var(--overlay)",
-              animation: "fade-in 0.2s ease-out both",
-            }}
-            onClick={() => setGenOpen(false)}
-          />
-          <div className="pointer-events-none relative flex w-full justify-center">
-          <div
-            className="pointer-events-auto animate-slide-up relative flex w-full max-h-[85vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
-            style={{
-              maxHeight: "85dvh",
-              background: "var(--surface-card)",
-              boxShadow: "var(--glass-shadow)",
-            }}
-          >
+      <SheetShell
+        open={genOpen}
+        onClose={() => setGenOpen(false)}
+        label="Auto-Generator"
+        panelClassName="pointer-events-auto relative flex w-full max-h-[85vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        panelStyle={{
+          maxHeight: "85dvh",
+          background: "var(--surface-card)",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
             <div className="flex items-center justify-between gap-3 px-5 pt-3">
               <div className="flex flex-col items-start">
                 <div
@@ -952,40 +938,23 @@ export default function WorkoutHubPage() {
             </div>
           </div>
             </div>
-          </div>
-          </div>
-        </div>
-      )}
+      </SheetShell>
 
       {/* Detail-Popup und Herz der letzten Workouts liegen seit dem
           Zwei-Felder-Umbau (Leon 31.08.) auf /workout/verlauf */}
 
       {/* ── Popup „Vom Trainer für dich" — freigegebene Pläne ── */}
-      {trainerPlansOpen && trainerPlans !== null && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label={sharedPlansTitle}
-        >
-          <button
-            type="button"
-            aria-label="Schließen"
-            className="absolute inset-0"
-            style={{
-              background: "var(--overlay)",
-              animation: "fade-in 0.2s ease-out both",
-            }}
-            onClick={() => setTrainerPlansOpen(false)}
-          />
-          <div
-            className="animate-slide-up relative flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
-            style={{
-              maxHeight: "75dvh",
-              background: "var(--surface-card)",
-              boxShadow: "var(--glass-shadow)",
-            }}
-          >
+      <SheetShell
+        open={trainerPlansOpen && trainerPlans !== null}
+        onClose={() => setTrainerPlansOpen(false)}
+        label={sharedPlansTitle}
+        panelClassName="relative flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        panelStyle={{
+          maxHeight: "75dvh",
+          background: "var(--surface-card)",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
             <div className="flex items-center justify-between gap-3 px-5 pt-3">
               <div className="flex flex-col items-start">
                 <div
@@ -1011,7 +980,7 @@ export default function WorkoutHubPage() {
                 paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
               }}
             >
-              {trainerPlans.map((plan) => {
+              {(trainerPlans ?? []).map((plan) => {
                 const minutes = Math.round(planDurationSeconds(plan) / 60);
                 const exercises = planExerciseCount(plan);
                 return (
@@ -1071,37 +1040,22 @@ export default function WorkoutHubPage() {
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
+      </SheetShell>
 
       {/* ── Popup „Meine Workouts" — Liste + „+" (Leons Vorgabe) ── */}
-      {plansOpen && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col justify-end"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Meine Workouts"
-        >
-          <button
-            type="button"
-            aria-label="Meine Workouts schließen"
-            className="absolute inset-0"
-            style={{
-              background: "var(--overlay)",
-              animation: "fade-in 0.2s ease-out both",
-            }}
-            onClick={() => setPlansOpen(false)}
-          />
-          <div
-            className="animate-slide-up relative flex max-h-[75vh] flex-col overflow-hidden"
-            style={{
-              maxHeight: "75dvh",
-              background: "var(--surface-card)",
-              borderRadius: "var(--r-xl) var(--r-xl) 0 0",
-              boxShadow: "var(--glass-shadow)",
-            }}
-          >
+      <SheetShell
+        open={plansOpen}
+        onClose={() => setPlansOpen(false)}
+        label="Meine Workouts"
+        placement="bottom"
+        panelClassName="relative flex max-h-[75vh] flex-col overflow-hidden"
+        panelStyle={{
+          maxHeight: "75dvh",
+          background: "var(--surface-card)",
+          borderRadius: "var(--r-xl) var(--r-xl) 0 0",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
             <div className="flex items-center justify-between gap-3 px-5 pt-3">
               <div className="flex flex-col items-start">
                 <div
@@ -1223,9 +1177,7 @@ export default function WorkoutHubPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+      </SheetShell>
 
       {!hasStaffShell && <AthleteTabBar />}
     </main>
