@@ -528,7 +528,13 @@ export default function SchedulePage() {
         >
           <div
             ref={modalRef}
-            className="t-card max-h-[90vh] w-full overflow-y-auto rounded-modal sm:max-w-xl"
+            // Nimmt sich den Platz, den der Bildschirm hergibt (Leon 04.09.:
+            // „warum machst du das Popup so klein, wenn der Desktop den Platz
+            // hergibt?"). Muster wie alle Sheets: Das Panel selbst scrollt
+            // NICHT (overflow-hidden), es ist eine Flex-Spalte — Kopf und Fuß
+            // stehen fest, genau EIN Bereich in der Mitte scrollt und füllt
+            // dabei die ganze Resthöhe bis 90vh.
+            className="t-card flex max-h-[90vh] w-full flex-col overflow-hidden rounded-modal sm:max-w-xl lg:max-w-3xl"
             style={{ boxShadow: "var(--glass-shadow)" }}
           >
             {modal.phase === "loading" && (
@@ -701,9 +707,11 @@ function BlockRow({
 
 function ModalSkeleton({ block, onClose }: { block: TrainingBlock; onClose: () => void }) {
   return (
-    <div className="p-5">
+    // Gleiche Flex-Spalte wie ModalReady, damit der Ladezustand im selben
+    // Rahmen sitzt und beim Wechsel nichts springt.
+    <div className="flex min-h-0 flex-1 flex-col p-5">
       <ModalHeader block={block} onClose={onClose} />
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {[1, 2, 3].map((n) => (
           <div
             key={n}
@@ -783,16 +791,22 @@ function ModalReady({
   const relevantDisciplines = getBlockDisciplines(block);
 
   return (
-    <div className="p-5">
+    // min-h-0: Ohne das weigert sich ein Flex-Kind zu schrumpfen und der
+    // innere Scrollbereich wächst aus dem Panel heraus, statt zu scrollen.
+    <div className="flex min-h-0 flex-1 flex-col p-5">
       <ModalHeader block={block} onClose={onClose} />
 
       {canEdit && editMode ? (
         // ── EDIT-MODUS: Strukturierter Technik-Picker ──────────────────────
         <>
+          {/* shrink-0: Der Hinweis behält seine Höhe, wenn die Liste
+              darunter den Platz einfordert — sonst quetscht Flex ihn zusammen. */}
+          <div className="shrink-0">
           <TrainerHint id="course-edit-techniques" title="Techniken auswählen">
             Stell die Techniken zusammen, die diese Woche dran sind. Mit
             „Speichern“ gehen sie an alle, die diesen Kurs abonniert haben.
           </TrainerHint>
+          </div>
           <TechniquePicker
             relevantDisciplines={relevantDisciplines}
             activeDiscipline={editDiscipline}
@@ -809,6 +823,9 @@ function ModalReady({
       ) : (
         // ── ANZEIGE-MODUS ─────────────────────────────────────────────────
         <>
+          {/* Alles über den Knöpfen scrollt gemeinsam — die Knopfreihe bleibt
+              unten stehen und rutscht nie aus dem Bild. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
           {canEdit && (
             <div
               className="mt-4 rounded-field px-3.5 py-3"
@@ -857,7 +874,9 @@ function ModalReady({
             )}
           </div>
 
-          <div className="mt-5 flex flex-col gap-2">
+          </div>
+
+          <div className="mt-5 flex shrink-0 flex-col gap-2">
             {/* Athleten-Funktion: Kurs-Abo (nur für Nicht-Trainer) */}
             {isLoggedIn && !isTrainer && (
               <button
@@ -1024,9 +1043,11 @@ function TechniquePicker({
   const totalVisible = groups.reduce((n, g) => n + g.techniques.length, 0);
 
   return (
-    <div className="mt-4">
+    // Flex-Spalte: Tabs, Suche und Status stehen fest, die Technik-Liste
+    // darunter nimmt die ganze Resthöhe des Modals ein.
+    <div className="mt-4 flex min-h-0 flex-1 flex-col">
       {/* Disziplin-Tabs */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <div className="mb-3 flex shrink-0 flex-wrap gap-1.5">
         {relevantDisciplines.map((d) => {
           const active = d === activeDiscipline;
           return (
@@ -1051,7 +1072,7 @@ function TechniquePicker({
       </div>
 
       {/* Suchfeld — app-weiter Standard ist die Gooey-Pille (Leon 04.09.) */}
-      <div className="mb-3">
+      <div className="mb-3 shrink-0">
         <GooeySearch
           value={search}
           onChange={onSearchChange}
@@ -1060,7 +1081,7 @@ function TechniquePicker({
       </div>
 
       {/* Status-Zeile */}
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex shrink-0 items-baseline justify-between">
         <span className="t-label" style={{ color: "var(--accent-text)" }}>
           {selectedIds.length} gewählt
         </span>
@@ -1069,9 +1090,12 @@ function TechniquePicker({
         </span>
       </div>
 
-      {/* Gruppierte Technik-Liste */}
+      {/* Gruppierte Technik-Liste — der EINZIGE Scrollbereich des Modals.
+          Vorher stand hier ein fester Deckel von 256 px (max-h-64): Auf
+          jedem Bildschirm gleich klein, während das Modal ringsum noch
+          Platz bis 90vh gehabt hätte. Jetzt füllt die Liste diesen Platz. */}
       <div
-        className="max-h-64 space-y-3 overflow-y-auto pr-1"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
         style={{ scrollbarWidth: "thin" }}
       >
         {groups.length === 0 ? (
@@ -1094,9 +1118,9 @@ function TechniquePicker({
         )}
       </div>
 
-      {/* Aktuelle Auswahl-Chips */}
+      {/* Aktuelle Auswahl-Chips — bleiben unten stehen, scrollen nicht weg */}
       {selectedIds.length > 0 && (
-        <div className="mt-3 flex flex-col gap-1.5">
+        <div className="mt-3 flex max-h-32 shrink-0 flex-col gap-1.5 overflow-y-auto">
           <span className="t-label">Auswahl</span>
           <div className="flex flex-wrap gap-1.5">
             {selectedIds.map((id) => {
@@ -1124,7 +1148,7 @@ function TechniquePicker({
       )}
 
       {/* Speichern / Abbrechen */}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex shrink-0 gap-2">
         <button
           type="button"
           onClick={onSave}
