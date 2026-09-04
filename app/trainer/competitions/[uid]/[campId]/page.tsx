@@ -12,6 +12,7 @@ import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
 import FightCampPlanView from "@/components/trainer/FightCampPlanView";
+import { MorphSwap } from "@/components/motion";
 import { competitionGroup } from "@/components/trainer/CompetitionCard";
 import {
   campOpponentId,
@@ -304,6 +305,10 @@ function CompetitionDetailContent({
             </p>
           )}
 
+          {/* Ansicht und Editor liegen am selben Platz — MorphSwap laesst den
+              einen in den anderen uebergehen und federt auf die neue Hoehe,
+              statt die halbe Seite auszutauschen. */}
+          <MorphSwap activeKey={editingDna ? "editor" : "ansicht"}>
           {editingDna ? (
             <OpponentEditor
               initial={{
@@ -345,6 +350,7 @@ function CompetitionDetailContent({
               }}
             />
           )}
+          </MorphSwap>
         </div>
 
         {/* Trainingsplan (4 Phasen) */}

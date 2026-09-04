@@ -18,7 +18,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
-import { SheetShell, useLetzterWert } from "@/components/motion";
+import { MorphSwap, SheetShell, useLetzterWert } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import type { StudentEntry } from "@/lib/admin";
 import {
@@ -309,21 +309,36 @@ function MemberRoleInhalt({
                       ? "Wirklich entfernen"
                       : "Aus dem Gym entfernen"}
                 </button>
-                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  {confirmRemove
-                    ? `${memberName(member)} gehört danach zu keinem Gym mehr: Kampfprofil, Analysen und Wettkämpfe sind für euch nicht mehr sichtbar, freigegebene Pläne und Gegnerprofile werden zurückgenommen. Mit einer neuen Einladung kann die Person jederzeit wiederkommen.`
-                    : "Beendet die Mitgliedschaft. Das Konto bleibt bestehen — es gehört der Person, nicht dem Gym; löschen kann es nur sie selbst."}
-                </p>
-                {confirmRemove && !removing && (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmRemove(false)}
-                    className="t-interactive self-start rounded-field px-2 py-1"
-                    style={{ ...BTN_FONT, color: "var(--text-3)" }}
-                  >
-                    Abbrechen
-                  </button>
-                )}
+                {/* Kurzer Satz wird langer Warntext, und „Abbrechen" fliesst
+                    mit herein — als EINE Verwandlung, damit die Hoehe federt
+                    statt zu springen. Der Knopf darueber bleibt bewusst
+                    draussen: Er traegt schon die CSS-Grundhaptik, und zwei
+                    Federn auf einem Element multiplizieren sich
+                    (MOTION-BRIEF §3.8). Sein Farbwechsel ist CSS. */}
+                <MorphSwap
+                  activeKey={confirmRemove ? "confirm" : "idle"}
+                  innerClassName="flex flex-col gap-2"
+                >
+                  <>
+                    <p
+                      style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                    >
+                      {confirmRemove
+                        ? `${memberName(member)} gehört danach zu keinem Gym mehr: Kampfprofil, Analysen und Wettkämpfe sind für euch nicht mehr sichtbar, freigegebene Pläne und Gegnerprofile werden zurückgenommen. Mit einer neuen Einladung kann die Person jederzeit wiederkommen.`
+                        : "Beendet die Mitgliedschaft. Das Konto bleibt bestehen — es gehört der Person, nicht dem Gym; löschen kann es nur sie selbst."}
+                    </p>
+                    {confirmRemove && !removing && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRemove(false)}
+                        className="t-interactive self-start rounded-field px-2 py-1"
+                        style={{ ...BTN_FONT, color: "var(--text-3)" }}
+                      >
+                        Abbrechen
+                      </button>
+                    )}
+                  </>
+                </MorphSwap>
               </div>
             )}
 

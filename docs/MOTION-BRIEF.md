@@ -141,6 +141,18 @@ Profil teilen, Übungs-Detail, Trainings-Log und der Auto-Generator. Prüfen: Di
 Panel-Höhe muss den vh-Deckel erreichen und es darf genau EIN scrollendes
 Element im Panel geben.
 
+**Ein `MorphSwap` MITTEN in dieser Kette braucht `innerClassName`** (Etappe 4,
+04.09.): Die Hülle schiebt ZWEI Ebenen zwischen Eltern und Inhalt — die
+`layout`-Hülle und den wechselnden Kasten. Trägt nur die äußere
+`flex min-h-0 flex-1 flex-col`, reißt die Kette an der inneren, und der
+Scrollbereich wächst aus dem Panel heraus. `className` setzt die äußere,
+`innerClassName` die innere; bei abbestellter Bewegung fällt eine Ebene weg und
+der verbliebene Kasten trägt beide Klassensätze. Wo der Wechsel nicht in einer
+Flex-Kette sitzt, reicht `innerClassName` allein — dann ist die äußere Hülle
+ein reiner Kasten und braucht keine Klassen. Sichtprüfung ohne Login:
+`/dev/kursfenster` (bildet die Kette des Kurs-Fensters nach — ändert sich die
+dort, gehört sie hier mit geändert).
+
 **Was NICHT scrollt, wird gekürzt — nicht gedeckelt** (Leon 04.09.): Eine
 Chip-Reihe, eine Merkliste, eine Fußzeile mit Auswahl braucht bei 51 Einträgen
 keinen zweiten Scrollbalken, sondern eine Grenze. Muster in

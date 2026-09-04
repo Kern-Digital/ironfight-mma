@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import OpponentProfileView from "@/components/trainer/OpponentProfileView";
+import { MorphSwap } from "@/components/motion";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
@@ -543,6 +544,11 @@ function OpponentDetailContent({ id }: { id: string }) {
           />
         )}
 
+        {/* Editor, Videos und die drei Profil-Tabs teilen sich denselben Platz.
+            Der activeKey traegt deshalb BEIDES — den Editor-Zustand und den
+            Tab: So verwandelt sich auch ein reiner Tab-Wechsel, statt die
+            halbe Seite hart auszutauschen. */}
+        <MorphSwap activeKey={editing ? "editor" : tab}>
         {editing ? (
           <>
             <OpponentEditor
@@ -616,6 +622,7 @@ function OpponentDetailContent({ id }: { id: string }) {
             />
           </div>
         )}
+        </MorphSwap>
       </div>
     </main>
   );

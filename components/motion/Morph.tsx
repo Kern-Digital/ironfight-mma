@@ -101,24 +101,40 @@ export function Pop({
  *
  * `activeKey` MUSS sich bei jedem Zustandswechsel ändern, sonst merkt
  * AnimatePresence nichts.
+ *
+ * `innerClassName` ist für den Fall gedacht, dass der Wechsel MITTEN in einer
+ * Flex-Kette sitzt — etwa im Kurs-Fenster zwischen Panel und Scrollbereich.
+ * Die Hülle schiebt ZWEI Ebenen zwischen Eltern und Inhalt; ohne
+ * `flex min-h-0 flex-1 flex-col` auf beiden reißt die Kette, und der
+ * Scrollbereich wächst aus dem Panel heraus (MOTION-BRIEF, Popup-Regel).
+ * Bei abbestellter Bewegung fällt die innere Ebene weg — dann trägt der
+ * eine verbliebene Kasten beide Klassensätze.
  */
 export function MorphSwap({
   activeKey,
   children,
   className,
+  innerClassName,
   ...rest
 }: {
   activeKey: string;
   children: ReactNode;
+  innerClassName?: string;
 } & HTMLMotionProps<"div">) {
   const { reduced } = useMotionCapability();
-  if (reduced) return <div className={className}>{children}</div>;
+  if (reduced)
+    return (
+      <div className={[className, innerClassName].filter(Boolean).join(" ")}>
+        {children}
+      </div>
+    );
 
   return (
     <motion.div layout className={className} transition={springSoft} {...rest}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={activeKey}
+          className={innerClassName}
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}

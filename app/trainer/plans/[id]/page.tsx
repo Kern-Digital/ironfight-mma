@@ -36,6 +36,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import PlanView from "../../../workout/plans/[slug]/PlanView";
+import { MorphSwap } from "@/components/motion";
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -390,8 +391,16 @@ export default function TrainerPlanDetailPage() {
         }
         belowBlocks={
           <>
-            {/* ── Löschen — Inline-Bestätigung statt Popup, ganz unten ── */}
-            <section className="flex flex-wrap items-center gap-3">
+            {/* ── Löschen — Inline-Bestätigung statt Popup, ganz unten ──
+                Der Knopf verwandelt sich in die Rückfrage, statt sie
+                danebenzustellen: MorphSwap misst die neue Breite und federt
+                dorthin. Die Flex-Reihe traegt der wechselnde Kasten selbst
+                (innerClassName), nicht die Huelle darum. */}
+            <section>
+              <MorphSwap
+                activeKey={confirmDelete ? "confirm" : "idle"}
+                innerClassName="flex flex-wrap items-center gap-3"
+              >
               {confirmDelete ? (
                 <>
                   <span
@@ -428,16 +437,19 @@ export default function TrainerPlanDetailPage() {
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="t-interactive -ml-2 inline-flex min-h-hit items-center gap-2 rounded-field px-2"
-                  style={{ ...BTN_FONT, color: "var(--negative)" }}
-                >
-                  <Icon name="trash" size={13} strokeWidth={2.2} />
-                  Plan löschen
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="t-interactive -ml-2 inline-flex min-h-hit items-center gap-2 rounded-field px-2"
+                    style={{ ...BTN_FONT, color: "var(--negative)" }}
+                  >
+                    <Icon name="trash" size={13} strokeWidth={2.2} />
+                    Plan löschen
+                  </button>
+                </>
               )}
+              </MorphSwap>
             </section>
           </>
         }

@@ -2,7 +2,7 @@
 
 import AuswahlChips from "@/components/schedule/AuswahlChips";
 import GooeySearch from "@/components/ui/GooeySearch";
-import { Collapse } from "@/components/motion";
+import { Collapse, MorphSwap } from "@/components/motion";
 import {
   Fragment,
   useCallback,
@@ -901,6 +901,16 @@ function ModalReady({
     <div className="flex min-h-0 flex-1 flex-col p-5">
       <ModalHeader block={block} onClose={onClose} />
 
+      {/* Detail und Picker liegen am selben Platz und verwandeln sich
+          ineinander. Beide Ebenen der Huelle tragen `flex min-h-0 flex-1
+          flex-col`, weil der Wechsel MITTEN in der Flex-Kette des Panels
+          sitzt: Ohne das reisst die Kette und der Scrollbereich waechst aus
+          dem Fenster heraus (MOTION-BRIEF, Popup-Regel). */}
+      <MorphSwap
+        activeKey={canEdit && editMode ? "picker" : "detail"}
+        className="flex min-h-0 flex-1 flex-col"
+        innerClassName="flex min-h-0 flex-1 flex-col"
+      >
       {canEdit && editMode ? (
         // ── EDIT-MODUS: Strukturierter Technik-Picker ──────────────────────
         <>
@@ -1116,6 +1126,7 @@ function ModalReady({
           </div>
         </>
       )}
+      </MorphSwap>
     </div>
   );
 }

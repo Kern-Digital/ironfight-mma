@@ -23,7 +23,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
-import { SheetShell } from "@/components/motion";
+import { MorphSwap, SheetShell } from "@/components/motion";
 import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
@@ -264,6 +264,14 @@ function InviteCreateInhalt({
                     );
                   })}
                 </div>
+                {/* Der Erklaertext verwandelt sich mit der Wahl, und die
+                    Gruppengroesse waechst dazwischen herein. MorphSwap statt
+                    Collapse, weil hier ein Select-Panel aufgeht — Collapse
+                    setzt overflow:hidden DAUERHAFT und wuerde es abschneiden. */}
+                <MorphSwap
+                  activeKey={forGroup ? "gruppe" : "person"}
+                  innerClassName="flex flex-col gap-2"
+                >
                 {forGroup ? (
                   <>
                     <Select
@@ -288,6 +296,7 @@ function InviteCreateInhalt({
                     ist, ist der Link verbraucht.
                   </p>
                 )}
+                </MorphSwap>
               </div>
 
               <div className="flex flex-col gap-2">
