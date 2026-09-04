@@ -869,6 +869,14 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       der Detailseite im Hinweis „noch nicht freigegeben". „Neuer Wettkampf"
       ist am 2026-09-04 schon auf `darfSehen(…, "wettkampf", …)` umgestellt —
       dasselbe Muster, ein Aufruf von `darfSehen`.
+- [ ] **`AiBudgetGauge` benutzt `window.prompt()`** (gefunden 04.09.2026 beim
+      Ausbau der Browser-Dialoge): Die Guthaben-Eingabe („Aufgeladenes
+      Claude-Guthaben in Euro") öffnet das Browser-Fenster — dieselbe Sache,
+      die Leon beim Löschen abgeschafft haben wollte, nur mit Eingabefeld
+      statt Ja/Nein. Braucht deshalb kein Inline-Muster, sondern ein kleines
+      Sheet mit Zahlenfeld (`SheetShell`, Muster `InviteCreateSheet`). Steht
+      auf dem Trainer-Dashboard und in `/admin`. Alle `confirm()` sind seit
+      dem 04.09. weg; das hier ist der letzte native Dialog der App.
 - [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
       länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
       in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`
