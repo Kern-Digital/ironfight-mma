@@ -78,6 +78,9 @@ function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
+      // Zeile einer Einstellungsliste: sinkt ein, hebt sich nie — eine
+      // bildschirmbreite Zeile, die 2 % wächst, ruckt sichtbar (MOTION-BRIEF §4).
+      data-press="quiet"
       className="t-interactive flex min-h-hit w-full items-center justify-between gap-3 rounded-badge py-2.5 text-left"
     >
       <span className="flex min-w-0 flex-col gap-0.5">
@@ -339,7 +342,7 @@ function SubscriptionsCard({ uid }: { uid: string }) {
         </div>
       )}
 
-      <Link
+      <Link data-press
         href="/schedule"
         className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 self-start rounded-field px-5"
         style={{
@@ -422,7 +425,7 @@ function ProfileContent() {
         ) : (
           <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6">
             {/* Verweis aufs Kampfprofil — DeepFight-Kontext, daher t-card-fight */}
-            <Link
+            <Link data-press="surface"
               href="/kampfprofil"
               className="t-card-fight t-interactive flex items-center gap-3 p-4 lg:col-span-2"
               style={{ textDecoration: "none" }}

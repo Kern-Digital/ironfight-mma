@@ -58,7 +58,7 @@ export default function TrainerSubnav() {
         {ITEMS.map((item) => {
           const active = item.isActive(pathname);
           return (
-            <Link
+            <Link data-press="quiet"
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}

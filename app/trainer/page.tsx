@@ -120,7 +120,7 @@ function StatTile({
     color: "inherit",
   };
   return href ? (
-    <Link
+    <Link data-press="surface"
       href={href}
       className="t-card t-interactive flex flex-col gap-1 p-4"
       style={style}
@@ -148,7 +148,7 @@ function SectionHead({
     <div className="flex items-center justify-between gap-3">
       <span className="t-label">{label}</span>
       {moreHref && (
-        <Link
+        <Link data-press
           href={moreHref}
           className="t-interactive -mr-2 inline-flex min-h-hit items-center gap-1.5 rounded-field px-2"
           style={{
@@ -388,7 +388,7 @@ export default function TrainerDashboardPage() {
                 <Skeleton className="h-24 w-full" />
               </div>
             ) : nextCamp && nextInfo ? (
-              <Link
+              <Link data-press="surface"
                 href={`/trainer/competitions/${nextCamp.studentUid}/${nextCamp.id}`}
                 className="t-glass t-interactive flex flex-col gap-2.5 p-4"
                 style={{
@@ -505,7 +505,7 @@ export default function TrainerDashboardPage() {
             hier die Flächen-Tokens invertiert (fast weiße Karte) — Leons
             Einwand 02.09.: die Farbe passte nicht zur App. */}
         <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2">
-          <Link
+          <Link data-press="surface"
             href="/trainer/athleten"
             className="t-interactive relative flex flex-col justify-between gap-6 overflow-hidden p-5 lg:row-span-2 lg:p-6"
             style={{
@@ -686,7 +686,7 @@ export default function TrainerDashboardPage() {
                 </span>
               </div>
               <div className="flex flex-col gap-2.5 sm:flex-row lg:shrink-0 lg:flex-col xl:flex-row">
-                <Link
+                <Link data-press
                   href="/trainer/opponents?new=1"
                   className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-6"
                   style={{
@@ -700,7 +700,7 @@ export default function TrainerDashboardPage() {
                 >
                   Gegner scouten
                 </Link>
-                <Link
+                <Link data-press
                   href="/trainer/deepfight/athletes"
                   className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-6"
                   style={{

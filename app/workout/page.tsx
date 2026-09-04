@@ -59,7 +59,7 @@ function WorkoutDetail() {
             Diese Ansicht zeigt die Details eines laufenden Workouts. Starte
             eins über den Workout-Hub.
           </p>
-          <Link
+          <Link data-press
             href="/workout/generator"
             className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
             style={{

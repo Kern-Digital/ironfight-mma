@@ -386,7 +386,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
               DeepFight und folgt bewusst KEINEM Gym-Akzent (Token-Kommentar
               in globals.css). Vorher stand dasselbe Violett dreimal als
               hartkodierter Hex-Wert in dieser Zeile. */}
-          <Link
+          <Link data-press
             id="deepfight"
             href={`/trainer/deepfight/athletes/${uid}`}
             className="t-interactive inline-flex scroll-mt-24 items-center gap-2 rounded-field px-3 py-2"
@@ -770,7 +770,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 inklusive.
               </p>
             </div>
-            <Link
+            <Link data-press
               href={`/trainer/competitions/new?student=${uid}`}
               className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
               style={{

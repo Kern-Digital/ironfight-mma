@@ -124,7 +124,7 @@ export default function TrainerPlansPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link
+            <Link data-press
               href="/trainer"
               className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
               style={{
@@ -155,7 +155,7 @@ export default function TrainerPlansPage() {
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
         <div>
-          <Link
+          <Link data-press
             href="/trainer/plans/neu"
             className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
             style={{
@@ -193,7 +193,7 @@ export default function TrainerPlansPage() {
               const exercises = planExerciseCount(plan);
               const audience = audienceLine(plan);
               return (
-                <Link
+                <Link data-press="surface"
                   key={plan.id}
                   href={`/trainer/plans/${plan.id}`}
                   className="t-card t-interactive flex items-start gap-4 p-4 sm:items-center sm:p-5"

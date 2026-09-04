@@ -100,7 +100,7 @@ export default function GymPlanPage({ slug }: { slug: string }) {
             Diesen Plan gibt es nicht mehr — oder er gehört zu einem anderen
             Gym.
           </p>
-          <Link
+          <Link data-press
             href="/workout/generator"
             className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
             style={{

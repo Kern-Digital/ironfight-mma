@@ -845,7 +845,7 @@ export default function PlanView({
   // dem letzten Block (startBelowBlocks, Leon 30.08.)
   const startAction =
     totalExercises > 0 ? (
-      <Link
+      <Link data-press
         href={sessionHref}
         className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
         style={{
@@ -1012,7 +1012,7 @@ export default function PlanView({
             {/* Zurück-Weg: eine Ebene hoch zur Disziplin-Seite (Ebene 2);
                 unbekannte Disziplin (eigene/künftige Gym-Pläne) fällt auf
                 den Hub */}
-            <Link
+            <Link data-press
               href={
                 backHref ??
                 (disciplineInfo

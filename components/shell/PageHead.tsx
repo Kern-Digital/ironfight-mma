@@ -113,7 +113,7 @@ export default function PageHead({
       >
         <div className="flex min-w-0 flex-col gap-1 lg:flex-1">
           {back && (
-            <Link
+            <Link data-press
               href={back.href}
               className="t-interactive -ml-2 mb-1 inline-flex w-fit items-center gap-1.5 rounded-field px-2 py-1"
               style={{

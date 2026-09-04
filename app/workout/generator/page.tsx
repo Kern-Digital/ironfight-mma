@@ -481,7 +481,7 @@ export default function WorkoutHubPage() {
             Herz und Detail-Popup leben jetzt auf /workout/verlauf. ── */}
         {(recent !== null || ownPlans !== null) && (
           <div className="grid grid-cols-2 items-stretch gap-3">
-            <Link
+            <Link data-press="surface"
               href="/workout/verlauf"
               className="t-card t-interactive flex flex-col gap-2 p-4 sm:p-5"
               style={{
@@ -644,7 +644,7 @@ export default function WorkoutHubPage() {
                 // Bild oben rechts klar, läuft nach links/unten in die
                 // Kartenfläche aus (Maske + Token-Verlauf), damit der Text
                 // in beiden Themes lesbar bleibt.
-                <Link
+                <Link data-press="surface"
                   key={d.discipline}
                   href={`/workout/disziplin/${d.discipline}`}
                   className="t-card t-interactive relative flex min-h-[10.5rem] flex-col gap-2 overflow-hidden p-4 sm:p-5"
@@ -838,6 +838,7 @@ export default function WorkoutHubPage() {
                     type="button"
                     onClick={() => toggleGear(eq.id)}
                     aria-pressed={active}
+                    data-press="surface"
                     className="t-interactive flex min-h-hit items-center gap-3 rounded-field px-3.5 py-2.5 text-left"
                     style={{
                       background: active
@@ -984,7 +985,7 @@ export default function WorkoutHubPage() {
                 const minutes = Math.round(planDurationSeconds(plan) / 60);
                 const exercises = planExerciseCount(plan);
                 return (
-                  <Link
+                  <Link data-press="surface"
                     key={plan.id}
                     href={`/workout/plans/${plan.id}`}
                     className="t-card t-interactive relative flex items-center gap-4 overflow-hidden p-4"
@@ -1082,7 +1083,7 @@ export default function WorkoutHubPage() {
               }}
             >
               {/* Der „+"-Knopf des Popups: völlig eigenes Workout erstellen */}
-              <Link
+              <Link data-press="quiet"
                 href="/workout/eigene/neu"
                 className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2"
                 style={{ color: "var(--accent-text)", textDecoration: "none" }}
@@ -1123,7 +1124,7 @@ export default function WorkoutHubPage() {
                         }}
                         disabled={isRemoving}
                       >
-                        <Link
+                        <Link data-press="surface"
                           href={`/workout/eigene/${plan.id}`}
                           className={`t-card t-interactive flex min-h-hit w-full items-center gap-3 p-3${
                             isRemoving ? " animate-remove-row" : ""

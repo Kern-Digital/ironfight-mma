@@ -141,7 +141,7 @@ export default function TrainerMembersPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link
+            <Link data-press
               href="/trainer"
               className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
               style={{
@@ -221,7 +221,7 @@ export default function TrainerMembersPage() {
                   Außer dir ist noch niemand da. Hol dein erstes Mitglied
                   dazu — mit einer Einladung dauert das eine Minute.
                 </p>
-                <Link
+                <Link data-press
                   href="/verwaltung/einladungen"
                   className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
                   style={{

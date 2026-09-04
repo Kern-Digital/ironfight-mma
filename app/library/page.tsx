@@ -234,7 +234,7 @@ function LibraryContent() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link
+            <Link data-press
               href="/techniques"
               className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
               style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
@@ -733,7 +733,7 @@ function EmptyState() {
           „Techniken durchsuchen“.
         </p>
       </div>
-      <Link
+      <Link data-press
         href="/schedule"
         className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
         style={{

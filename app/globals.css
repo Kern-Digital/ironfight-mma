@@ -2620,6 +2620,17 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
   transform: scale(.99);
 }
 
+/* `data-press` traegt die Haptik auch auf Elementen, die KEINE Knoepfe sind.
+   Zeilen dichter Listen sind oft ein <div onClick> mit eigener Gestik (der
+   Uebungs-Picker wischt nach rechts zum Hinzufuegen) — ohne diese Zeile fehlte
+   ihnen der UEBERGANG: Die Zeile sprang auf .99 und ohne Feder zurueck.
+   `touch-action` bleibt hier bewusst aussen vor: SwipeAction setzt `pan-y` auf
+   seinen Rahmen und braucht die waagerechte Geste fuer sich. */
+:where([data-press]:not(button):not([role="button"]):not(a):not(summary)) {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-fast) var(--ease-pop);
+}
+
 /* Zeilen dichter Listen und Rubrik-Koepfe ("quiet"): sinken nur ein, heben
    sich NIE. In einer Liste wackelt sonst jede Zeile unter der Maus, und ein
    angehobener Kopf laeuft links aus dem Scroll-Container (frisst den ersten
@@ -2661,7 +2672,8 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
 /* Wer Bewegung abbestellt hat, bekommt Farbe und Rand als Rueckmeldung —
    die Zustaende bleiben lesbar, nur die Verschiebung faellt weg. */
 @media (prefers-reduced-motion: reduce) {
-  :where(button, [role="button"], summary, a[data-press]) {
+  :where(button, [role="button"], summary, a[data-press]),
+  :where([data-press]:not(button):not([role="button"]):not(a):not(summary)) {
     transition: none;
   }
   button:active, [role="button"]:active, [role="button"]:hover,

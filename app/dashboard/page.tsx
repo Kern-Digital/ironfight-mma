@@ -412,7 +412,7 @@ function DashboardContent() {
                   dazu, wenn du einem Gym beitrittst. Dafür brauchst du einen
                   Einladungscode.
                 </span>
-                <Link
+                <Link data-press
                   href="/beitreten"
                   className="t-interactive inline-flex min-h-hit items-center gap-2 self-start rounded-field px-4"
                   style={{
@@ -439,7 +439,7 @@ function DashboardContent() {
         {isPureVerwaltung && (
           <section className="flex flex-col gap-2 lg:col-span-2">
             <span className="t-label">Dein Gym</span>
-            <Link
+            <Link data-press="surface"
               href="/verwaltung/mitglieder"
               className="t-card t-interactive flex items-center gap-3.5 p-4"
               style={{ textDecoration: "none" }}
@@ -628,7 +628,7 @@ function DashboardContent() {
               {i > 0 && (
                 <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
               )}
-              <Link
+              <Link data-press="quiet"
                 href={a.href}
                 className="t-interactive flex min-h-hit items-center gap-3 rounded-badge py-3"
                 style={{ textDecoration: "none", color: "inherit" }}
@@ -665,7 +665,7 @@ function DashboardContent() {
                 <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                   Starte dein erstes Training über den Generator oder die Trainingspläne.
                 </span>
-                <Link
+                <Link data-press
                   href="/workout/generator"
                   className="t-interactive mt-2 inline-flex min-h-hit items-center justify-center rounded-field px-5"
                   style={{
@@ -685,7 +685,7 @@ function DashboardContent() {
             {sessions &&
               sessions.length > 0 &&
               sessions.slice(0, 6).map((s, i) => (
-                <Link
+                <Link data-press="quiet"
                   key={s.id}
                   href="/workout/verlauf"
                   className="t-interactive flex min-h-hit items-center gap-3 py-3"

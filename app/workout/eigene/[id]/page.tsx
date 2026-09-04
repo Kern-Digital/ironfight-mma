@@ -176,7 +176,7 @@ export default function PersonalPlanPage() {
             Diese Kopie gibt es nicht mehr — oder sie gehört zu einem anderen
             Konto.
           </p>
-          <Link
+          <Link data-press
             href="/workout/generator"
             className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
             style={{

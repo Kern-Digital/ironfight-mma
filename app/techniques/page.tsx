@@ -244,7 +244,7 @@ export default function TechniquesPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link
+            <Link data-press
               href="/dashboard"
               className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
               style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
@@ -284,7 +284,7 @@ export default function TechniquesPage() {
         {/* ── Meine Bibliothek — gespeicherte Techniken (Muster „Meine
             Workouts"-Feld im Hub); rechts drei schräg geschnittene Bilder,
             von rechts stark nach links auslaufend (Leon 2026-08-29) ── */}
-        <Link
+        <Link data-press="surface"
           href="/library"
           className="t-card t-interactive relative flex min-h-[7rem] items-center gap-4 overflow-hidden p-4 sm:min-h-[8rem] sm:p-5"
           style={{
@@ -461,7 +461,7 @@ export default function TechniquesPage() {
                         : t.trainingArea
                       : null;
                     return (
-                      <Link
+                      <Link data-press="surface"
                         key={t.id}
                         href={`/techniques/${t.id}`}
                         className="t-card t-interactive relative flex flex-col gap-1 overflow-hidden p-4 sm:p-5"

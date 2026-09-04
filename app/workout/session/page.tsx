@@ -487,7 +487,7 @@ function SessionRunner() {
         <p style={{ font: "var(--type-body-strong)", color: "var(--text-3)" }}>
           Kein Workout geladen.
         </p>
-        <Link
+        <Link data-press
           href="/workout/generator"
           className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
           style={{
@@ -765,7 +765,7 @@ function SessionRunner() {
             )}
           </div>
           <div className="mt-auto flex flex-wrap justify-center gap-3 pt-4">
-            <Link
+            <Link data-press
               href="/dashboard"
               className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4"
               style={{
@@ -778,7 +778,7 @@ function SessionRunner() {
             >
               Mein Training
             </Link>
-            <Link
+            <Link data-press
               href="/workout/generator"
               className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-4"
               style={{
@@ -982,6 +982,7 @@ function SessionRunner() {
                       key={`${exercise.id}-${index}`}
                       type="button"
                       onClick={() => jumpToExercise(index)}
+                      data-press="quiet"
                       className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2 text-left"
                       style={{
                         background:

@@ -295,6 +295,11 @@ export default function ExercisePicker({
                             if (isMouseLikeClick(e)) handleAdd(ex.id);
                             else setDetail(ex);
                           }}
+                          // Zeile einer dichten Liste: sinkt ein, hebt sich nie
+                          // (MOTION-BRIEF §4, Stärke „quiet"). Das Attribut wirkt
+                          // auch auf diesem <div>, seit die Grundhaptik den
+                          // Übergang für Nicht-Knöpfe mitgibt.
+                          data-press="quiet"
                           className={`t-interactive relative flex min-h-hit w-full cursor-pointer items-center gap-3 rounded-field px-2.5 py-2${flashTick !== null ? " animate-add-glow" : ""}`}
                           style={{ color: "var(--text-body)" }}
                         >

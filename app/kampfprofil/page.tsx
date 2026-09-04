@@ -226,7 +226,7 @@ function KampfprofilContent() {
             <div className="mt-4 flex flex-col items-start gap-2">
               <ProfileShareButton />
               {isTrainer && user && (
-                <Link
+                <Link data-press
                   href="/trainer/deepfight/me"
                   className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
                   style={{
@@ -393,7 +393,7 @@ function KampfprofilContent() {
                 {sharedOpponents.map((o) => {
                   const pct = dnaCompleteness(o.dna);
                   return (
-                    <Link
+                    <Link data-press="surface"
                       key={o.id}
                       href={`/deepfight/opponents/${o.id}`}
                       className="t-card t-interactive flex flex-col gap-1.5 p-4"

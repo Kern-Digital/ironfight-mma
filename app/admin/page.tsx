@@ -135,7 +135,7 @@ function StatTile({
     color: "inherit",
   };
   return href ? (
-    <Link
+    <Link data-press="surface"
       href={href}
       className="t-card t-interactive flex flex-col gap-1 p-4"
       style={style}
@@ -163,7 +163,7 @@ function SectionHead({
     <div className="flex items-center justify-between gap-3">
       <span className="t-label">{label}</span>
       {moreHref && (
-        <Link
+        <Link data-press
           href={moreHref}
           className="t-interactive -mr-2 inline-flex min-h-hit items-center gap-1.5 rounded-field px-2"
           style={{
@@ -506,7 +506,7 @@ function PlattformDashboard() {
             gehören. Deshalb sagt der Satz darunter, wie viele davon Demo
             sind: Ohne ihn wäre die größte Zahl der Seite die unehrlichste. */}
         <div className="grid gap-3 lg:col-span-2 lg:grid-cols-2">
-          <Link
+          <Link data-press="surface"
             href="/admin/users"
             className="t-interactive relative flex flex-col justify-between gap-6 overflow-hidden p-5 lg:row-span-2 lg:p-6"
             style={{
@@ -618,7 +618,7 @@ function PlattformDashboard() {
               >
                 Rechte plattformweit
               </span>
-              <Link
+              <Link data-press
                 href="/admin/users"
                 className="t-interactive -mr-2 inline-flex min-h-hit items-center gap-1.5 rounded-field px-2"
                 style={{

@@ -55,7 +55,7 @@ export default function AthleteTabBar({
                 pathname.startsWith("/library")
               : pathname.startsWith(tab.activePrefix ?? tab.href);
           return (
-            <Link
+            <Link data-press="quiet"
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}

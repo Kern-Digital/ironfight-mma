@@ -364,7 +364,7 @@ function ShareSheetInhalt({
                   // NAME OBEN, BEREICHE DARUNTER — nebeneinander drängte die
                   // Bereichszeile den Namen auf 390 px vollständig aus der
                   // Zeile und lief 23 px über den Rand (gemessen 03.09.2026).
-                  <Link
+                  <Link data-press="quiet"
                     key={eintrag.uid}
                     href={`/trainer/athleten/${eintrag.uid}`}
                     className="t-interactive flex min-h-hit items-center gap-3 rounded-field px-2 py-1.5"

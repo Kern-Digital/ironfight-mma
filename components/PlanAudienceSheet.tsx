@@ -329,7 +329,8 @@ function PlanAudienceInhalt({
                         type="button"
                         onClick={() => toggleStudent(s.uid)}
                         aria-pressed={active}
-                        className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2 text-left"
+                        data-press="quiet"
+                        className="picker-zeile t-interactive flex min-h-hit w-full items-center gap-3 rounded-field px-2.5 py-2 text-left"
                         style={{ color: "var(--text-body)" }}
                       >
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

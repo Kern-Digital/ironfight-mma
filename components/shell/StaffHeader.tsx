@@ -90,7 +90,7 @@ function CourseChip() {
   const live = current.state === "now";
 
   return (
-    <Link
+    <Link data-press="surface"
       href="/schedule"
       className="t-interactive flex min-w-0 shrink-0 items-center gap-2.5 px-3 py-1.5"
       style={{ borderRadius: "var(--r-nav)", textDecoration: "none" }}
