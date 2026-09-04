@@ -114,6 +114,19 @@ laufen über die Hülle — Achtung: Der Inhalt wird vom Aufrufer auch bei
 (`(liste ?? []).map(…)`).
 Sichtprüfung: `node scripts/motion-sheet-shots.mjs` gegen `/dev/motion-sheet`.
 
+**Popups nehmen den Platz, den der Bildschirm hergibt** (Leon 04.09.): Das
+Panel ist `flex flex-col overflow-hidden` mit `max-h-[NNvh]` und scrollt NIE
+selbst. Genau EIN Bereich in der Mitte trägt `min-h-0 flex-1
+overflow-y-auto` und füllt damit die Resthöhe; Kopf, Fuß und Knopfreihen
+bekommen `shrink-0`. `min-h-0` ist Pflicht — ohne das weigert sich ein
+Flex-Kind zu schrumpfen und der Scrollbereich wächst aus dem Panel heraus.
+Ein fester px-Deckel (`max-h-64`) auf einem Scrollbereich ist in einem Sheet
+VERBOTEN: Er ist auf jedem Bildschirm gleich klein, und zusammen mit einem
+scrollenden Panel entstehen zwei verschachtelte Scrollbereiche. Listen-Popups
+wachsen in der Breite mit (`sm:max-w-xl lg:max-w-3xl`). Prüfen: Die
+Panel-Höhe muss den vh-Deckel erreichen und es darf genau EIN scrollendes
+Element im Panel geben.
+
 **Drei Stärken der Grundhaptik** (Attribut `data-press`):
 - *Knopf* (kein Attribut bzw. bare `data-press` auf `<a>`): hebt 1.02, sinkt .97.
 - `surface` (Karten, Kacheln): hebt 1.008, sinkt .99.
