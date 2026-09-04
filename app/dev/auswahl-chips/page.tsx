@@ -34,7 +34,11 @@ export default function AuswahlChipsDevPage() {
         <h1 style={{ font: "var(--type-h2)" }}>Auswahl-Chips</h1>
         <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
           {ids.length} Techniken gewählt — die Reihe darf höchstens zwei Zeilen
-          hoch sein und niemals scrollen.
+          hoch sein und niemals scrollen. &bdquo;+N weitere&ldquo; klappt auf sechs Zeilen
+          auf; bleibt danach noch etwas übrig, sagt das ein Satz am Ende der
+          Reihe. Der ist Auskunft, kein Knopf: Im echten Kurs-Fenster steht
+          über den Chips die Technik-Liste, dort werden die restlichen
+          abgewählt. Hier auf der Prüfseite fehlt diese Liste.
         </p>
         <div
           data-pruefflaeche

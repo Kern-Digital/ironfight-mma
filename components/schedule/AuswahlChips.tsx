@@ -129,17 +129,17 @@ export default function AuswahlChips({
           </button>
         )}
         {/* Aufgeklappt und immer noch gekürzt: Der Zähler sagt es, ohne einen
-            weiteren Klick anzubieten, der nichts mehr zeigen könnte. */}
+            weiteren Klick anzubieten, der nichts mehr zeigen könnte.
+            KEINE Pille, KEIN Rahmen (Leon 04.09.: „ich kann da nicht drauf
+            klicken") — mit Rahmen sah er aus wie „Weniger zeigen" direkt
+            daneben, und ein Ding, das wie ein Knopf aussieht, muss einer
+            sein. Als bloßer Satz in der Reihe ist er, was er ist: Auskunft. */}
         {gekuerzt && maxZeilen !== ZEILEN_ZU && (
           <span
-            className="inline-flex min-h-hit items-center rounded-pill px-3.5"
-            style={{
-              font: "var(--type-sub)",
-              border: "1px solid var(--line)",
-              color: "var(--text-3)",
-            }}
+            className="inline-flex min-h-hit items-center pl-1 pr-2"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
           >
-            +{versteckt} weitere in der Liste oben
+            … und {versteckt} weitere oben in der Liste
           </span>
         )}
         {maxZeilen !== ZEILEN_ZU && (

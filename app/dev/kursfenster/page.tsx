@@ -17,9 +17,13 @@
  *
  * Erwartung in BEIDEN Zweigen: Das Panel erreicht den 90-vh-Deckel, scrollt
  * selbst NICHT, und es gibt genau EINEN scrollenden Bereich darin.
+ *
+ * In Produktion 404; liegt bewusst außerhalb des Middleware-Matchers
+ * (wie /dev/motion-sheet, /dev/auswahl-chips und /dev/helix).
  */
 
 import { MorphSwap } from "@/components/motion";
+import { notFound } from "next/navigation";
 import { useState } from "react";
 
 const ZEILEN = Array.from({ length: 60 }, (_, i) => i + 1);
@@ -27,11 +31,26 @@ const ZEILEN = Array.from({ length: 60 }, (_, i) => i + 1);
 export default function KursfensterPruefseite() {
   const [editMode, setEditMode] = useState(false);
 
+  if (process.env.NODE_ENV === "production") notFound();
+
   return (
     <main
-      className="min-h-screen p-4"
+      className="min-h-screen px-4 py-8"
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
+      <div className="mx-auto mb-4 flex max-w-3xl flex-col gap-2">
+        <h1 style={{ font: "var(--type-h2)" }}>Kurs-Fenster — Flex-Kette</h1>
+        <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          Nachbau des Kurs-Fensters von /schedule, nur mit Dummy-Zeilen: Das
+          echte Fenster braucht einen Trainer-Login, ohne den läuft es in den
+          Fehler-Zweig. Auf &bdquo;Umschalten&ldquo; tippen und beim Wechsel Detail ↔
+          Picker auf drei Dinge achten: Das weiße Panel bleibt gleich hoch und
+          füllt den Bildschirm, es gibt nur EINEN Scrollbalken (im Listenteil,
+          nicht am Panel), und die Zeile &bdquo;Knopfreihe bleibt unten&ldquo; steht immer
+          noch unten im Panel. Springt eine davon, ist die Kette gerissen.
+        </p>
+      </div>
+
       {/* Panel — Maße und Klassen wie im Kurs-Fenster (app/schedule/page.tsx) */}
       <div
         className="t-card mx-auto flex max-h-[90vh] w-full flex-col overflow-hidden rounded-modal sm:max-w-xl lg:max-w-3xl"
