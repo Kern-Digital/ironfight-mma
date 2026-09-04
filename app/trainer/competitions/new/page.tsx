@@ -10,6 +10,7 @@ import DeepFightWordmark from "@/components/DeepFightWordmark";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
+import { MorphSwap, StaggerFlow, FlowItem } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
@@ -54,34 +55,47 @@ function athleteSubLabel(s: StudentEntry): string | null {
   return level ? `${role} · ${level}` : role;
 }
 
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  letterSpacing: "0.15em",
-  color: "var(--fg-3)",
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
 };
 const fieldStyle: React.CSSProperties = {
-  background: "var(--ink-3)",
-  border: "1px solid var(--ink-5)",
-  color: "var(--fg-1)",
+  background: "var(--surface-raised)",
+  border: "1px solid var(--line)",
+  color: "var(--text-body)",
+  font: "var(--type-body)",
   outline: "none",
 };
 
+/** Nummer + Titel eines Schritts. Die Ziffer trägt den Gym-Akzent — vorher
+    war sie das alte Pink, das es im neuen System nicht mehr gibt. */
 function StepHeader({ n, title }: { n: number; title: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-2.5">
       <span
-        className="font-display-ta flex h-7 w-7 items-center justify-center rounded-lg text-sm font-black"
+        aria-hidden
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-badge"
         style={{
-          background: "rgba(255,79,168,0.1)",
-          border: "1px solid rgba(255,79,168,0.4)",
-          color: "var(--ta-pink)",
+          font: "var(--type-body-strong)",
+          background: "var(--accent-subtle)",
+          border: "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
+          color: "var(--accent-text)",
         }}
       >
         {n}
       </span>
       <h2
-        className="font-display-ta font-black uppercase"
-        style={{ fontSize: "16px", letterSpacing: "0.05em" }}
+        style={{
+          font: "var(--type-h3)",
+          letterSpacing: "var(--ls-display)",
+          textTransform: "uppercase",
+        }}
       >
         {title}
       </h2>
@@ -101,33 +115,42 @@ function AthleteCard({
   const sub = athleteSubLabel(entry);
   return (
     <button
+      type="button"
       onClick={onSelect}
-      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors"
+      aria-pressed={active}
+      data-press="surface"
+      className="t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-field px-3 py-2.5 text-left"
       style={{
-        background: active ? "rgba(35,196,206,0.1)" : "var(--ink-3)",
-        border: `1px solid ${active ? "var(--ta-cyan)" : "var(--ink-5)"}`,
+        background: active ? "var(--accent-subtle)" : "var(--surface-raised)",
+        border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
       }}
     >
       <span
-        className="font-display-ta flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black"
+        aria-hidden
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-badge"
         style={{
-          background: "var(--ink-4)",
-          color: active ? "var(--ta-cyan)" : "var(--fg-3)",
+          font: "var(--type-meta)",
+          letterSpacing: "var(--ls-label)",
+          background: active ? "var(--accent)" : "var(--surface-card)",
+          color: active ? "var(--on-accent)" : "var(--text-3)",
         }}
       >
         {studentLabel(entry).slice(0, 2).toUpperCase()}
       </span>
       <span className="min-w-0">
         <span
-          className="block truncate text-sm font-bold"
-          style={{ color: active ? "var(--ta-cyan)" : "var(--fg-2)" }}
+          className="block truncate"
+          style={{
+            font: "var(--type-body-strong)",
+            color: active ? "var(--accent-text)" : "var(--text-body)",
+          }}
         >
           {studentLabel(entry)}
         </span>
         {sub && (
           <span
-            className="font-mono-ta block truncate text-[9px] uppercase"
-            style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
+            className="block truncate"
+            style={{ ...META_FONT, color: "var(--text-3)" }}
           >
             {sub}
           </span>
@@ -153,22 +176,23 @@ function AthleteGroup({
   if (entries.length === 0) return null;
   return (
     <div>
-      <p
-        className="font-mono-ta mb-2 text-[9px] font-bold uppercase"
-        style={{ letterSpacing: "0.18em", color: accent }}
-      >
+      <p className="t-label mb-2" style={{ color: accent }}>
         {title}
       </p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {entries.map((e) => (
-          <AthleteCard
-            key={e.uid}
-            entry={e}
-            active={e.uid === selectedUid}
-            onSelect={() => onSelect(e.uid)}
-          />
+      {/* Die Suche filtert live — bleibende Namen rutschen an ihren neuen
+          Platz, statt zu springen. Schlüssel ist die uid, nie der Index
+          (MOTION-BRIEF §3.7). */}
+      <StaggerFlow className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {entries.map((e, i) => (
+          <FlowItem key={e.uid} index={i}>
+            <AthleteCard
+              entry={e}
+              active={e.uid === selectedUid}
+              onSelect={() => onSelect(e.uid)}
+            />
+          </FlowItem>
         ))}
-      </div>
+      </StaggerFlow>
     </div>
   );
 }
@@ -372,7 +396,10 @@ function NewCompetitionContent() {
   }
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
+    <main
+      className="min-h-screen"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
       <PageHead
         lane="narrow"
         back={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}
@@ -388,8 +415,8 @@ function NewCompetitionContent() {
 
         {members === null || opponents === null ? (
           <div className="flex flex-col gap-4">
-            <Skeleton className="h-40 w-full rounded-2xl" />
-            <Skeleton className="h-40 w-full rounded-2xl" />
+            <Skeleton className="h-40 w-full rounded-card" />
+            <Skeleton className="h-40 w-full rounded-card" />
           </div>
         ) : (
           <div className="flex flex-col gap-7">
@@ -404,8 +431,9 @@ function NewCompetitionContent() {
                 />
               </div>
               {filteredMembers.length === 0 ? (
-                <p className="text-xs" style={{ color: "var(--fg-4)" }}>
-                  Keine Athleten gefunden.
+                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  Kein Athlet zu diesem Suchbegriff. Such nach einem anderen
+                  Namen oder leer die Suche.
                 </p>
               ) : (
                 // Deckel wächst mit dem Bildschirm (MOTION-BRIEF §4): `max-h-72`
@@ -416,21 +444,25 @@ function NewCompetitionContent() {
                 <div className="flex max-h-[50vh] flex-col gap-4 overflow-y-auto">
                   <AthleteGroup
                     title="Ich selbst"
-                    accent="var(--ta-cyan)"
+                    accent="var(--accent)"
                     entries={selfEntry ? [selfEntry] : []}
                     selectedUid={studentUid}
                     onSelect={setStudentUid}
                   />
+                  {/* Kein eigenes Violett mehr: Das gehoert app-weit
+                      DeepFight (dieselbe Entscheidung wie bei „Archiviert" in
+                      der Uebersicht). Die Gruppen trennt ihre Ueberschrift,
+                      nicht eine dritte Farbe. */}
                   <AthleteGroup
                     title="Trainer & Coaches"
-                    accent="#9D7BFA"
+                    accent="var(--text-2)"
                     entries={staffEntries}
                     selectedUid={studentUid}
                     onSelect={setStudentUid}
                   />
                   <AthleteGroup
                     title="Athlet"
-                    accent="var(--fg-4)"
+                    accent="var(--text-3)"
                     entries={studentEntries}
                     selectedUid={studentUid}
                     onSelect={setStudentUid}
@@ -443,8 +475,11 @@ function NewCompetitionContent() {
             <section>
               <StepHeader n={2} title={<DeepFightWordmark />} />
               <div
-                className="mb-3 inline-flex gap-1 rounded-xl p-1"
-                style={{ background: "var(--ink-3)", border: "1px solid var(--ink-5)" }}
+                className="mb-3 inline-flex gap-1 rounded-field p-1"
+                style={{
+                  background: "var(--surface-raised)",
+                  border: "1px solid var(--line)",
+                }}
               >
                 {([
                   ["existing", "Bestehende auswählen"],
@@ -452,12 +487,14 @@ function NewCompetitionContent() {
                 ] as const).map(([id, label]) => (
                   <button
                     key={id}
+                    type="button"
                     onClick={() => setOppMode(id)}
-                    className="font-mono-ta rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase transition-colors"
+                    aria-pressed={oppMode === id}
+                    className="t-interactive rounded-badge px-3 py-2"
                     style={{
-                      letterSpacing: "0.1em",
-                      background: oppMode === id ? "var(--ta-pink)" : "transparent",
-                      color: oppMode === id ? "#fff" : "var(--fg-3)",
+                      ...META_FONT,
+                      background: oppMode === id ? "var(--accent)" : "transparent",
+                      color: oppMode === id ? "var(--on-accent)" : "var(--text-2)",
                     }}
                   >
                     {label}
@@ -465,6 +502,10 @@ function NewCompetitionContent() {
                 ))}
               </div>
 
+              {/* Der Wechsel zwischen Auswahl und Editor ist ein Formwechsel,
+                  kein Umschalten (MOTION-BRIEF §1.1). `activeKey` ist der
+                  Modus — ohne ihn merkt AnimatePresence nichts. */}
+              <MorphSwap activeKey={oppMode}>
               {oppMode === "existing" ? (
                 <>
                   <div className="mb-3">
@@ -475,50 +516,66 @@ function NewCompetitionContent() {
                     />
                   </div>
                   {filteredOpponents.length === 0 ? (
-                    <p className="text-xs" style={{ color: "var(--fg-4)" }}>
-                      Noch keine DeepFight-Profile im Gym.{" "}
+                    <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                      Noch kein DeepFight-Profil im Gym.{" "}
                       <button
+                        type="button"
                         onClick={() => setOppMode("new")}
-                        style={{ color: "var(--ta-cyan)", textDecoration: "underline" }}
+                        style={{
+                          color: "var(--accent-text)",
+                          textDecoration: "underline",
+                        }}
                       >
-                        Jetzt neu anlegen
+                        Jetzt eins anlegen
                       </button>
                     </p>
                   ) : (
-                    <div className="grid max-h-[50vh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-                      {filteredOpponents.map((o) => {
+                    <StaggerFlow className="grid max-h-[50vh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+                      {filteredOpponents.map((o, i) => {
                         const active = o.id === selectedOpponentId;
                         return (
-                          <button
-                            key={o.id}
-                            onClick={() => setSelectedOpponentId(o.id)}
-                            className="rounded-xl px-3 py-2.5 text-left transition-colors"
-                            style={{
-                              background: active ? "rgba(255,79,168,0.1)" : "var(--ink-3)",
-                              border: `1px solid ${active ? "var(--ta-pink)" : "var(--ink-5)"}`,
-                            }}
-                          >
-                            <span
-                              className="block truncate text-sm font-bold"
-                              style={{ color: active ? "var(--ta-pink)" : "var(--fg-2)" }}
+                          <FlowItem key={o.id} index={i}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOpponentId(o.id)}
+                              aria-pressed={active}
+                              data-press="surface"
+                              className="t-interactive min-h-hit w-full rounded-field px-3 py-2.5 text-left"
+                              style={{
+                                background: active
+                                  ? "var(--accent-subtle)"
+                                  : "var(--surface-raised)",
+                                border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
+                              }}
                             >
-                              {o.name}
-                            </span>
-                            <span
-                              className="font-mono-ta block truncate text-[9px] uppercase"
-                              style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
-                            >
-                              {FIGHT_STYLE_LABEL[o.style]} · DNA {dnaCompleteness(o.dna)} %
-                            </span>
-                          </button>
+                              <span
+                                className="block truncate"
+                                style={{
+                                  font: "var(--type-body-strong)",
+                                  color: active ? "var(--accent-text)" : "var(--text-body)",
+                                }}
+                              >
+                                {o.name}
+                              </span>
+                              <span
+                                className="block truncate"
+                                style={{ ...META_FONT, color: "var(--text-3)" }}
+                              >
+                                {FIGHT_STYLE_LABEL[o.style]} · DNA {dnaCompleteness(o.dna)} %
+                              </span>
+                            </button>
+                          </FlowItem>
                         );
                       })}
-                    </div>
+                    </StaggerFlow>
                   )}
                 </>
               ) : (
                 <div className="mt-1">
-                  <p className="mb-4 text-xs" style={{ color: "var(--fg-4)" }}>
+                  <p
+                    className="mb-4"
+                    style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                  >
                     Neues Gegnerprofil — dein ganzes Trainerteam arbeitet
                     damit, und für diesen Wettkampf steht es nach dem Speichern
                     schon bereit.
@@ -530,34 +587,31 @@ function NewCompetitionContent() {
                   />
                 </div>
               )}
+              </MorphSwap>
             </section>
 
             {/* Schritt 3: Details */}
             <section>
               <StepHeader n={3} title="Wettkampf-Details" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase" style={labelStyle}>
-                    Wettkampf-Name
-                  </span>
+                <label className="flex flex-col gap-1.5">
+                  <span className="t-label">Wettkampf-Name</span>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="z.B. Fight Night München"
-                    className="rounded-lg px-3 py-2 text-sm"
+                    className="min-h-hit rounded-field px-3"
                     style={fieldStyle}
                   />
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase" style={labelStyle}>
-                    Kampfdatum
-                  </span>
+                <label className="flex flex-col gap-1.5">
+                  <span className="t-label">Kampfdatum</span>
                   <input
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="rounded-lg px-3 py-2 text-sm"
+                    className="min-h-hit rounded-field px-3"
                     style={fieldStyle}
                   />
                 </label>
@@ -565,48 +619,57 @@ function NewCompetitionContent() {
             </section>
 
             {/* Zusammenfassung + Erstellen */}
-            <div
-              className="sticky bottom-3 rounded-2xl p-4"
-              style={{
-                background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-                border: "1px solid var(--ink-4)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-              }}
-            >
+            {/* Die Zusammenfassung klebt unten — sie ist die einzige Stelle,
+                an der man sieht, ob Athlet UND Gegner stehen, und sie darf
+                beim Scrollen durch lange Listen nicht verschwinden.
+                `t-glass` statt einer eigenen Karte: Sie liegt ÜBER dem
+                Inhalt, und der soll dahinter durchscheinen. */}
+            <div className="t-glass sticky bottom-3 p-4">
               <div
-                className="font-mono-ta mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] uppercase"
-                style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
+                className="mb-3 flex flex-wrap gap-x-4 gap-y-1"
+                style={{ ...META_FONT, color: "var(--text-3)" }}
               >
                 <span>
                   Athlet:{" "}
-                  <span style={{ color: selectedStudent ? "var(--ta-cyan)" : "var(--fg-4)" }}>
+                  <span
+                    style={{
+                      color: selectedStudent ? "var(--accent-text)" : "var(--text-3)",
+                    }}
+                  >
                     {selectedStudent ? studentLabel(selectedStudent) : "—"}
                   </span>
                 </span>
                 <span>
                   Gegner:{" "}
-                  <span style={{ color: selectedOpponent ? "var(--ta-pink)" : "var(--fg-4)" }}>
+                  <span
+                    style={{
+                      color: selectedOpponent ? "var(--accent-text)" : "var(--text-3)",
+                    }}
+                  >
                     {selectedOpponent?.name ?? "—"}
                   </span>
                 </span>
               </div>
               <button
+                type="button"
                 onClick={handleCreateCompetition}
                 disabled={!canSubmit || submitting}
-                className="btn-primary w-full px-5 py-2.5 text-sm"
+                className="t-interactive min-h-hit w-full rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
-                  opacity: !canSubmit || submitting ? 0.5 : 1,
-                  cursor: !canSubmit || submitting ? "not-allowed" : "pointer",
+                  ...BTN_FONT,
+                  background: "var(--accent)",
+                  color: "var(--on-accent)",
+                  boxShadow: "var(--accent-glow)",
                 }}
               >
                 {submitting ? "Erstelle Wettkampf + Plan…" : "Wettkampf erstellen"}
               </button>
               {!canSubmit && (
                 <p
-                  className="font-mono-ta mt-2 text-center text-[9px] uppercase"
-                  style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+                  className="mt-2 text-center"
+                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                 >
-                  Athlet, DeepFight-Profil, Name und Datum wählen
+                  Wähl Athlet, DeepFight-Profil, Name und Datum — dann geht es los.
                 </p>
               )}
             </div>
