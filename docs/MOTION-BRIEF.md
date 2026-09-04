@@ -114,11 +114,20 @@ laufen über die Hülle — Achtung: Der Inhalt wird vom Aufrufer auch bei
 (`(liste ?? []).map(…)`).
 Sichtprüfung: `node scripts/motion-sheet-shots.mjs` gegen `/dev/motion-sheet`.
 
-**Dichte Listen:** Zeilen einer Auswahl- oder Checkbox-Liste sind FLÄCHEN,
-keine Knöpfe — sie tragen `data-press="surface"`, auch wenn sie technisch
-`<button>` sind. Sonst hebt die Grundhaptik jede Zeile unter der Maus um
-2 % an und die ganze Liste poppt beim Überfahren (Leon 04.09. im
-Kurs-Editor: „das nervt"). Flächen nicken nur (1.008 / .99).
+**Drei Stärken der Grundhaptik** (Attribut `data-press`):
+- *Knopf* (kein Attribut bzw. bare `data-press` auf `<a>`): hebt 1.02, sinkt .97.
+- `surface` (Karten, Kacheln): hebt 1.008, sinkt .99.
+- `quiet` (Zeilen dichter Listen, Rubrik-Köpfe, Akkordeon-Header): hebt
+  sich NIE, sinkt .99. Grund: In einer Liste wackelt sonst jede Zeile unter
+  der Maus (Leon 04.09. im Kurs-Editor: „das nervt"), und ein angehobener
+  Kopf läuft links aus seinem Scroll-Container — der erste Buchstabe wird
+  angefressen und unten erscheint ein Querbalken. Hover-Rückmeldung ist dort
+  die Flächen-Tönung (`.t-interactive:hover`).
+Die Knopf-Regeln schließen `surface`/`quiet` ausdrücklich aus — ohne diese
+Sperre gewinnt die Knopf-Regel per Spezifität, und das Attribut wirkt nicht.
+
+**Akkordeons starten geschlossen** (Leon 04.09.), außer eine aktive Suche
+braucht die Treffer sichtbar — dann stehen alle Gruppen offen.
 
 **Links:** Die Grundhaptik greift bei `<a>` nur mit `data-press`
 (Knopf-Stärke) bzw. `data-press="surface"` (Karten, Listenzeilen) — ein

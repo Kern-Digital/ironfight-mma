@@ -2603,9 +2603,14 @@ h1, h2 { overflow-wrap: anywhere; }
    gilt deshalb auf jedem Geraet. [data-motion] bleibt aussen vor: dort
    arbeitet bereits eine Framer-Feder, und beide zusammen multiplizierten
    sich auf scale(.94). */
-button:active:not(:disabled):not([data-motion]),
-[role="button"]:active:not([aria-disabled="true"]):not([data-motion]),
-a[data-press]:active:not([data-motion]) {
+/* Die Knopf-Regeln lassen Flaechen und Zeilen ausdruecklich aus
+   (:not([data-press="surface"]), :not([data-press="quiet"])). Ohne diese
+   Sperre gewann die Knopf-Regel durch ihre hoehere Spezifitaet (Element +
+   :not(:disabled)) gegen die Flaechen-Regel — und JEDER Knopf hob sich um
+   2 %, auch die Zeilen im Technik-Picker (Leon 04.09.: „die Zeilen poppen"). */
+button:active:not(:disabled):not([data-motion]):not([data-press="surface"]):not([data-press="quiet"]),
+[role="button"]:active:not([aria-disabled="true"]):not([data-motion]):not([data-press="surface"]):not([data-press="quiet"]),
+a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-press="quiet"]) {
   transform: scale(.97);
 }
 
@@ -2615,20 +2620,30 @@ a[data-press]:active:not([data-motion]) {
   transform: scale(.99);
 }
 
+/* Zeilen dichter Listen und Rubrik-Koepfe ("quiet"): sinken nur ein, heben
+   sich NIE. In einer Liste wackelt sonst jede Zeile unter der Maus, und ein
+   angehobener Kopf laeuft links aus dem Scroll-Container (frisst den ersten
+   Buchstaben, zeigt einen Querbalken). Hover-Rueckmeldung ist dort die
+   Flaechen-Toenung von .t-interactive. */
+[data-press="quiet"]:active:not([data-motion]) {
+  transform: scale(.99);
+}
+
 /* Entgegenkommen — nur wo es einen Zeiger gibt, den man entgegenkommen
    kann. Auf Touch bliebe der angehobene Zustand nach dem Tap stehen. */
 @media (hover: hover) and (pointer: fine) {
-  :where(button, [role="button"], a[data-press]):hover:not(:disabled):not([data-motion]) {
+  :where(button, [role="button"], a[data-press]):hover:not(:disabled):not([data-motion]):not([data-press="surface"]):not([data-press="quiet"]) {
     transform: scale(1.02);
   }
-  :where([data-press="surface"]):hover:not([data-motion]) {
+  [data-press="surface"]:hover:not([data-motion]) {
     transform: scale(1.008);
   }
   /* Beim Druecken schlaegt das Einsinken das Anheben. */
-  :where(button, [role="button"], a[data-press]):active:not(:disabled):not([data-motion]) {
+  :where(button, [role="button"], a[data-press]):active:not(:disabled):not([data-motion]):not([data-press="surface"]):not([data-press="quiet"]) {
     transform: scale(.97);
   }
-  :where([data-press="surface"]):active:not([data-motion]) {
+  [data-press="surface"]:active:not([data-motion]),
+  [data-press="quiet"]:active:not([data-motion]) {
     transform: scale(.99);
   }
 }
@@ -2641,7 +2656,8 @@ a[data-press]:active:not([data-motion]) {
   }
   button:active, [role="button"]:active, [role="button"]:hover,
   button:hover, a[data-press]:hover, a[data-press]:active,
-  [data-press="surface"]:hover, [data-press="surface"]:active {
+  [data-press="surface"]:hover, [data-press="surface"]:active,
+  [data-press="quiet"]:active {
     transform: none;
   }
 }

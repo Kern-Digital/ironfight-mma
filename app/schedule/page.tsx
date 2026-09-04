@@ -1095,6 +1095,7 @@ function TechniquePicker({
               group={group}
               selectedIds={selectedIds}
               onToggle={onToggle}
+              searching={search.trim().length > 0}
             />
           ))
         )}
@@ -1168,19 +1169,30 @@ function TechniqueGroup({
   group,
   selectedIds,
   onToggle,
+  searching,
 }: {
   group: TechniqueGroup;
   selectedIds: string[];
   onToggle: (id: string) => void;
+  /** Suchtext aktiv → Treffer muessen sichtbar sein, Gruppe steht offen */
+  searching: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Rubriken starten GESCHLOSSEN (Leon 04.09.) — die Liste zeigt erst die
+  // Bereiche, der Trainer öffnet, was er braucht. Nur während einer Suche
+  // stehen alle offen, sonst versteckte die zugeklappte Rubrik ihre Treffer.
+  const [collapsed, setCollapsed] = useState(true);
+  const open = !collapsed || searching;
   const selectedInGroup = group.techniques.filter((t) => selectedIds.includes(t.id)).length;
 
   return (
     <div>
-      {/* Gruppen-Header */}
+      {/* Gruppen-Header — "quiet": hebt sich unter der Maus NICHT. Als
+          normaler Knopf zoomte er um 2 % und lief links aus dem
+          Scroll-Container (das F von „Footwork" war angefressen). */}
       <button
         type="button"
+        data-press="quiet"
+        aria-expanded={open}
         onClick={() => setCollapsed((v) => !v)}
         className="t-interactive flex min-h-hit w-full items-center gap-2 rounded-badge"
       >
@@ -1206,7 +1218,7 @@ function TechniqueGroup({
         <span
           style={{
             color: "var(--text-3)",
-            transform: collapsed ? "rotate(-90deg)" : "none",
+            transform: open ? "none" : "rotate(-90deg)",
             transition: "transform var(--dur-fast) var(--ease-out)",
           }}
         >
@@ -1214,11 +1226,12 @@ function TechniqueGroup({
         </span>
       </button>
 
-      {/* Techniken — die Gruppe klappt weich (Collapse). Die Zeilen tragen
-          die Flächen-Stärke: Als normale Knöpfe hob die Grundhaptik jede
-          Technik unter der Maus um 2 % an, in der dichten Liste poppte damit
-          jede Zeile (Leon 04.09.: „das nervt"). Flächen nicken nur. */}
-      <Collapse open={!collapsed}>
+      {/* Techniken — die Gruppe klappt weich (Collapse). Die Zeilen sind
+          "quiet": Als normale Knöpfe hob die Grundhaptik jede Technik unter
+          der Maus um 2 % an, in der dichten Liste poppte damit jede Zeile
+          (Leon 04.09.: „das nervt"). Jetzt sinken sie nur beim Drücken ein;
+          Hover ist die Flächen-Tönung von t-interactive. */}
+      <Collapse open={open}>
         <div className="space-y-0.5">
           {group.techniques.map((t) => {
             const selected = selectedIds.includes(t.id);
@@ -1227,7 +1240,7 @@ function TechniqueGroup({
               <button
                 key={t.id}
                 type="button"
-                data-press="surface"
+                data-press="quiet"
                 onClick={() => onToggle(t.id)}
                 className="t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-badge px-2 py-1.5 text-left"
                 style={{
