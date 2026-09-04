@@ -29,7 +29,7 @@ zeitversetzt nacheinander statt alle auf einen Schlag.
 | Schicht | Datei | Zuständig für |
 |---|---|---|
 | Werte | `lib/motion.ts` | Federn, Skalierungen, Stagger-Abstände |
-| Bausteine | `components/motion/` | Pressable, Stagger, Collapse, Pop, MorphSwap |
+| Bausteine | `components/motion/` | Pressable, Stagger, Collapse, Pop, MorphSwap, Reveal, SheetShell |
 | Grundhaptik | `app/globals.css`, Abschnitt GRUNDHAPTIK | alle 240 Knöpfe der App |
 
 **Arbeitsteilung, und sie ist nicht verhandelbar:** CSS macht die Haptik
@@ -46,10 +46,19 @@ dafür ist Framer da.
 
 1. **Kein `import { motion } from "framer-motion"` in Seiten oder
    Bereichs-Komponenten.** Alles läuft über `@/components/motion`.
-   Ausnahmen: Diagramme mit eigenen Pfad-Animationen und die Helix — dort
-   IST die Bewegung der Inhalt. Grund: Wer die Bibliothek direkt anfasst,
-   umgeht die Touch- und Reduced-Motion-Sperren, und ein späterer Wechsel
-   der Animations-Bibliothek würde 70 Dateien treffen statt einer.
+   Grund: Wer die Bibliothek direkt anfasst, umgeht die Touch- und
+   Reduced-Motion-Sperren, und ein späterer Wechsel der Animations-Bibliothek
+   würde 70 Dateien treffen statt einer.
+
+   **Die vollständige Ausnahmeliste** (Leon 04.09.2026 — dort IST die
+   Bewegung der Inhalt, ein Baustein dafür hätte genau einen Aufrufer):
+   Diagramme (`CourseLoadChart`, `WeeklyFeedbackChart`, `MemberGrowthChart`,
+   `GrowthSparkline`, `ExerciseAnimation`), die Helix (`FightDnaHelix`,
+   `HelixGlyph`), die beiden Verwandlungs-Primitive in `components/ui/`
+   (`GooeySearch`, `MultiFilter`) und `PwaInstallPrompt`. Sie stehen alle in
+   `components/`, nie in `app/` — eine SEITE fasst die Bibliothek nie an.
+   Jede Ausnahme trägt oben im Kopf einen Kommentar, der auf diese Zeile
+   verweist. Wer die Liste erweitern will, fragt vorher.
 
 2. **Kein `whileHover` ohne Zeiger-Prüfung.** Immer über
    `useMotionCapability().canHover`. Auf iOS löst der erste Tap `:hover`
@@ -123,7 +132,12 @@ Flex-Kind zu schrumpfen und der Scrollbereich wächst aus dem Panel heraus.
 Ein fester px-Deckel (`max-h-64`) auf einem Scrollbereich ist in einem Sheet
 VERBOTEN: Er ist auf jedem Bildschirm gleich klein, und zusammen mit einem
 scrollenden Panel entstehen zwei verschachtelte Scrollbereiche. Listen-Popups
-wachsen in der Breite mit (`sm:max-w-xl lg:max-w-3xl`). Prüfen: Die
+wachsen in der Breite mit (`sm:max-w-xl lg:max-w-3xl`) — Formular- und
+Detail-Sheets NICHT (Leon 04.09.): Auf 768 px werden Eingabezeilen so lang,
+dass das Auge den Zeilenanfang verliert. Gewachsen sind damit
+Bibliotheks-Suche, Gym-Pläne, Athleten-Auswahl im Plan-Sheet und der
+Übungs-Picker; schmal bleiben Einladung anlegen/Detail, Rolle ändern,
+Profil teilen, Übungs-Detail, Trainings-Log und der Auto-Generator. Prüfen: Die
 Panel-Höhe muss den vh-Deckel erreichen und es darf genau EIN scrollendes
 Element im Panel geben.
 

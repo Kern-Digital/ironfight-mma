@@ -31,6 +31,7 @@
  */
 
 import type { MonthPoint } from "@/lib/gym-stats";
+// AUSNAHME (MOTION-BRIEF §3.1): Diagramm mit eigenen Pfad-Animationen.
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
 

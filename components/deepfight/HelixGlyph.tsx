@@ -1,5 +1,6 @@
 "use client";
 
+// AUSNAHME (MOTION-BRIEF §3.1): Die Helix — dort IST die Bewegung der Inhalt.
 import { motion } from "framer-motion";
 import { useEffect, useId, useState } from "react";
 import type { HelixModel } from "@/lib/fight-dna-helix";

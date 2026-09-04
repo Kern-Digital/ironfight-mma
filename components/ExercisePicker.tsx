@@ -148,7 +148,7 @@ export default function ExercisePicker({
         }}
       >
       <div
-        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl lg:max-w-3xl sm:rounded-[var(--r-xl)]"
         style={{
           maxHeight: "80dvh",
           // Hinten angestellt: volle Höhe erzwingen, damit die Oberkante

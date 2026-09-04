@@ -44,6 +44,10 @@
  */
 
 import Icon from "@/components/ui/Icon";
+// AUSNAHME vom „kein framer-motion außerhalb components/motion/"
+// (MOTION-BRIEF §3.1): Die Verwandlung Knopf → Feld IST diese Komponente.
+// Ein Baustein dafür hätte genau einen Aufrufer. Die Sperren hält sie
+// trotzdem ein: `whileHover` läuft durch `canHover` (siehe unten).
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useMotionCapability } from "@/components/motion";
 import { useEffect, useMemo, useRef, useState } from "react";

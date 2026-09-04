@@ -20,6 +20,7 @@ export {
   FlowItem,
 } from "./Stagger";
 export { Collapse, Pop, MorphSwap } from "./Morph";
+export { Reveal } from "./Reveal";
 export { SheetShell, useLetzterWert } from "./SheetShell";
 export { useMotionCapability } from "./useMotionCapability";
 export type { MotionCapability } from "./useMotionCapability";

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+// AUSNAHME (MOTION-BRIEF §3.1): Die Helix — dort IST die Bewegung der Inhalt.
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Icon from "@/components/ui/Icon";

@@ -949,7 +949,7 @@ export default function WorkoutHubPage() {
         open={trainerPlansOpen && trainerPlans !== null}
         onClose={() => setTrainerPlansOpen(false)}
         label={sharedPlansTitle}
-        panelClassName="relative flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        panelClassName="relative flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl lg:max-w-3xl sm:rounded-[var(--r-xl)]"
         panelStyle={{
           maxHeight: "75dvh",
           background: "var(--surface-card)",

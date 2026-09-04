@@ -19,6 +19,7 @@
 
 import Icon from "@/components/ui/Icon";
 import type { CourseLoad } from "@/lib/gym-stats";
+// AUSNAHME (MOTION-BRIEF §3.1): Diagramm mit eigenen Pfad-Animationen.
 import { motion, useReducedMotion } from "framer-motion";
 import { useState } from "react";
 

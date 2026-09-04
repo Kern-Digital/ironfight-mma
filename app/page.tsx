@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Icon, { type IconName } from "@/components/ui/Icon";
-import Reveal from "@/components/dashboard/Reveal";
+import { Reveal } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import { greetingFor } from "@/lib/greeting";
 import { useTheme } from "@/lib/theme-context";

@@ -14,6 +14,10 @@
  *   breathe — Aufwärmen / Cooldown: Ringe pulsieren ruhig nach außen
  */
 
+// AUSNAHME vom „kein framer-motion außerhalb components/motion/"
+// (MOTION-BRIEF §3.1): Diese Datei animiert SVG-Formen — Kreise, Linien,
+// Ellipsen, die zusammen die Übung vorführen. Hier ist die Bewegung der
+// Inhalt, kein Baustein könnte sie kapseln.
 import { motion } from "framer-motion";
 import type { ExerciseKind, Category } from "@/lib/types";
 

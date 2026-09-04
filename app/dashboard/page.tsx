@@ -10,7 +10,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import SectionCard from "@/components/dashboard/SectionCard";
 import QuickAction from "@/components/dashboard/QuickAction";
 import EmptyState from "@/components/dashboard/EmptyState";
-import Reveal from "@/components/dashboard/Reveal";
+import { Reveal } from "@/components/motion";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { dashboardGreetingFor, trainerGreetingFor } from "@/lib/greeting";

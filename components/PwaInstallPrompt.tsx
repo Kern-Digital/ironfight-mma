@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+// AUSNAHME vom „kein framer-motion außerhalb components/motion/"
+// (MOTION-BRIEF §3.1): Der Installations-Hinweis führt seine eigene
+// Choreografie vor (Schritt-Karten, die sich zeigen und zurückziehen) und
+// steht außerhalb der Sheet-Hülle, weil ihn das Betriebssystem auslöst.
 import { AnimatePresence, motion } from "framer-motion";
 
 // Der Prompt legt sich als Modal (Backdrop + Bottom-Sheet) über ALLES.

@@ -417,7 +417,7 @@ function LibraryContent() {
         open={showBrowse}
         onClose={() => setShowBrowse(false)}
         label="Techniken durchsuchen"
-        panelClassName="pointer-events-auto relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+        panelClassName="pointer-events-auto relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl lg:max-w-3xl sm:rounded-[var(--r-xl)]"
         panelStyle={{
           maxHeight: "80dvh",
           background: "var(--surface-card)",

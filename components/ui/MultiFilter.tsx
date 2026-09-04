@@ -97,6 +97,10 @@
  */
 
 import Icon from "@/components/ui/Icon";
+// AUSNAHME vom „kein framer-motion außerhalb components/motion/"
+// (MOTION-BRIEF §3.1): Das Aufklappen der Filter-Matrix IST diese
+// Komponente — `layout` plus `AnimatePresence` sind ihr Inhalt, nicht ihr
+// Schmuck. Ein Baustein dafür hätte genau einen Aufrufer.
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 

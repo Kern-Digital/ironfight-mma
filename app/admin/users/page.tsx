@@ -7,7 +7,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import SectionCard from "@/components/dashboard/SectionCard";
 import EmptyState from "@/components/dashboard/EmptyState";
-import Reveal from "@/components/dashboard/Reveal";
+import { Reveal } from "@/components/motion";
 import { listAllUsers, type AdminUserEntry } from "@/lib/admin";
 import type { UserRole } from "@/lib/types";
 import { legacyRole } from "@/lib/roles";

@@ -26,6 +26,7 @@
  */
 
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import GrowthSparkline from "@/components/trainer/GrowthSparkline";
 import CourseLoadChart from "@/components/trainer/CourseLoadChart";
 import WeeklyFeedbackChart from "@/components/trainer/WeeklyFeedbackChart";
 import Icon from "@/components/ui/Icon";
@@ -52,7 +53,6 @@ import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { getWeekIdentifier } from "@/lib/schedule";
 import { getSessionCountForWeek } from "@/lib/training-sessions";
 import { competitionGroup } from "@/components/trainer/CompetitionCard";
-import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -161,37 +161,6 @@ function SectionHead({
           <Icon name="arrow-right" size={14} strokeWidth={2.2} />
         </Link>
       )}
-    </div>
-  );
-}
-
-/**
- * Balken-Sparkline der Wachstums-Kachel (Leons Bento-Vorlage): ein Balken je
- * Monat, Höhe folgt den Beitritten. Kein eigenes Diagramm mit Achsen — die
- * Kachel trägt die Zahl, die Balken tragen nur die Form des Verlaufs.
- */
-function GrowthSparkline({ values }: { values: number[] }) {
-  const reduced = useReducedMotion();
-  const max = Math.max(...values, 1);
-  return (
-    <div aria-hidden className="flex h-12 items-end gap-[3px]">
-      {values.map((v, i) => {
-        const h = 4 + (v / max) * 42;
-        return (
-          <motion.span
-            key={i}
-            className="w-1.5 rounded-full"
-            style={{ background: "var(--accent)", opacity: v === 0 ? 0.3 : 1 }}
-            initial={reduced ? false : { height: 4 }}
-            animate={{ height: h }}
-            transition={{
-              duration: 0.5,
-              delay: i * 0.05,
-              ease: [0.2, 0.8, 0.2, 1],
-            }}
-          />
-        );
-      })}
     </div>
   );
 }
