@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, isValidElement } from "react";
+import { Children, forwardRef, isValidElement } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { HTMLMotionProps } from "framer-motion";
@@ -119,18 +119,38 @@ export function StaggerFlow({
   );
 }
 
-/** Eintrag in einer <StaggerFlow>-Liste: fließt mit, statt zu springen. */
-export function FlowItem({
-  children,
-  className,
-  index = 0,
-  ...rest
-}: { children: ReactNode; index?: number } & HTMLMotionProps<"div">) {
+/**
+ * Eintrag in einer <StaggerFlow>-Liste: fließt mit, statt zu springen.
+ *
+ * MUSS `forwardRef` SEIN (gemessen 04.09.2026 auf /trainer/competitions):
+ * `AnimatePresence mode="popLayout"` wickelt jedes Kind in `PopChild` und
+ * hängt ihm einen Ref an, um seine Lage zu VERMESSEN, bevor es aus dem Fluss
+ * genommen wird. Als einfache Funktionskomponente konnte FlowItem den Ref
+ * nicht annehmen — React meldete „Function components cannot be given refs.
+ * Attempts to access this ref will fail. Check the render method of
+ * PopChild", und genau die Messung fiel aus. Damit fehlte dem gehenden
+ * Eintrag die eingefrorene Position, und die bleibenden rutschten nicht
+ * sauber nach — also genau das, wofür StaggerFlow da ist.
+ *
+ * Der Rückfall bei abbestellter Bewegung reicht den Ref ebenfalls durch:
+ * PopChild greift dort zwar nicht, aber eine Hülle, die den Ref je nach
+ * Einstellung verschluckt, wäre eine Falle für den nächsten Aufrufer.
+ */
+export const FlowItem = forwardRef<
+  HTMLDivElement,
+  { children: ReactNode; index?: number } & HTMLMotionProps<"div">
+>(function FlowItem({ children, className, index = 0, ...rest }, ref) {
   const { reduced, canBlur } = useMotionCapability();
-  if (reduced) return <div className={className}>{children}</div>;
+  if (reduced)
+    return (
+      <div ref={ref} className={className}>
+        {children}
+      </div>
+    );
 
   return (
     <motion.div
+      ref={ref}
       layout
       className={className}
       initial={{
@@ -150,7 +170,7 @@ export function FlowItem({
       {children}
     </motion.div>
   );
-}
+});
 
 /**
  * Auftrittswelle ohne Umbau der Liste.
