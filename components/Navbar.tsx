@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -681,8 +682,9 @@ export default function Navbar() {
                         </span>
                       </button>
 
-                      {/* Accordion children */}
-                      {groupMobileOpen && (
+                      {/* Accordion children — Collapse verwandelt die Höhe,
+                          statt die Unterlinks aufpoppen zu lassen */}
+                      <Collapse open={groupMobileOpen}>
                         <div
                           className="mb-2 ml-6 flex flex-col border-l"
                           style={{ borderColor: "var(--ink-5)" }}
@@ -715,7 +717,7 @@ export default function Navbar() {
                             );
                           })}
                         </div>
-                      )}
+                      </Collapse>
                     </>
                   )}
                 </div>

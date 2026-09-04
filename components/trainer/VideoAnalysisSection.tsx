@@ -15,6 +15,7 @@
  *      (users/{uid}.fightProfile, siehe lib/fight-profile.ts).
  */
 
+import { Collapse, MorphSwap } from "@/components/motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
@@ -980,15 +981,19 @@ export default function VideoAnalysisSection({
             beobachtet und bewertet {mode === "opponent" ? "den Gegner" : "deinen Athleten"}.
           </p>
         </div>
-        {!formOpen && !running && (
-          <button
-            onClick={() => setFormOpen(true)}
-            className="font-mono-ta flex items-center gap-1.5 rounded-lg px-4 py-2 text-[10px] font-bold uppercase"
-            style={{ letterSpacing: "0.12em", background: VIOLET, color: "#fff" }}
-          >
-            <Icon name="video" size={14} /> Neue Analyse
-          </button>
-        )}
+        {/* Der Knopf schrumpft weg, statt zu verschwinden — das Formular
+            darunter wächst zeitgleich auf (Collapse) */}
+        <MorphSwap activeKey={!formOpen && !running ? "knopf" : "leer"}>
+          {!formOpen && !running && (
+            <button
+              onClick={() => setFormOpen(true)}
+              className="font-mono-ta flex items-center gap-1.5 rounded-lg px-4 py-2 text-[10px] font-bold uppercase"
+              style={{ letterSpacing: "0.12em", background: VIOLET, color: "#fff" }}
+            >
+              <Icon name="video" size={14} /> Neue Analyse
+            </button>
+          )}
+        </MorphSwap>
       </div>
 
       {/* Claude-Guthaben-Ring (geschätzt aus den Token-Kosten aller Analysen) */}
@@ -1008,7 +1013,7 @@ export default function VideoAnalysisSection({
       )}
 
       {/* Formular */}
-      {formOpen && !running && (
+      <Collapse open={formOpen && !running}>
         <div
           className="flex flex-col gap-3 rounded-2xl p-4"
           style={{
@@ -1287,7 +1292,7 @@ export default function VideoAnalysisSection({
             </button>
           </div>
         </div>
-      )}
+      </Collapse>
 
       {/* Fortschritt — Vollbild-Overlay: KI-Loader mittig, Schritte darunter */}
       {running && (

@@ -21,6 +21,7 @@
  *     „Plan speichern"-Knopf legt das Dokument an.
  */
 
+import { MorphSwap } from "@/components/motion";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import ExercisePicker from "@/components/ExercisePicker";
@@ -1350,6 +1351,17 @@ export default function PlanView({
                   {/* Rubrik-Titel — im Trainer-Editor öffnet EIN Klick auf
                       die freie Blockfläche die Eingabe (handleSectionClick);
                       der nächste Klick (egal wohin) speichert per Blur */}
+                  {/* MorphSwap: der Titel DEHNT sich zum Eingabefeld und
+                      zurück (Motion-Prinzip 1, Leons Wahl 04.09.). Die Hülle
+                      übernimmt flex-1, das Feld füllt sie mit w-full. */}
+                  <MorphSwap
+                    activeKey={
+                      edit?.onBlockTitleChange && editingTitleBlock === idx
+                        ? "feld"
+                        : "titel"
+                    }
+                    className="flex min-w-0 flex-1 items-baseline"
+                  >
                   {edit?.onBlockTitleChange && editingTitleBlock === idx ? (
                     <input
                       type="text"
@@ -1370,7 +1382,7 @@ export default function PlanView({
                       }}
                       placeholder="Rubrik-Name"
                       aria-label={`Name der Rubrik ${idx + 1}`}
-                      className="plan-block-title-input min-w-0 flex-1"
+                      className="plan-block-title-input w-full min-w-0"
                       style={{
                         font: "var(--type-h2)",
                         letterSpacing: "var(--ls-display)",
@@ -1391,6 +1403,7 @@ export default function PlanView({
                         (edit?.onBlockTitleChange ? "Rubrik-Name" : "")}
                     </h2>
                   )}
+                  </MorphSwap>
                   {/* Keine Pausen-Anzeige mehr im Kopf: die Rundenpause ist
                       PRO ÜBUNG (Übungsdetails), nicht mehr pro Rubrik */}
                   {/* Rubrik löschen (Leon 30.08.) — nur wo der Editor einen

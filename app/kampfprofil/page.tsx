@@ -17,6 +17,7 @@
  * Akzente über --accent-2/--grad-fight (exklusiv diesen Elementen).
  */
 
+import { Collapse } from "@/components/motion";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -363,7 +364,9 @@ function KampfprofilContent() {
                           <Icon name="chevron-down" size={16} strokeWidth={2.4} />
                         </span>
                       </button>
-                      {open && (
+                      {/* Klappt weich auf und zu (Collapse: Höhe wird
+                          verwandelt, nicht umgeschaltet) */}
+                      <Collapse open={open}>
                         <div className="pb-3">
                           <VideoAnalysisResult
                             analysis={a}
@@ -371,7 +374,7 @@ function KampfprofilContent() {
                             existingDna={null}
                           />
                         </div>
-                      )}
+                      </Collapse>
                     </Fragment>
                   );
                 })}

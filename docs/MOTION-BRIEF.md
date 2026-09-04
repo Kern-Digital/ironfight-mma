@@ -114,6 +114,12 @@ laufen über die Hülle — Achtung: Der Inhalt wird vom Aufrufer auch bei
 (`(liste ?? []).map(…)`).
 Sichtprüfung: `node scripts/motion-sheet-shots.mjs` gegen `/dev/motion-sheet`.
 
+**Dichte Listen:** Zeilen einer Auswahl- oder Checkbox-Liste sind FLÄCHEN,
+keine Knöpfe — sie tragen `data-press="surface"`, auch wenn sie technisch
+`<button>` sind. Sonst hebt die Grundhaptik jede Zeile unter der Maus um
+2 % an und die ganze Liste poppt beim Überfahren (Leon 04.09. im
+Kurs-Editor: „das nervt"). Flächen nicken nur (1.008 / .99).
+
 **Links:** Die Grundhaptik greift bei `<a>` nur mit `data-press`
 (Knopf-Stärke) bzw. `data-press="surface"` (Karten, Listenzeilen) — ein
 Text-Link im Fließtext soll sich nicht heben. Jeder `next/link`, der wie ein

@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
@@ -1213,8 +1214,11 @@ function TechniqueGroup({
         </span>
       </button>
 
-      {/* Techniken */}
-      {!collapsed && (
+      {/* Techniken — die Gruppe klappt weich (Collapse). Die Zeilen tragen
+          die Flächen-Stärke: Als normale Knöpfe hob die Grundhaptik jede
+          Technik unter der Maus um 2 % an, in der dichten Liste poppte damit
+          jede Zeile (Leon 04.09.: „das nervt"). Flächen nicken nur. */}
+      <Collapse open={!collapsed}>
         <div className="space-y-0.5">
           {group.techniques.map((t) => {
             const selected = selectedIds.includes(t.id);
@@ -1223,6 +1227,7 @@ function TechniqueGroup({
               <button
                 key={t.id}
                 type="button"
+                data-press="surface"
                 onClick={() => onToggle(t.id)}
                 className="t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-badge px-2 py-1.5 text-left"
                 style={{
@@ -1262,7 +1267,7 @@ function TechniqueGroup({
             );
           })}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
