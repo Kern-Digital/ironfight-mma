@@ -1030,12 +1030,12 @@ function SessionRunner() {
 
     {/* ── Übungs-Detail — Sheet zum „Detail"-Button (gemeinsame Komponente,
         auch im Übungs-Picker und Plan-Editor im Einsatz) ─────────────────── */}
-    {detailOpen && currentExercise && (
-      <ExerciseDetailSheet
-        exercise={currentExercise}
-        onClose={() => setDetailOpen(false)}
-      />
-    )}
+    {/* Immer gerendert, `exercise={null}` heißt geschlossen — so hat auch
+        das Schließen eine Bewegung (components/motion/SheetShell). */}
+    <ExerciseDetailSheet
+      exercise={detailOpen ? (currentExercise ?? null) : null}
+      onClose={() => setDetailOpen(false)}
+    />
     </main>
   );
 }

@@ -28,7 +28,12 @@
 7. **Tech-Grenzen:** Tailwind CSS 3.4, React 18 (KEIN Upgrade), R3F bleibt
    v8, Tokens leben in `app/globals.css`, Tailwind-Farbwelt in
    `tailwind.config`.
-8. **Mobile-First / Native-Ready** (die App soll später via Capacitor o. ä.
+8. **Bewegung folgt `docs/MOTION-BRIEF.md`.** Wie die App sich ANFÜHLT —
+   Haptik, Verwandlung, Auftritt — regelt dieser eigene Brief (beschlossen
+   2026-09-04). Er ist gleichrangig verbindlich: kein direkter
+   `framer-motion`-Import außerhalb `components/motion/`, kein `whileHover`
+   ohne Zeiger-Prüfung, animierter Blur nie auf Touch.
+9. **Mobile-First / Native-Ready** (die App soll später via Capacitor o. ä.
    in die App-Stores): Touch-Ziele ≥ 44 px; KEINE Hover-only-Funktionen
    (Hover nur als Verstärkung); Safe-Area-Insets einplanen
    (`env(safe-area-inset-*)`, Notch/Home-Indicator); Schüler-Kernbereiche

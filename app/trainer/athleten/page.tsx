@@ -46,6 +46,7 @@ import GooeySearch from "@/components/ui/GooeySearch";
 import Icon from "@/components/ui/Icon";
 import MultiFilter from "@/components/ui/MultiFilter";
 import Skeleton from "@/components/ui/Skeleton";
+import { StaggerFlow, FlowItem } from "@/components/motion";
 import ErrorState from "@/components/ui/ErrorState";
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
@@ -158,6 +159,7 @@ function StudentRow({
       onContextMenu={(e) => {
         if (auswahlmodus) e.preventDefault();
       }}
+      data-press="surface"
       className="t-card t-interactive student-row flex select-none items-center gap-3 p-3.5"
       style={{ textDecoration: "none", color: "inherit" }}
     >
@@ -549,23 +551,28 @@ function StudentsContent() {
         )}
 
         {students !== null && filtered.length > 0 && (
-          <div className="auswahl-vorn grid items-start gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((entry) => (
-              <StudentRow
-                key={entry.uid}
-                entry={entry}
-                auswahlmodus={auswahlmodus}
-                gewaehlt={gewaehlt.includes(entry.uid)}
-                onLangerDruck={() => {
-                  setAuswahlmodus(true);
-                  setGewaehlt((v) =>
-                    v.includes(entry.uid) ? v : [...v, entry.uid],
-                  );
-                }}
-                onUmschalten={() => umschalten(entry.uid)}
-              />
+          // Die Liste aendert sich unter dem Nutzer (Suche, drei Kursfilter).
+          // StaggerFlow nimmt gehende Karten sofort aus dem Fluss, damit die
+          // bleibenden zu ihrer neuen Rasterposition rutschen statt zu
+          // springen — der Unterschied zwischen "sortiert sich" und "blinkt".
+          <StaggerFlow className="auswahl-vorn grid items-start gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((entry, i) => (
+              <FlowItem key={entry.uid} index={i}>
+                <StudentRow
+                  entry={entry}
+                  auswahlmodus={auswahlmodus}
+                  gewaehlt={gewaehlt.includes(entry.uid)}
+                  onLangerDruck={() => {
+                    setAuswahlmodus(true);
+                    setGewaehlt((v) =>
+                      v.includes(entry.uid) ? v : [...v, entry.uid],
+                    );
+                  }}
+                  onUmschalten={() => umschalten(entry.uid)}
+                />
+              </FlowItem>
             ))}
-          </div>
+          </StaggerFlow>
         )}
       </div>
     </main>

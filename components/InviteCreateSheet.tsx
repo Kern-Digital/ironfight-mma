@@ -23,6 +23,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import { SheetShell } from "@/components/motion";
 import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
@@ -51,7 +52,14 @@ const META_FONT: React.CSSProperties = {
 /** Gruppengrößen — Vorgaben statt freier Zahl (Serverobergrenze 200). */
 const GROUP_SIZES = [5, 10, 20, 30, 50, 100, 200];
 
-export default function InviteCreateSheet({
+/**
+ * Der Inhalt liegt INNERHALB der SheetShell, damit sein Formularzustand
+ * (Rolle, Gruppengroesse, Notiz, erzeugter Code) beim Schliessen mit ihm
+ * verschwindet. Fuer die Austritts-Animation bleibt das Sheet gerendert —
+ * laege der Zustand aussen, stuende eine halb ausgefuellte Einladung beim
+ * naechsten Oeffnen wieder da.
+ */
+function InviteCreateInhalt({
   canInviteTrainer,
   onCreated,
   onClose,
@@ -124,31 +132,7 @@ export default function InviteCreateSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Einladung erstellen"
-    >
-      <button
-        type="button"
-        aria-label="Schließen"
-        className="absolute inset-0"
-        style={{
-          background: "var(--overlay)",
-          animation: "fade-in 0.2s ease-out both",
-        }}
-        onClick={onClose}
-      />
-      <div
-        className="pointer-events-auto animate-slide-up relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-md sm:rounded-[var(--r-xl)]"
-        style={{
-          maxHeight: "80dvh",
-          background: "var(--surface-card)",
-          border: "1px solid transparent",
-          boxShadow: "var(--glass-shadow)",
-        }}
-      >
+    <>
         <div className="flex items-center justify-between gap-3 px-5 pt-3">
           <div className="flex min-w-0 flex-col items-start">
             <div
@@ -382,7 +366,33 @@ export default function InviteCreateSheet({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </>
+  );
+}
+
+export default function InviteCreateSheet({
+  open,
+  ...props
+}: {
+  open: boolean;
+  canInviteTrainer: boolean;
+  onCreated: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <SheetShell
+      open={open}
+      onClose={props.onClose}
+      label="Einladung erstellen"
+      panelClassName="pointer-events-auto relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-md sm:rounded-[var(--r-xl)]"
+      panelStyle={{
+        maxHeight: "80dvh",
+        background: "var(--surface-card)",
+        border: "1px solid transparent",
+        boxShadow: "var(--glass-shadow)",
+      }}
+    >
+      <InviteCreateInhalt {...props} />
+    </SheetShell>
   );
 }

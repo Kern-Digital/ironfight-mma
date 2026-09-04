@@ -20,6 +20,7 @@ import InviteCreateSheet from "@/components/InviteCreateSheet";
 import InviteDetailSheet from "@/components/InviteDetailSheet";
 import InviteStatusChip from "@/components/InviteStatusChip";
 import Icon from "@/components/ui/Icon";
+import { StaggerList } from "@/components/motion";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
 import { resolveGymId } from "@/lib/gym";
@@ -200,7 +201,7 @@ export default function TrainerInvitesPage() {
                 nächstes Mitglied dazu.
               </p>
             ) : (
-              <div className="flex flex-col gap-3">
+              <StaggerList className="flex flex-col gap-3">
                 {invites.map((invite) => {
                   const usable = inviteStatus(invite) === "open";
                   const copied = copiedCode === invite.code;
@@ -284,27 +285,28 @@ export default function TrainerInvitesPage() {
                     </div>
                   );
                 })}
-              </div>
+              </StaggerList>
             )}
           </>
         )}
       </div>
 
-      {creating && (
-        <InviteCreateSheet
-          canInviteTrainer={isVerwaltung}
-          onCreated={load}
-          onClose={() => setCreating(false)}
-        />
-      )}
+      {/* `open` statt `{creating && …}`: nur wer gerendert bleibt, kann sich
+          beim Schliessen zurueckverwandeln (siehe components/motion/
+          SheetShell). Der Formularzustand liegt im Inneren und verschwindet
+          weiterhin mit dem Sheet. */}
+      <InviteCreateSheet
+        open={creating}
+        canInviteTrainer={isVerwaltung}
+        onCreated={load}
+        onClose={() => setCreating(false)}
+      />
 
-      {detail && (
-        <InviteDetailSheet
-          invite={detail}
-          onChanged={load}
-          onClose={() => setDetail(null)}
-        />
-      )}
+      <InviteDetailSheet
+        invite={detail}
+        onChanged={load}
+        onClose={() => setDetail(null)}
+      />
     </main>
   );
 }

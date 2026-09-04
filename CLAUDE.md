@@ -383,6 +383,33 @@ Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
 - Tailwind-Farben in `tailwind.config`: `pink` (Akzent), `ink`, `blood`, `carbon`.
 - Utility-Klassen u.a.: `card-glass`, `font-mono-ta` (Mono via `var(--font-mono)`).
 
+### Bewegung & Haptik (Regelwerk: `docs/MOTION-BRIEF.md`, ab 2026-09-04)
+Wie sich die App ANFÜHLT, ist ein eigenes System — nicht Beiwerk einzelner
+Komponenten. Drei Schichten, klare Arbeitsteilung:
+- **`lib/motion.ts`** — die Werte: drei Federn (`springSnappy/Soft/Gentle`),
+  Skalierungen (`HOVER_LIFT` 1.02, `TAP_PRESS` .97, Flächen zurückhaltender),
+  `STAGGER_STEP` 45 ms, `BLUR_IN` 4 px. Nie neu erfinden, hier nachschlagen.
+- **`components/motion/`** — die Bausteine: `Pressable`/`PressableBox`
+  (Haptik), `Stagger`/`StaggerList`/`StaggerFlow`/`FlowItem` (Auftritt und
+  fließende Listen), `Collapse`/`Pop`/`MorphSwap` (Verwandlung),
+  `useMotionCapability` (Zeiger-, Blur- und Reduced-Motion-Prüfung).
+- **`app/globals.css`, Abschnitt GRUNDHAPTIK** — Drücken und Anheben für
+  ALLE Knöpfe der App, plus `-webkit-tap-highlight-color: transparent` und
+  `touch-action: manipulation` fürs WebView.
+
+CSS macht die Haptik, Framer Motion macht Verwandlung, Layout-Fluss und
+Ein-/**Austritt**. Grund: 240 Knöpfe einzeln in JS-Federn zu wickeln kostet
+Bundle und Hauptthread für etwas, das der Compositor umsonst macht.
+
+**Harte Regeln** (vollständig im MOTION-BRIEF): kein
+`import { motion } from "framer-motion"` außerhalb `components/motion/`
+(Ausnahme: Diagramme und die Helix — dort IST Bewegung der Inhalt); kein
+`whileHover` ohne `useMotionCapability().canHover`, sonst bleibt der
+Hover-Zustand auf iOS nach dem Tap hängen; animierter `filter: blur()` nie
+auf Touch (in WKWebView pro Bild ein Repaint); Tap-Feedback dagegen auf
+JEDEM Gerät. `future.hoverOnlyWhenSupported` in `tailwind.config.ts` deckt
+alle `hover:`-Klassen ab — nicht wieder entfernen.
+
 ## Firestore (Collections — Top-Level)
 ```
 gyms/{gymId}                      — Gym-Stammdaten (Multi-Gym; Mitglieder lesen ihr
@@ -605,6 +632,13 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Token-only-Branding (Palette aus 1–2 Eingabefarben ableitbar), harte vs.
   verhandelbare Regeln, Arbeitsmodus (Tokens → Referenzseite → Rollout),
   Abnahme-Checkliste. Jede Design-Session startet mit dieser Datei.
+- **`docs/MOTION-BRIEF.md`** — verbindliches Regelwerk für Bewegung und
+  Haptik (beschlossen von Leon 2026-09-04): die drei Prinzipien (verwandeln
+  statt umschalten · alles Anfassbare antwortet · Auftreten in Wellen), die
+  Schichten-Arbeitsteilung CSS ↔ Framer Motion, acht harte Regeln, die
+  Wertetabelle und die Abnahme-Checkliste. Farben, Themes und
+  Komponentengrößen bleiben davon UNBERÜHRT. Jede Session, die UI anfasst,
+  liest diese Datei.
 
 ## Backlog (offen)
 - [ ] **Workout-Pläne — eigene Etappe DIREKT NACH Redesign-Etappe 4, VOR

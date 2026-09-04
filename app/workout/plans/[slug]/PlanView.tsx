@@ -1635,27 +1635,28 @@ export default function PlanView({
 
       {/* Übungs-Detail — Tipp/Klick auf eine Übungszeile; im Editier-Modus
           wird hier die Rundenpause DIESER Übung eingestellt */}
-      {detailExercise && (
-        <ExerciseDetailSheet
-          exercise={detailExercise.exercise}
-          rest={
-            edit && shown.blocks[detailExercise.block]
-              ? {
-                  label: "Pause zwischen den Runden",
-                  sub: "Gilt nur für diese Übung",
-                  seconds: exerciseRestSeconds(
-                    shown,
-                    shown.blocks[detailExercise.block],
-                    detailExercise.exercise.id,
-                  ),
-                  onChange: (s) =>
-                    edit.onExerciseRestChange(detailExercise.exercise.id, s),
-                }
-              : undefined
-          }
-          onClose={() => setDetailExercise(null)}
-        />
-      )}
+      {/* Immer gerendert, `exercise={null}` heißt geschlossen — nur so kann
+          das Sheet sich beim Schließen zurückverwandeln, statt zu
+          verschwinden (components/motion/SheetShell). */}
+      <ExerciseDetailSheet
+        exercise={detailExercise?.exercise ?? null}
+        rest={
+          detailExercise && edit && shown.blocks[detailExercise.block]
+            ? {
+                label: "Pause zwischen den Runden",
+                sub: "Gilt nur für diese Übung",
+                seconds: exerciseRestSeconds(
+                  shown,
+                  shown.blocks[detailExercise.block],
+                  detailExercise.exercise.id,
+                ),
+                onChange: (s) =>
+                  edit.onExerciseRestChange(detailExercise.exercise.id, s),
+              }
+            : undefined
+        }
+        onClose={() => setDetailExercise(null)}
+      />
 
       {/* Pausen-Rad für die Zwischen-Rubrik-Pause */}
       {edit && gapWheel !== null && shown.blocks[gapWheel] && (

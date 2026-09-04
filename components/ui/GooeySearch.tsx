@@ -45,6 +45,7 @@
 
 import Icon from "@/components/ui/Icon";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useMotionCapability } from "@/components/motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -120,6 +121,7 @@ export default function GooeySearch({
   const rootRef = useRef<HTMLDivElement>(null);
   const unsupported = useMemo(isUnsupportedBrowser, []);
   const reduced = useReducedMotion();
+  const { canHover } = useMotionCapability();
 
   // Geöffnet wird der Fokus gesetzt; beim Schließen fällt der Suchtext weg —
   // ein eingeklapptes Feld, das unsichtbar weiterfiltert, wäre eine Liste,
@@ -173,7 +175,13 @@ export default function GooeySearch({
         {/* Die Pille selbst. Eingeklappt ein Knopf, geöffnet ein Feld. */}
         <motion.div
           className="goo-pill"
-          whileHover={reduced || open ? undefined : { scale: 1.05 }}
+          // canHover statt nur reduced: auf iOS loest der erste Tap
+          // pointerenter aus und die Pille bliebe auf 1.05 stehen, bis
+          // woanders hingetippt wird. Das Einsinken (whileTap) bleibt
+          // auf jedem Geraet — es ist die Haelfte des Gefuehls.
+          whileHover={
+            canHover && !open ? { scale: 1.05 } : undefined
+          }
           whileTap={reduced ? undefined : { scale: 0.95 }}
           onClick={() => !open && setOpen(true)}
           role={open ? undefined : "button"}

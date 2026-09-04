@@ -1,13 +1,31 @@
 "use client";
 
+/**
+ * Wettkampf-Übersicht — Rollout-Etappe 2a (04.09.2026).
+ *
+ * Umzug auf das neue Token-System: `.t-card`-Raster statt Ink-Verläufen, Typo
+ * aus den `--type-*`-Tokens, Gooey-Suche statt nativem Suchfeld (dieselbe
+ * Geste wie in der Athletenliste — eine Suche in zwei Ausführungen wäre eine
+ * Suche zu viel). Der Kopf stand schon auf `PageHead`.
+ *
+ * ZWEI QUELLEN, EINE LISTE (Schritt 2b, 04.09.): `listAllFightCamps` liest
+ * gym-weit nur Athleten-Camps und holt die eigenen sowie die freigegebenen
+ * Kollegen-Camps einzeln dazu — deshalb hängt die Abfrage an der
+ * Mitgliederliste, die die Freigaben trägt.
+ */
+
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import TrainerHint from "@/components/TrainerHint";
+import GooeySearch from "@/components/ui/GooeySearch";
+import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import { StaggerFlow, FlowItem } from "@/components/motion";
 import CompetitionCard, {
+  GROUP_ACCENT,
   competitionGroup,
 } from "@/components/trainer/CompetitionCard";
 import { useAuth } from "@/lib/auth-context";
@@ -20,6 +38,12 @@ import {
 import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { werTeiltMitMir } from "@/lib/profile-sharing";
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
   if (!entry) return "Athlet";
@@ -38,14 +62,18 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-6">
-      <h2
-        className="font-mono-ta mb-2.5 text-[11px] font-bold uppercase"
-        style={{ letterSpacing: "0.2em", color: accent }}
-      >
+    <section className="flex flex-col gap-2.5">
+      {/* Die Gruppen-Überschrift trägt die Farbe der Gruppe — bei „Vergangen"
+          und „Archiviert" ist das derselbe neutrale Ton (Begründung in
+          CompetitionCard). */}
+      <h2 className="t-label" style={{ color: accent }}>
         {title}
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+      {/* Die Suche filtert live — bleibende Karten rutschen zu ihrer neuen
+          Rasterposition, statt zu springen (Muster Athletenliste). */}
+      <StaggerFlow className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {children}
+      </StaggerFlow>
     </section>
   );
 }
@@ -130,15 +158,31 @@ function CompetitionsHubContent() {
     return g;
   }, [filteredCamps]);
 
+  // Eine Karte im fließenden Raster — der Schlüssel ist die Firestore-ID,
+  // nie der Index, sonst hält Framer die falsche Karte für die gebliebene.
+  const karte = (c: FightCamp, i: number) => (
+    <FlowItem key={c.id} index={i}>
+      <CompetitionCard
+        camp={c}
+        studentLabel={studentLabelOf(members.get(c.studentUid))}
+        href={`/trainer/competitions/${c.studentUid}/${c.id}`}
+        opponent={opponents.get(campOpponentId(c) ?? "")}
+      />
+    </FlowItem>
+  );
+
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
+    <main
+      className="min-h-screen"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
       <PageHead
         lane="wide"
         title="Wettkampf"
         description="Jeder Wettkampf verbindet einen Athleten mit einem Gegner — von der Planung über das Camp bis zum Rückblick."
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-1 sm:px-6">
         <TrainerHint id="competitions-hub" title="Wettkampfbereich">
           Hier legst du Wettkämpfe an und verfolgst sie — jeder Wettkampf
           verbindet einen Athleten mit einem Gegner aus der
@@ -147,40 +191,45 @@ function CompetitionsHubContent() {
         </TrainerHint>
 
         {error && (
-          <div className="mb-5">
-            <ErrorState
-              title="Daten konnten nicht geladen werden"
-              message={error}
-              onRetry={load}
-            />
-          </div>
+          <ErrorState
+            title="Daten konnten nicht geladen werden"
+            message={error}
+            onRetry={load}
+          />
         )}
 
-        {/* Aktionsleiste */}
-        <div className="mb-2 flex flex-wrap items-center gap-3">
-          <Link href="/trainer/competitions/new" className="btn-primary px-4 py-2 text-xs">
-            + Neuer Wettkampf
-          </Link>
-          <input
-            type="search"
-            placeholder="Wettkampf, Gegner oder Athlet suchen…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="min-w-0 flex-1 rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
+        {/* Aktionsleiste — Knopf und Suche in EINER Reihe aus Pillen, wie in
+            der Athletenliste. */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/trainer/competitions/new"
+            data-press
+            className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
             style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg-1)",
-              outline: "none",
+              ...BTN_FONT,
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
+              textDecoration: "none",
             }}
+          >
+            <Icon name="plus" size={13} strokeWidth={2.4} />
+            Neuer Wettkampf
+          </Link>
+
+          <GooeySearch
+            value={search}
+            onChange={setSearch}
+            label="Suchen"
+            placeholder="Wettkampf, Gegner oder Athlet…"
           />
         </div>
 
         {/* Inhalt */}
         {camps === null ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+              <Skeleton key={i} className="h-28 w-full rounded-card" />
             ))}
           </div>
         ) : filteredCamps.length === 0 ? (
@@ -188,52 +237,37 @@ function CompetitionsHubContent() {
             title={search ? "Keine Wettkämpfe gefunden." : "Noch keine Wettkämpfe."}
             hint={
               search
-                ? undefined
+                ? "Such nach einem anderen Namen oder leer die Suche."
                 : "Leg deinen ersten Wettkampf an — wähle einen Athleten und einen Gegner."
             }
           />
         ) : (
-          <>
+          // Auch die GRUPPEN fließen: Leert die Suche „Vergangen" komplett,
+          // rutscht „Archiviert" nach oben, statt dorthin zu springen. Die
+          // Karten selbst fließen im Raster jeder Gruppe (Section).
+          <StaggerFlow className="flex flex-col gap-6 pb-4">
             {grouped.upcoming.length > 0 && (
-              <Section title="Geplant / Aktiv" accent="var(--ta-cyan)">
-                {grouped.upcoming.map((c) => (
-                  <CompetitionCard
-                    key={c.id}
-                    camp={c}
-                    studentLabel={studentLabelOf(members.get(c.studentUid))}
-                    href={`/trainer/competitions/${c.studentUid}/${c.id}`}
-                    opponent={opponents.get(campOpponentId(c) ?? "")}
-                  />
-                ))}
-              </Section>
+              <FlowItem key="upcoming">
+                <Section title="Geplant / Aktiv" accent={GROUP_ACCENT.upcoming}>
+                  {grouped.upcoming.map(karte)}
+                </Section>
+              </FlowItem>
             )}
             {grouped.past.length > 0 && (
-              <Section title="Vergangene Wettkämpfe" accent="var(--fg-3)">
-                {grouped.past.map((c) => (
-                  <CompetitionCard
-                    key={c.id}
-                    camp={c}
-                    studentLabel={studentLabelOf(members.get(c.studentUid))}
-                    href={`/trainer/competitions/${c.studentUid}/${c.id}`}
-                    opponent={opponents.get(campOpponentId(c) ?? "")}
-                  />
-                ))}
-              </Section>
+              <FlowItem key="past">
+                <Section title="Vergangene Wettkämpfe" accent={GROUP_ACCENT.past}>
+                  {grouped.past.map(karte)}
+                </Section>
+              </FlowItem>
             )}
             {grouped.archived.length > 0 && (
-              <Section title="Archiviert" accent="#9D7BFA">
-                {grouped.archived.map((c) => (
-                  <CompetitionCard
-                    key={c.id}
-                    camp={c}
-                    studentLabel={studentLabelOf(members.get(c.studentUid))}
-                    href={`/trainer/competitions/${c.studentUid}/${c.id}`}
-                    opponent={opponents.get(campOpponentId(c) ?? "")}
-                  />
-                ))}
-              </Section>
+              <FlowItem key="archived">
+                <Section title="Archiviert" accent={GROUP_ACCENT.archived}>
+                  {grouped.archived.map(karte)}
+                </Section>
+              </FlowItem>
             )}
-          </>
+          </StaggerFlow>
         )}
       </div>
     </main>
@@ -243,14 +277,15 @@ function CompetitionsHubContent() {
 function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
     <div
-      className="mt-3 rounded-2xl p-10 text-center"
-      style={{ border: "1px dashed var(--ink-5)", background: "var(--ink-2)" }}
+      className="rounded-card p-10 text-center"
+      style={{
+        border: "1px dashed var(--line-strong)",
+        background: "var(--surface-card)",
+      }}
     >
-      <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-        {title}
-      </p>
+      <p style={{ font: "var(--type-body-strong)" }}>{title}</p>
       {hint && (
-        <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
+        <p className="mt-1" style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
           {hint}
         </p>
       )}

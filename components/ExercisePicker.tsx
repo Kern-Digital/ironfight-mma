@@ -375,21 +375,25 @@ export default function ExercisePicker({
       </div>
 
       {/* Übungs-Detail über dem Picker — mit direktem Hinzufügen-Weg */}
-      {detail && (
-        <ExerciseDetailSheet
-          exercise={detail}
-          zIndex={60}
-          onClose={() => setDetail(null)}
-          action={{
-            label: "Übung hinzufügen",
-            icon: "plus",
-            onClick: () => {
-              handleAdd(detail.id);
-              setDetail(null);
-            },
-          }}
-        />
-      )}
+      {/* Immer gerendert, `exercise={null}` heißt geschlossen — so hat auch
+          das Schließen eine Bewegung (components/motion/SheetShell). */}
+      <ExerciseDetailSheet
+        exercise={detail}
+        zIndex={60}
+        onClose={() => setDetail(null)}
+        action={
+          detail
+            ? {
+                label: "Übung hinzufügen",
+                icon: "plus",
+                onClick: () => {
+                  handleAdd(detail.id);
+                  setDetail(null);
+                },
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

@@ -22,6 +22,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import { SheetShell } from "@/components/motion";
 import type { GeteiltMitMir } from "@/components/ProfileShareButton";
 import type { StudentEntry } from "@/lib/admin";
 import { memberName } from "@/lib/members";
@@ -100,7 +101,15 @@ function BereichChip({
   );
 }
 
-export default function ProfileShareSheet({
+/**
+ * Der Inhalt liegt bewusst in einer eigenen Komponente INNERHALB der
+ * SheetShell. Grund: Fuer die Austritts-Animation muss das Sheet dauerhaft
+ * gerendert werden (nur `open` wechselt) — laege der Entwurf weiter hier
+ * aussen, ueberlebte ein ABGEBROCHENER Entwurf das Schliessen und stuende
+ * beim naechsten Oeffnen wieder da. Innen entfernt AnimatePresence ihn
+ * mitsamt Zustand, wie es der Aufrufer vorher selbst tat.
+ */
+function ShareSheetInhalt({
   shares,
   kollegen,
   teilenMitMir,
@@ -182,31 +191,7 @@ export default function ProfileShareSheet({
   ).length;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Sichtbarkeit bearbeiten"
-    >
-      <button
-        type="button"
-        aria-label="Schließen"
-        className="absolute inset-0"
-        style={{
-          background: "var(--overlay)",
-          animation: "fade-in 0.2s ease-out both",
-        }}
-        onClick={onClose}
-      />
-      <div
-        className="pointer-events-auto animate-slide-up relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-lg sm:rounded-[var(--r-xl)]"
-        style={{
-          maxHeight: "80dvh",
-          background: "var(--surface-card)",
-          border: "1px solid transparent",
-          boxShadow: "var(--glass-shadow)",
-        }}
-      >
+    <>
         <div className="flex items-center justify-between gap-3 px-5 pt-3">
           <div className="flex min-w-0 flex-col items-start">
             <div
@@ -450,7 +435,35 @@ export default function ProfileShareSheet({
             {saving ? "Speichere…" : "Speichern"}
           </button>
         </div>
-      </div>
-    </div>
+    </>
+  );
+}
+
+export default function ProfileShareSheet({
+  open,
+  ...props
+}: {
+  open: boolean;
+  shares: ProfileShares;
+  kollegen: StudentEntry[];
+  teilenMitMir: GeteiltMitMir[];
+  onSave: (naechste: ProfileShares) => Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <SheetShell
+      open={open}
+      onClose={props.onClose}
+      label="Sichtbarkeit bearbeiten"
+      panelClassName="pointer-events-auto relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-lg sm:rounded-[var(--r-xl)]"
+      panelStyle={{
+        maxHeight: "80dvh",
+        background: "var(--surface-card)",
+        border: "1px solid transparent",
+        boxShadow: "var(--glass-shadow)",
+      }}
+    >
+      <ShareSheetInhalt {...props} />
+    </SheetShell>
   );
 }

@@ -10,6 +10,7 @@
 
 import PlanAudienceSheet from "@/components/PlanAudienceSheet";
 import Icon from "@/components/ui/Icon";
+import { StaggerList, useLetzterWert } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
@@ -68,6 +69,8 @@ export default function TrainerPlansPage() {
   const [audiencePlan, setAudiencePlan] = useState<TrainerWorkoutPlan | null>(
     null,
   );
+  // Haelt den Plan waehrend der Austritts-Feder des Freigabe-Sheets fest.
+  const letzterPlan = useLetzterWert(audiencePlan);
 
   async function handleAudienceSave(uids: string[], courseIds: string[]) {
     if (!audiencePlan) return;
@@ -184,7 +187,7 @@ export default function TrainerPlansPage() {
             deine Athleten frei.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
+          <StaggerList className="flex flex-col gap-3">
             {plans.map((plan) => {
               const minutes = Math.round(planDurationSeconds(plan) / 60);
               const exercises = planExerciseCount(plan);
@@ -254,21 +257,23 @@ export default function TrainerPlansPage() {
                 </Link>
               );
             })}
-          </div>
+          </StaggerList>
         )}
       </div>
 
-      {/* Freigabe-Sheet für den gewählten Plan */}
-      {audiencePlan && (
-        <PlanAudienceSheet
-          gymId={gymId}
-          planName={audiencePlan.name || "Unbenannter Plan"}
-          initialUids={audiencePlan.audienceUids}
-          initialCourseIds={audiencePlan.audienceCourseIds}
-          onSave={handleAudienceSave}
-          onClose={() => setAudiencePlan(null)}
-        />
-      )}
+      {/* Freigabe-Sheet für den gewählten Plan. Immer gerendert, damit es
+          sich beim Schliessen zurueckverwandeln kann; `letzterPlan` haelt
+          den Inhalt waehrend der Austritts-Feder, wenn audiencePlan schon
+          null ist. */}
+      <PlanAudienceSheet
+        open={audiencePlan !== null}
+        gymId={gymId}
+        planName={letzterPlan?.name || "Unbenannter Plan"}
+        initialUids={letzterPlan?.audienceUids ?? []}
+        initialCourseIds={letzterPlan?.audienceCourseIds ?? []}
+        onSave={handleAudienceSave}
+        onClose={() => setAudiencePlan(null)}
+      />
     </main>
   );
 }

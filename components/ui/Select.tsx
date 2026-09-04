@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
+import { Pop } from "@/components/motion";
 
 export type SelectOption = { value: string; label: string };
 
@@ -137,20 +138,26 @@ export default function Select({
         </span>
       </button>
 
-      {open && (
-        <div
-          role="listbox"
-          onKeyDown={onPanelKeyDown}
-          className="t-select-panel absolute inset-x-0 top-full z-40 overflow-y-auto p-1"
-          style={{
-            maxHeight: "min(300px, 40vh)",
-            background: "var(--surface-raised)",
-            border: "1px solid var(--line)",
-            borderTop: "none",
-            borderRadius: "0 0 var(--r-md) var(--r-md)",
-            boxShadow: "var(--glass-shadow)",
-          }}
-        >
+      {/* Pop statt {open && <div>}: das Panel wuchs bisher auf (CSS-Keyframe
+          t-select-open), verschwand beim Schliessen aber ohne Uebergang.
+          AnimatePresence haelt es lange genug am Leben, um es zurueck in
+          seinen Ursprung schrumpfen zu lassen. Die CSS-Klasse t-select-panel
+          faellt dafuer weg — sonst liefen Keyframe und Feder gegeneinander;
+          transform-origin uebernimmt origin-top. */}
+      <Pop
+        open={open}
+        role="listbox"
+        onKeyDown={onPanelKeyDown}
+        className="absolute inset-x-0 top-full z-40 overflow-y-auto p-1"
+        style={{
+          maxHeight: "min(300px, 40vh)",
+          background: "var(--surface-raised)",
+          border: "1px solid var(--line)",
+          borderTop: "none",
+          borderRadius: "0 0 var(--r-md) var(--r-md)",
+          boxShadow: "var(--glass-shadow)",
+        }}
+      >
           {listOptions.map((o, i) => {
             const isSelected = o.value === value;
             return (
@@ -191,8 +198,7 @@ export default function Select({
               </button>
             );
           })}
-        </div>
-      )}
+      </Pop>
     </div>
   );
 }

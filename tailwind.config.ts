@@ -1,6 +1,13 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // Hover-Styles NUR an Geräten mit echtem Zeiger.
+  // Ohne diesen Schalter setzt Tailwind `hover:` als blankes `:hover` — und
+  // auf iOS/Android löst der erste Tap das aus und der Zustand BLEIBT
+  // hängen, bis woanders hingetippt wird. Mit dem Schalter wickelt Tailwind
+  // jede hover:-Klasse in `@media (hover: hover)`. Pflicht, weil die App
+  // via Capacitor in WKWebView laufen soll (docs/DESIGN-BRIEF.md §8).
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",

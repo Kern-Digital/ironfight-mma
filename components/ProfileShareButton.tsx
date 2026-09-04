@@ -190,15 +190,17 @@ export default function ProfileShareButton() {
         )}
       </button>
 
-      {offen && (
-        <ProfileShareSheet
-          shares={shares}
-          kollegen={kollegen}
-          teilenMitMir={teilenMitMir}
-          onSave={speichern}
-          onClose={() => setOffen(false)}
-        />
-      )}
+      {/* `open` statt `{offen && …}`: nur wer gerendert bleibt, kann sich
+          beim Schliessen zurueckverwandeln. Die Bedingung liegt jetzt in
+          der SheetShell, die den Inhalt nach der Austritts-Feder entfernt. */}
+      <ProfileShareSheet
+        open={offen}
+        shares={shares}
+        kollegen={kollegen}
+        teilenMitMir={teilenMitMir}
+        onSave={speichern}
+        onClose={() => setOffen(false)}
+      />
     </>
   );
 }

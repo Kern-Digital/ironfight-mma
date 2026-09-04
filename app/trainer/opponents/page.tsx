@@ -8,6 +8,7 @@ import TrainerHint from "@/components/TrainerHint";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
+import { StaggerFlow, FlowItem } from "@/components/motion";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
@@ -240,11 +241,15 @@ function OpponentsLibraryContent() {
             )}
           </div>
         ) : (
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((o) => (
-              <OpponentCard key={o.id} opponent={o} />
+          // Die Bibliothek filtert live nach Stil und Suchbegriff — die
+          // Karten sollen dabei zu ihrer neuen Rasterposition rutschen.
+          <StaggerFlow className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((o, i) => (
+              <FlowItem key={o.id} index={i}>
+                <OpponentCard opponent={o} />
+              </FlowItem>
             ))}
-          </div>
+          </StaggerFlow>
         )}
       </div>
     </main>

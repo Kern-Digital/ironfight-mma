@@ -443,16 +443,17 @@ export default function TrainerPlanDetailPage() {
         }
       />
 
-      {audienceOpen && (
-        <PlanAudienceSheet
-          gymId={gymId}
-          planName={saved.name || "Unbenannter Plan"}
-          initialUids={saved.audienceUids}
-          initialCourseIds={saved.audienceCourseIds}
-          onSave={handleAudienceSave}
-          onClose={() => setAudienceOpen(false)}
-        />
-      )}
+      {/* Immer gerendert (siehe components/motion/SheetShell) — `saved`
+          steht auf dieser Seite ohnehin durchgehend zur Verfuegung. */}
+      <PlanAudienceSheet
+        open={audienceOpen}
+        gymId={gymId}
+        planName={saved.name || "Unbenannter Plan"}
+        initialUids={saved.audienceUids}
+        initialCourseIds={saved.audienceCourseIds}
+        onSave={handleAudienceSave}
+        onClose={() => setAudienceOpen(false)}
+      />
     </>
   );
 }

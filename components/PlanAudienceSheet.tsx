@@ -18,6 +18,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import { SheetShell } from "@/components/motion";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
 import { TRAINING_BLOCKS, WEEKDAY_LABELS } from "@/lib/schedule";
@@ -65,7 +66,9 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
-export default function PlanAudienceSheet({
+/** Inhalt INNERHALB der Huelle: die zusammengeklickte Auswahl (Athleten,
+ *  Kurse, Suchbegriff) soll beim Schliessen verschwinden. */
+function PlanAudienceInhalt({
   gymId,
   planName,
   initialUids,
@@ -204,31 +207,7 @@ export default function PlanAudienceSheet({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Freigabe für „${planName}"`}
-    >
-      <button
-        type="button"
-        aria-label="Freigabe schließen"
-        className="absolute inset-0"
-        style={{
-          background: "var(--overlay)",
-          animation: "fade-in 0.2s ease-out both",
-        }}
-        onClick={onClose}
-      />
-      <div
-        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
-        style={{
-          maxHeight: "80dvh",
-          background: "var(--surface-card)",
-          border: "1px solid transparent",
-          boxShadow: "var(--glass-shadow)",
-        }}
-      >
+    <>
         <div className="flex items-center justify-between gap-3 px-5 pt-3">
           <div className="flex min-w-0 flex-col items-start">
             <div
@@ -450,7 +429,36 @@ export default function PlanAudienceSheet({
             {saving ? "Speichere…" : "Freigabe speichern"}
           </button>
         </div>
-      </div>
-    </div>
+    </>
+  );
+}
+
+export default function PlanAudienceSheet({
+  open,
+  ...props
+}: {
+  open: boolean;
+  gymId: string;
+  planName: string;
+  initialUids: string[];
+  initialCourseIds: string[];
+  onSave: (uids: string[], courseIds: string[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <SheetShell
+      open={open}
+      onClose={props.onClose}
+      label={`Freigabe für „${props.planName}"`}
+      panelClassName="pointer-events-auto relative flex w-full max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+      panelStyle={{
+        maxHeight: "80dvh",
+        background: "var(--surface-card)",
+        border: "1px solid transparent",
+        boxShadow: "var(--glass-shadow)",
+      }}
+    >
+      <PlanAudienceInhalt {...props} />
+    </SheetShell>
   );
 }

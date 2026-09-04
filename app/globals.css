@@ -841,7 +841,9 @@
       background-color var(--dur-fast) var(--ease-out),
       transform var(--dur-fast) var(--ease-out);
   }
-  .t-row-card:has(.t-row-target:hover) { background: var(--surface-raised); }
+  @media (hover: hover) {
+    .t-row-card:has(.t-row-target:hover) { background: var(--surface-raised); }
+  }
   .t-row-card:has(.t-row-target:active) { transform: scale(0.99); }
   .t-row-card:has(.t-row-target:focus-visible) {
     outline: 2px solid var(--accent);
@@ -895,7 +897,9 @@
       border-color var(--dur-fast) var(--ease-out),
       transform var(--dur-fast) var(--ease-out);
   }
-  .t-interactive:hover { background-color: var(--surface-raised); }
+  @media (hover: hover) {
+    .t-interactive:hover { background-color: var(--surface-raised); }
+  }
   .t-interactive:active { transform: scale(0.98); }
   .t-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* Klickbares OHNE eigene Rundung: die Hover-Fläche bekommt trotzdem
@@ -916,20 +920,24 @@
     outline-offset: 8px;
     transition: outline-color var(--dur-fast) var(--ease-out);
   }
-  .plan-section-grab:hover:not(:has(.t-interactive:hover)) {
-    outline-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  @media (hover: hover) {
+    .plan-section-grab:hover:not(:has(.t-interactive:hover)) {
+      outline-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    }
   }
   .plan-section-lifted,
-  .plan-section-lifted:hover {
-    outline: 1.5px solid var(--accent) !important;
-    outline-offset: 8px;
-    /* Angehoben = UNDURCHSICHTIG (Leon 30.08.: Kopfzeile schien beim
-       Ziehen durch): Seitengrund als Fläche + als 8px-Ring bis zur
-       Outline, dazu Tiefenwirkung */
-    background: var(--surface-page);
-    box-shadow:
-      0 0 0 8px var(--surface-page),
-      0 18px 40px rgba(0, 0, 0, 0.35);
+  @media (hover: hover) {
+    .plan-section-lifted:hover {
+      outline: 1.5px solid var(--accent) !important;
+      outline-offset: 8px;
+      /* Angehoben = UNDURCHSICHTIG (Leon 30.08.: Kopfzeile schien beim
+         Ziehen durch): Seitengrund als Fläche + als 8px-Ring bis zur
+         Outline, dazu Tiefenwirkung */
+      background: var(--surface-page);
+      box-shadow:
+        0 0 0 8px var(--surface-page),
+        0 18px 40px rgba(0, 0, 0, 0.35);
+    }
   }
   /* Fokus-Modus fürs Umbenennen (Leon 31.08.): Doppelklick auf die freie
      Blockfläche hebt den Block über ein dunkles Overlay — größer, klar
@@ -1129,13 +1137,15 @@ h1, h2 { overflow-wrap: anywhere; }
       0 4px 18px rgba(35,196,206,.28),
       inset 0 1px 0 rgba(255,255,255,.35);
   }
-  .btn-primary:hover {
-    background: var(--ta-cyan-bright);
-    box-shadow:
-      0 2px 4px rgba(0,0,0,.3),
-      0 6px 26px rgba(35,196,206,.42),
-      inset 0 1px 0 rgba(255,255,255,.45);
-    transform: translateY(-1px);
+  @media (hover: hover) {
+    .btn-primary:hover {
+      background: var(--ta-cyan-bright);
+      box-shadow:
+        0 2px 4px rgba(0,0,0,.3),
+        0 6px 26px rgba(35,196,206,.42),
+        inset 0 1px 0 rgba(255,255,255,.45);
+      transform: translateY(-1px);
+    }
   }
   .btn-primary:active { transform: scale(.97); }
   .btn-primary:focus-visible {
@@ -1152,10 +1162,12 @@ h1, h2 { overflow-wrap: anywhere; }
     border: 1px solid var(--ink-5);
     color: var(--fg);
   }
-  .btn-secondary:hover {
-    border-color: var(--ta-cyan);
-    color: var(--ta-cyan);
-    box-shadow: 0 0 24px rgba(35,196,206,.2);
+  @media (hover: hover) {
+    .btn-secondary:hover {
+      border-color: var(--ta-cyan);
+      color: var(--ta-cyan);
+      box-shadow: 0 0 24px rgba(35,196,206,.2);
+    }
   }
   .btn-secondary:active { transform: scale(.97); }
   .btn-secondary:focus-visible {
@@ -1172,9 +1184,11 @@ h1, h2 { overflow-wrap: anywhere; }
     border: 1px solid rgba(255,79,168,.4);
     color: var(--ta-pink);
   }
-  .btn-ghost-pink:hover {
-    background: rgba(255,79,168,.08);
-    box-shadow: 0 0 24px rgba(255,79,168,.25);
+  @media (hover: hover) {
+    .btn-ghost-pink:hover {
+      background: rgba(255,79,168,.08);
+      box-shadow: 0 0 24px rgba(255,79,168,.25);
+    }
   }
 
   /* Display-Headline — relaxed weight + breathing letter-spacing */
@@ -1208,10 +1222,12 @@ h1, h2 { overflow-wrap: anywhere; }
     border: 1px solid var(--ink-4);
     @apply rounded-2xl p-5 transition-all duration-300 relative overflow-hidden;
   }
-  .card:hover {
-    border-color: rgba(35,196,206,.3);
-    box-shadow: 0 8px 30px rgba(0,0,0,.25), 0 0 24px rgba(35,196,206,.08);
-    transform: translateY(-2px);
+  @media (hover: hover) {
+    .card:hover {
+      border-color: rgba(35,196,206,.3);
+      box-shadow: 0 8px 30px rgba(0,0,0,.25), 0 0 24px rgba(35,196,206,.08);
+      transform: translateY(-2px);
+    }
   }
 
   /* Glass-Card — moderne, leichte Fläche mit Blur */
@@ -1222,9 +1238,11 @@ h1, h2 { overflow-wrap: anywhere; }
     -webkit-backdrop-filter: blur(14px);
     @apply rounded-2xl p-5 transition-all duration-300 relative overflow-hidden;
   }
-  .card-glass:hover {
-    border-color: rgba(35,196,206,.25);
-    box-shadow: 0 8px 30px rgba(0,0,0,.3);
+  @media (hover: hover) {
+    .card-glass:hover {
+      border-color: rgba(35,196,206,.25);
+      box-shadow: 0 8px 30px rgba(0,0,0,.3);
+    }
   }
   [data-theme="light"] .card-glass {
     background: rgba(255,255,255,.78);
@@ -1237,15 +1255,19 @@ h1, h2 { overflow-wrap: anywhere; }
     @apply transition-all duration-300;
     will-change: transform;
   }
-  .card-interactive:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(0,0,0,.3), 0 0 20px rgba(35,196,206,.08);
+  @media (hover: hover) {
+    .card-interactive:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0,0,0,.3), 0 0 20px rgba(35,196,206,.08);
+    }
   }
   .card-interactive:active {
     transform: translateY(-1px) scale(.99);
   }
-  [data-theme="light"] .card-interactive:hover {
-    box-shadow: 0 10px 28px rgba(0,0,0,.1), 0 0 0 1px rgba(19,147,156,.15);
+  @media (hover: hover) {
+    [data-theme="light"] .card-interactive:hover {
+      box-shadow: 0 10px 28px rgba(0,0,0,.1), 0 0 0 1px rgba(19,147,156,.15);
+    }
   }
 
   /* Input field */
@@ -1494,20 +1516,26 @@ h1, h2 { overflow-wrap: anywhere; }
 [data-theme="light"] .card {
   box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 2px 10px rgba(0,0,0,.04);
 }
-[data-theme="light"] .card:hover {
-  border-color: rgba(19,147,156,.4);
-  box-shadow: 0 4px 20px rgba(19,147,156,.1), 0 0 0 1px rgba(19,147,156,.2);
+@media (hover: hover) {
+  [data-theme="light"] .card:hover {
+    border-color: rgba(19,147,156,.4);
+    box-shadow: 0 4px 20px rgba(19,147,156,.1), 0 0 0 1px rgba(19,147,156,.2);
+  }
 }
 
-[data-theme="light"] .btn-secondary:hover {
-  border-color: var(--ta-cyan-deep);
-  color: var(--ta-cyan-deep);
-  box-shadow: 0 0 16px rgba(19,147,156,.12);
+@media (hover: hover) {
+  [data-theme="light"] .btn-secondary:hover {
+    border-color: var(--ta-cyan-deep);
+    color: var(--ta-cyan-deep);
+    box-shadow: 0 0 16px rgba(19,147,156,.12);
+  }
 }
 
-[data-theme="light"] .btn-ghost-pink:hover {
-  background: rgba(255,79,168,.06);
-  box-shadow: 0 0 16px rgba(255,79,168,.15);
+@media (hover: hover) {
+  [data-theme="light"] .btn-ghost-pink:hover {
+    background: rgba(255,79,168,.06);
+    box-shadow: 0 0 16px rgba(255,79,168,.15);
+  }
 }
 
 [data-theme="light"] .input-field {
@@ -2209,8 +2237,10 @@ h1, h2 { overflow-wrap: anywhere; }
     border-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
-.mf-trigger:hover {
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .mf-trigger:hover {
+    border-color: var(--line-strong);
+  }
 }
 .mf-trigger:focus-visible {
   outline: 2px solid var(--accent);
@@ -2292,8 +2322,10 @@ h1, h2 { overflow-wrap: anywhere; }
   border-radius: var(--r-pill);
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.mf-clear:hover .mf-clear-kreis {
-  background: color-mix(in oklab, var(--accent) 26%, transparent);
+@media (hover: hover) {
+  .mf-clear:hover .mf-clear-kreis {
+    background: color-mix(in oklab, var(--accent) 26%, transparent);
+  }
 }
 .mf-clear:focus-visible {
   outline: 2px solid var(--accent);
@@ -2364,9 +2396,11 @@ h1, h2 { overflow-wrap: anywhere; }
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
-.mf-row:hover {
-  background: var(--surface-raised);
-  color: var(--text-body);
+@media (hover: hover) {
+  .mf-row:hover {
+    background: var(--surface-raised);
+    color: var(--text-body);
+  }
 }
 .mf-row[data-gewaehlt] {
   background: var(--accent-subtle);
@@ -2471,8 +2505,10 @@ h1, h2 { overflow-wrap: anywhere; }
   color: var(--accent-text);
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.auswahl-schliessen:hover {
-  background: color-mix(in oklab, var(--accent) 22%, transparent);
+@media (hover: hover) {
+  .auswahl-schliessen:hover {
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+  }
 }
 .auswahl-schliessen:focus-visible {
   outline: 2px solid var(--accent);
@@ -2494,8 +2530,10 @@ h1, h2 { overflow-wrap: anywhere; }
   color: var(--accent-text);
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.auswahl-chip:hover {
-  background: color-mix(in oklab, var(--accent) 22%, transparent);
+@media (hover: hover) {
+  .auswahl-chip:hover {
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+  }
 }
 .auswahl-chip:focus-visible {
   outline: 2px solid var(--accent);
@@ -2528,5 +2566,82 @@ h1, h2 { overflow-wrap: anywhere; }
   .auswahl-schleier,
   .auswahl-leiste {
     animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GRUNDHAPTIK — jedes anfassbare Element antwortet
+   ═══════════════════════════════════════════════════════════════════════
+
+   Die App hat 240 Knöpfe in 70 Dateien. Sie einzeln mit Framer Motion zu
+   umwickeln hieße 70 Dateien anfassen und in jedem Klick-Ziel eine
+   JavaScript-Feder mitzuschleppen — für eine Bewegung, die der Compositor
+   umsonst macht. Diese Schicht gibt deshalb ALLEN Knöpfen ihre Grundhaptik
+   aus dem CSS; Framer Motion (components/motion/) bleibt für das, was CSS
+   nicht kann: Verwandlung, Layout-Fluss, Ein- und Austritt.
+
+   Die Kurve --ease-pop schwingt leicht über, bevor sie zur Ruhe kommt —
+   dasselbe Gefühl wie die Federn in lib/motion.ts. So sinken CSS-Knopf und
+   Motion-Knopf gleich weit ein und federn gleich zurück.
+
+   :where() hält die Spezifitaet bei NULL. Jede vorhandene Regel gewinnt
+   also weiterhin; die Schicht springt nur dort ein, wo bisher nichts stand.
+   Farben, Groessen und Radien fasst sie nicht an. */
+
+:where(button, [role="button"], summary, a[data-press]) {
+  /* Kein grauer Aufblitz-Kasten unter dem Finger — der zerreisst auf iOS
+     jede Federbewegung, weil er sofort und ohne Uebergang erscheint. */
+  -webkit-tap-highlight-color: transparent;
+  /* Nimmt WKWebView die 300 ms Wartezeit auf einen Doppeltipp. Ohne das
+     kommt JEDE Reaktion eine Drittelsekunde zu spaet — der haeufigste
+     Grund, warum sich eine WebView-App "traege" anfuehlt. */
+  touch-action: manipulation;
+  transition: transform var(--dur-fast) var(--ease-pop);
+}
+
+/* Einsinken unter Finger UND Maus. Das ist die Haelfte des Gefuehls und
+   gilt deshalb auf jedem Geraet. [data-motion] bleibt aussen vor: dort
+   arbeitet bereits eine Framer-Feder, und beide zusammen multiplizierten
+   sich auf scale(.94). */
+button:active:not(:disabled):not([data-motion]),
+[role="button"]:active:not([aria-disabled="true"]):not([data-motion]),
+a[data-press]:active:not([data-motion]) {
+  transform: scale(.97);
+}
+
+/* Flaechen nehmen sich zurueck: 3 % auf einer breiten Karte waeren ein
+   Sprung, kein Nicken. Spiegelt TAP_PRESS_SURFACE aus lib/motion.ts. */
+[data-press="surface"]:active:not([data-motion]) {
+  transform: scale(.99);
+}
+
+/* Entgegenkommen — nur wo es einen Zeiger gibt, den man entgegenkommen
+   kann. Auf Touch bliebe der angehobene Zustand nach dem Tap stehen. */
+@media (hover: hover) and (pointer: fine) {
+  :where(button, [role="button"], a[data-press]):hover:not(:disabled):not([data-motion]) {
+    transform: scale(1.02);
+  }
+  :where([data-press="surface"]):hover:not([data-motion]) {
+    transform: scale(1.008);
+  }
+  /* Beim Druecken schlaegt das Einsinken das Anheben. */
+  :where(button, [role="button"], a[data-press]):active:not(:disabled):not([data-motion]) {
+    transform: scale(.97);
+  }
+  :where([data-press="surface"]):active:not([data-motion]) {
+    transform: scale(.99);
+  }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt Farbe und Rand als Rueckmeldung —
+   die Zustaende bleiben lesbar, nur die Verschiebung faellt weg. */
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], summary, a[data-press]) {
+    transition: none;
+  }
+  button:active, [role="button"]:active, [role="button"]:hover,
+  button:hover, a[data-press]:hover, a[data-press]:active,
+  [data-press="surface"]:hover, [data-press="surface"]:active {
+    transform: none;
   }
 }

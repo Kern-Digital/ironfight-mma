@@ -24,6 +24,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import { StaggerList } from "@/components/motion";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
@@ -204,7 +205,11 @@ export default function TrainerNewsPage() {
             ) : (
               <div className="flex flex-col gap-6">
                 {days.map((day) => (
-                  <section key={day.label} className="flex flex-col gap-3">
+                  <StaggerList
+                    as="section"
+                    key={day.label}
+                    className="flex flex-col gap-3"
+                  >
                     <span className="t-label">{day.label}</span>
                     {day.items.map((entry) => {
                       const fresh = isFresh(entry);
@@ -268,7 +273,7 @@ export default function TrainerNewsPage() {
                         </div>
                       );
                     })}
-                  </section>
+                  </StaggerList>
                 ))}
               </div>
             )}

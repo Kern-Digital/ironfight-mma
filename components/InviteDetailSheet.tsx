@@ -15,6 +15,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import { SheetShell, useLetzterWert } from "@/components/motion";
 import InviteStatusChip from "@/components/InviteStatusChip";
 import { useAuth } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
@@ -69,7 +70,9 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function InviteDetailSheet({
+/** Inhalt INNERHALB der Huelle: Notiz-Entwurf und die Rueckfrage beim
+ *  Zurueckziehen sollen beim Schliessen verschwinden. */
+function InviteDetailInhalt({
   invite,
   onChanged,
   onClose,
@@ -165,31 +168,7 @@ export default function InviteDetailSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Einladung ${formatInviteCode(invite.code)}`}
-    >
-      <button
-        type="button"
-        aria-label="Schließen"
-        className="absolute inset-0"
-        style={{
-          background: "var(--overlay)",
-          animation: "fade-in 0.2s ease-out both",
-        }}
-        onClick={onClose}
-      />
-      <div
-        className="pointer-events-auto animate-slide-up relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-md sm:rounded-[var(--r-xl)]"
-        style={{
-          maxHeight: "80dvh",
-          background: "var(--surface-card)",
-          border: "1px solid transparent",
-          boxShadow: "var(--glass-shadow)",
-        }}
-      >
+    <>
         <div className="flex items-center justify-between gap-3 px-5 pt-3">
           <div className="flex min-w-0 flex-col items-start">
             <div
@@ -370,7 +349,43 @@ export default function InviteDetailSheet({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </>
+  );
+}
+
+export default function InviteDetailSheet({
+  invite,
+  onChanged,
+  onClose,
+}: {
+  /** null heisst geschlossen. */
+  invite: GymInvite | null;
+  onChanged: () => void;
+  onClose: () => void;
+}) {
+  const zeigen = useLetzterWert(invite);
+  return (
+    <SheetShell
+      open={invite !== null}
+      onClose={onClose}
+      label={
+        zeigen ? `Einladung ${formatInviteCode(zeigen.code)}` : "Einladung"
+      }
+      panelClassName="pointer-events-auto relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-md sm:rounded-[var(--r-xl)]"
+      panelStyle={{
+        maxHeight: "80dvh",
+        background: "var(--surface-card)",
+        border: "1px solid transparent",
+        boxShadow: "var(--glass-shadow)",
+      }}
+    >
+      {zeigen && (
+        <InviteDetailInhalt
+          invite={zeigen}
+          onChanged={onChanged}
+          onClose={onClose}
+        />
+      )}
+    </SheetShell>
   );
 }

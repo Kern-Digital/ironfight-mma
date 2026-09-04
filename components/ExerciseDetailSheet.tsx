@@ -11,14 +11,20 @@
  * die ganze Fläche. „Ansehen" bei einer Technik öffnet ein weiteres Popup
  * NUR mit dieser Technik (keine Navigation auf die Technik-Seite; die
  * laufende Session / der Editor bleiben unangetastet).
+ *
+ * Bewegung (Motion-System, 2026-09-04): Hülle ist `SheetShell` aus
+ * components/motion — damit hat auch das SCHLIESSEN eine Bewegung. Der
+ * Aufrufer rendert das Sheet deshalb immer und meldet „zu" über
+ * `exercise={null}`, statt es mit `{x && …}` aus dem Baum zu nehmen.
  */
 
 import Icon, { type IconName } from "@/components/ui/Icon";
 import RestWheel, { formatRest } from "@/components/RestWheel";
+import { SheetShell, useLetzterWert } from "@/components/motion";
 import { EQUIPMENT } from "@/lib/equipment";
 import { CATEGORY_LABEL, getTechniqueById } from "@/lib/techniques";
 import { DIFFICULTY_LABEL, type Exercise, type Technique } from "@/lib/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -42,34 +48,36 @@ const INTENSITY_LABEL: Record<string, string> = {
  * Kartei-Effekt (Leons Vorgabe 2026-08-28): Steht ein weiteres Popup vor
  * diesem Sheet, rückt es leicht nach oben und wird etwas schmaler — wie
  * ein hinten angestellter Ordner sichtbar hinter dem vorderen Fenster.
- * Nur scaleX (keine Höhen-Skalierung), damit die Oberkante wirklich über
- * dem vorderen Sheet hervorschaut; das Overlay des vorderen Fensters
- * dunkelt den Stapel automatisch ab. WICHTIG: Das hintere Sheet zieht
- * sich dabei per min-height auf die volle Sheet-Höhe auf — sonst
- * verschwindet ein kurzes Sheet komplett hinter einem längeren
- * (Leons Fund am Handy: „ich sehe nichts").
+ * Den Versatz selbst federt `SheetShell` (`stacked`, Werte STACK_LIFT /
+ * STACK_SHRINK in lib/motion.ts); hier bleibt, was CSS besser kann: Die
+ * Flächen-Tönung und die min-height. WICHTIG: Das hintere Sheet zieht
+ * sich per min-height auf die volle Sheet-Höhe auf — sonst verschwindet
+ * ein kurzes Sheet komplett hinter einem längeren (Leons Fund am Handy:
+ * „ich sehe nichts").
  */
-const STACKED_TRANSFORM = "translateY(-44px) scaleX(0.92)";
-const STACK_TRANSITION = "transform .35s cubic-bezier(.22,.8,.3,1)";
-const STACK_MIN_HEIGHT_TRANSITION = "min-height .35s cubic-bezier(.22,.8,.3,1)";
+const STACK_STYLE_TRANSITION =
+  "min-height .35s cubic-bezier(.22,.8,.3,1), background .35s ease, border-color .35s ease, box-shadow .35s ease";
 /** Vorderes Fenster wirft Schatten NACH OBEN auf die Karte dahinter —
     erst dadurch liest sich der Stapel als „Karte schiebt sich unter" */
 const FRONT_SHADOW = "0 -16px 36px rgba(0, 0, 0, 0.45), var(--glass-shadow)";
 
 /**
- * Gemeinsame Hülle beider Ebenen: Overlay + Panel (mobil Bottom-Sheet,
- * ab sm zentriertes Fenster mit max-w).
+ * Gemeinsamer Rahmen beider Ebenen: Kopfzeile mit Grabber und x, scrollender
+ * Inhalt, optionale Fußzeile — alles INNERHALB der SheetShell-Hülle (mobil
+ * Bottom-Sheet, ab sm zentriertes Fenster mit max-w).
  */
-function SheetShell({
+function DetailRahmen({
+  open,
   label,
   ariaLabel,
   zIndex,
-  stacked,
+  stacked = false,
   stackTitle,
   onClose,
   children,
   footer,
 }: {
+  open: boolean;
   /** Kopfzeilen-Label („Übungs-Detail", „Technik") */
   label: string;
   ariaLabel: string;
@@ -83,117 +91,99 @@ function SheetShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div
-      className="fixed inset-0 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
-      style={{ zIndex }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={ariaLabel}
+    <SheetShell
+      open={open}
+      onClose={onClose}
+      label={ariaLabel}
+      zIndex={zIndex}
+      stacked={stacked}
+      panelClassName="pointer-events-auto relative flex w-full max-h-[75vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
+      panelStyle={{
+        maxHeight: "75dvh",
+        // "0px" statt auto — auto→Länge springt statt zu animieren
+        minHeight: stacked ? "75dvh" : "0px",
+        transition: STACK_STYLE_TRANSITION,
+        // Hinten angestellt: Akzent-Tönung + leuchtende Kante — nur
+        // heller reichte nicht, das Overlay des vorderen Fensters glich
+        // die Flächen wieder an (Leons Feedback)
+        background: stacked
+          ? "color-mix(in oklab, var(--accent) 18%, color-mix(in oklab, white 10%, var(--surface-card)))"
+          : "var(--surface-card)",
+        border: "1px solid",
+        borderColor: stacked
+          ? "color-mix(in oklab, var(--accent) 55%, transparent)"
+          : "transparent",
+        boxShadow: stacked
+          ? "var(--glass-shadow), var(--accent-glow)"
+          : FRONT_SHADOW,
+      }}
     >
-      <button
-        type="button"
-        aria-label={`${label} schließen`}
-        className="absolute inset-0"
-        style={{
-          background: "var(--overlay)",
-          animation: "fade-in 0.2s ease-out both",
-        }}
-        onClick={onClose}
-      />
-      {/* Transform auf einer eigenen Hülle — die Einblende-Animation des
-          Panels (fill both) würde eine Panel-Transform überschreiben.
-          pointer-events-none: neben dem zentrierten Panel (Desktop) müssen
-          Klicks das Overlay darunter treffen (= schließen) */}
-      <div
-        className="pointer-events-none relative flex w-full justify-center"
-        style={{
-          transform: stacked ? STACKED_TRANSFORM : undefined,
-          transformOrigin: "50% 100%",
-          transition: STACK_TRANSITION,
-        }}
-      >
-      <div
-        className="pointer-events-auto animate-slide-up relative flex w-full max-h-[75vh] flex-col overflow-hidden rounded-t-[var(--r-xl)] sm:max-w-xl sm:rounded-[var(--r-xl)]"
-        style={{
-          maxHeight: "75dvh",
-          // "0px" statt auto — auto→Länge springt statt zu animieren
-          minHeight: stacked ? "75dvh" : "0px",
-          transition: `${STACK_MIN_HEIGHT_TRANSITION}, background .35s ease, border-color .35s ease, box-shadow .35s ease`,
-          // Hinten angestellt: Akzent-Tönung + leuchtende Kante — nur
-          // heller reichte nicht, das Overlay des vorderen Fensters glich
-          // die Flächen wieder an (Leons Feedback)
-          background: stacked
-            ? "color-mix(in oklab, var(--accent) 18%, color-mix(in oklab, white 10%, var(--surface-card)))"
-            : "var(--surface-card)",
-          border: "1px solid",
-          borderColor: stacked
-            ? "color-mix(in oklab, var(--accent) 55%, transparent)"
-            : "transparent",
-          boxShadow: stacked
-            ? "var(--glass-shadow), var(--accent-glow)"
-            : FRONT_SHADOW,
-        }}
-      >
-        {/* Kartei-Streifen: statt des Grabbers steht hier der Popup-Titel */}
-        {stacked && (
+      {/* Kartei-Streifen: statt des Grabbers steht hier der Popup-Titel */}
+      {stacked && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5"
+          style={{ animation: "fade-in 0.3s ease-out both" }}
+        >
+          <span
+            className="truncate px-6"
+            style={{ ...META_FONT, color: "var(--accent-text)" }}
+          >
+            {stackTitle ?? label}
+          </span>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3 px-5 pt-3">
+        <div className="flex flex-col items-start">
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5"
-            style={{ animation: "fade-in 0.3s ease-out both" }}
-          >
-            <span
-              className="truncate px-6"
-              style={{ ...META_FONT, color: "var(--accent-text)" }}
-            >
-              {stackTitle ?? label}
-            </span>
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-3 px-5 pt-3">
-          <div className="flex flex-col items-start">
-            <div
-              aria-hidden
-              className={`mb-2 h-1 w-10 rounded-full sm:invisible${stacked ? " invisible" : ""}`}
-              style={{ background: "var(--line-strong)" }}
-            />
-            <span className="t-label">{label}</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Schließen"
-            className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={16} strokeWidth={2.2} />
-          </button>
+            className={`mb-2 h-1 w-10 rounded-full sm:invisible${stacked ? " invisible" : ""}`}
+            style={{ background: "var(--line-strong)" }}
+          />
+          <span className="t-label">{label}</span>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Schließen"
+          className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
+          style={{ color: "var(--text-3)" }}
+        >
+          <Icon name="x" size={16} strokeWidth={2.2} />
+        </button>
+      </div>
+      <div
+        className="overflow-y-auto px-5 pt-2"
+        style={{
+          paddingBottom: footer
+            ? "16px"
+            : "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+        }}
+      >
+        {children}
+      </div>
+      {footer && (
         <div
-          className="overflow-y-auto px-5 pt-2"
+          className="px-5 pt-3"
           style={{
-            paddingBottom: footer
-              ? "16px"
-              : "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+            borderTop: "1px solid var(--line)",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
           }}
         >
-          {children}
+          {footer}
         </div>
-        {footer && (
-          <div
-            className="px-5 pt-3"
-            style={{
-              borderTop: "1px solid var(--line)",
-              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
-            }}
-          >
-            {footer}
-          </div>
-        )}
-      </div>
-      </div>
-    </div>
+      )}
+    </SheetShell>
   );
 }
+
+type DetailAction = { label: string; icon: IconName; onClick: () => void };
+type DetailRest = {
+  label: string;
+  sub?: string;
+  seconds: number;
+  onChange: (seconds: number) => void;
+};
 
 export default function ExerciseDetailSheet({
   exercise,
@@ -202,37 +192,60 @@ export default function ExerciseDetailSheet({
   rest,
   zIndex = 50,
 }: {
-  exercise: Exercise;
+  /** null heißt geschlossen — der Aufrufer setzt es beim Schließen. */
+  exercise: Exercise | null;
   onClose: () => void;
   /** Optionaler Aktions-Knopf unten (z. B. „Übung hinzufügen" im Picker) */
-  action?: { label: string; icon: IconName; onClick: () => void };
+  action?: DetailAction;
   /** Rubrik-Pause im Editor (Leons Vorgabe 2026-08-28: die Pause zwischen
       den Runden ist NUR über die Übungsdetails einstellbar) — Tippen auf
       den Wert öffnet das Pausen-Rad. Fehlt der Prop (Runner/Picker),
       erscheint die Zeile nicht. */
-  rest?: { label: string; sub?: string; seconds: number; onChange: (seconds: number) => void };
+  rest?: DetailRest;
   /** Über anderen Sheets (Picker ist z-50 → dort 60 übergeben) */
   zIndex?: number;
 }) {
+  const open = exercise !== null;
+  // Beim Schließen setzt der Aufrufer `exercise` auf null — und mit ihm
+  // meist auch `rest` und `action`, die von derselben Auswahl abhängen.
+  // Während der Austritts-Feder soll der Inhalt aber vollständig stehen
+  // bleiben, deshalb wird das Trio als EINHEIT festgehalten: Ein altes
+  // `rest` darf nie zu einer neuen Übung ohne `rest` durchrutschen.
+  const zeigen = useLetzterWert(
+    exercise ? { exercise, action, rest } : null,
+  );
+
   // Technik-Popup (Ebene über dem Übungs-Detail)
   const [technique, setTechnique] = useState<Technique | null>(null);
+  const technikZeigen = useLetzterWert(technique);
   // Pausen-Rad (Ebene über dem Übungs-Detail)
   const [wheelOpen, setWheelOpen] = useState(false);
 
+  // Das Sheet bleibt jetzt im Baum — die inneren Ebenen müssen deshalb
+  // beim Schließen von Hand zufallen, sonst stünde beim nächsten Öffnen
+  // noch die alte Technik davor.
+  useEffect(() => {
+    if (!open) {
+      setTechnique(null);
+      setWheelOpen(false);
+    }
+  }, [open]);
+
   return (
     <>
-      <SheetShell
+      <DetailRahmen
+        open={open}
         label="Übungs-Detail"
-        ariaLabel={`Details zu ${exercise.name}`}
+        ariaLabel={zeigen ? `Details zu ${zeigen.exercise.name}` : "Übungs-Detail"}
         zIndex={zIndex}
         stacked={technique !== null}
-        stackTitle={exercise.name}
+        stackTitle={zeigen?.exercise.name}
         onClose={onClose}
         footer={
-          action ? (
+          zeigen?.action ? (
             <button
               type="button"
-              onClick={action.onClick}
+              onClick={zeigen.action.onClick}
               className="t-interactive inline-flex min-h-hit w-full items-center justify-center gap-2 rounded-field px-5"
               style={{
                 ...BTN_FONT,
@@ -241,266 +254,298 @@ export default function ExerciseDetailSheet({
                 boxShadow: "var(--accent-glow)",
               }}
             >
-              <Icon name={action.icon} size={13} strokeWidth={2.4} />
-              {action.label}
+              <Icon name={zeigen.action.icon} size={13} strokeWidth={2.4} />
+              {zeigen.action.label}
             </button>
           ) : undefined
         }
       >
-        <h2
-          style={{
-            font: "var(--type-h2)",
-            letterSpacing: "var(--ls-display)",
-            textTransform: "uppercase",
-          }}
-        >
-          {exercise.name}
-        </h2>
-        <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
-          {exercise.defaultRounds}× {exercise.durationSeconds}s
-          {" · "}Intensität {INTENSITY_LABEL[exercise.intensity]}
-        </p>
-
-        {/* Rundenpause dieser Übung — nur im Editor-Kontext; das GANZE Feld
-            ist der Button und öffnet das Pausen-Rad (Leon 2026-08-28) */}
-        {rest && (
-          <button
-            type="button"
-            onClick={() => setWheelOpen(true)}
-            aria-label={`${rest.label} ändern — aktuell ${formatRest(rest.seconds)} Minuten`}
-            className="t-interactive mt-4 flex w-full items-center justify-between gap-3 rounded-field px-3.5 py-2.5 text-left"
-            style={{
-              background: "var(--surface-raised)",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="t-label">{rest.label}</span>
-              {rest.sub && (
-                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  {rest.sub}
-                </span>
-              )}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-baseline gap-1 rounded-field px-3.5 py-2 tabular-nums"
-              style={{
-                font: "700 18px/1 var(--font-archivo), system-ui, sans-serif",
-                background: "var(--accent-subtle)",
-                border: "1px solid var(--accent)",
-                color: "var(--accent-text)",
-              }}
-            >
-              {formatRest(rest.seconds)}
-              <span style={{ ...META_FONT, color: "var(--text-3)" }}>min</span>
-            </span>
-          </button>
+        {zeigen && (
+          <ExerciseInhalt
+            exercise={zeigen.exercise}
+            rest={zeigen.rest}
+            onOpenWheel={() => setWheelOpen(true)}
+            onOpenTechnique={setTechnique}
+          />
         )}
-
-        {exercise.notes && (
-          <p
-            className="mt-3"
-            style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-          >
-            {exercise.notes}
-          </p>
-        )}
-
-        {(exercise.cues?.length ?? 0) > 0 && (
-          <div className="mt-5 flex flex-col gap-2">
-            <span className="t-label">Darauf achten</span>
-            <ul className="flex flex-col gap-1.5">
-              {exercise.cues!.map((cue) => (
-                <li
-                  key={cue}
-                  className="flex items-start gap-2"
-                  style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-                >
-                  <span
-                    className="mt-[3px] shrink-0"
-                    style={{ color: "var(--accent-text)" }}
-                  >
-                    <Icon name="check" size={14} strokeWidth={2.6} />
-                  </span>
-                  {cue}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {exercise.focus.length > 0 && (
-          <div className="mt-5 flex flex-col gap-2">
-            <span className="t-label">Fokus</span>
-            <div className="flex flex-wrap gap-1.5">
-              {exercise.focus.map((f) => (
-                <span
-                  key={f}
-                  className="rounded-badge px-2 py-1"
-                  style={{
-                    ...META_FONT,
-                    background: "var(--surface-raised)",
-                    border: "1px solid var(--line)",
-                    color: "var(--text-2)",
-                  }}
-                >
-                  {f}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-5 flex flex-col gap-1">
-          <span className="t-label">Equipment</span>
-          <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-            {exercise.equipment.length > 0
-              ? exercise.equipment
-                  .map((id) => EQUIPMENT[id]?.label)
-                  .filter(Boolean)
-                  .join(" · ")
-              : EQUIPMENT.bodyweight.label}
-          </p>
-        </div>
-
-        {(exercise.techniqueIds?.length ?? 0) > 0 && (
-          <div className="mt-5 flex flex-col gap-2">
-            <span className="t-label">Techniken dazu</span>
-            <div className="flex flex-col gap-2">
-              {exercise
-                .techniqueIds!.map((id) => getTechniqueById(id))
-                .filter((t): t is Technique => Boolean(t))
-                .map((t) => (
-                  // Popup statt Seitenwechsel — Session/Editor bleiben stehen
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setTechnique(t)}
-                    className="t-interactive flex min-h-hit items-center justify-between gap-3 rounded-field px-3 text-left"
-                    style={{
-                      background: "var(--surface-raised)",
-                      border: "1px solid var(--line)",
-                      color: "var(--text-body)",
-                    }}
-                  >
-                    <span
-                      className="min-w-0 flex-1 truncate"
-                      style={{ font: "var(--type-body-strong)" }}
-                    >
-                      {t.name}
-                    </span>
-                    <span style={{ ...META_FONT, color: "var(--text-3)" }}>
-                      Ansehen
-                    </span>
-                  </button>
-                ))}
-            </div>
-          </div>
-        )}
-      </SheetShell>
+      </DetailRahmen>
 
       {/* ── Technik-Popup — nur die Technik, kein Seitenwechsel ─────────── */}
-      {technique && (
-        <SheetShell
-          label="Technik"
-          ariaLabel={`Technik ${technique.name}`}
-          zIndex={zIndex + 10}
-          onClose={() => setTechnique(null)}
-        >
-          <h2
-            style={{
-              font: "var(--type-h2)",
-              letterSpacing: "var(--ls-display)",
-              textTransform: "uppercase",
-            }}
-          >
-            {technique.name}
-          </h2>
-          <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
-            {DIFFICULTY_LABEL[technique.difficulty]}
-            {" · "}
-            {CATEGORY_LABEL[technique.category]}
-          </p>
-
-          {technique.description && (
-            <p
-              className="mt-3"
-              style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-            >
-              {technique.description}
-            </p>
-          )}
-
-          {technique.steps.length > 0 && (
-            <div className="mt-5 flex flex-col gap-2">
-              <span className="t-label">Schritt für Schritt</span>
-              <ol className="flex flex-col gap-1.5">
-                {technique.steps.map((step, i) => (
-                  <li
-                    key={step}
-                    className="flex items-start gap-2.5"
-                    style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-                  >
-                    <span
-                      className="shrink-0 tabular-nums"
-                      style={{
-                        ...META_FONT,
-                        color: "var(--accent-text)",
-                        marginTop: "4px",
-                      }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {technique.commonMistakes.length > 0 && (
-            <div className="mt-5 flex flex-col gap-2">
-              <span className="t-label">Häufige Fehler</span>
-              <ul className="flex flex-col gap-1.5">
-                {technique.commonMistakes.map((m) => (
-                  <li
-                    key={m}
-                    className="flex items-start gap-2"
-                    style={{ font: "var(--type-body)", color: "var(--text-2)" }}
-                  >
-                    <span
-                      className="mt-[3px] shrink-0"
-                      style={{ color: "var(--negative)" }}
-                    >
-                      <Icon name="x" size={14} strokeWidth={2.4} />
-                    </span>
-                    {m}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {technique.usage && (
-            <div className="mt-5 flex flex-col gap-1">
-              <span className="t-label">Einsatz</span>
-              <p style={{ font: "var(--type-body)", color: "var(--text-2)" }}>
-                {technique.usage}
-              </p>
-            </div>
-          )}
-        </SheetShell>
-      )}
+      <DetailRahmen
+        open={technique !== null}
+        label="Technik"
+        ariaLabel={technikZeigen ? `Technik ${technikZeigen.name}` : "Technik"}
+        zIndex={zIndex + 10}
+        onClose={() => setTechnique(null)}
+      >
+        {technikZeigen && <TechnikInhalt technique={technikZeigen} />}
+      </DetailRahmen>
 
       {/* ── Pausen-Rad über dem Übungs-Detail ───────────────────────────── */}
-      {rest && wheelOpen && (
+      {zeigen?.rest && wheelOpen && (
         <RestWheel
-          label={rest.label}
-          value={rest.seconds}
-          onChange={rest.onChange}
+          label={zeigen.rest.label}
+          value={zeigen.rest.seconds}
+          onChange={zeigen.rest.onChange}
           onClose={() => setWheelOpen(false)}
           zIndex={zIndex + 20}
         />
+      )}
+    </>
+  );
+}
+
+function ExerciseInhalt({
+  exercise,
+  rest,
+  onOpenWheel,
+  onOpenTechnique,
+}: {
+  exercise: Exercise;
+  rest?: DetailRest;
+  onOpenWheel: () => void;
+  onOpenTechnique: (t: Technique) => void;
+}) {
+  return (
+    <>
+      <h2
+        style={{
+          font: "var(--type-h2)",
+          letterSpacing: "var(--ls-display)",
+          textTransform: "uppercase",
+        }}
+      >
+        {exercise.name}
+      </h2>
+      <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
+        {exercise.defaultRounds}× {exercise.durationSeconds}s
+        {" · "}Intensität {INTENSITY_LABEL[exercise.intensity]}
+      </p>
+
+      {/* Rundenpause dieser Übung — nur im Editor-Kontext; das GANZE Feld
+          ist der Button und öffnet das Pausen-Rad (Leon 2026-08-28) */}
+      {rest && (
+        <button
+          type="button"
+          onClick={onOpenWheel}
+          aria-label={`${rest.label} ändern — aktuell ${formatRest(rest.seconds)} Minuten`}
+          className="t-interactive mt-4 flex w-full items-center justify-between gap-3 rounded-field px-3.5 py-2.5 text-left"
+          style={{
+            background: "var(--surface-raised)",
+            border: "1px solid var(--line)",
+          }}
+        >
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="t-label">{rest.label}</span>
+            {rest.sub && (
+              <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                {rest.sub}
+              </span>
+            )}
+          </span>
+          <span
+            className="inline-flex shrink-0 items-baseline gap-1 rounded-field px-3.5 py-2 tabular-nums"
+            style={{
+              font: "700 18px/1 var(--font-archivo), system-ui, sans-serif",
+              background: "var(--accent-subtle)",
+              border: "1px solid var(--accent)",
+              color: "var(--accent-text)",
+            }}
+          >
+            {formatRest(rest.seconds)}
+            <span style={{ ...META_FONT, color: "var(--text-3)" }}>min</span>
+          </span>
+        </button>
+      )}
+
+      {exercise.notes && (
+        <p
+          className="mt-3"
+          style={{ font: "var(--type-body)", color: "var(--text-2)" }}
+        >
+          {exercise.notes}
+        </p>
+      )}
+
+      {(exercise.cues?.length ?? 0) > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="t-label">Darauf achten</span>
+          <ul className="flex flex-col gap-1.5">
+            {exercise.cues!.map((cue) => (
+              <li
+                key={cue}
+                className="flex items-start gap-2"
+                style={{ font: "var(--type-body)", color: "var(--text-2)" }}
+              >
+                <span
+                  className="mt-[3px] shrink-0"
+                  style={{ color: "var(--accent-text)" }}
+                >
+                  <Icon name="check" size={14} strokeWidth={2.6} />
+                </span>
+                {cue}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {exercise.focus.length > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="t-label">Fokus</span>
+          <div className="flex flex-wrap gap-1.5">
+            {exercise.focus.map((f) => (
+              <span
+                key={f}
+                className="rounded-badge px-2 py-1"
+                style={{
+                  ...META_FONT,
+                  background: "var(--surface-raised)",
+                  border: "1px solid var(--line)",
+                  color: "var(--text-2)",
+                }}
+              >
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-col gap-1">
+        <span className="t-label">Equipment</span>
+        <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+          {exercise.equipment.length > 0
+            ? exercise.equipment
+                .map((id) => EQUIPMENT[id]?.label)
+                .filter(Boolean)
+                .join(" · ")
+            : EQUIPMENT.bodyweight.label}
+        </p>
+      </div>
+
+      {(exercise.techniqueIds?.length ?? 0) > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="t-label">Techniken dazu</span>
+          <div className="flex flex-col gap-2">
+            {exercise
+              .techniqueIds!.map((id) => getTechniqueById(id))
+              .filter((t): t is Technique => Boolean(t))
+              .map((t) => (
+                // Popup statt Seitenwechsel — Session/Editor bleiben stehen
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onOpenTechnique(t)}
+                  className="t-interactive flex min-h-hit items-center justify-between gap-3 rounded-field px-3 text-left"
+                  style={{
+                    background: "var(--surface-raised)",
+                    border: "1px solid var(--line)",
+                    color: "var(--text-body)",
+                  }}
+                >
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    style={{ font: "var(--type-body-strong)" }}
+                  >
+                    {t.name}
+                  </span>
+                  <span style={{ ...META_FONT, color: "var(--text-3)" }}>
+                    Ansehen
+                  </span>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function TechnikInhalt({ technique }: { technique: Technique }) {
+  return (
+    <>
+      <h2
+        style={{
+          font: "var(--type-h2)",
+          letterSpacing: "var(--ls-display)",
+          textTransform: "uppercase",
+        }}
+      >
+        {technique.name}
+      </h2>
+      <p className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
+        {DIFFICULTY_LABEL[technique.difficulty]}
+        {" · "}
+        {CATEGORY_LABEL[technique.category]}
+      </p>
+
+      {technique.description && (
+        <p
+          className="mt-3"
+          style={{ font: "var(--type-body)", color: "var(--text-2)" }}
+        >
+          {technique.description}
+        </p>
+      )}
+
+      {technique.steps.length > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="t-label">Schritt für Schritt</span>
+          <ol className="flex flex-col gap-1.5">
+            {technique.steps.map((step, i) => (
+              <li
+                key={step}
+                className="flex items-start gap-2.5"
+                style={{ font: "var(--type-body)", color: "var(--text-2)" }}
+              >
+                <span
+                  className="shrink-0 tabular-nums"
+                  style={{
+                    ...META_FONT,
+                    color: "var(--accent-text)",
+                    marginTop: "4px",
+                  }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {technique.commonMistakes.length > 0 && (
+        <div className="mt-5 flex flex-col gap-2">
+          <span className="t-label">Häufige Fehler</span>
+          <ul className="flex flex-col gap-1.5">
+            {technique.commonMistakes.map((m) => (
+              <li
+                key={m}
+                className="flex items-start gap-2"
+                style={{ font: "var(--type-body)", color: "var(--text-2)" }}
+              >
+                <span
+                  className="mt-[3px] shrink-0"
+                  style={{ color: "var(--negative)" }}
+                >
+                  <Icon name="x" size={14} strokeWidth={2.4} />
+                </span>
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {technique.usage && (
+        <div className="mt-5 flex flex-col gap-1">
+          <span className="t-label">Einsatz</span>
+          <p style={{ font: "var(--type-body)", color: "var(--text-2)" }}>
+            {technique.usage}
+          </p>
+        </div>
       )}
     </>
   );

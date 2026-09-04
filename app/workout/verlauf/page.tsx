@@ -170,15 +170,17 @@ export default function WorkoutHistoryPage() {
         ))}
       </div>
 
-      {openLog && (
-        <WorkoutLogSheet
-          session={openLog}
-          heartColor={heartColor}
-          heartBusy={heartBusy === openLog.id}
-          onToggleFavorite={() => void toggleFavorite(openLog)}
-          onClose={() => setOpenLogId(null)}
-        />
-      )}
+      {/* Immer gerendert, `session={null}` heißt geschlossen — so hat auch
+          das Schließen eine Bewegung (components/motion/SheetShell). */}
+      <WorkoutLogSheet
+        session={openLog}
+        heartColor={heartColor}
+        heartBusy={openLog !== null && heartBusy === openLog.id}
+        onToggleFavorite={() => {
+          if (openLog) void toggleFavorite(openLog);
+        }}
+        onClose={() => setOpenLogId(null)}
+      />
 
       {!hasStaffShell && <AthleteTabBar />}
     </main>

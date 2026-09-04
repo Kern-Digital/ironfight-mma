@@ -19,6 +19,7 @@
 
 import MemberRoleSheet from "@/components/MemberRoleSheet";
 import Icon from "@/components/ui/Icon";
+import { StaggerList } from "@/components/motion";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
@@ -266,7 +267,11 @@ export default function TrainerMembersPage() {
                   const list = groups[key];
                   if (list.length === 0) return null;
                   return (
-                    <section key={key} className="flex flex-col gap-3">
+                    <StaggerList
+                      as="section"
+                      key={key}
+                      className="flex flex-col gap-3"
+                    >
                       <span className="t-label">
                         {MEMBER_GROUP_LABEL[key]} · {list.length}
                       </span>
@@ -326,7 +331,7 @@ export default function TrainerMembersPage() {
                           </button>
                         );
                       })}
-                    </section>
+                    </StaggerList>
                   );
                 })}
               </div>
@@ -335,13 +340,14 @@ export default function TrainerMembersPage() {
         )}
       </div>
 
-      {detail && (
-        <MemberRoleSheet
-          member={detail}
-          onChanged={load}
-          onClose={() => setDetail(null)}
-        />
-      )}
+      {/* Immer gerendert, `member={null}` heisst geschlossen — nur so kann
+          das Sheet sich beim Schliessen zurueckverwandeln, statt zu
+          verschwinden (components/motion/SheetShell). */}
+      <MemberRoleSheet
+        member={detail}
+        onChanged={load}
+        onClose={() => setDetail(null)}
+      />
     </main>
   );
 }
