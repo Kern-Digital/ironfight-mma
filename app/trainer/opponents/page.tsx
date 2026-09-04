@@ -1,5 +1,6 @@
 "use client";
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -185,18 +186,10 @@ function OpponentsLibraryContent() {
           >
             {showNewOpponent ? "Schließen" : "+ Neues DeepFight-Profil"}
           </button>
-          <input
-            type="search"
-            placeholder="Gegner suchen…"
+          <GooeySearch
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="min-w-0 flex-1 rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg-1)",
-              outline: "none",
-            }}
+            onChange={setSearch}
+            placeholder="Gegner suchen…"
           />
         </div>
 

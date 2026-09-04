@@ -17,6 +17,7 @@
  * automatisch dazu (echte Kurs-Mitgliedschaft erst Multi-Gym Phase 2).
  */
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import Icon from "@/components/ui/Icon";
 import { SheetShell } from "@/components/motion";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
@@ -293,20 +294,10 @@ function PlanAudienceInhalt({
           {/* ── Personen — die Auswahl, die zählt. Gruppen wie in den
               Kampfkontexten; die Suche filtert alle Gruppen. ── */}
           <div className="px-2.5 pb-2 pt-4">
-            <input
-              type="search"
+            <GooeySearch
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
               placeholder="Person suchen…"
-              aria-label="Person suchen"
-              className="t-interactive w-full min-h-hit rounded-field px-3.5"
-              style={{
-                font: "var(--type-body)",
-                background: "var(--surface-raised)",
-                border: "1px solid var(--line)",
-                color: "var(--text-body)",
-                outline: "none",
-              }}
             />
           </div>
           {members === null ? null : loadError ? (

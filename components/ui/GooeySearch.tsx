@@ -138,10 +138,18 @@ export default function GooeySearch({
   }, [open]);
 
   // Klick daneben und Escape schließen — dasselbe Muster wie in ui/Select.
+  // ABER: Steht Text im Feld, bleibt es bei einem Klick daneben offen. Seit
+  // die Pille app-weit der Suchstandard ist (Leon 04.09.2026), sitzt sie
+  // auch über Auswahllisten (Technik-Picker, Bibliothek, Zielgruppe): Wer
+  // dort „Jab" sucht und den ersten Treffer antippt, verlöre sonst mit dem
+  // Tipp die Suche — und die Liste spränge auf volle Länge. Escape leert
+  // und schließt weiterhin.
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current?.contains(e.target as Node)) return;
+      if (inputRef.current?.value) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);

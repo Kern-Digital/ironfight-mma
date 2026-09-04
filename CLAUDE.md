@@ -383,6 +383,15 @@ Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
 - Tailwind-Farben in `tailwind.config`: `pink` (Akzent), `ink`, `blood`, `carbon`.
 - Utility-Klassen u.a.: `card-glass`, `font-mono-ta` (Mono via `var(--font-mono)`).
 
+### Suchfelder (Leons Vorgabe 2026-09-04)
+Jedes Suchfeld der App ist `components/ui/GooeySearch` — die eingeklappte
+Pille, die sich per Feder zum Feld öffnet, während die Lupe als Tropfen
+heraustritt (Vorbild: /trainer/athleten). Kein natives `<input type="search">`
+mehr, auch nicht in Sheets und Pickern. Gesteuert über `value`/`onChange`,
+`placeholder`, `label`. Steht Text im Feld, bleibt es bei einem Klick daneben
+offen (sonst verlöre der Tipp auf einen Treffer die Suche); Escape leert und
+schließt.
+
 ### Bewegung & Haptik (Regelwerk: `docs/MOTION-BRIEF.md`, ab 2026-09-04)
 Wie sich die App ANFÜHLT, ist ein eigenes System — nicht Beiwerk einzelner
 Komponenten. Drei Schichten, klare Arbeitsteilung:

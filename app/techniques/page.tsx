@@ -17,13 +17,13 @@
  *    (Muster Hub-Disziplinkarten) statt als Farbkante
  */
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import { useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import {
-  ALL_TECHNIQUES,
   DISCIPLINE_LABEL,
   searchTechniques,
 } from "@/lib/techniques";
@@ -344,30 +344,13 @@ export default function TechniquesPage() {
 
         {/* ── Suche & Filter ── */}
         <div className="flex flex-col gap-3">
-          {/* Große Lupe statt Platzhalter-Text (Leon 2026-08-29) */}
-          <div className="relative">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
-              style={{ color: "var(--text-3)", lineHeight: 0 }}
-            >
-              <Icon name="search" size={24} strokeWidth={2} />
-            </span>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Technik suchen"
-              className="t-interactive w-full min-h-hit rounded-field pl-12 pr-3.5"
-              style={{
-                font: "var(--type-body)",
-                background: "var(--surface-raised)",
-                border: "1px solid var(--line)",
-                color: "var(--text-body)",
-                outline: "none",
-              }}
-            />
-          </div>
+          {/* Gooey-Pille — app-weiter Suchstandard (Leon 04.09.2026), löst
+              die große Lupe im Feld (Leon 2026-08-29) ab */}
+          <GooeySearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Technik suchen…"
+          />
 
           {/* Disziplin als Aufklapp-Menü (ui/Select-Standard, Leon 2026-08-29) */}
           <Select

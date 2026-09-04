@@ -1,5 +1,6 @@
 "use client";
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import { Collapse } from "@/components/motion";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -1049,22 +1050,14 @@ function TechniquePicker({
         })}
       </div>
 
-      {/* Suchfeld */}
-      <input
-        type="text"
-        placeholder="Technik suchen…"
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        className="t-interactive mb-3 min-h-hit w-full rounded-field px-3.5"
-        style={{
-          font: "var(--type-body)",
-          background: "var(--surface-raised)",
-          border: "1px solid var(--line)",
-          color: "var(--text-body)",
-          outline: "none",
-        }}
-        autoFocus
-      />
+      {/* Suchfeld — app-weiter Standard ist die Gooey-Pille (Leon 04.09.) */}
+      <div className="mb-3">
+        <GooeySearch
+          value={search}
+          onChange={onSearchChange}
+          placeholder="Technik suchen…"
+        />
+      </div>
 
       {/* Status-Zeile */}
       <div className="mb-2 flex items-baseline justify-between">
@@ -1241,11 +1234,14 @@ function TechniqueGroup({
                 key={t.id}
                 type="button"
                 data-press="quiet"
+                aria-pressed={selected}
                 onClick={() => onToggle(t.id)}
-                className="t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-badge px-2 py-1.5 text-left"
-                style={{
-                  background: selected ? "var(--accent-subtle)" : "transparent",
-                }}
+                // Kein Inline-Hintergrund im Ruhezustand: der schlüge die
+                // Hover-Tönung (.picker-zeile:hover in globals.css). Leon
+                // 04.09.: „die einzelne Technik soll farblich hervorgehoben
+                // sein, wenn ich darüber hover."
+                className="picker-zeile t-interactive flex min-h-hit w-full items-center gap-2.5 rounded-badge px-2 py-1.5 text-left"
+                style={selected ? { background: "var(--accent-subtle)" } : undefined}
               >
                 {/* Checkbox */}
                 <span

@@ -2629,6 +2629,16 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
   transform: scale(.99);
 }
 
+/* Zeilen einer Auswahlliste (Technik-Picker & Co.) leuchten unter der Maus
+   leicht im Akzent — schwaecher als die gewaehlte Zeile (--accent-subtle),
+   damit Hover und Auswahl auseinanderzuhalten bleiben. Leon 04.09.: die
+   Zeile soll sich farblich melden, nur nicht mehr bewegen. */
+@media (hover: hover) {
+  .picker-zeile:hover:not([aria-pressed="true"]) {
+    background-color: color-mix(in oklab, var(--accent) 9%, transparent);
+  }
+}
+
 /* Entgegenkommen — nur wo es einen Zeiger gibt, den man entgegenkommen
    kann. Auf Touch bliebe der angehobene Zustand nach dem Tap stehen. */
 @media (hover: hover) and (pointer: fine) {

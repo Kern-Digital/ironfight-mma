@@ -15,6 +15,7 @@
  *    NIE farbcodiert — nur Text (Regel Rubrik-Farben/Slot-System)
  */
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import SwipeAction from "@/components/SwipeAction";
@@ -454,21 +455,10 @@ function LibraryContent() {
                   onChange={(v) => setBrowseDiscipline(v)}
                   options={BROWSE_DISCIPLINES}
                 />
-                <input
-                  type="search"
-                  placeholder="Technik suchen…"
+                <GooeySearch
                   value={browseSearch}
-                  onChange={(e) => setBrowseSearch(e.target.value)}
-                  autoFocus
-                  aria-label="Technik suchen"
-                  className="t-interactive w-full min-h-hit rounded-field px-3.5"
-                  style={{
-                    font: "var(--type-body)",
-                    background: "var(--surface-raised)",
-                    border: "1px solid var(--line)",
-                    color: "var(--text-body)",
-                    outline: "none",
-                  }}
+                  onChange={setBrowseSearch}
+                  placeholder="Technik suchen…"
                 />
               </div>
 

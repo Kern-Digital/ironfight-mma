@@ -1,5 +1,6 @@
 "use client";
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
 import AdminRoute from "@/components/AdminRoute";
 import Skeleton from "@/components/ui/Skeleton";
@@ -244,18 +245,10 @@ function AdminUsersContent() {
 
         {/* Suche + Filter */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            type="search"
-            placeholder="Suche nach Name oder E-Mail…"
+          <GooeySearch
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-xs"
-            style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg-1)",
-              outline: "none",
-            }}
+            onChange={setSearch}
+            placeholder="Name oder E-Mail…"
           />
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {FILTER_TABS.map((tab) => {

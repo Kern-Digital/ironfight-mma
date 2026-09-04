@@ -1,5 +1,6 @@
 "use client";
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -395,14 +396,13 @@ function NewCompetitionContent() {
             {/* Schritt 1: Athlet */}
             <section>
               <StepHeader n={1} title="Athlet" />
-              <input
-                type="search"
-                placeholder="Athlet suchen…"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                className="mb-3 w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
-                style={fieldStyle}
-              />
+              <div className="mb-3">
+                <GooeySearch
+                  value={studentSearch}
+                  onChange={setStudentSearch}
+                  placeholder="Athlet suchen…"
+                />
+              </div>
               {filteredMembers.length === 0 ? (
                 <p className="text-xs" style={{ color: "var(--fg-4)" }}>
                   Keine Athleten gefunden.
@@ -462,14 +462,13 @@ function NewCompetitionContent() {
 
               {oppMode === "existing" ? (
                 <>
-                  <input
-                    type="search"
-                    placeholder="Gegner suchen…"
-                    value={oppSearch}
-                    onChange={(e) => setOppSearch(e.target.value)}
-                    className="mb-3 w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm"
-                    style={fieldStyle}
-                  />
+                  <div className="mb-3">
+                    <GooeySearch
+                      value={oppSearch}
+                      onChange={setOppSearch}
+                      placeholder="Gegner suchen…"
+                    />
+                  </div>
                   {filteredOpponents.length === 0 ? (
                     <p className="text-xs" style={{ color: "var(--fg-4)" }}>
                       Noch keine DeepFight-Profile im Gym.{" "}

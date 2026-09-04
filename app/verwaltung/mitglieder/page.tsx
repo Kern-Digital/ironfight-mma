@@ -17,6 +17,7 @@
  * wer das Gym führt und wer Kurse gibt. Innerhalb der Gruppen alphabetisch.
  */
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import MemberRoleSheet from "@/components/MemberRoleSheet";
 import Icon from "@/components/ui/Icon";
 import { StaggerList } from "@/components/motion";
@@ -194,30 +195,11 @@ export default function TrainerMembersPage() {
                 fremde Gyms sind für die Abfrage wie für die Firestore-Regeln
                 gar nicht erst erreichbar. */}
             {members !== null && members.length > 0 && (
-              <div className="relative">
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-3)" }}
-                >
-                  <Icon name="search" size={17} strokeWidth={2} />
-                </span>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Mitglied in deinem Gym suchen"
-                  aria-label="Mitglieder durchsuchen"
-                  className="t-interactive min-h-hit w-full rounded-field pl-11 pr-3.5"
-                  style={{
-                    font: "var(--type-body)",
-                    background: "var(--surface-raised)",
-                    border: "1px solid var(--line)",
-                    color: "var(--text-body)",
-                    outline: "none",
-                  }}
-                />
-              </div>
+              <GooeySearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Mitglied suchen…"
+              />
             )}
 
             {members !== null && members.length > 0 && (
@@ -259,7 +241,7 @@ export default function TrainerMembersPage() {
                 className="py-8 text-center"
                 style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
               >
-                Zu „{search}" passt niemand.
+                Zu „{search}“ passt niemand.
               </p>
             ) : (
               <div className="flex flex-col gap-6">

@@ -1,5 +1,6 @@
 "use client";
 
+import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -96,17 +97,13 @@ export default function DeepFightAthletesPage() {
         </div>
 
         {/* Suche */}
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Athlet suchen …"
-          className="mt-4 w-full max-w-sm rounded-xl px-3 py-2 text-sm"
-          style={{
-            background: "var(--ink-2)",
-            border: "1px solid var(--ink-5)",
-            color: "var(--fg)",
-          }}
-        />
+        <div className="mt-4">
+          <GooeySearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Athlet suchen…"
+          />
+        </div>
 
         <div className="mt-5">
           {error ? (
