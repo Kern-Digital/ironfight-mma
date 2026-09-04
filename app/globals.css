@@ -889,6 +889,29 @@
     border-radius: 3px;
     background: var(--grad-progress);
   }
+  /* Zerstörerische Handlung — rot hinterlegt, nicht nur roter Text
+     (Leon 04.09.2026 am Wettkampf-Löschen). Zwei Stufen, weil das Muster
+     immer zweistufig ist: `.t-danger` ruht, `.t-danger-strong` steht in der
+     Rückfrage. Beide leiten alles aus --negative ab und folgen damit beiden
+     Themes. Sie stehen HIER und nicht als Objekt in vier Dateien — der Stil
+     lief sonst auseinander, sobald jemand eine fünfte Stelle baut. */
+  .t-danger,
+  .t-danger-strong {
+    color: var(--negative);
+    border: 1px solid color-mix(in oklab, var(--negative) 40%, transparent);
+    background: color-mix(in oklab, var(--negative) 12%, transparent);
+  }
+  .t-danger-strong {
+    border-color: color-mix(in oklab, var(--negative) 55%, transparent);
+    background: color-mix(in oklab, var(--negative) 18%, transparent);
+  }
+  /* Die Grundhaptik hebt und senkt sie wie jeden Knopf; nur die Hover-Fläche
+     von .t-interactive würde das Rot überschreiben. */
+  .t-danger.t-interactive:hover,
+  .t-danger-strong.t-interactive:hover {
+    background-color: color-mix(in oklab, var(--negative) 22%, transparent);
+  }
+
   /* Interaktion (Handoff-Regel): Hover = Fläche 1 Ebene heller,
      Press = scale(0.98), Motion 120 ms --ease-out. */
   .t-interactive {

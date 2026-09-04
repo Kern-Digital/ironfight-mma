@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
+import { MorphSwap } from "@/components/motion";
 import { DNA_CATEGORIES, DNA_QUESTION_BY_ID } from "@/lib/gegner-dna";
 import { actionLabel, CAGE_ZONE_LABEL, successRate } from "@/lib/fight-stats";
 import {
@@ -143,6 +144,12 @@ function TopList({ title, entries }: { title: string; entries: TopListEntry[] })
 
 // ─── Haupt-Komponente ───────────────────────────────────────────────────────
 
+const DEL_BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
 export default function VideoAnalysisResult({
   analysis,
   mode,
@@ -162,6 +169,10 @@ export default function VideoAnalysisResult({
   onApplyAll?: () => void;
   onDelete?: () => void;
 }) {
+  // Rueckfrage vor dem Loeschen — inline statt Browser-Popup (Leon
+  // 04.09.2026). Sie sitzt HIER und nicht im Aufrufer, weil hier der Knopf
+  // steht: Die Frage gehoert neben die Handlung, nicht in eine andere Datei.
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { observation: obs, evaluation: ev } = analysis;
   const weight = computeVideoWeight(analysis);
   const applied = new Set(analysis.appliedFindingIds);
@@ -254,19 +265,51 @@ export default function VideoAnalysisResult({
               </button>
             )}
             {onDelete && (
-              <button
-                onClick={onDelete}
-                disabled={busy}
-                className="font-mono-ta rounded-lg px-3 py-1.5 text-[10px] uppercase"
-                style={{
-                  letterSpacing: "0.12em",
-                  border: "1px solid var(--ink-5)",
-                  color: "var(--fg-4)",
-                  background: "transparent",
-                }}
+              <MorphSwap
+                activeKey={confirmDelete ? "confirm" : "idle"}
+                innerClassName="flex flex-wrap items-center gap-2"
               >
-                Löschen
-              </button>
+                {confirmDelete ? (
+                  <>
+                    <span
+                      style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                    >
+                      Analyse wirklich löschen? Übernommene Befunde bleiben im
+                      Profil.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      disabled={busy}
+                      className="t-danger-strong t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4 disabled:opacity-50"
+                      style={DEL_BTN_FONT}
+                    >
+                      <Icon name="trash" size={13} strokeWidth={2.2} />
+                      Endgültig löschen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={busy}
+                      className="t-interactive inline-flex min-h-hit items-center rounded-field px-3 disabled:opacity-50"
+                      style={{ ...DEL_BTN_FONT, color: "var(--text-3)" }}
+                    >
+                      Abbrechen
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={busy}
+                    className="t-danger t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4 disabled:opacity-50"
+                    style={DEL_BTN_FONT}
+                  >
+                    <Icon name="trash" size={13} strokeWidth={2.2} />
+                    Löschen
+                  </button>
+                )}
+              </MorphSwap>
             )}
           </div>
         </div>

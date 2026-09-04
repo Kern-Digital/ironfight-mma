@@ -4,6 +4,7 @@ import PageHead from "@/components/shell/PageHead";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
@@ -13,7 +14,13 @@ import OpponentEditor, {
 } from "@/components/trainer/OpponentEditor";
 import FightCampPlanView from "@/components/trainer/FightCampPlanView";
 import { MorphSwap } from "@/components/motion";
-import { competitionGroup } from "@/components/trainer/CompetitionCard";
+// GROUP_ACCENT kommt aus der Uebersicht — es gab hier eine zweite Fassung,
+// und die beiden liefen auseinander: „Archiviert" war dort neutral und hier
+// Brand-Violett. Eine Quelle, ein Aussehen.
+import {
+  GROUP_ACCENT,
+  competitionGroup,
+} from "@/components/trainer/CompetitionCard";
 import {
   campOpponentId,
   deleteFightCamp,
@@ -39,17 +46,27 @@ function formatDate(d: Date | null | undefined): string {
   });
 }
 
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+/** Zweitrangige Handlung im Seitenkopf — Fläche statt Farbe. */
+const SEC_BTN: React.CSSProperties = {
+  ...BTN_FONT,
+  background: "var(--surface-raised)",
+  border: "1px solid var(--line)",
+  color: "var(--text-body)",
+  textDecoration: "none",
+};
+
 const GROUP_LABEL = {
   upcoming: "Geplant / Aktiv",
   past: "Vergangen",
   archived: "Archiviert",
 } as const;
 
-const GROUP_ACCENT = {
-  upcoming: "var(--ta-cyan)",
-  past: "var(--fg-3)",
-  archived: "var(--accent-2)",
-} as const;
 
 function CompetitionDetailContent({
   uid,
@@ -67,6 +84,9 @@ function CompetitionDetailContent({
   const [error, setError] = useState<string | null>(null);
   const [editingDna, setEditingDna] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Rueckfrage vor dem Loeschen — inline statt Browser-Popup, siehe unten.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -151,13 +171,15 @@ function CompetitionDetailContent({
   }
 
   async function handleDelete() {
-    if (!camp) return;
-    if (!confirm("Wettkampf wirklich löschen? Diese Aktion ist endgültig.")) return;
+    if (!camp || deleting) return;
+    setDeleting(true);
     try {
       await deleteFightCamp(uid, campId);
       router.push("/trainer/competitions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -177,8 +199,8 @@ function CompetitionDetailContent({
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-28 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-28 w-full rounded-card" />
+          <Skeleton className="h-64 w-full rounded-card" />
         </div>
       </div>
     );
@@ -198,7 +220,10 @@ function CompetitionDetailContent({
     "Athlet";
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
+    <main
+      className="min-h-screen"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
       <PageHead
         lane="detail"
         back={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}
@@ -219,24 +244,30 @@ function CompetitionDetailContent({
             {camp.opponent.opponentId && (
               <Link
                 href={`/trainer/opponents/${camp.opponent.opponentId}`}
-                className="btn-secondary px-3 py-2 text-xs"
+                data-press
+                className="t-interactive inline-flex min-h-hit items-center rounded-field px-4"
+                style={SEC_BTN}
               >
                 Geteiltes Profil
               </Link>
             )}
             {group === "archived" ? (
               <button
+                type="button"
                 onClick={() => setStatus("active")}
                 disabled={busy}
-                className="btn-secondary px-3 py-2 text-xs"
+                className="t-interactive inline-flex min-h-hit items-center rounded-field px-4 disabled:opacity-50"
+                style={SEC_BTN}
               >
                 Reaktivieren
               </button>
             ) : (
               <button
+                type="button"
                 onClick={() => setStatus("archived")}
                 disabled={busy}
-                className="btn-secondary px-3 py-2 text-xs"
+                className="t-interactive inline-flex min-h-hit items-center rounded-field px-4 disabled:opacity-50"
+                style={SEC_BTN}
               >
                 Archivieren
               </button>
@@ -270,15 +301,25 @@ function CompetitionDetailContent({
         <div className="mb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2
-              className="font-display-ta font-black uppercase"
-              style={{ fontSize: "18px", letterSpacing: "0.05em" }}
+              style={{
+                font: "var(--type-h2)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
             >
               <DeepFightWordmark />
             </h2>
             {!editingDna && (
               <button
+                type="button"
                 onClick={() => setEditingDna(true)}
-                className="btn-primary px-4 py-2 text-xs"
+                className="t-interactive inline-flex min-h-hit items-center rounded-field px-5"
+                style={{
+                  ...BTN_FONT,
+                  background: "var(--accent)",
+                  color: "var(--on-accent)",
+                  boxShadow: "var(--accent-glow)",
+                }}
               >
                 Bearbeiten
               </button>
@@ -287,9 +328,9 @@ function CompetitionDetailContent({
 
           {addedDnaCount > 0 && (
             <p
-              className="font-mono-ta mb-3 rounded-lg px-3 py-2 text-[10px]"
+              className="mb-3 rounded-field px-3 py-2"
               style={{
-                letterSpacing: "0.1em",
+                font: "var(--type-sub)",
                 background: "color-mix(in oklab, var(--accent-2) 10%, transparent)",
                 border:
                   "1px solid color-mix(in oklab, var(--accent-2) 30%, transparent)",
@@ -356,8 +397,12 @@ function CompetitionDetailContent({
         {/* Trainingsplan (4 Phasen) */}
         <div className="mt-8">
           <h2
-            className="font-display-ta mb-3 font-black uppercase"
-            style={{ fontSize: "18px", letterSpacing: "0.05em" }}
+            className="mb-3"
+            style={{
+              font: "var(--type-h2)",
+              letterSpacing: "var(--ls-display)",
+              textTransform: "uppercase",
+            }}
           >
             Trainingsplan
           </h2>
@@ -365,19 +410,60 @@ function CompetitionDetailContent({
         </div>
 
         {/* Gefahrenzone */}
-        <div className="mt-8 border-t pt-4" style={{ borderColor: "var(--ink-4)" }}>
-          <button
-            onClick={handleDelete}
-            className="font-mono-ta rounded-lg px-3 py-1.5 text-[10px] uppercase"
-            style={{
-              letterSpacing: "0.15em",
-              background: "transparent",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg-4)",
-            }}
+        {/* ── Löschen — Inline-Rückfrage statt Browser-Popup ──────────────
+            Vorher stand hier `confirm()`. Das Fenster kommt vom BROWSER: Es
+            trägt dessen Schrift, dessen Knöpfe und die Zeile „Auf
+            localhost:3000 wird Folgendes angezeigt" — mitten in einer App,
+            die sonst jede Fläche selbst gestaltet. Es lässt sich weder
+            beschriften noch gestalten, und in einer Capacitor-WebView sieht
+            es wieder anders aus.
+            Der Knopf verwandelt sich stattdessen in die Rückfrage (MorphSwap
+            misst die neue Breite und federt dorthin) — dasselbe Muster wie
+            beim Trainer-Plan. Rot ist er schon im Ruhezustand: Was endgültig
+            löscht, soll man vor dem Klick erkennen, nicht erst danach. */}
+        <div className="mt-8 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+          <MorphSwap
+            activeKey={confirmDelete ? "confirm" : "idle"}
+            innerClassName="flex flex-wrap items-center gap-3"
           >
-            Wettkampf löschen
-          </button>
+            {confirmDelete ? (
+              <>
+                <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                  Wettkampf wirklich löschen? Das Camp samt Plan und
+                  Gegner-Snapshot ist danach weg.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={deleting}
+                  className="t-danger-strong t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4 disabled:opacity-50"
+                  style={BTN_FONT}
+                >
+                  <Icon name="trash" size={13} strokeWidth={2.2} />
+                  {deleting ? "Lösche…" : "Endgültig löschen"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="t-interactive inline-flex min-h-hit items-center rounded-field px-4 disabled:opacity-50"
+                  style={{ ...BTN_FONT, color: "var(--text-3)" }}
+                >
+                  Abbrechen
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="t-danger t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4"
+                style={BTN_FONT}
+              >
+                <Icon name="trash" size={13} strokeWidth={2.2} />
+                Wettkampf löschen
+              </button>
+            )}
+          </MorphSwap>
         </div>
       </div>
     </main>

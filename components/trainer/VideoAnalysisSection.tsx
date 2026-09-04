@@ -924,8 +924,9 @@ export default function VideoAnalysisSection({
     }
   }
 
+  // Die Rueckfrage steht im VideoAnalysisResult, direkt am Knopf — hier wird
+  // nur noch geloescht (Leon 04.09.2026: kein Browser-Popup mehr).
   async function handleDelete(a: VideoAnalysis) {
-    if (!confirm("Diese Analyse wirklich löschen?")) return;
     setBusy(true);
     try {
       await deleteVideoAnalysis(mode, targetId, a.id);

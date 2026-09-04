@@ -280,6 +280,9 @@ function OpponentDetailContent({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Rueckfrage vor dem Loeschen — inline statt Browser-Popup.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [tab, setTab] = useState<DetailTab>("uebersicht");
   const [sharingOpen, setSharingOpen] = useState(false);
 
@@ -327,18 +330,15 @@ function OpponentDetailContent({ id }: { id: string }) {
   }
 
   async function handleDelete() {
-    if (!opponent) return;
-    if (
-      !confirm(
-        `DeepFight-Profil „${opponent.name}" wirklich löschen? Bereits angelegte Wettkämpfe behalten ihren gespeicherten Snapshot.`,
-      )
-    )
-      return;
+    if (!opponent || deleting) return;
+    setDeleting(true);
     try {
       await deleteOpponent(opponent.id);
       router.push("/trainer/opponents");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -572,19 +572,52 @@ function OpponentDetailContent({ id }: { id: string }) {
               onSubmit={handleSave}
               onCancel={() => setEditing(false)}
             />
-            <div className="mt-6 border-t pt-4" style={{ borderColor: "var(--ink-4)" }}>
-              <button
-                onClick={handleDelete}
-                className="font-mono-ta rounded-lg px-3 py-1.5 text-[10px] uppercase"
-                style={{
-                  letterSpacing: "0.15em",
-                  background: "transparent",
-                  border: "1px solid var(--ink-5)",
-                  color: "var(--fg-4)",
-                }}
+            {/* Loeschen — Inline-Rueckfrage statt Browser-Popup (Leon
+                04.09.2026). Dasselbe Muster wie beim Wettkampf und beim
+                Trainer-Plan; der Rest dieser Seite folgt in Rollout-Etappe 3. */}
+            <div className="mt-6 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+              <MorphSwap
+                activeKey={confirmDelete ? "confirm" : "idle"}
+                innerClassName="flex flex-wrap items-center gap-3"
               >
-                DeepFight-Profil löschen
-              </button>
+                {confirmDelete ? (
+                  <>
+                    <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                      &bdquo;{opponent.name}&ldquo; wirklich löschen? Angelegte
+                      Wettkämpfe behalten ihren gespeicherten Snapshot.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete()}
+                      disabled={deleting}
+                      className="t-danger-strong t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4 disabled:opacity-50"
+                      style={BTN_FONT}
+                    >
+                      <Icon name="trash" size={13} strokeWidth={2.2} />
+                      {deleting ? "Lösche…" : "Endgültig löschen"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleting}
+                      className="t-interactive inline-flex min-h-hit items-center rounded-field px-4 disabled:opacity-50"
+                      style={{ ...BTN_FONT, color: "var(--text-3)" }}
+                    >
+                      Abbrechen
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="t-danger t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4"
+                    style={BTN_FONT}
+                  >
+                    <Icon name="trash" size={13} strokeWidth={2.2} />
+                    DeepFight-Profil löschen
+                  </button>
+                )}
+              </MorphSwap>
             </div>
           </>
         ) : tab === "videos" ? (
@@ -627,6 +660,12 @@ function OpponentDetailContent({ id }: { id: string }) {
     </main>
   );
 }
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
 
 export default function OpponentDetailPage({
   params,

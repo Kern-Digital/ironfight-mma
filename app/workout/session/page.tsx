@@ -65,6 +65,7 @@ import { DISCIPLINE_LABEL, GENDER_HEART_COLOR } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { SheetShell } from "@/components/motion";
 
 // ─── Helfer ───────────────────────────────────────────────────────────────────
 
@@ -156,6 +157,7 @@ function SessionRunner() {
 
   // Hochziehbare Übungsliste + Autostart nach Sprung daraus
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [confirmAbort, setConfirmAbort] = useState(false);
   // Übungs-Detail-Sheet („Detail"-Button): erklärt die AKTUELLE Übung
   const [detailOpen, setDetailOpen] = useState(false);
   const autoStartRef = useRef(false);
@@ -406,8 +408,16 @@ function SessionRunner() {
     t.start();
   }
 
+  /**
+   * Beenden — die Rueckfrage steht in einem eigenen Sheet (Leon 04.09.2026:
+   * kein Browser-Popup mehr). Anders als beim Loeschen sitzt sie NICHT inline:
+   * Der Knopf steht in der Kopfleiste eines laufenden Workouts, und dort ist
+   * neben Uebungsname und Zaehler kein Platz fuer eine Frage plus zwei
+   * Knoepfe. Rot ist der Knopf auch nicht — hier geht nichts verloren, der
+   * Stand wird als abgebrochenes Workout gespeichert.
+   */
   function handleAbort() {
-    if (!confirm("Workout abbrechen? Was du bis hier geschafft hast, bleibt als abgebrochenes Workout gespeichert.")) return;
+    setConfirmAbort(false);
     if (user && !loggedRef.current) {
       loggedRef.current = true;
       logWorkoutFull(user.uid, {
@@ -547,7 +557,7 @@ function SessionRunner() {
       <div className="mb-3 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={handleAbort}
+          onClick={() => setConfirmAbort(true)}
           aria-label="Session beenden"
           className="t-interactive flex min-h-hit items-center gap-1.5 rounded-field px-3"
           style={{
@@ -1037,6 +1047,50 @@ function SessionRunner() {
       exercise={detailOpen ? (currentExercise ?? null) : null}
       onClose={() => setDetailOpen(false)}
     />
+
+    {/* ── Beenden? — die Rückfrage, die früher der Browser stellte ────────── */}
+    <SheetShell
+      open={confirmAbort}
+      onClose={() => setConfirmAbort(false)}
+      label="Workout beenden?"
+      panelClassName="flex flex-col gap-4 p-5"
+    >
+      <div className="flex flex-col gap-1">
+        <span className="t-sheet-title">Workout beenden?</span>
+        <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+          Was du bis hier geschafft hast, bleibt als abgebrochenes Workout in
+          deinem Verlauf.
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleAbort}
+          className="t-interactive inline-flex min-h-hit flex-1 items-center justify-center rounded-field px-5"
+          style={{
+            ...BTN_FONT,
+            background: "var(--accent)",
+            color: "var(--on-accent)",
+            boxShadow: "var(--accent-glow)",
+          }}
+        >
+          Beenden und speichern
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmAbort(false)}
+          className="t-interactive inline-flex min-h-hit items-center justify-center rounded-field px-5"
+          style={{
+            ...BTN_FONT,
+            background: "var(--surface-raised)",
+            border: "1px solid var(--line)",
+            color: "var(--text-body)",
+          }}
+        >
+          Weiter trainieren
+        </button>
+      </div>
+    </SheetShell>
     </main>
   );
 }
