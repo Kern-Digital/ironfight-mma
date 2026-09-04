@@ -408,7 +408,12 @@ function NewCompetitionContent() {
                   Keine Athleten gefunden.
                 </p>
               ) : (
-                <div className="flex max-h-72 flex-col gap-4 overflow-y-auto">
+                // Deckel wächst mit dem Bildschirm (MOTION-BRIEF §4): `max-h-72`
+                // war auf jedem Gerät gleich klein — auf dem Desktop drei
+                // sichtbare Zeilen neben viel leerem Platz. 50vh lässt auf dem
+                // Handy die Schritte 2–4 im Blick und verdoppelt am Monitor die
+                // Liste.
+                <div className="flex max-h-[50vh] flex-col gap-4 overflow-y-auto">
                   <AthleteGroup
                     title="Ich selbst"
                     accent="var(--ta-cyan)"
@@ -480,7 +485,7 @@ function NewCompetitionContent() {
                       </button>
                     </p>
                   ) : (
-                    <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+                    <div className="grid max-h-[50vh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
                       {filteredOpponents.map((o) => {
                         const active = o.id === selectedOpponentId;
                         return (

@@ -5,6 +5,7 @@ import { Collapse } from "@/components/motion";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
+import { isPermissionDenied } from "@/lib/admin";
 import { resolveGymId } from "@/lib/gym";
 import { useTheme } from "@/lib/theme-context";
 import AthleteTabBar from "@/components/AthleteTabBar";
@@ -250,6 +251,13 @@ function getTechniqueGroups(discipline: string, search: string): TechniqueGroup[
 type ModalState =
   | { phase: "idle" }
   | { phase: "loading"; block: TrainingBlock }
+  // Ohne diesen Zweig blieb das Fenster bei einem geworfenen Read ewig im
+  // Ladezustand stehen (gefunden 04.09.): `openBlock` hatte kein `catch`, die
+  // abgelehnte Promise verpuffte in der Konsole und `setModal({phase:"ready"})`
+  // lief nie. Häufigster Auslöser: kein Login — dann verweigert Firestore die
+  // Session-Daten. `denied` trennt die beiden Fälle, weil sie verschiedene
+  // Antworten verdienen: anmelden oder es noch einmal versuchen.
+  | { phase: "error"; block: TrainingBlock; denied: boolean }
   | {
       phase: "ready";
       block: TrainingBlock;
@@ -322,13 +330,18 @@ export default function SchedulePage() {
       const weekId = getWeekIdentifier();
       const sessionId = `${block.id}_${weekId}`;
 
-      const [session, participated, subscribed] = await Promise.all([
-        getTrainingSession(block.id, weekId),
-        user ? hasParticipated(user.uid, sessionId) : Promise.resolve(false),
-        user ? isSubscribedToBlock(user.uid, block.id) : Promise.resolve(false),
-      ]);
+      try {
+        const [session, participated, subscribed] = await Promise.all([
+          getTrainingSession(block.id, weekId),
+          user ? hasParticipated(user.uid, sessionId) : Promise.resolve(false),
+          user ? isSubscribedToBlock(user.uid, block.id) : Promise.resolve(false),
+        ]);
 
-      setModal({ phase: "ready", block, session, participated, subscribed });
+        setModal({ phase: "ready", block, session, participated, subscribed });
+      } catch (err) {
+        console.error("[schedule] Kurs konnte nicht geladen werden", err);
+        setModal({ phase: "error", block, denied: isPermissionDenied(err) || !user });
+      }
     },
     [user],
   );
@@ -540,6 +553,14 @@ export default function SchedulePage() {
             {modal.phase === "loading" && (
               <ModalSkeleton block={modal.block} onClose={closeModal} />
             )}
+            {modal.phase === "error" && (
+              <ModalError
+                block={modal.block}
+                denied={modal.denied}
+                onRetry={() => openBlock(modal.block)}
+                onClose={closeModal}
+              />
+            )}
             {modal.phase === "ready" && (
               <ModalReady
                 block={modal.block}
@@ -719,6 +740,83 @@ function ModalSkeleton({ block, onClose }: { block: TrainingBlock; onClose: () =
             style={{ background: "var(--surface-raised)" }}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ModalError ───────────────────────────────────────────────────────────
+
+/**
+ * Was der Kurs zeigt, wenn der Read schiefging. Zwei Fälle, zwei Antworten:
+ * Ohne Login liegen Session, Teilnahme und Abo hinter der Firestore-Regel —
+ * dann führt der Weg zur Anmeldung. Sonst hakt die Verbindung, und ein
+ * zweiter Versuch reicht meist.
+ */
+function ModalError({
+  block,
+  denied,
+  onRetry,
+  onClose,
+}: {
+  block: TrainingBlock;
+  denied: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col p-5">
+      <ModalHeader block={block} onClose={onClose} />
+
+      <div className="mt-6 flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto text-center">
+        <span
+          className="flex h-12 w-12 items-center justify-center rounded-full"
+          style={{ background: "var(--surface-raised)", color: "var(--text-2)" }}
+          aria-hidden
+        >
+          <Icon name={denied ? "lock" : "warn"} size={20} />
+        </span>
+        <p style={{ font: "var(--type-body-strong)" }}>
+          {denied ? "Melde dich an" : "Das hat gehakt"}
+        </p>
+        <p style={{ color: "var(--text-2)", maxWidth: "34ch" }}>
+          {denied
+            ? "Techniken, Teilnahme und Abo dieses Kurses gehören zu deinem Konto. Melde dich an, dann geht der Kurs auf."
+            : "Die Verbindung war gerade zäh. Hol den Kurs einfach noch einmal."}
+        </p>
+      </div>
+
+      <div className="mt-5 flex shrink-0 flex-col gap-2">
+        {denied && (
+          <Link
+            href="/login"
+            data-press
+            className="t-interactive flex min-h-hit w-full items-center justify-center rounded-field px-4"
+            style={{
+              ...BTN_FONT,
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
+              textDecoration: "none",
+            }}
+            onClick={onClose}
+          >
+            Anmelden und dabei sein
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="t-interactive flex min-h-hit w-full items-center justify-center rounded-field px-4"
+          style={{
+            ...BTN_FONT,
+            background: denied ? "var(--surface-raised)" : "var(--accent)",
+            color: denied ? "var(--text-1)" : "var(--on-accent)",
+            boxShadow: denied ? undefined : "var(--accent-glow)",
+          }}
+        >
+          Noch einmal laden
+        </button>
       </div>
     </div>
   );
@@ -994,6 +1092,7 @@ function ModalReady({
               ) : (
                 <Link
                   href="/login"
+                  data-press
                   className="t-interactive flex min-h-hit w-full items-center justify-center rounded-field px-4"
                   style={{
                     ...BTN_FONT,
