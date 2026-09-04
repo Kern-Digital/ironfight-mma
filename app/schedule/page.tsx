@@ -1,8 +1,15 @@
 "use client";
 
+import AuswahlChips from "@/components/schedule/AuswahlChips";
 import GooeySearch from "@/components/ui/GooeySearch";
 import { Collapse } from "@/components/motion";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { isPermissionDenied } from "@/lib/admin";
@@ -1218,33 +1225,7 @@ function TechniquePicker({
       </div>
 
       {/* Aktuelle Auswahl-Chips — bleiben unten stehen, scrollen nicht weg */}
-      {selectedIds.length > 0 && (
-        <div className="mt-3 flex max-h-32 shrink-0 flex-col gap-1.5 overflow-y-auto">
-          <span className="t-label">Auswahl</span>
-          <div className="flex flex-wrap gap-1.5">
-            {selectedIds.map((id) => {
-              const t = getTechniqueById(id);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => onToggle(id)}
-                  className="t-interactive inline-flex min-h-hit items-center gap-1.5 rounded-pill px-3.5"
-                  style={{
-                    font: "var(--type-sub)",
-                    background: "var(--accent-subtle)",
-                    color: "var(--accent-text)",
-                  }}
-                  title="Entfernen"
-                >
-                  {t?.name ?? id}
-                  <Icon name="x" size={12} strokeWidth={2.4} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <AuswahlChips ids={selectedIds} onToggle={onToggle} />
 
       {/* Speichern / Abbrechen */}
       <div className="mt-4 flex shrink-0 gap-2">

@@ -141,6 +141,18 @@ Profil teilen, Übungs-Detail, Trainings-Log und der Auto-Generator. Prüfen: Di
 Panel-Höhe muss den vh-Deckel erreichen und es darf genau EIN scrollendes
 Element im Panel geben.
 
+**Was NICHT scrollt, wird gekürzt — nicht gedeckelt** (Leon 04.09.): Eine
+Chip-Reihe, eine Merkliste, eine Fußzeile mit Auswahl braucht bei 51 Einträgen
+keinen zweiten Scrollbalken, sondern eine Grenze. Muster in
+`components/schedule/AuswahlChips.tsx`: Die Reihe füllt zwei Zeilen, dahinter
+steht ein Zähler-Chip („+40 weitere"), ein Tipp öffnet auf sechs Zeilen. Die
+Zeilenzahl wird über `offsetTop` GEMESSEN, nicht geraten — wie viele Chips in
+eine Zeile passen, hängt an Fensterbreite und Wortlänge. Und auch das
+Aufklappen hat eine Grenze: Die Reihe steht zwischen Scrollbereich und
+Knopfzeile und schrumpft nicht (`shrink-0`); ohne Deckel schöbe sie den
+Speichern-Knopf aus dem Panel, das bei `overflow-hidden` einfach abschneidet.
+Sichtprüfung ohne Login: `/dev/auswahl-chips`.
+
 **Drei Stärken der Grundhaptik** (Attribut `data-press`):
 - *Knopf* (kein Attribut bzw. bare `data-press` auf `<a>`): hebt 1.02, sinkt .97.
 - `surface` (Karten, Kacheln): hebt 1.008, sinkt .99.
