@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import { useEffect, useRef, useState } from "react";
 import {
   DNA_CATEGORIES,
@@ -70,6 +71,7 @@ export default function DnaCategoryGrid({
               type="button"
               onClick={() => setSelectedId(active ? null : category.id)}
               aria-expanded={active}
+              data-press="surface"
               className="flex flex-col rounded-2xl p-3.5 text-left transition-colors"
               style={{
                 background: frameless
@@ -169,8 +171,11 @@ export default function DnaCategoryGrid({
         })}
       </div>
 
-      {/* Detail-Panel der gewählten Kategorie */}
-      {selected && (
+      {/* Detail-Panel der gewählten Kategorie. Der Inhalt wird auch bei
+          `open={false}` ausgewertet — deshalb bleibt das `selected &&` stehen;
+          die Austritts-Feder behält dabei die zuletzt gerenderte Fassung. */}
+      <Collapse open={selected !== null}>
+        {selected && (
         <div
           ref={panelRef}
           className="mt-3 rounded-2xl p-4 sm:p-5"
@@ -239,7 +244,8 @@ export default function DnaCategoryGrid({
             </div>
           )}
         </div>
-      )}
+        )}
+      </Collapse>
     </div>
   );
 }

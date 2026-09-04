@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import { useState } from "react";
 import {
   DNA_CATEGORIES,
@@ -105,6 +106,7 @@ export default function GegnerDnaAccordion({
             <button
               type="button"
               onClick={() => toggle(category.id)}
+              data-press="quiet"
               className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
               aria-expanded={open}
             >
@@ -155,7 +157,7 @@ export default function GegnerDnaAccordion({
             </button>
 
             {/* Inhalt */}
-            {open && (
+            <Collapse open={open}>
               <div
                 className="border-t px-4 py-4"
                 style={{ borderColor: "var(--ink-4)" }}
@@ -211,7 +213,7 @@ export default function GegnerDnaAccordion({
                   </div>
                 )}
               </div>
-            )}
+            </Collapse>
           </div>
         );
       })}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import PageHeader from "@/components/PageHeader";
 import { useState } from "react";
 import { SPORT_QUIZZES } from "@/lib/quiz-data";
@@ -304,6 +305,8 @@ export default function RegelnPage() {
               >
                 <button
                   onClick={() => toggleSection(section.title)}
+                  aria-expanded={open}
+                  data-press="quiet"
                   className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-carbon-600/40"
                 >
                   <h3 className="font-bold uppercase tracking-wider">{section.title}</h3>
@@ -315,7 +318,7 @@ export default function RegelnPage() {
                     ▾
                   </span>
                 </button>
-                {open && (
+                <Collapse open={open}>
                   <div className="border-t border-carbon-500/60 px-6 py-4">
                     <ul className="space-y-2">
                       {section.items.map((item, idx) => (
@@ -326,7 +329,7 @@ export default function RegelnPage() {
                       ))}
                     </ul>
                   </div>
-                )}
+                </Collapse>
               </div>
             );
           })}

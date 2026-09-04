@@ -14,6 +14,7 @@
  * der Eintrag bleibt mit `revokedAt` stehen.
  */
 
+import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import { SheetShell, useLetzterWert } from "@/components/motion";
 import InviteStatusChip from "@/components/InviteStatusChip";
@@ -231,7 +232,7 @@ function InviteDetailInhalt({
                 Die Notiz hilft dir, den Code später wiederzuerkennen — sie
                 steht nur in deiner Übersicht, nie im Link.
               </p>
-              {noteDirty && (
+              <Collapse open={noteDirty}>
                 <button
                   type="button"
                   onClick={() => void handleSaveNote()}
@@ -247,7 +248,7 @@ function InviteDetailInhalt({
                   <Icon name="check" size={13} strokeWidth={2.4} />
                   {savingNote ? "Speichere…" : "Notiz speichern"}
                 </button>
-              )}
+              </Collapse>
             </div>
 
             <div className="flex flex-col">

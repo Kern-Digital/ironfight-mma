@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import PageHead from "@/components/shell/PageHead";
 import TrainerHint from "@/components/TrainerHint";
 import Skeleton from "@/components/ui/Skeleton";
@@ -651,6 +652,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
                 type="button"
                 onClick={() => setAreasOpen((o) => !o)}
                 aria-expanded={areasOpen}
+                data-press="quiet"
                 className="t-interactive flex min-h-hit w-full items-center gap-2 rounded-field px-2 text-left"
               >
                 <span className="t-label">Kampfbereiche · Abdeckung</span>
@@ -673,11 +675,11 @@ function StudentDetailContent({ uid }: { uid: string }) {
                   <Icon name="arrow-right" size={14} strokeWidth={2.2} />
                 </span>
               </button>
-              {areasOpen && (
+              <Collapse open={areasOpen}>
                 <div className="mt-2">
                   <AreaCoverageChart scores={analysis.areaScores} highlightWeak />
                 </div>
-              )}
+              </Collapse>
             </div>
 
             {/* Strong / Weak summary */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import { useRights } from "@/lib/auth-context";
 import { useTrainerHint } from "@/lib/use-trainer-hints";
@@ -40,9 +41,13 @@ export default function TrainerHint({
   const { seen, dismiss } = useTrainerHint(id);
 
   if (!rights.trainer && !rights.verwaltung) return null;
-  if (seen) return null;
 
   return (
+    // Der Hinweis KLAPPT weg, statt zu verschwinden: Vorher gab `dismiss`
+    // schlagartig `null` zurück und die halbe Seite sprang nach oben
+    // (MOTION-BRIEF §1 — auch das Verschwinden ist eine Bewegung). `seen`
+    // startet true, es blitzt also nichts auf, was schon weggeklickt war.
+    <Collapse open={!seen}>
     <div
       role="status"
       // Auf dem Handy steht „Verstanden" UNTER dem Text: als dritte Spalte
@@ -89,5 +94,6 @@ export default function TrainerHint({
         Verstanden
       </button>
     </div>
+    </Collapse>
   );
 }

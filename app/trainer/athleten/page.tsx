@@ -39,6 +39,7 @@
  * 32 — und ein Kurs trägt Disziplin und Altersgruppe schon in sich.
  */
 
+import { Collapse } from "@/components/motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHead from "@/components/shell/PageHead";
 import TrainerHint from "@/components/TrainerHint";
@@ -382,7 +383,7 @@ function StudentsContent() {
         {/* Auswahlleiste. Sie steht ÜBER der Filterleiste, weil man aus ihr
             heraus weiterfiltert: ein paar Athleten aus Kurs A wählen, auf
             Kurs B umschalten, dort weitersammeln. */}
-        {auswahlmodus && (
+        <Collapse open={auswahlmodus}>
           <div className="auswahl-leiste">
             <span className="t-label" style={{ color: "var(--accent-text)" }}>
               {gewaehlt.length} {gewaehlt.length === 1 ? "Athlet" : "Athleten"}{" "}
@@ -413,7 +414,7 @@ function StudentsContent() {
               </p>
             )}
           </div>
-        )}
+        </Collapse>
 
         {/* Suche + Filter — EINE Reihe aus Pillen (Leon 03.09.2026).
             Die Gooey-Suche steht vorn und wächst beim Öffnen; die drei

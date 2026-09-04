@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -194,7 +195,7 @@ function OpponentsLibraryContent() {
         </div>
 
         {/* Inline-Editor: neue Gegner-DNA */}
-        {showNewOpponent && (
+        <Collapse open={showNewOpponent}>
           <div className="mb-6 mt-4">
             <h3
               className="font-display-ta mb-4 font-black uppercase"
@@ -209,7 +210,7 @@ function OpponentsLibraryContent() {
               onCancel={() => setShowNewOpponent(false)}
             />
           </div>
-        )}
+        </Collapse>
 
         {/* Bibliothek */}
         {opponents === null ? (

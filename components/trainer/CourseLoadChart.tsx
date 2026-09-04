@@ -17,6 +17,7 @@
  * auf ihre Länge — angehalten bei prefers-reduced-motion.
  */
 
+import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import type { CourseLoad } from "@/lib/gym-stats";
 // AUSNAHME (MOTION-BRIEF §3.1): Diagramm mit eigenen Pfad-Animationen.
@@ -40,9 +41,10 @@ export default function CourseLoadChart({
 
   const withFeedback = courses.filter((c) => c.count > 0);
   const silent = courses.filter((c) => c.count === 0);
-  const visible = expanded
-    ? withFeedback
-    : withFeedback.slice(0, COLLAPSED_ROWS);
+  // Zwei Listen statt einer geschnittenen: Die ersten acht stehen immer, der
+  // Rest klappt auf (MOTION-BRIEF §1 — auch das Zuklappen ist eine Bewegung).
+  const basis = withFeedback.slice(0, COLLAPSED_ROWS);
+  const rest = withFeedback.slice(COLLAPSED_ROWS);
   const maxCount = withFeedback[0]?.count ?? 0;
 
   return (
@@ -55,56 +57,31 @@ export default function CourseLoadChart({
         </p>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {visible.map((c, i) => (
-            <div
+          {basis.map((c, i) => (
+            <Zeile
               key={c.trainingBlockId}
-              className="grid items-center gap-3"
-              style={{ gridTemplateColumns: "minmax(0, 45%) 1fr auto" }}
-            >
-              <span className="flex min-w-0 items-baseline gap-1.5">
-                <span
-                  className="shrink-0"
-                  style={{
-                    font: "var(--type-nav-meta)",
-                    color: "var(--text-3)",
-                  }}
-                >
-                  {courseSlot(c)}
-                </span>
-                <span
-                  className="truncate"
-                  style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
-                >
-                  {c.title}
-                </span>
-              </span>
-              <div className="t-progress">
-                <motion.span
-                  initial={reduced ? false : { width: "0%" }}
-                  animate={{
-                    width: `${maxCount > 0 ? (c.count / maxCount) * 100 : 0}%`,
-                  }}
-                  transition={{
-                    duration: 0.6,
-                    delay: i * 0.04,
-                    ease: [0.2, 0.8, 0.2, 1],
-                  }}
-                />
-              </div>
-              <span
-                className="w-8 text-right"
-                style={{
-                  font: "var(--type-num)",
-                  fontVariantNumeric: "tabular-nums",
-                  color: "var(--text-2)",
-                }}
-              >
-                {c.count}
-              </span>
-            </div>
+              c={c}
+              i={i}
+              maxCount={maxCount}
+              reduced={reduced}
+            />
           ))}
+          <Collapse open={expanded}>
+            <div className="flex flex-col gap-2.5 pt-2.5">
+              {rest.map((c, i) => (
+                <Zeile
+                  key={c.trainingBlockId}
+                  c={c}
+                  i={i + COLLAPSED_ROWS}
+                  maxCount={maxCount}
+                  reduced={reduced}
+                />
+              ))}
+            </div>
+          </Collapse>
         </div>
       )}
+
 
       {withFeedback.length > COLLAPSED_ROWS && (
         <button
@@ -152,6 +129,73 @@ export default function CourseLoadChart({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Zeile ────────────────────────────────────────────────────────────────
+
+/**
+ * Ein Kurs im Balkendiagramm. Eigene Komponente, seit die Liste in zwei
+ * Teile zerfällt: acht Zeilen stehen immer, der Rest klappt auf. `i` ist der
+ * Platz in der GANZEN Liste — daran hängt der Versatz des Balkens.
+ */
+function Zeile({
+  c,
+  i,
+  maxCount,
+  reduced,
+}: {
+  c: CourseLoad;
+  i: number;
+  maxCount: number;
+  reduced: boolean | null;
+}) {
+  return (
+    <div
+      className="grid items-center gap-3"
+      style={{ gridTemplateColumns: "minmax(0, 45%) 1fr auto" }}
+    >
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        <span
+          className="shrink-0"
+          style={{
+            font: "var(--type-nav-meta)",
+            color: "var(--text-3)",
+          }}
+        >
+          {courseSlot(c)}
+        </span>
+        <span
+          className="truncate"
+          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+        >
+          {c.title}
+        </span>
+      </span>
+      <div className="t-progress">
+        <motion.span
+          initial={reduced ? false : { width: "0%" }}
+          animate={{
+            width: `${maxCount > 0 ? (c.count / maxCount) * 100 : 0}%`,
+          }}
+          transition={{
+            duration: 0.6,
+            delay: i * 0.04,
+            ease: [0.2, 0.8, 0.2, 1],
+          }}
+        />
+      </div>
+      <span
+        className="w-8 text-right"
+        style={{
+          font: "var(--type-num)",
+          fontVariantNumeric: "tabular-nums",
+          color: "var(--text-2)",
+        }}
+      >
+        {c.count}
+      </span>
     </div>
   );
 }

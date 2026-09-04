@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 
 import { getTechniqueById, youtubeSearchUrl, CATEGORY_LABEL } from "@/lib/techniques";
@@ -51,15 +52,18 @@ export default function TechniqueInlinePanel({
   const MISTAKES_PREVIEW = 3;
   const CUES_PREVIEW = 3;
 
+  // Vorschau und Rest als ZWEI Listen: Der Rest klappt auf, statt an die
+  // Vorschau angehängt zu werden (MOTION-BRIEF §1). Ohne Schalter steht alles
+  // in der Vorschau — dann bleibt der zweite Block leer.
   const showStepsToggle = t.steps.length > 4;
-  const visibleSteps = showStepsToggle && !stepsExpanded
+  const visibleSteps = showStepsToggle
     ? t.steps.slice(0, STEPS_PREVIEW)
     : t.steps;
+  const restSteps = showStepsToggle ? t.steps.slice(STEPS_PREVIEW) : [];
 
-  const visibleMistakes = !mistakesExpanded
-    ? t.commonMistakes.slice(0, MISTAKES_PREVIEW)
-    : t.commonMistakes;
   const showMistakesToggle = t.commonMistakes.length > MISTAKES_PREVIEW;
+  const visibleMistakes = t.commonMistakes.slice(0, MISTAKES_PREVIEW);
+  const restMistakes = t.commonMistakes.slice(MISTAKES_PREVIEW);
 
   const visibleCues = t.coachingCues?.slice(0, CUES_PREVIEW) ?? [];
 
@@ -148,6 +152,18 @@ export default function TechniqueInlinePanel({
             </li>
           ))}
         </ol>
+        <Collapse open={stepsExpanded}>
+          <ol className="mt-1.5 space-y-1.5">
+            {restSteps.map((step, idx) => (
+              <li key={idx} className="flex gap-2 text-xs text-foreground/80">
+                <span className="font-display font-black text-blood shrink-0 w-4">
+                  {idx + 1 + STEPS_PREVIEW}.
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </Collapse>
         {showStepsToggle && (
           <button
             onClick={() => setStepsExpanded((p) => !p)}
@@ -174,6 +190,16 @@ export default function TechniqueInlinePanel({
               </li>
             ))}
           </ul>
+          <Collapse open={mistakesExpanded}>
+            <ul className="mt-1 space-y-1">
+              {restMistakes.map((m) => (
+                <li key={m} className="flex gap-2 text-xs text-foreground/75">
+                  <span className="text-blood shrink-0"><Icon name="warn" size={14} /></span>
+                  <span>{m}</span>
+                </li>
+              ))}
+            </ul>
+          </Collapse>
           {showMistakesToggle && (
             <button
               onClick={() => setMistakesExpanded((p) => !p)}

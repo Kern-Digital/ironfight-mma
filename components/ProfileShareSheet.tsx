@@ -21,6 +21,7 @@
  * `profileShares` ausdrücklich zu, weil das Feld dem Inhaber gehört.
  */
 
+import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import { SheetShell } from "@/components/motion";
 import type { GeteiltMitMir } from "@/components/ProfileShareButton";
@@ -267,6 +268,7 @@ function ShareSheetInhalt({
                       onClick={() =>
                         setOffenerKollege(offen ? null : kollege.uid)
                       }
+                      data-press="quiet"
                       className="t-interactive -m-1 flex items-center gap-3 rounded-field p-1 text-left"
                     >
                       <span
@@ -323,7 +325,7 @@ function ShareSheetInhalt({
                         dort mitten im Namen um und stand zweizeilig neben
                         einem einzeiligen „Wettkämpfe". Untereinander trägt
                         jeder Chip seinen Namen in einer Zeile. */}
-                    {offen && (
+                    <Collapse open={offen}>
                     <div className="flex flex-col gap-2">
                       {SHARE_AREAS.map((bereich) => (
                         <BereichChip
@@ -346,7 +348,7 @@ function ShareSheetInhalt({
                         />
                       ))}
                     </div>
-                    )}
+                    </Collapse>
                   </div>
                 );
               })

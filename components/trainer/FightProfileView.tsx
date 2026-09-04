@@ -12,6 +12,7 @@
  * OpponentEditor nutzen sie weiter gerahmt im alten Look.
  */
 
+import { Collapse } from "@/components/motion";
 import { Fragment, useState } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import {
@@ -164,6 +165,7 @@ export default function FightProfileView({
                 type="button"
                 onClick={() => setOpenId(open ? null : b.id)}
                 aria-expanded={open}
+                data-press="quiet"
                 className="t-interactive flex min-h-hit w-full items-center gap-3 rounded-badge py-3 text-left"
               >
                 <BlockHeader block={b} />
@@ -186,7 +188,9 @@ export default function FightProfileView({
                 </span>
               </button>
             )}
-            {open && <div className="pb-4 pt-1">{b.content}</div>}
+            <Collapse open={open}>
+              <div className="pb-4 pt-1">{b.content}</div>
+            </Collapse>
           </Fragment>
         );
       })}
