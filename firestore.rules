@@ -91,6 +91,12 @@ service cloud.firestore {
     //
     // DENY BY DEFAULT: Fehlt `profileShares` oder ist ein Bereich leer, ist ein
     // Stab-Konto dort privat — ohne Backfill, ohne Sonderfall (Konzept §3).
+    // Entsprechung im Code: hasAnyRight(readRoleSet(...)) aus lib/roles.ts.
+    // Der Rueckfall auf das alte `role` fehlt hier bewusst — er faellt mit
+    // legacyRole() zusammen weg, und am 04.09.2026 nachgemessen trug KEINES
+    // der 37 users-Dokumente nur den Altwert (0 Abweichungen). Sollte es je
+    // eines geben, meldet sich das als abgewiesener Camp-Schreibvorgang
+    // (ownerIsStaffStimmt unten) — laut, nicht still.
     function istStabKonto(d) {
       return d.get("trainer", false) == true
              || d.get("verwaltung", false) == true
@@ -113,6 +119,29 @@ service cloud.firestore {
                  && (request.auth.uid == uid
                      || (sameGym(d)
                          && (!istStabKonto(d) || hatFreigabe(d, bereich)))));
+    }
+
+    // ─── Wettkampf-Freigabe: das materialisierte `ownerIsStaff` ────────────
+    //
+    // Eine collectionGroup-Query kann keinen get() auf das Eltern-Dokument
+    // machen — sie muss allein aus dem Camp-Dokument beweisbar sein. Deshalb
+    // traegt jedes Camp mit, ob sein Besitzer ein Stab-Konto ist (Muster
+    // `trainerPlans.audienceUids`, Begruendung in lib/fight-camp.ts).
+    //
+    // GESCHRIEBEN WIRD DAS FELD VOM CLIENT — also muss es beim Schreiben
+    // gegen die Wahrheit gehalten werden. Ohne diesen Vergleich koennte
+    // jemand mit Wettkampf-Freigabe das Camp eines Kollegen auf false setzen
+    // und es damit gym-weit sichtbar machen: aus „einer darf" wuerde „alle
+    // duerfen". Der get() faellt nur beim SCHREIBEN an, nie in einer Query.
+    // DIREKTER FELDZUGRIFF, KEIN get(…, default) — das Feld ist damit PFLICHT:
+    // Fehlt es, ist der Ausdruck ein Auswertungsfehler und der Schreibvorgang
+    // abgelehnt. Mit einem Default `false` waere ein Athleten-Camp OHNE das
+    // Feld durchgegangen und danach aus der gym-weiten Liste verschwunden
+    // (`== false` matcht ein fehlendes Feld nicht) — ein Camp, das niemand
+    // sieht und niemand sucht.
+    function ownerIsStaffStimmt(uid) {
+      return request.resource.data.ownerIsStaff
+             == istStabKonto(get(/databases/$(database)/documents/users/$(uid)).data);
     }
 
     match /users/{uid} {
@@ -188,17 +217,32 @@ service cloud.firestore {
       // gewinnt. Genau diese Falle steckt weiter unten in der
       // collectionGroup-Regel fuer fightCamps (dort noch offen, s. u.).
       match /{subcollection}/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid
-                           && subcollection != "videoAnalyses"
-                           && subcollection != "fightProfile";
+        // OWNER-LESEN: fightCamps bleiben dabei — jeder sieht seine eigenen
+        // Wettkaempfe (Athleten-Dashboard).
+        allow read: if request.auth != null && request.auth.uid == uid
+                    && subcollection != "videoAnalyses"
+                    && subcollection != "fightProfile";
+        // OWNER-SCHREIBEN OHNE fightCamps (Schritt 2b): Sonst koennte der
+        // Besitzer `ownerIsStaff` frei setzen und den Vergleich unten
+        // umgehen. Kein Verlust — Camps legt und pflegt ausschliesslich der
+        // Trainerbereich; die Regel darunter laesst den Besitzer weiterhin
+        // durch, nur eben mit dem Vergleich.
+        allow write: if request.auth != null && request.auth.uid == uid
+                     && subcollection != "videoAnalyses"
+                     && subcollection != "fightProfile"
+                     && subcollection != "fightCamps";
         allow read: if request.auth != null
                     && subcollection != "videoAnalyses"
                     && subcollection != "fightProfile"
                     && subcollection != "fightCamps"
                     && canAccessMemberData(uid, "athlet");
 
-        // Admin schreibt in alle Sub-Collections (Demo-Seed)
-        allow write: if request.auth != null && isAdmin();
+        // Admin schreibt in alle Sub-Collections (Demo-Seed) — fightCamps
+        // ausgenommen, damit der `ownerIsStaff`-Vergleich unten AUSNAHMSLOS
+        // gilt. Ein Camp, das an dieser Regel vorbei mit falschem Feld
+        // entstuende, waere in keiner Liste zu sehen und in keiner zu suchen.
+        allow write: if request.auth != null && isAdmin()
+                     && subcollection != "fightCamps";
       }
 
       // Persoenliche Workoutplan-Kopien (Etappe Workout-Plaene, Teilschritt 3):
@@ -212,22 +256,29 @@ service cloud.firestore {
       // Trainer + Admin verwalten Wettkaempfe (fightCamps) — eigenes Gym,
       // bei Kollegen nur mit Freigabe im Bereich „wettkampf".
       //
-      // ACHTUNG, DIESE ZEILE HAELT HEUTE NICHT (gemessen 03.09.2026 per REST):
-      // Die collectionGroup-Regel `match /{path=**}/fightCamps/{campId}` weiter
-      // unten matcht DENSELBEN Pfad und prueft dort nur `sameGym`. Weil
-      // Firestore-Regeln ODER-verknuepft sind, gewinnt die grosszuegigere —
-      // Trainer A liest das Camp von Trainer B mit 200, ohne jede Freigabe, und
-      // eine erteilte Freigabe aendert daran nichts.
+      // DIESE ZEILE HAELT SEIT DEM 04.09.2026 (Schritt 2b). Bis dahin
+      // ueberstimmte die collectionGroup-Regel weiter unten sie: `{path=**}`
+      // matcht denselben Pfad und prueft dort nur `sameGym` — und weil
+      // Firestore-Regeln ODER-verknuepft sind, gewinnt die grosszuegigere. Ein
+      // Camp war damit fuer jeden Trainer des Gyms lesbar (per REST gemessen),
+      // und eine erteilte Freigabe aenderte daran nichts. Geschlossen wurde es
+      // nicht hier, sondern DORT: Die collectionGroup-Regel sortiert Camps von
+      // Stab-Konten jetzt ueber `ownerIsStaff` aus, sodass sie nur noch ueber
+      // diese Zeile ihren Weg finden.
       //
-      // Deshalb vergibt die Oberflaeche den Bereich „wettkampf" NOCH NICHT
-      // (lib/profile-sharing.ts) — ein Haekchen, das nichts haelt, waere eine
-      // falsche Sicherheitsaussage. Die Zeile hier steht trotzdem richtig, weil
-      // sie greift, sobald die collectionGroup-Regel Stab-Camps aussortieren
-      // kann (materialisiertes `ownerIsStaff` am Camp, Muster
-      // `trainerPlans.audienceUids`) — Schritt 2b, Bauplan im CLAUDE.md-Backlog.
+      // SCHREIBEN GETRENNT VOM LESEN, weil `request.resource` beim Loeschen
+      // null ist — ein `allow write` mit ownerIsStaffStimmt() waere dort ein
+      // Auswertungsfehler und damit eine Ablehnung. Create und Update tragen
+      // den Vergleich, Delete braucht ihn nicht: Ein geloeschtes Camp kann
+      // nichts mehr behaupten.
       match /fightCamps/{campId} {
-        allow read, write: if request.auth != null
-                           && canAccessMemberData(uid, "wettkampf");
+        allow read: if request.auth != null
+                    && canAccessMemberData(uid, "wettkampf");
+        allow create, update: if request.auth != null
+                              && canAccessMemberData(uid, "wettkampf")
+                              && ownerIsStaffStimmt(uid);
+        allow delete: if request.auth != null
+                      && canAccessMemberData(uid, "wettkampf");
       }
 
       // Kampfprofil = kuratierte DeepFight-Auswertung (lib/fight-profile.ts).
@@ -254,40 +305,58 @@ service cloud.firestore {
     }
 
     // CollectionGroup-Query: zentraler Wettkampfbereich liest fightCamps
-    // gym-weit ueber alle Schueler — nur eigenes Gym (Query braucht
-    // where("gymId","==",…)); Admin gym-uebergreifend.
+    // gym-weit ueber alle Athleten — nur eigenes Gym und nur ATHLETEN-Camps.
+    // Die Query braucht deshalb BEIDE Filter:
+    //   where("gymId","==",…) und where("ownerIsStaff","==",false)
+    // (lib/fight-camp.ts, listAllFightCamps). Fehlt einer, ist die Query fuer
+    // die Rules-Engine nicht beweisbar und wird KOMPLETT abgelehnt — sie
+    // liefert nicht etwa weniger Dokumente.
     //
-    // ═══ OFFENE LUECKE, GEMESSEN AM 03.09.2026 — Schritt 2b ═══════════════
+    // ═══ WARUM HIER `ownerIsStaff` STEHT — die Luecke von Schritt 2b ══════
     // `{path=**}` matcht NICHT nur collectionGroup-Queries. Es matcht auch den
     // direkten Pfad `users/{uid}/fightCamps/{campId}` — also genau den, den die
     // strenge Regel oben mit `canAccessMemberData(uid, "wettkampf")` schuetzen
     // soll. Firestore-Regeln sind ODER-verknuepft: Eine strengere Regel daneben
-    // schraenkt nichts ein, die grosszuegigere gewinnt. Hier steht nur
-    // `sameGym` — damit liest jeder Trainer des Gyms jedes Camp.
+    // schraenkt nichts ein, die grosszuegigere gewinnt. Solange hier nur
+    // `sameGym` stand, las jeder Trainer des Gyms jedes Camp.
     //
-    // Per REST mit echten ID-Tokens belegt (Trainer A auf Trainer B):
-    //   Camp von B direkt lesen, KEINE Freigabe   → 200  (soll 403 sein)
+    // Per REST mit echten ID-Tokens belegt (Trainer A auf Trainer B), VOR dem
+    // Fix:
+    //   Camp von B direkt lesen, KEINE Freigabe   → 200  (sollte 403 sein)
     //   athleteProfile von B, KEINE Freigabe      → 403  (Gate wirkt dort)
     //   Camp aus fremdem Gym                      → 403  (sameGym haelt)
     //   Camp von B NACH erteilter Freigabe        → 200  (unveraendert)
     //
-    // WARUM ES NICHT MIT EINER ZEILE ZU FLICKEN IST: Eine Query kann keinen
-    // `get()` auf das Eltern-Dokument machen — die Regel muss allein aus dem
-    // Camp-Dokument beweisbar sein. Der Weg ist deshalb ein materialisiertes
-    // Feld am Camp (`ownerIsStaff`, Muster `trainerPlans.audienceUids`), das
-    // hier `resource.data.get("ownerIsStaff", false) == false` verlangt; die
-    // Camps von Stab-Konten faenden dann nur noch ueber die strenge Regel oben
-    // ihren Weg. Dazu gehoeren: beide Schreibstellen in lib/fight-camp.ts, ein
-    // Nachziehen in /api/members/role, ein Backfill-Script und der Umbau von
-    // `listAllFightCamps` auf „gym-weit nur Athleten + Direktabfrage fuer
-    // freigegebene Kollegen". Bauplan im CLAUDE.md-Backlog.
+    // Eine Query kann keinen `get()` auf das Eltern-Dokument machen — die
+    // Regel muss allein aus dem Camp-Dokument beweisbar sein. Deshalb traegt
+    // jedes Camp die Antwort mit (`ownerIsStaff`, Muster
+    // `trainerPlans.audienceUids`), und diese Regel deckt nur noch die Camps
+    // ab, um die es ihr geht: die der Athleten. Die Camps von Stab-Konten
+    // finden ausschliesslich ueber die strenge Regel oben ihren Weg — und
+    // damit ueber die Freigabe.
     //
-    // Bis dahin vergibt die Oberflaeche den Bereich „wettkampf" NICHT
-    // (lib/profile-sharing.ts) — sie behauptet lieber nichts, als etwas
-    // Falsches zu behaupten.
+    // ═══ WARUM HIER `resource.data.ownerIsStaff` UND NICHT `.get(…, false)`
+    // GEMESSEN AM 04.09.2026, per REST mit echtem Trainer-Token. Ein erster
+    // Anlauf schrieb `resource.data.get("ownerIsStaff", false) == false` —
+    // sicher gegen Camps ohne das Feld, und deshalb naheliegend. Ergebnis:
+    //
+    //   Query nur mit gymId + orderBy  → HTTP 200, Stab-Camp WAR DABEI
+    //
+    // Die Query-Analyse der Rules-Engine versteht die `.get()`-Form NICHT als
+    // Einschraenkung. Sie verlangt daraufhin auch keinen passenden Filter und
+    // laesst die Abfrage durch — die Luecke blieb offen, obwohl die Regel
+    // richtig aussah. Nur der DIREKTE Feldzugriff zwingt die Query, den Filter
+    // `where("ownerIsStaff","==",false)` mitzubringen.
+    //
+    // Preis: Ein Camp OHNE das Feld ist hier ein Auswertungsfehler und damit
+    // verboten. Das ist die richtige Richtung (Deny by Default) und der Grund,
+    // warum der Backfill VOR diesem Deploy laufen muss
+    // (scripts/backfill-fight-camp-owner.mjs, Reihenfolge im Script-Kopf) und
+    // warum `ownerIsStaffStimmt` das Feld bei jedem Schreibvorgang erzwingt.
     // ═════════════════════════════════════════════════════════════════════
     match /{path=**}/fightCamps/{campId} {
       allow read: if request.auth != null
+                  && resource.data.ownerIsStaff == false
                   && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));
     }
 

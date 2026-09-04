@@ -13,10 +13,13 @@ import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   getStudentEntry,
+  isGhostAccount,
   isStaffEntry,
   listAllMembers,
   type StudentEntry,
 } from "@/lib/admin";
+import { darfSehen } from "@/lib/profile-sharing";
+import { hasAnyRight } from "@/lib/roles";
 import {
   createOpponent,
   getOpponent,
@@ -245,10 +248,28 @@ function NewCompetitionContent() {
     () => filteredMembers.find((s) => s.uid === user?.uid) ?? null,
     [filteredMembers, user?.uid],
   );
+  /**
+   * Kollegen, denen man einen Wettkampf anlegen darf.
+   *
+   * NUR MIT IHRER FREIGABE (Bereich „wettkampf", Schritt 2b): Ein Camp für
+   * einen Kollegen ohne Freigabe scheitert beim Speichern an den Regeln —
+   * die Auswahl darf ihn deshalb gar nicht erst anbieten. Ein Name, den man
+   * anklicken kann und der dann eine Fehlermeldung bringt, ist schlechter
+   * als kein Name.
+   *
+   * OHNE PLATTFORM-ADMINS: Ghost-Konten gehören keinem Gym-Team an
+   * (Begründung an `isGhostAccount` in lib/admin.ts).
+   */
   const staffEntries = useMemo(
     () =>
       filteredMembers
-        .filter((s) => s.uid !== user?.uid && isStaffEntry(s))
+        .filter(
+          (s) =>
+            s.uid !== user?.uid &&
+            isStaffEntry(s) &&
+            !isGhostAccount(s) &&
+            darfSehen(s.profileShares, "wettkampf", user?.uid ?? ""),
+        )
         .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "de")),
     [filteredMembers, user?.uid],
   );
@@ -329,6 +350,17 @@ function NewCompetitionContent() {
         ...base,
         gymId,
         opponentId: opponent.id,
+        // Dieselbe Bedingung wie `istStabKonto()` in den Firestore-Regeln:
+        // trainer ODER verwaltung ODER admin. Nicht `isStaffEntry` — das
+        // prüft nur das Trainer-Häkchen und ließe eine reine Verwaltung als
+        // Athletin durchgehen (lib/fight-camp.ts, Kopfkommentar).
+        ownerIsStaff: hasAnyRight(
+          members?.find((m) => m.uid === studentUid)?.rights ?? {
+            trainer: false,
+            verwaltung: false,
+            admin: false,
+          },
+        ),
       });
 
       router.push(`/trainer/competitions/${studentUid}/${created.id}`);

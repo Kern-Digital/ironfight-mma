@@ -31,6 +31,7 @@ import WeeklyFeedbackChart from "@/components/trainer/WeeklyFeedbackChart";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
+import { werTeiltMitMir } from "@/lib/profile-sharing";
 import { useAuth } from "@/lib/auth-context";
 import {
   fightCampProgress,
@@ -198,8 +199,9 @@ function GrowthSparkline({ values }: { values: number[] }) {
 // ─── Seite ───────────────────────────────────────────────────────────────────
 
 export default function TrainerDashboardPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const gymId = resolveGymId(profile);
+  const eigeneUid = user?.uid ?? "";
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   const [opponents, setOpponents] = useState<Opponent[] | null>(null);
@@ -235,11 +237,22 @@ export default function TrainerDashboardPage() {
     );
 
     try {
+      // Die Camps hängen an der Mitgliederliste: Sie trägt die Freigaben, und
+      // ohne sie wüsste die Abfrage nicht, welche Kollegen-Camps sie einzeln
+      // holen darf (lib/fight-camp.ts, listAllFightCamps). Alles Übrige läuft
+      // unverändert nebenher.
+      const memberP = listAllMembers(gymId).catch(() => [] as StudentEntry[]);
+      const campP = memberP.then((liste) =>
+        listAllFightCamps(gymId, {
+          eigeneUid,
+          freigegebeneUids: werTeiltMitMir(liste, "wettkampf", eigeneUid),
+        }).catch(() => [] as FightCamp[]),
+      );
       const [allCamps, gymOpponents, memberList, parts, sessions] =
         await Promise.all([
-          listAllFightCamps(gymId).catch(() => [] as FightCamp[]),
+          campP,
           listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
-          listAllMembers(gymId).catch(() => [] as StudentEntry[]),
+          memberP,
           getParticipationsSince(gymId, since).catch(() => null),
           getSessionCountForWeek(getWeekIdentifier()).catch(() => null),
         ]);
@@ -257,7 +270,7 @@ export default function TrainerDashboardPage() {
       setParticipations([]);
       setSessionCount(0);
     }
-  }, [gymId]);
+  }, [gymId, eigeneUid]);
 
   useEffect(() => {
     load();

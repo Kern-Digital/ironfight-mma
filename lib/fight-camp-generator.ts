@@ -303,6 +303,13 @@ export function generateFightCampPhases(
 
 /**
  * Erzeugt ein komplettes Fight-Camp aus den Inputs.
+ *
+ * `ownerIsStaff` fehlt im Rückgabetyp mit Absicht — das Feld gehört zur
+ * Ablage, nicht zur Planung (wie `gymId` und `opponentId`, die der Aufrufer
+ * ebenfalls ergänzt). Weil es an `FightCamp` PFLICHT ist, verlangt
+ * `createFightCamp` es damit sichtbar von jeder Anlegestelle; ein Vergessen
+ * ist ein Compile-Fehler statt eines Camps, das aus der Liste fällt
+ * (Begründung in lib/fight-camp.ts).
  */
 export function generateFightCamp(input: {
   studentUid: string;
@@ -313,7 +320,7 @@ export function generateFightCamp(input: {
   athleteLevel: AthleteLevel | null | undefined;
   analysis: TrainingHistoryAnalysis;
   opponent: OpponentProfile;
-}): Omit<FightCamp, "id" | "createdAt"> {
+}): Omit<FightCamp, "id" | "createdAt" | "ownerIsStaff"> {
   const startedAt = input.startedAt ?? new Date();
   const weeksTotal = Math.max(
     1,

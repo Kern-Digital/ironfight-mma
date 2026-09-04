@@ -26,7 +26,8 @@ import {
   resolveCampOpponent,
   type Opponent,
 } from "@/lib/opponents";
-import { getStudentEntry, type StudentEntry } from "@/lib/admin";
+import { getMemberEntry, type StudentEntry } from "@/lib/admin";
+import { hasAnyRight } from "@/lib/roles";
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -71,9 +72,14 @@ function CompetitionDetailContent({
     setCamp(null);
     setOpponent(null);
     try {
+      // getMemberEntry statt getStudentEntry: Die Seite braucht nur den
+      // NAMEN, und der steht am users-Dokument. Das Athletenprofil eine Ebene
+      // tiefer hängt am Bereich „athlet" — wer seinen Wettkampf freigibt,
+      // muss dafür nicht auch sein Profil hergeben, und dann stünde hier
+      // sonst „Athlet" statt eines Namens.
       const [c, s] = await Promise.all([
         getFightCamp(uid, campId),
-        getStudentEntry(uid).catch(() => null),
+        getMemberEntry(uid).catch(() => null),
       ]);
       if (!c) throw new Error("Wettkampf nicht gefunden");
       setCamp(c);
@@ -88,6 +94,17 @@ function CompetitionDetailContent({
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * `ownerIsStaff` bei jedem Speichern mitschreiben (Schritt 2b). Es heilt
+   * Camps aus der Zeit vor dem Backfill und zieht nach, falls sich die Rechte
+   * des Besitzers geändert haben. Steht der Name (noch) nicht fest, bleibt das
+   * Feld weg — dann behält das Dokument seinen bisherigen Wert, und die Regel
+   * prüft weiter gegen den.
+   */
+  function ownerFlag(): { ownerIsStaff?: boolean } {
+    return student ? { ownerIsStaff: hasAnyRight(student.rights) } : {};
+  }
 
   async function handleSaveDna(value: OpponentEditorValue) {
     if (!camp) return;
@@ -109,7 +126,7 @@ function CompetitionDetailContent({
         actionStats: value.actionStats,
         opponentId: camp.opponent.opponentId ?? camp.opponentId ?? null,
       };
-      await updateFightCamp(uid, campId, { opponent });
+      await updateFightCamp(uid, campId, { opponent, ...ownerFlag() });
       await load();
       setEditingDna(false);
     } catch (err) {
@@ -123,7 +140,7 @@ function CompetitionDetailContent({
     if (!camp) return;
     setBusy(true);
     try {
-      await updateFightCamp(uid, campId, { status });
+      await updateFightCamp(uid, campId, { status, ...ownerFlag() });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Status-Update fehlgeschlagen");

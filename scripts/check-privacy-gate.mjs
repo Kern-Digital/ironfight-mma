@@ -21,6 +21,24 @@
  *   C (Athlet) liest B                          → 403
  *   Der Inhaber schreibt seine Freigabe selbst  → 200
  *   Der Inhaber schreibt sich ein Recht         → 403
+ *
+ * SEIT SCHRITT 2b (04.09.2026) STEHEN DIE WETTKÄMPFE MIT DRIN. Sie waren die
+ * Ausnahme: `match /{path=**}/fightCamps/{campId}` matchte auch den direkten
+ * Pfad und prüfte dort nur `sameGym` — die großzügigere Regel gewann, jeder
+ * Trainer las jedes Camp. Geschlossen mit einem materialisierten
+ * `ownerIsStaff` am Camp (lib/fight-camp.ts). Geprüft wird deshalb beides:
+ * der EINZELZUGRIFF wie bei den anderen Bereichen UND die gym-weite
+ * collectionGroup-Query, die den Fix überhaupt erst nötig machte.
+ *
+ *   A liest C-Camp (Athlet)                     → 200
+ *   A liest B-Camp ohne Freigabe                → 403   (war 200)
+ *   nur athlet frei → B-Camp                    → 403   (Bereichstrennung)
+ *   wettkampf frei  → B-Camp                    → 200
+ *   gym-weite Query mit ownerIsStaff==false     → nur das Athleten-Camp
+ *   gym-weite Query OHNE den Filter             → 403   (Regel greift)
+ *   A setzt am eigenen Camp ownerIsStaff:false  → 403   (Schreibvergleich)
+ *   A ändert am eigenen Camp den Namen          → 200   (Gegenprobe)
+ *
  * Danach alles löschen und Bestand zählen.
  */
 import { readFileSync } from "node:fs";
@@ -51,6 +69,7 @@ const konten = {
   C: { email: "gate-c@tidal-athletics.invalid", rights: { trainer: false, verwaltung: false, admin: false }, name: "Athlet C" },
 };
 const uids = {};
+const campIds = {};
 let fehler = 0;
 try {
   for (const [k, v] of Object.entries(konten)) {
@@ -62,6 +81,22 @@ try {
     });
     await db.collection("users").doc(u.uid).collection("athleteProfile").doc("main").set({ level: "beginner" });
     await db.collection("users").doc(u.uid).collection("fightProfile").doc("main").set({ dna: {} });
+    // Ein Wettkampf je Konto. `ownerIsStaff` spiegelt die Rechte — genau das,
+    // was der Backfill und beide Schreibstellen in lib/fight-camp.ts tun.
+    const camp = await db.collection("users").doc(u.uid).collection("fightCamps").add({
+      studentUid: u.uid,
+      gymId: GYM,
+      ownerIsStaff: v.rights.trainer || v.rights.verwaltung || v.rights.admin,
+      createdBy: u.uid,
+      competitionName: `Testkampf ${k}`,
+      competitionDate: new Date(Date.now() + 30 * 864e5),
+      startedAt: new Date(),
+      weeksTotal: 4,
+      status: "active",
+      opponent: { name: "Prüfgegner", style: "striker", stance: "orthodox", strengths: [], weaknesses: [], favoriteAttacks: [] },
+      phases: [],
+    });
+    campIds[k] = camp.id;
   }
 
   async function token(k) {
@@ -103,9 +138,71 @@ try {
       ),
     },
   });
-  /** Freigabe per Admin-SDK setzen (schneller Aufbau eines Zustands). */
+  /**
+   * Freigabe per Admin-SDK setzen (schneller Aufbau eines Zustands).
+   *
+   * ALLE DREI BEREICHE STEHEN IMMER AUSDRÜCKLICH DRIN — auch die leeren.
+   * `set(..., { merge: true })` mergt eine Map FELDWEISE: Ein Aufruf mit nur
+   * `{ wettkampf: [...] }` ließ die vorher gesetzte `athlet`-Freigabe stehen,
+   * und der Test meldete daraufhin einen Zugriff als Lücke, den er selbst
+   * erlaubt hatte (gemessen 04.09.2026). Dieselbe Falle wie beim
+   * users-Rechte-Spiegel in lib/roles.ts, und dieselbe Lösung.
+   */
   const setzeShares = (k, map) =>
-    db.collection("users").doc(uids[k]).set({ profileShares: map }, { merge: true });
+    db.collection("users").doc(uids[k]).set(
+      { profileShares: { athlet: [], deepfight: [], wettkampf: [], ...map } },
+      { merge: true },
+    );
+
+  /** Ein Camp direkt lesen — derselbe Weg wie `getFightCamp`. */
+  const leseCamp = (alsK, zielK) => lese(alsK, zielK, `fightCamps/${campIds[zielK]}`);
+
+  /**
+   * Die gym-weite collectionGroup-Query per REST — genau die Abfrage, die
+   * `listAllFightCamps` stellt. Sie ist der eigentliche Grund für
+   * `ownerIsStaff`: Eine Query kann keinen get() aufs Eltern-Dokument machen.
+   *
+   * Rückgabe: { status, ids } — bei 200 die Camp-IDs, die durchkamen.
+   * Ein fehlender Index meldet sich als 400, nicht als 403; die beiden
+   * auseinanderzuhalten ist der halbe Wert dieser Prüfung.
+   */
+  async function gymWeiteCampQuery(alsK, mitOwnerFilter) {
+    const t = await token(alsK);
+    const filters = [
+      { fieldFilter: { field: { fieldPath: "gymId" }, op: "EQUAL", value: { stringValue: GYM } } },
+    ];
+    if (mitOwnerFilter) {
+      filters.push({
+        fieldFilter: { field: { fieldPath: "ownerIsStaff" }, op: "EQUAL", value: { booleanValue: false } },
+      });
+    }
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:runQuery`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${t}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "fightCamps", allDescendants: true }],
+          where: { compositeFilter: { op: "AND", filters } },
+          // Die Sortierung gehört DAZU, nicht weg: Genau so fragt
+          // listAllFightCamps, und nur so trifft die Abfrage einen Index, den
+          // es gibt. Ohne orderBy verlangt Firestore einen eigenen
+          // COLLECTION_GROUP-Index auf gymId — der Lauf endet dann in 400
+          // („requires an index"), und ein 400 beweist über die REGELN nichts.
+          orderBy: [{ field: { fieldPath: "competitionDate" }, direction: "DESCENDING" }],
+        },
+      }),
+    });
+    if (r.status !== 200) {
+      const text = await r.text();
+      return { status: r.status, ids: [], hinweis: text.slice(0, 160) };
+    }
+    const rows = await r.json();
+    const ids = (Array.isArray(rows) ? rows : [])
+      .filter((row) => row.document)
+      .map((row) => row.document.name.split("/").pop());
+    return { status: 200, ids };
+  }
 
   const erwarte = (bez, ist, soll) => {
     if (ist !== soll) fehler += 1;
@@ -169,6 +266,72 @@ try {
       return r.status;
     })(),
     403,
+  );
+
+  // ─── Wettkämpfe (Schritt 2b, 04.09.2026) ────────────────────────────────
+  //
+  // Vor dem Fix las A das Camp von B mit 200 — ohne Freigabe, und auch die
+  // erteilte Freigabe änderte nichts. Beides steht hier als Zeile.
+  console.log("\nWETTKÄMPFE — Einzelzugriff:");
+  await setzeShares("B", {});
+  erwarte("A liest C-Camp (Athlet)", await leseCamp("A", "C"), 200);
+  erwarte("A liest sein eigenes Camp", await leseCamp("A", "A"), 200);
+  erwarte("A liest B-Camp (Kollege, privat)", await leseCamp("A", "B"), 403);
+
+  await setzeShares("B", { athlet: [uids.A], deepfight: [uids.A] });
+  erwarte("athlet+deepfight frei → B-Camp", await leseCamp("A", "B"), 403);
+
+  await setzeShares("B", { wettkampf: [uids.A] });
+  erwarte("wettkampf frei → B-Camp", await leseCamp("A", "B"), 200);
+  erwarte("wettkampf frei → B-Athletenprofil", await lese("A", "B"), 403);
+
+  await setzeShares("B", {});
+  erwarte("Freigabe zurück → B-Camp", await leseCamp("A", "B"), 403);
+
+  console.log("\nWETTKÄMPFE — die gym-weite Query:");
+  const mitFilter = await gymWeiteCampQuery("A", true);
+  erwarte("Query mit ownerIsStaff==false", mitFilter.status, 200);
+  if (mitFilter.status !== 200) console.log(`    Hinweis: ${mitFilter.hinweis}`);
+  erwarte(
+    "… liefert das Athleten-Camp",
+    mitFilter.ids.includes(campIds.C),
+    true,
+  );
+  erwarte(
+    "… und KEINES der beiden Trainer-Camps",
+    mitFilter.ids.includes(campIds.A) || mitFilter.ids.includes(campIds.B),
+    false,
+  );
+  const ohneFilter = await gymWeiteCampQuery("A", false);
+  erwarte("Query OHNE den Filter wird abgewiesen", ohneFilter.status, 403);
+
+  // ─── Der Schreibvergleich (ownerIsStaffStimmt) ──────────────────────────
+  //
+  // Ohne ihn könnte jemand mit Wettkampf-Freigabe ein fremdes Camp auf
+  // ownerIsStaff:false setzen und es damit gym-weit sichtbar machen. A ist
+  // Stab-Konto — `false` an seinem eigenen Camp ist also eine Lüge.
+  // ACHTUNG No-Op-Falle: Beide Werte unten ändern das Dokument wirklich.
+  console.log("\nWETTKÄMPFE — Schreibvergleich am Camp:");
+  async function schreibeCamp(alsK, zielK, felder) {
+    const t = await token(alsK);
+    const maske = Object.keys(felder).map((f) => `updateMask.fieldPaths=${f}`).join("&");
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/users/${uids[zielK]}/fightCamps/${campIds[zielK]}?${maske}`;
+    const r = await fetch(url, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${t}`, "content-type": "application/json" },
+      body: JSON.stringify({ fields: felder }),
+    });
+    return r.status;
+  }
+  erwarte(
+    "A setzt am eigenen Camp ownerIsStaff:false",
+    await schreibeCamp("A", "A", { ownerIsStaff: { booleanValue: false } }),
+    403,
+  );
+  erwarte(
+    "A ändert am eigenen Camp den Namen",
+    await schreibeCamp("A", "A", { competitionName: { stringValue: "Umbenannt" } }),
+    200,
   );
 } finally {
   for (const uid of Object.values(uids)) {

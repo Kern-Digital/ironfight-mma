@@ -43,6 +43,24 @@
       ]
     },
     {
+      "collectionGroup": "fightCamps",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "gymId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ownerIsStaff",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "competitionDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "videoAnalyses",
       "queryScope": "COLLECTION",
       "fields": [

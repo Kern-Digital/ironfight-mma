@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * „Wer darf dich sehen?" — die Freigabe des eigenen Profils an Kollegen.
- * Sheet in der Picker-Optik, geöffnet aus `components/ProfileSharingSection`.
+ * „Sichtbarkeit bearbeiten" — die Freigabe des eigenen Profils an Kollegen.
+ * Sheet in der Picker-Optik, geöffnet aus `components/ProfileShareButton`.
  * Muster: components/MemberRoleSheet.tsx.
  *
  * WARUM DIE HÄKCHEN HIER STEHEN UND NICHT IN DER KARTE: Dieselbe Begründung
@@ -22,8 +22,10 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import type { GeteiltMitMir } from "@/components/ProfileShareButton";
 import type { StudentEntry } from "@/lib/admin";
 import { memberName } from "@/lib/members";
+import Link from "next/link";
 import {
   SHARE_AREAS,
   bereicheFuer,
@@ -37,12 +39,6 @@ import { useEffect, useState } from "react";
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
   letterSpacing: "0.08em",
-  textTransform: "uppercase",
-};
-
-const META_FONT: React.CSSProperties = {
-  font: "var(--type-meta)",
-  letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
 
@@ -107,6 +103,7 @@ function BereichChip({
 export default function ProfileShareSheet({
   shares,
   kollegen,
+  teilenMitMir,
   onSave,
   onClose,
 }: {
@@ -114,16 +111,36 @@ export default function ProfileShareSheet({
   shares: ProfileShares;
   /**
    * Trainer des eigenen Gyms, ohne einen selbst UND ohne Plattform-Admins —
-   * die filtert `ProfileSharingSection` heraus (Ghost-Konten, Begründung an
+   * die filtert `ProfileShareButton` heraus (Ghost-Konten, Begründung an
    * `isGhostAccount` in lib/admin.ts). Deshalb behandelt dieses Sheet jede
    * Zeile gleich: Wer hier steht, ist ein Kollege im Gym.
    */
   kollegen: StudentEntry[];
+  /**
+   * Die GEGENRICHTUNG: Kollegen, die MIR etwas freigegeben haben.
+   *
+   * Sie stand bis zum 04.09.2026 als zweiter Block in der Karte auf der Seite.
+   * Mit der Karte ist sie hierher gezogen — sie gehört zur selben Frage
+   * („wer sieht wen"), kostet keine eigene Abfrage und hätte sonst gar keinen
+   * Ort mehr. Leer bleibt der Abschnitt weg.
+   */
+  teilenMitMir: GeteiltMitMir[];
   /** Speichert und schließt — wirft bei Fehler. */
   onSave: (naechste: ProfileShares) => Promise<void>;
   onClose: () => void;
 }) {
   const [entwurf, setEntwurf] = useState<ProfileShares>(shares);
+  /**
+   * Welcher Kollege gerade aufgeklappt ist (Leon 04.09.2026: „erst anzeigen,
+   * wenn man auf das Profil tippt").
+   *
+   * IMMER NUR EINER — dasselbe Muster wie das DeepFight-Akkordeon. Bei vier
+   * Kollegen standen sonst zwölf Schalter untereinander, und die eigentliche
+   * Frage („was darf Roman sehen") verschwand zwischen den Zeilen. Start
+   * geschlossen: Wer das Sheet öffnet, will meist nur nachsehen, was gerade
+   * gilt — und das steht schon im Satz unter dem Namen.
+   */
+  const [offenerKollege, setOffenerKollege] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = !gleicheShares(entwurf, shares);
@@ -169,7 +186,7 @@ export default function ProfileShareSheet({
       className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-label="Wer darf dich sehen?"
+      aria-label="Sichtbarkeit bearbeiten"
     >
       <button
         type="button"
@@ -198,14 +215,7 @@ export default function ProfileShareSheet({
               style={{ background: "var(--line-strong)" }}
             />
             <span className="t-sheet-title max-w-full truncate">
-              Wer darf dich sehen?
-            </span>
-            <span
-              className="max-w-full truncate"
-              style={{ ...META_FONT, color: "var(--text-3)" }}
-            >
-              {kollegen.length} {kollegen.length === 1 ? "Kollege" : "Kollegen"}{" "}
-              in deinem Gym
+              Sichtbarkeit bearbeiten
             </span>
           </div>
           <button
@@ -222,14 +232,13 @@ export default function ProfileShareSheet({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
           <div className="flex flex-col gap-4 pb-2">
             <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Als Trainer bleibst du für deine Kollegen erst einmal privat. Gib
-              frei, wer dich wie einen Athleten betreuen darf — Bereich für
-              Bereich.
+              Als Trainer entscheidest du selbst, mit wem du deine Daten und
+              Analysen teilst.
             </p>
 
-            {/* Was die zwei Bereiche umfassen — EINMAL, statt unter jedem
-                Häkchen jeder Person. Die Erklärung gehört zum Bereich, nicht
-                zur Person (Regel „Hilfstexte erklärend"). */}
+            {/* Was die Bereiche umfassen — EINMAL, statt unter jedem Häkchen
+                jeder Person. Die Erklärung gehört zum Bereich, nicht zur
+                Person (Regel „Hilfstexte erklärend"). */}
             <div
               className="flex flex-col gap-3 rounded-field p-3.5"
               style={{
@@ -258,12 +267,23 @@ export default function ProfileShareSheet({
               kollegen.map((kollege) => {
                 const name = memberName(kollege);
                 const aktive = bereicheFuer(entwurf, kollege.uid);
+                const offen = offenerKollege === kollege.uid;
                 return (
                   <div
                     key={kollege.uid}
                     className="t-card flex flex-col gap-3 p-3.5"
                   >
-                    <div className="flex items-center gap-3">
+                    {/* DIE GANZE ZEILE IST DAS KLICKZIEL — Bild, Name und
+                        Satz gehören zusammen, und auf dem Handy wäre ein
+                        Pfeil allein ein 16-px-Ziel. */}
+                    <button
+                      type="button"
+                      aria-expanded={offen}
+                      onClick={() =>
+                        setOffenerKollege(offen ? null : kollege.uid)
+                      }
+                      className="t-interactive -m-1 flex items-center gap-3 rounded-field p-1 text-left"
+                    >
                       <span
                         aria-hidden
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
@@ -286,7 +306,8 @@ export default function ProfileShareSheet({
                           {name}
                         </span>
                         {/* Der Satz FOLGT der Auswahl — siehe
-                            satzFuerPerson() in lib/profile-sharing.ts. */}
+                            satzFuerPerson() in lib/profile-sharing.ts. Er
+                            trägt im zugeklappten Zustand die ganze Auskunft. */}
                         <span
                           style={{
                             font: "var(--type-sub)",
@@ -296,9 +317,29 @@ export default function ProfileShareSheet({
                           {satzFuerPerson(aktive)}
                         </span>
                       </span>
-                    </div>
+                      <span
+                        aria-hidden
+                        className="shrink-0"
+                        style={{
+                          color: "var(--text-3)",
+                          transform: offen ? "rotate(180deg)" : "none",
+                          transition:
+                            "transform var(--dur-fast) var(--ease-out)",
+                          lineHeight: 0,
+                        }}
+                      >
+                        <Icon name="chevron-down" size={16} strokeWidth={2.4} />
+                      </span>
+                    </button>
 
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                    {/* EINE ZEILE JE BEREICH, auch am Desktop (Leon
+                        04.09.2026). Nebeneinander blieben bei drei Bereichen
+                        141 px je Chip — „Athletenprofil & Training" brach
+                        dort mitten im Namen um und stand zweizeilig neben
+                        einem einzeiligen „Wettkämpfe". Untereinander trägt
+                        jeder Chip seinen Namen in einer Zeile. */}
+                    {offen && (
+                    <div className="flex flex-col gap-2">
                       {SHARE_AREAS.map((bereich) => (
                         <BereichChip
                           key={bereich.key}
@@ -320,9 +361,54 @@ export default function ProfileShareSheet({
                         />
                       ))}
                     </div>
+                    )}
                   </div>
                 );
               })
+            )}
+
+            {/* ─── Und was umgekehrt bei mir ankommt ─────────────────────── */}
+            {teilenMitMir.length > 0 && (
+              <div className="flex flex-col gap-2 pt-1">
+                <div
+                  aria-hidden
+                  style={{ height: "1px", background: "var(--line)" }}
+                />
+                <span className="t-label pt-2">Mit dir geteilt</span>
+                {teilenMitMir.map(({ eintrag, bereiche }) => (
+                  // NAME OBEN, BEREICHE DARUNTER — nebeneinander drängte die
+                  // Bereichszeile den Namen auf 390 px vollständig aus der
+                  // Zeile und lief 23 px über den Rand (gemessen 03.09.2026).
+                  <Link
+                    key={eintrag.uid}
+                    href={`/trainer/athleten/${eintrag.uid}`}
+                    className="t-interactive flex min-h-hit items-center gap-3 rounded-field px-2 py-1.5"
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span
+                        className="truncate"
+                        style={{ font: "var(--type-body-strong)" }}
+                      >
+                        {memberName(eintrag)}
+                      </span>
+                      <span
+                        className="truncate"
+                        style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                      >
+                        {bereiche
+                          .map(
+                            (b) => SHARE_AREAS.find((a) => a.key === b)?.label ?? b,
+                          )
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <span aria-hidden style={{ color: "var(--text-3)" }}>
+                      <Icon name="arrow-right" size={16} strokeWidth={2.2} />
+                    </span>
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
         </div>

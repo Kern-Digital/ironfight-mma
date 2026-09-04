@@ -22,7 +22,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import AthleteProfileForm from "@/components/AthleteProfileForm";
-import ProfileSharingSection from "@/components/ProfileSharingSection";
+import ProfileShareButton from "@/components/ProfileShareButton";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
 import FightProfileView from "@/components/trainer/FightProfileView";
@@ -214,21 +214,32 @@ function KampfprofilContent() {
                 <HeaderChip tone="fight">DNA {dnaPct} %</HeaderChip>
               )}
             </div>
-            {isTrainer && user && (
-              <Link
-                href="/trainer/deepfight/me"
-                className="t-interactive mt-4 inline-flex min-h-hit items-center justify-center gap-2 self-start rounded-field px-5"
-                style={{
-                  ...BTN_FONT,
-                  background: "var(--grad-fight)",
-                  color: "var(--on-accent)",
-                  textDecoration: "none",
-                }}
-              >
-                <Icon name="video" size={14} strokeWidth={2.4} />
-                Meine Analyse starten
-              </Link>
-            )}
+            {/* Sichtbarkeit — wer aus dem Team mich sehen darf. Sitzt seit
+                dem 04.09.2026 hier ÜBER „Meine Analyse starten" statt als
+                eigene Karte weiter unten (Leons Festlegung): beides sind
+                Handlungen am eigenen Profil und gehören zusammen. Der Knopf
+                blendet sich bei Athleten aus (Begründung in der Komponente),
+                deshalb steht er AUSSERHALB der isTrainer-Bedingung — eine
+                reine Verwaltung ist ebenfalls ein Stab-Konto und damit
+                privat, startet aber keine Analyse. */}
+            <div className="mt-4 flex flex-col items-start gap-2">
+              <ProfileShareButton />
+              {isTrainer && user && (
+                <Link
+                  href="/trainer/deepfight/me"
+                  className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5"
+                  style={{
+                    ...BTN_FONT,
+                    background: "var(--grad-fight)",
+                    color: "var(--on-accent)",
+                    textDecoration: "none",
+                  }}
+                >
+                  <Icon name="video" size={14} strokeWidth={2.4} />
+                  Meine Analyse starten
+                </Link>
+              )}
+            </div>
           </div>
           {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
           {!hasStaffShell && (
@@ -411,12 +422,6 @@ function KampfprofilContent() {
               </div>
             </section>
           )}
-
-          {/* Sichtbarkeit — wer aus dem Team mich sehen darf. Steht direkt
-              ÜBER den Athleten-Daten: Wer seine Körperdaten pflegt, stellt
-              sich von selbst die Frage, wer die eigentlich liest. Der Block
-              blendet sich bei Athleten aus (Begründung in der Komponente). */}
-          <ProfileSharingSection />
 
           {/* Athleten-Daten (editierbar) */}
           <section className="flex flex-col gap-3">

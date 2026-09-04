@@ -14,38 +14,34 @@
  * `lib/roles.ts` für die Rechte.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * WARUM „WETTKÄMPFE" HIER (NOCH) FEHLT — gemessen am 03.09.2026, nicht
- * angenommen: Der Bereich hat in `firestore.rules` zwei Regeln, und die
- * großzügigere gewinnt. `match /{path=**}/fightCamps/{campId}` matcht nicht
- * nur collectionGroup-Queries, sondern denselben Pfad wie
- * `match /users/{uid}/fightCamps/{campId}` — und prüft dort nur `sameGym`.
- * Firestore-Regeln sind ODER-verknüpft: Eine strengere Regel daneben schränkt
- * nichts ein.
+ * „WETTKÄMPFE" IST SEIT SCHRITT 2b DABEI (04.09.2026)
  *
- * Per REST mit echten ID-Tokens belegt (Trainer A auf Trainer B, kein
- * Freigabe-Eintrag): Camp direkt lesen → **200**, `athleteProfile` desselben
- * Kollegen → 403, Camp aus fremdem Gym → 403. Und nach erteilter Freigabe:
- * unverändert 200 — die Freigabe bewirkt für Camps schlicht nichts.
+ * Der Bereich stand von Anfang an in den Regeln, die Oberfläche vergab ihn
+ * aber nicht — ein Häkchen, das nichts hält, wäre eine falsche
+ * Sicherheitsaussage gewesen. Gemessen am 03.09. per REST mit echten
+ * ID-Tokens: `match /{path=**}/fightCamps/{campId}` matchte nicht nur
+ * collectionGroup-Queries, sondern denselben direkten Pfad wie
+ * `match /users/{uid}/fightCamps/{campId}` — und prüfte dort nur `sameGym`.
+ * Firestore-Regeln sind ODER-verknüpft: Die großzügigere gewann, ein Camp war
+ * für jeden Trainer des Gyms lesbar, und eine erteilte Freigabe änderte daran
+ * nichts.
  *
- * Ein Häkchen „Wettkämpfe" wäre damit eine falsche Sicherheitsaussage. Es
- * kommt hinzu, sobald die collectionGroup-Regel Stab-Camps aussortieren kann
- * (materialisiertes `ownerIsStaff` am Camp, Muster `trainerPlans.audienceUids`)
- * — Schritt 2b, Bauplan im CLAUDE.md-Backlog. Die Regel für den DIREKTEN Pfad
- * fragt schon heute nach dem Schlüssel `"wettkampf"`; es kann ihn nur noch
- * niemand setzen.
+ * Geschlossen mit einem materialisierten `ownerIsStaff` am Camp-Dokument
+ * (`lib/fight-camp.ts`): Die collectionGroup-Regel liefert seither nur noch
+ * Athleten-Camps, die Camps von Stab-Konten laufen ausschließlich über die
+ * strenge Regel — und damit über genau diesen Schlüssel.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-/** Ein freigebbarer Bereich. `wettkampf` steht in den Regeln, aber noch nicht
-    in der Oberfläche (Begründung im Kopfkommentar). */
+/** Ein freigebbarer Bereich. Jeder Schlüssel steht so auch in den Regeln. */
 export type ShareArea = "athlet" | "deepfight" | "wettkampf";
 
 /** Was am users-Dokument steht: je Bereich eine Liste von Trainer-uids. */
 export type ProfileShares = Partial<Record<ShareArea, string[]>>;
 
 /**
- * Die Bereiche, die ein Mensch heute vergeben kann — in der Reihenfolge, in
- * der sie im Sheet stehen.
+ * Die Bereiche, die ein Mensch vergeben kann — in der Reihenfolge, in der sie
+ * im Sheet stehen.
  *
  * Die Erklärungen folgen dem Zustand (Regel „Hilfstexte erklärend", Leon
  * 31.08.): Steht ein Häkchen auf aus, beschreibt der Satz darunter nicht den
@@ -69,7 +65,13 @@ export const SHARE_AREAS: {
     key: "deepfight",
     label: "Kampfprofil & DeepFight",
     umfasst:
-      "Dein Kampfprofil und deine Video-Analysen — wer das sieht, darf dich auch analysieren wie einen Athleten.",
+      "Dein Kampfprofil und die Ergebnisse aus deinen DeepFight-Analysen — so kann man dich analysieren wie einen Athleten.",
+  },
+  {
+    key: "wettkampf",
+    label: "Wettkämpfe",
+    umfasst:
+      "Deine Fight Camps mit Gegner, Zeitplan und Phasen — wer das sieht, plant deine Vorbereitung mit und legt dir neue Wettkämpfe an.",
   },
 ];
 
@@ -86,12 +88,6 @@ export function readShares(data: Record<string, unknown> | undefined): ProfileSh
     if (Array.isArray(liste)) {
       out[key] = liste.filter((x): x is string => typeof x === "string");
     }
-  }
-  // `wettkampf` wird mitgelesen, obwohl es die Oberfläche noch nicht vergibt —
-  // sonst löschte ein Speichern aus dem Sheet einen später gesetzten Wert.
-  const wk = (roh as Record<string, unknown>).wettkampf;
-  if (Array.isArray(wk)) {
-    out.wettkampf = wk.filter((x): x is string => typeof x === "string");
   }
   return out;
 }
@@ -111,6 +107,24 @@ export function bereicheFuer(
   viewerUid: string,
 ): ShareArea[] {
   return SICHTBARE_BEREICHE.filter((b) => darfSehen(shares, b, viewerUid));
+}
+
+/**
+ * Die Gegenrichtung: Wer aus dieser Liste gibt MIR diesen Bereich frei?
+ *
+ * Sie kostet keine zweite Abfrage — `listAllMembers` trägt `profileShares` an
+ * jedem Eintrag. Genau davon lebt der Wettkampfbereich: Er fragt die Camps
+ * seiner freigegebenen Kollegen einzeln ab, und diese Liste sagt ihm, welche
+ * das sind.
+ */
+export function werTeiltMitMir(
+  eintraege: { uid: string; profileShares?: ProfileShares }[],
+  bereich: ShareArea,
+  viewerUid: string,
+): string[] {
+  return eintraege
+    .filter((e) => darfSehen(e.profileShares, bereich, viewerUid))
+    .map((e) => e.uid);
 }
 
 /** Setzt ein einzelnes Häkchen und gibt die neue Sammlung zurück. */
@@ -161,19 +175,43 @@ export function gleicheShares(a: ProfileShares, b: ProfileShares): boolean {
 }
 
 /**
+ * Was ein Bereich in EINER Aufzählung beisteuert — einzelne Glieder, KEINE
+ * fertigen Teilsätze.
+ *
+ * Der Unterschied ist der ganze Punkt (Leon 04.09.2026): Solange jeder Bereich
+ * ein fertiges Stück mit eigenem „und" lieferte, entstand beim Zusammensetzen
+ * eine Kette — „Sieht dein Athletenprofil und dein Training und dein
+ * Kampfprofil und deine Analysen." Als Glieder gefügt liest derselbe Zustand
+ * „Sieht dein Athletenprofil, dein Training, dein Kampfprofil und deine
+ * Analysen."
+ */
+const GLIEDER: Record<ShareArea, string[]> = {
+  athlet: ["dein Athletenprofil", "dein Training"],
+  deepfight: ["dein Kampfprofil", "deine Analysen"],
+  wettkampf: ["deine Wettkämpfe"],
+};
+
+/** „a", „a und b", „a, b und c" — deutsche Aufzählung, ein Komma zu wenig statt eins zu viel. */
+function aufzaehlung(teile: string[]): string {
+  if (teile.length <= 1) return teile[0] ?? "";
+  return `${teile.slice(0, -1).join(", ")} und ${teile[teile.length - 1]}`;
+}
+
+/**
  * Der Satz unter einem Namen — er FOLGT der Auswahl (siehe Kopfkommentar).
- * Bewusst positiv formuliert: „bleibt bei dir" statt „sieht nichts"
- * (Sprachregel, Verneinung ist keine Erklärung).
+ * Bewusst positiv formuliert: „sieht aktuell nur deinen Namen" statt „sieht
+ * nichts" (Sprachregel, Verneinung ist keine Erklärung).
+ *
+ * Alle Bereiche zusammen bekommen einen eigenen Satz: Die volle Aufzählung
+ * wäre fünf Glieder lang und sagt weniger als „alles von dir".
  */
 export function satzFuerPerson(bereiche: ShareArea[]): string {
-  if (bereiche.length === 0) {
-    return "Sieht deinen Namen in der Mitgliederliste — mehr bleibt bei dir.";
-  }
+  if (bereiche.length === 0) return "Sieht aktuell nur deinen Namen.";
   if (bereiche.length === SICHTBARE_BEREICHE.length) {
-    return "Sieht dein Profil, dein Training, dein Kampfprofil und deine Analysen — und betreut dich wie einen Athleten.";
+    return "Sieht alles von dir und betreut dich wie einen Athleten.";
   }
-  if (bereiche[0] === "athlet") {
-    return "Sieht dein Athletenprofil und dein Training.";
-  }
-  return "Sieht dein Kampfprofil und deine Analysen — und darf dich analysieren.";
+  const teile = SICHTBARE_BEREICHE.filter((b) => bereiche.includes(b)).flatMap(
+    (b) => GLIEDER[b],
+  );
+  return `Sieht ${aufzaehlung(teile)}.`;
 }

@@ -51,8 +51,13 @@
   (`/trainer/students`, Admin-Seed, Freigabe-Panel im Gegnerprofil) und für die
   „Schüler"-Kachel auf dem Dashboard. UI-Gruppierung in beiden Kampfkontexten
   identisch: „Ich selbst"/„Meine Analyse" (cyan) · „Trainer & Coaches"
-  (violet) · „Schüler" (neutral). Firestore brauchte dafür KEINE Änderung —
-  `users/{uid}/fightCamps` erlaubt Trainer/Admin ohnehin jede uid.
+  (violet) · „Schüler" (neutral). ACHTUNG, seit 2026-09-04 eingeschränkt: Bei
+  einem KOLLEGEN braucht es dessen Freigabe (siehe „Privates Athletenprofil").
+  „Neuer Wettkampf" listet deshalb seit 2026-09-04 nur noch Kollegen mit dem
+  Bereich `wettkampf`. Das DeepFight-Grid (`/trainer/deepfight/athletes`)
+  filtert NOCH NICHT nach `deepfight` — dort steht ein Kollege ohne Freigabe
+  weiter in der Liste und läuft erst auf der Detailseite in den Hinweis
+  „noch nicht freigegeben". Nachzuziehen zusammen mit dem Ghost-Filter.
 - **Wettkampf-Gegner: Snapshot + verknüpftes Profil** (seit 2026-08-20):
   Der Snapshot in `fightCamps/{id}.opponent` bleibt gespeichert wie bisher,
   ist aber **nicht mehr das, was angezeigt wird**. Anzeige und Editor-Vorbelegung
@@ -86,7 +91,7 @@
   `scripts/migrate-multi-gym.mjs`, Cutover-Reihenfolge im Script-Kopf!).
   Trainer-Listen-Queries filtern deshalb zwingend nach gymId:
   `listAllMembers(gymId)`, `listAllStudents(gymId)`,
-  `listAllFightCamps(gymId)`, `listOpponentsForGym(gymId)`;
+  `listAllFightCamps(gymId, zugriff)`, `listOpponentsForGym(gymId)`;
   `belongsToGym` ist jetzt strikt. `set-role.mjs` MERGT Claims (gymId bleibt
   erhalten). Noch bewusst OHNE Gym-Scope (Phase 2/3): `trainingSessions`,
   `aiUsage`, `techniqueStats`, Rollen-API/Einladungen.
@@ -212,53 +217,111 @@ Sperre (Deny-by-Default, Konzept §3).
   |---|---|---|
   | `athlet` | athleteProfile, workouts, participations, workoutPlans | users-Wildcard |
   | `deepfight` | fightProfile **+** videoAnalyses (das eine IST die Auswertung des anderen) | zwei eigene Blöcke |
-  | `wettkampf` | fightCamps | eigener Block — **greift noch nicht, s. u.** |
+  | `wettkampf` | fightCamps | eigener Block + materialisiertes `ownerIsStaff` am Camp |
 
   **Der users-Wildcard nimmt jetzt `videoAnalyses`, `fightProfile` UND
   `fightCamps` aus.** Solange EINE Freigabe für alles galt, war das egal — die
   Bedingung war überall dieselbe. Ohne die Ausnahme öffnete das Häkchen
   „Athletenprofil & Training" stillschweigend auch das Kampfprofil.
-- **DIE WETTKAMPF-LÜCKE (gemessen 03.09.2026, offen — Schritt 2b):**
-  `match /{path=**}/fightCamps/{campId}` matcht **nicht nur**
+- **DIE WETTKAMPF-LÜCKE — GESCHLOSSEN am 2026-09-04 (Schritt 2b, LIVE):**
+  `match /{path=**}/fightCamps/{campId}` matchte **nicht nur**
   collectionGroup-Queries, sondern auch den direkten Pfad
-  `users/{uid}/fightCamps/{campId}` — und prüft dort nur `sameGym`. Weil
-  Firestore-Regeln ODER-verknüpft sind, gewinnt die großzügigere: Trainer A
-  liest das Camp von Trainer B mit **200**, ohne jede Freigabe, und eine
-  erteilte Freigabe ändert daran **nichts** (per REST mit echten ID-Tokens
-  belegt; `athleteProfile` desselben Kollegen ergab im selben Lauf 403, ein
-  Camp aus fremdem Gym ebenfalls 403). Deshalb vergibt die Oberfläche den
-  Bereich `wettkampf` NOCH NICHT — ein Häkchen, das nicht hält, wäre eine
-  falsche Sicherheitsaussage. Zu bauen: materialisiertes `ownerIsStaff` am
-  Camp (Muster `trainerPlans.audienceUids`; eine Query kann keinen `get()`
-  aufs Eltern-Dokument machen), die zwei Schreibstellen in
-  `lib/fight-camp.ts`, ein Nachziehen in `/api/members/role`, ein
-  Backfill-Script und der Umbau von `listAllFightCamps` auf „gym-weit nur
-  Athleten + Direktabfrage für freigegebene Kollegen".
+  `users/{uid}/fightCamps/{campId}` — und prüfte dort nur `sameGym`. Weil
+  Firestore-Regeln ODER-verknüpft sind, gewann die großzügigere: Trainer A las
+  das Camp von Trainer B mit **200**, ohne jede Freigabe, und eine erteilte
+  Freigabe änderte daran **nichts**.
+  Geschlossen mit einem materialisierten **`ownerIsStaff`** am Camp-Dokument
+  (Muster `trainerPlans.audienceUids` — eine Query kann keinen `get()` aufs
+  Eltern-Dokument machen, die Regel muss allein aus dem Camp beweisbar sein).
+  Seither liefert die collectionGroup-Regel nur noch **Athleten-Camps**; die
+  Camps von Stab-Konten laufen ausschließlich über
+  `canAccessMemberData(uid, "wettkampf")`. Gebaut wurde:
+  Pflichtfeld am Typ `FightCamp` (TypeScript erzwingt es an jeder
+  Anlegestelle), beide Schreibstellen in `lib/fight-camp.ts`, Nachziehen in
+  `/api/members/role` (mit Rücknahme wie beim Spiegel), Backfill
+  (`scripts/backfill-fight-camp-owner.mjs`, Cutover-Reihenfolge im
+  Script-Kopf), Umbau von `listAllFightCamps(gymId, zugriff)` auf „gym-weit
+  nur Athleten-Camps **plus** Direktabfrage für die eigenen und die
+  freigegebenen Kollegen" und ein neuer Index
+  (`gymId + ownerIsStaff + competitionDate DESC`, COLLECTION_GROUP).
+- **DAS FELD IST AUCH BEIM SCHREIBEN GEPRÜFT** (über den Bauplan hinaus, Leons
+  Entscheidung 04.09.): `ownerIsStaffStimmt(uid)` vergleicht den geschriebenen
+  Wert gegen `istStabKonto(get(users/{uid}))`. Ohne diesen Vergleich könnte
+  jemand mit Wettkampf-Freigabe das Camp eines Kollegen auf `false` setzen und
+  gym-weit sichtbar machen — aus „einer darf" würde „alle dürfen". Der `get()`
+  fällt nur beim Schreiben an, nie in einer Query. Dafür ist `fightCamps` aus
+  dem OWNER-Schreibzweig und aus dem Admin-Zweig des users-Wildcards
+  herausgenommen: Alle Camp-Schreibvorgänge laufen jetzt durch diese eine
+  Regel. Owner-LESEN bleibt (Athleten-Dashboard).
+- **REGEL-FALLE, TEUER GEMESSEN (04.09.2026):** Die Query-Analyse der
+  Rules-Engine versteht **`resource.data.get("feld", default)` NICHT** als
+  Einschränkung. Ein erster Anlauf schrieb
+  `resource.data.get("ownerIsStaff", false) == false` — die Regel sah richtig
+  aus, kompilierte, und eine Query mit nur `gymId` + `orderBy` kam trotzdem mit
+  **200 durch und lieferte das Stab-Camp mit**. Erst der DIREKTE Feldzugriff
+  `resource.data.ownerIsStaff == false` zwingt die Query, den passenden Filter
+  mitzubringen (danach: ohne Filter 403, mit Filter 200 und nur die
+  Athleten-Camps). Preis: Ein Dokument OHNE das Feld ist ein
+  Auswertungsfehler und damit verboten — deshalb muss der Backfill VOR dem
+  Rules-Deploy laufen. **Bei jeder rules-seitigen Query-Einschränkung das Feld
+  direkt lesen, nie mit Default.**
+- **Die Oberfläche vergibt den Bereich `wettkampf` jetzt** (`SHARE_AREAS`).
+  „Neuer Wettkampf" bietet Kollegen nur noch an, wenn sie den Bereich
+  freigegeben haben — ein Name, der beim Speichern an den Regeln scheitert,
+  wäre schlechter als kein Name; Ghost-Konten fehlen dort ebenfalls. Die
+  Camp-Detailseite liest den Namen über `getMemberEntry()` statt
+  `getStudentEntry()`: Wer seinen Wettkampf freigibt, muss dafür nicht auch
+  sein Athletenprofil hergeben.
 - **`node scripts/check-privacy-gate.mjs` ist der Regressionstest** — REST mit
-  echten ID-Tokens, **14 Fälle** (Gate, Bereichstrennung, Schreibrecht am
-  eigenen Dokument). Nach JEDER Regeländerung laufen lassen; das Admin-SDK
+  echten ID-Tokens, **24 Fälle** (Gate, Bereichstrennung, Schreibrecht am
+  eigenen Dokument, Wettkämpfe einzeln UND als echte collectionGroup-Query
+  per `documents:runQuery`). Nach JEDER Regeländerung laufen lassen; das Admin-SDK
   umgeht Regeln und beweist nichts. **Achtung beim Erweitern:**
   `affectedKeys()` enthält nur Felder, die sich TATSÄCHLICH ändern — ein
   Schreibvorgang mit dem bereits gespeicherten Wert ist ein No-Op, und dann
   liefert `hasAny([...])` false und `hasOnly([...])` sogar true. Ein erster
   Anlauf des Tests meldete dadurch 200, wo er 403 erwartete.
-- **Der Freigabe-Knopf (Schritt 2, LIVE):** `components/ProfileSharingSection`
-  auf `/kampfprofil`, direkt über „Athleten-Daten" — Karte mit Zustandssatz +
-  Sheet (`ProfileShareSheet`, Muster `MemberRoleSheet`), gruppiert nach MENSCH
-  statt nach Bereich. Sichtbar nur für Stab-Konten (bei Athleten bewirkt das
-  Feld nichts). Plattform-Admins stehen NICHT in der Liste (`isGhostAccount`
+- **Der Freigabe-Knopf (Schritt 2, LIVE; Form von Leon am 04.09. festgelegt):**
+  `components/ProfileShareButton` — ein Knopf **„Profil teilen"** (Icon
+  `share`, 20 px, Rahmen in `--accent`) im Kopf von `/kampfprofil`, direkt
+  ÜBER „Meine Analyse starten". Der Rahmen nimmt bewusst den Akzent-Token
+  statt eines blauen Hex (DESIGN-BRIEF §1.1): Das Blau IST der Gym-Akzent und
+  folgt später dem Branding-Kit. Bis dahin war es eine ganze Karte („Sichtbarkeit") weiter unten;
+  das war viel Fläche für eine selten angefasste Einstellung, und sie stand
+  dort, wo niemand sie suchte. Der Zähler am Knopf hält den Zustand sichtbar —
+  eine Freigabe, an die man sich nicht erinnert, ist genau das, was der
+  Bereich verhindern soll.
+  Dahinter das Sheet **„Sichtbarkeit bearbeiten"** (`ProfileShareSheet`,
+  Muster `MemberRoleSheet`), gruppiert nach MENSCH statt nach Bereich: Erklärung
+  je Bereich einmal oben, darunter je Kollege eine Zeile.
+  **Die Schalter sind ein AKKORDEON** (Leon 04.09.): Sie erscheinen erst beim
+  Antippen der Person, und immer nur bei einer — bei vier Kollegen standen
+  sonst zwölf Schalter untereinander. Zugeklappt trägt der Satz unter dem Namen
+  die ganze Auskunft; Klickziel ist die ganze Zeile, nicht der Pfeil (auf dem
+  Handy wären 16 px zu wenig). Im aufgeklappten Zustand liegen die drei
+  Schalter UNTEREINANDER — nebeneinander ließen sie „Athletenprofil & Training"
+  auf 141 px mitten im Namen umbrechen. Sichtbar nur für Stab-Konten (bei
+  Athleten bewirkt das Feld nichts). Plattform-Admins stehen NICHT in der Liste (`isGhostAccount`
   in `lib/admin.ts`, Leons Entscheidung 03.09. — siehe Backlog „Ghost-Konten
   app-weit durchziehen").
-  Die Gegenrichtung („Mit dir geteilt") kostet keine zweite Abfrage —
-  `listAllMembers` trägt `profileShares` an jedem Eintrag — und erscheint nur
-  für Trainer, weil `canAccessMemberData` `isTrainerOrAdmin()` verlangt.
+  Die Gegenrichtung („Mit dir geteilt") steht seit dem 04.09. am FUSS DES
+  SHEETS statt in der Karte, kostet keine zweite Abfrage (`listAllMembers`
+  trägt `profileShares` an jedem Eintrag) und erscheint nur für Trainer, weil
+  `canAccessMemberData` `isTrainerOrAdmin()` verlangt.
+- **Der Satz unter einem Namen wird aus GLIEDERN gefügt, nicht aus Teilsätzen**
+  (`satzFuerPerson` + `GLIEDER` in `lib/profile-sharing.ts`): Solange jeder
+  Bereich ein fertiges Stück mit eigenem „und" lieferte, entstand bei zwei
+  Bereichen eine Kette — „… dein Athletenprofil und dein Training und dein
+  Kampfprofil und deine Analysen." Als Glieder gefügt steht dort
+  „… dein Athletenprofil, dein Training, dein Kampfprofil und deine Analysen."
+  Wer einen Bereich ergänzt, ergänzt seine Glieder, keinen Satz.
 - **Dual-Read als Übergang** (`lib/user-profile.ts`, `lib/fight-profile.ts`):
   erst Unter-Sammlung, dann altes Feld — aber NUR bei „Dokument fehlt", nie bei
   „Zugriff verweigert". Sonst unterliefe der Rückfall genau das Gate.
 - **Listen tragen kein Athletenprofil mehr.** `StudentEntry.athlete` füllt nur
   `getStudentEntry()`; `getMemberEntry()` liefert die reine Identität und
   bleibt auch bei gesperrtem Profil lesbar.
-- **Noch offen:** Schritt 2b (Wettkampf-Lücke, s. o.) · Schritt 3 Anfrage +
+- **Noch offen:** Schritt 3 Anfrage +
   Benachrichtigung (es gibt heute KEINEN Benachrichtigungsweg — `auditLog` ist
   das Gym-Protokoll, nur die Verwaltung liest, kein Postfach) · Schritt 4
   Trainer mit „Trainer"-Vermerk in der Athletenliste (bewusst zuletzt).
@@ -340,8 +403,10 @@ users/{uid}/fightProfile/main     — Kampfprofil = kuratierte DeepFight-Auswert
 users/{uid}/workouts              — geloggte Workouts
 users/{uid}/fightCamps/{campId}   — Wettkampf + Gegner-Snapshot (Anzeige = Snapshot
                                     + Lücken aus opponents/{opponentId}, s.o.)
-                                    (Trainer/Admin lesen+schreiben JEDE uid;
-                                    zentrale Liste via collectionGroup)
+                                    Trägt PFLICHT `ownerIsStaff` — die gym-weite
+                                    collectionGroup-Query filtert darauf und sieht
+                                    nur Athleten-Camps; Stab-Camps nur mit Freigabe
+                                    im Bereich „wettkampf“
 users/{uid}/videoAnalyses/{id}    — KI-Video-Analysen des Athleten (Owner liest NUR
                                     sharedWithAthlete==true, schreibt NIE)
 opponents/{id}                    — Gegner-DNA-Bibliothek (Trainer/Admin)
@@ -738,7 +803,7 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Betreiber trainieren will, legt sich über eine Einladung ein eigenes
       Mitgliedskonto an — die beiden Konten bleiben getrennt.
       Der Helfer steht schon: `isGhostAccount()` in `lib/admin.ts`; angewandt
-      ist er bisher NUR im Freigabe-Knopf (`ProfileSharingSection`).
+      ist er bisher NUR im Freigabe-Knopf (`ProfileShareButton`).
       Nachzuziehen: `/verwaltung/mitglieder` (zeigt Admins heute als
       „Trainer · Verwaltung"), `/trainer/athleten`,
       `/trainer/deepfight/athletes`, „Neuer Wettkampf" (Schritt 1), das
@@ -755,23 +820,12 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       `firestore.rules` jede Freigabe-Prüfung) verschwindet damit aus der
       Oberfläche und MUSS in den Datenschutzhinweisen und im AVV stehen —
       derselbe Punkt wie „vor der ersten Zahlung fällig".
-- [ ] **Schritt 2b — Wettkampf-Freigabe erzwingen** (Lücke gemessen
-      2026-09-03, Begründung und Messwerte im Abschnitt „Privates
-      Athletenprofil"): Die collectionGroup-Regel für `fightCamps` überstimmt
-      die strenge Regel darüber, weil `{path=**}` denselben Pfad matcht und nur
-      `sameGym` prüft. Zu bauen: (1) `ownerIsStaff: boolean` ans Camp-Dokument
-      (Muster `trainerPlans.audienceUids` — eine Query kann keinen `get()` aufs
-      Eltern-Dokument machen, die Regel muss allein aus dem Camp beweisbar
-      sein); (2) beide Schreibstellen in `lib/fight-camp.ts`
-      (`createFightCamp`, `updateFightCamp`); (3) Nachziehen in
-      `/api/members/role`, wenn jemand das Trainer-Häkchen bekommt oder
-      verliert; (4) Backfill-Script für den Bestand; (5)
-      `listAllFightCamps` auf „gym-weit nur Athleten-Camps + Direktabfrage für
-      die eigenen und die freigegebenen Kollegen" umbauen; (6) collectionGroup-
-      Regel um `resource.data.get("ownerIsStaff", false) == false` ergänzen;
-      (7) `SHARE_AREAS` in `lib/profile-sharing.ts` um `wettkampf` erweitern —
-      der Schlüssel steht in den Regeln schon. Danach
-      `scripts/check-privacy-gate.mjs` um die Camp-Fälle erweitern.
+      GLEICHER GRIFF, ANDERE FRAGE — beim selben Durchgang mitnehmen: Das
+      DeepFight-Grid `/trainer/deepfight/athletes` listet Kollegen OHNE
+      Rücksicht auf ihre `deepfight`-Freigabe; wer einen anklickt, landet auf
+      der Detailseite im Hinweis „noch nicht freigegeben". „Neuer Wettkampf"
+      ist am 2026-09-04 schon auf `darfSehen(…, "wettkampf", …)` umgestellt —
+      dasselbe Muster, ein Aufruf von `darfSehen`.
 - [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
       länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
       in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`

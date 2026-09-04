@@ -19,6 +19,7 @@ import {
 } from "@/lib/fight-camp";
 import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
+import { werTeiltMitMir } from "@/lib/profile-sharing";
 
 function studentLabelOf(entry: StudentEntry | undefined): string {
   if (!entry) return "Athlet";
@@ -52,10 +53,11 @@ function Section({
 // ─── Hauptinhalt ─────────────────────────────────────────────────────────────
 
 function CompetitionsHubContent() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const gymId = resolveGymId(profile);
+  const eigeneUid = user?.uid ?? "";
 
   const [camps, setCamps] = useState<FightCamp[] | null>(null);
   // Alle Mitglieder inkl. Trainer: auch Coaches treten als Athleten an.
@@ -75,9 +77,20 @@ function CompetitionsHubContent() {
     setError(null);
     setCamps(null);
     try {
+      // Die Camps hängen an der Mitgliederliste: Sie trägt die Freigaben, und
+      // ohne sie wüsste die Abfrage nicht, welche Kollegen-Camps sie einzeln
+      // holen darf (lib/fight-camp.ts, listAllFightCamps). Nur DIESE eine
+      // Kette ist seriell — die Gegner laufen weiter nebenher.
+      const memberP = listAllMembers(gymId).catch(() => [] as StudentEntry[]);
+      const campP = memberP.then((liste) =>
+        listAllFightCamps(gymId, {
+          eigeneUid,
+          freigegebeneUids: werTeiltMitMir(liste, "wettkampf", eigeneUid),
+        }).catch(() => [] as FightCamp[]),
+      );
       const [allCamps, memberList, gymOpponents] = await Promise.all([
-        listAllFightCamps(gymId).catch(() => [] as FightCamp[]),
-        listAllMembers(gymId).catch(() => [] as StudentEntry[]),
+        campP,
+        memberP,
         listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
       ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
@@ -87,7 +100,7 @@ function CompetitionsHubContent() {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
       setCamps([]);
     }
-  }, [gymId]);
+  }, [gymId, eigeneUid]);
 
   useEffect(() => {
     load();

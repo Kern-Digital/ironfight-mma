@@ -22,6 +22,10 @@
  *      Verwaltung?" gar nicht beantworten. Schlägt er fehl, werden die Claims
  *      ZURÜCKGENOMMEN: ein Recht, das niemand mehr zählen kann, ist schlimmer
  *      als ein Klick, der sichtbar fehlgeschlagen ist.
+ *   4. WETTKÄMPFE nachziehen (Schritt 2b, 04.09.2026). Jedes Camp trägt
+ *      `ownerIsStaff` als Kopie mit — genau die Antwort, die dieser Klick
+ *      gerade ändert. Schlägt es fehl, werden Spiegel UND Claims
+ *      zurückgenommen; die Begründung steht an `syncFightCampOwnerFlag`.
  *
  * Wer sich selbst geändert hat, muss danach `refreshRole()` rufen — der neue
  * Claim steckt im ID-Token, und das holt der Client nicht von allein.
@@ -87,6 +91,36 @@ async function countRemainingManagers(
     }
   }
   return count;
+}
+
+/**
+ * Zieht `ownerIsStaff` an allen Wettkämpfen des Mitglieds nach und meldet,
+ * wie viele Camps sich geändert haben.
+ *
+ * WARUM DAS HIER STEHEN MUSS: Das Feld am Camp ist die Kopie einer Antwort,
+ * die dieser Klick gerade ändert (Begründung in lib/fight-camp.ts). Ohne das
+ * Nachziehen bliebe ein frisch ernannter Trainer mit `ownerIsStaff: false` in
+ * der gym-weiten Liste stehen — seine Wettkämpfe wären für alle Kollegen
+ * sichtbar, obwohl er ab sofort selbst entscheiden darf, wer sie sieht. Und
+ * umgekehrt verschwänden die Camps eines zurückgestuften Trainers aus der
+ * Liste, ohne dass jemand wüsste, warum.
+ *
+ * Das Admin-SDK umgeht die Firestore-Regeln — der `ownerIsStaffStimmt`-
+ * Vergleich aus firestore.rules greift hier also nicht. Deshalb steht der
+ * Aufruf unten hinter dem Spiegel und trägt dieselbe Rücknahme wie er.
+ */
+async function syncFightCampOwnerFlag(
+  db: Firestore,
+  uid: string,
+  ownerIsStaff: boolean,
+): Promise<number> {
+  const camps = await db.collection("users").doc(uid).collection("fightCamps").get();
+  const zuAendern = camps.docs.filter((c) => c.get("ownerIsStaff") !== ownerIsStaff);
+  if (zuAendern.length === 0) return 0;
+  const batch = db.batch();
+  for (const c of zuAendern) batch.update(c.ref, { ownerIsStaff });
+  await batch.commit();
+  return zuAendern.length;
 }
 
 export async function POST(req: Request) {
@@ -234,6 +268,30 @@ export async function POST(req: Request) {
       throw mirrorErr;
     }
 
+    // ─── Wettkämpfe nachziehen (Schritt 2b) ─────────────────────────────
+    // Dieselbe Rücknahme wie beim Spiegel, aus demselben Grund: Ein Recht,
+    // dessen Folgen nur zur Hälfte gelten, ist schlimmer als ein Klick, der
+    // sichtbar fehlgeschlagen ist. Die riskante Richtung ist das Ernennen —
+    // dort blieben die Camps sonst gym-weit sichtbar.
+    let campsNachgezogen = 0;
+    try {
+      campsNachgezogen = await syncFightCampOwnerFlag(
+        db,
+        uid,
+        nextRights.trainer || nextRights.verwaltung || nextRights.admin,
+      );
+    } catch (campErr) {
+      await db
+        .collection("users")
+        .doc(uid)
+        .set(rightsMirror(targetRights), { merge: true })
+        .catch(() => {});
+      await adminAuth()
+        .setCustomUserClaims(uid, claimsWithRights(targetClaims, targetRights))
+        .catch(() => {});
+      throw campErr;
+    }
+
     const [actorName, targetName] = await Promise.all([
       displayNameFor(db, user.uid),
       displayNameFor(db, uid, "Ein Mitglied"),
@@ -250,6 +308,9 @@ export async function POST(req: Request) {
         verwaltung: nextRights.verwaltung,
         trainerBefore: targetRights.trainer,
         verwaltungBefore: targetRights.verwaltung,
+        // Wie viele Wettkämpfe die Rechteänderung mitgenommen hat. Steht im
+        // Protokoll, weil sich damit die Sichtbarkeit fremder Daten ändert.
+        fightCampsUpdated: campsNachgezogen,
       },
     });
 

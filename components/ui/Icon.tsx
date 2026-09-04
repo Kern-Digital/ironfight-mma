@@ -36,6 +36,7 @@ export type IconName =
   | "chart"
   | "calendar"
   | "users"
+  | "share"
   | "shield"
   | "spark"
   | "timer"
@@ -264,6 +265,22 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="4" y="5.5" width="16" height="15" rx="2" />
       <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+    </>
+  ),
+  // Teilen — drei Knoten, zwei Verbindungen. Gross und mittig in der 24er-Box
+  // (Leon 04.09.2026: „nimm einfach das Teilen-Icon und mach es groesser").
+  //
+  // Die Vorgaenger-Fassung trug zusaetzlich eine Person. Sie scheiterte an der
+  // Groesse: Auf 24 Einheiten mussten sich Kopf, Schulter und drei Knoten
+  // teilen, und bei 17 px verschwanden die Verbindungslinien. Allein hat das
+  // Zeichen die ganze Box — und der Knopf sagt daneben ohnehin „Profil
+  // teilen".
+  share: (
+    <>
+      <circle cx="6.5" cy="12" r="2.2" />
+      <circle cx="17.5" cy="6.5" r="2.2" />
+      <circle cx="17.5" cy="17.5" r="2.2" />
+      <path d="M8.8 10.8 15.2 7.7M8.8 13.2l6.4 3.1" />
     </>
   ),
   users: (
