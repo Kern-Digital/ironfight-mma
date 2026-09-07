@@ -8,7 +8,13 @@ import {
   type FightStyle,
 } from "@/lib/fight-camp";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
-import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
+import {
+  deriveSuggestions,
+  deriveTendencies,
+  zoneDistribution,
+  type ActionStat,
+  type DnaSplit,
+} from "@/lib/fight-stats";
 import GegnerDnaAccordion from "./GegnerDnaAccordion";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Select from "@/components/ui/Select";
@@ -117,6 +123,14 @@ export default function OpponentEditor({
   // (Summen beim Übernehmen). Wert wird nur durchgereicht, damit Speichern
   // anderer Felder ihn nicht löscht.
   const actionStats: ActionStat[] = initial?.actionStats ?? [];
+
+  // Dieselbe Bedingung, unter der FightInsights etwas rendert — sie steht hier,
+  // damit die Überschrift darüber nicht allein stehen bleibt.
+  const zonen = zoneDistribution(actionStats);
+  const hatInsights =
+    deriveTendencies(actionStats).length > 0 ||
+    deriveSuggestions(dnaSplit, actionStats).length > 0 ||
+    zonen.center + zonen.open + zonen.cage > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -281,8 +295,14 @@ export default function OpponentEditor({
         </label>
       </div>
 
-      {/* ── §1 Fight-DNA-Split (nur Anzeige — Quelle ist die Video-Analyse) ── */}
+      {/* ── §1 Fight-DNA-Split (nur Anzeige — Quelle ist die Video-Analyse) ──
+          DIE ÜBERSCHRIFTEN STEHEN SEIT ETAPPE 3a HIER: Die drei Blöcke brachten
+          sie bis dahin selbst mit, solange sie ohne `frameless` gerendert
+          wurden. Das Prop ist weg, die Blöcke sind reine Anzeige — wer sie
+          platziert, benennt sie (Begründung im Kopf von FightDnaSplit.tsx).
+          Der Rest dieser Datei zieht in Etappe 3b nach. */}
       <div>
+        <div className="t-label mb-3">Fight-DNA</div>
         <FightDnaSplit split={dnaSplit} />
         <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
           Der Fight-DNA-Split kommt aus der KI-Video-Analyse — ein gewichteter
@@ -292,6 +312,7 @@ export default function OpponentEditor({
 
       {/* ── §2 Technik-Statistik (nur Anzeige — Quelle ist die Video-Analyse) ── */}
       <div>
+        <div className="t-label mb-3">Technik-Statistik</div>
         <FightStatsBlock stats={actionStats} />
         <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
           Versuche, Treffer, Zone und Setup zählt die KI-Video-Analyse mit —
@@ -299,8 +320,17 @@ export default function OpponentEditor({
         </p>
       </div>
 
-      {/* ── §3/§4/§5 Auswertung der gespeicherten Zahlen ── */}
-      <FightInsights split={dnaSplit} stats={actionStats} />
+      {/* ── §3/§4/§5 Auswertung der gespeicherten Zahlen ──
+          Anders als die beiden Blöcke darüber steht hier KEIN Erklärsatz, der
+          die Überschrift auch ohne Daten trägt — deshalb dieselbe Bedingung,
+          unter der FightInsights überhaupt etwas rendert. Bei einem frisch
+          angelegten Gegner ist der ganze Abschnitt sonst nur ein Wort. */}
+      {hatInsights && (
+        <div>
+          <div className="t-label mb-3">Auto-Insights</div>
+          <FightInsights split={dnaSplit} stats={actionStats} />
+        </div>
+      )}
 
       {/* ── DeepFight-Analyse (ausklappbare Kategorien) ── */}
       <div>

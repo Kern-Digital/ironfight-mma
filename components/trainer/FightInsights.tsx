@@ -13,13 +13,26 @@ import {
 } from "@/lib/fight-stats";
 import Icon, { type IconName } from "@/components/ui/Icon";
 
-// Ton-Farben als Hex, damit Glow-Schatten (#RRGGBBAA) daraus ableitbar sind.
+/**
+ * ZWEI FARBEN FÜR FÜNF TÖNE (Rollout-Etappe 3a, 04.09.2026).
+ *
+ * Vorher trug jeder der fünf Töne eine eigene Farbe: Violett, Grün, Cyan,
+ * nochmal Violett, Pink. Fünf Akzente in einer Liste, zwei davon in der Farbe,
+ * die app-weit DeepFight bedeutet — direkt unter der DeepFight-Wortmarke.
+ *
+ * Die Töne sind aber keine Skala, sondern fünf ARTEN von Aussage: „seine
+ * häufigste Waffe", „seine Trefferquote", „wo es passiert", „wie er
+ * vorbereitet" — und, als einziges, „Hauptbedrohung". Nur der letzte ist ein
+ * Alarm. Also färbt der ZUSTAND und nicht die Art (dieselbe Regel wie bei den
+ * Camp-Phasen): Warnung rot, alles andere Gym-Akzent. Unterschieden bleiben
+ * die Töne durch ihr Symbol, das sie ohnehin schon tragen.
+ */
 const TONE_COLOR: Record<TendencyTone, string> = {
-  weapon: "#8A63E8",
-  success: "#3EE06B",
-  zone: "#23C4CE",
-  setup: "#9D7BFA",
-  warning: "#FF4FA8",
+  weapon: "var(--accent-text)",
+  success: "var(--accent-text)",
+  zone: "var(--accent-text)",
+  setup: "var(--accent-text)",
+  warning: "var(--negative)",
 };
 
 const TONE_ICON: Record<TendencyTone, IconName> = {
@@ -30,30 +43,25 @@ const TONE_ICON: Record<TendencyTone, IconName> = {
   warning: "warn",
 };
 
-/** Gemeinsame Karten-Fläche der Insight-Panels (siehe Referenz-Design). */
-const CARD_STYLE: React.CSSProperties = {
-  background: "linear-gradient(180deg, var(--ink-2), var(--ink-1))",
-  border: "1px solid var(--ink-4)",
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
 };
 
 /**
- * Heat-Prinzip der Käfig-Karte: EINE Farbe (Cyan), Deckkraft streng nach
- * RANG der Anteile (hellste Zone = größter Anteil) — „kräftiger = mehr"
- * braucht keine Legende. 0 % bleibt bewusst ungefüllt.
+ * Heat-Prinzip der Käfig-Karte: EINE Farbe, Deckkraft streng nach RANG der
+ * Anteile (hellste Zone = größter Anteil) — „kräftiger = mehr" braucht keine
+ * Legende. 0 % bleibt bewusst ungefüllt.
+ *
+ * Die Farbe ist seit Etappe 3a der Gym-Akzent statt des festen Tidal-Cyan:
+ * Heute sieht das identisch aus (der Akzent IST dieses Cyan), aber ein Gym mit
+ * eigenem Branding bekommt seine Käfig-Karte mit (DESIGN-BRIEF §1.1). Die
+ * Deckkraft-Stufen laufen deshalb über `color-mix` statt über einen
+ * rgba()-Dreiklang, in den sich kein Token einsetzen ließe.
  */
-const HEAT_RGB = "35,196,206"; // --ta-cyan
-
-/** Kleiner Info-Punkt oben rechts in den Karten (Tooltip via title). */
-function InfoDot({ text }: { text: string }) {
-  return (
-    <span
-      className="font-mono-ta flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px]"
-      title={text}
-      style={{ border: "1px solid var(--ink-6)", color: "var(--fg-4)" }}
-    >
-      i
-    </span>
-  );
+function heat(alpha: number): string {
+  return `color-mix(in oklab, var(--accent) ${Math.round(alpha * 100)}%, transparent)`;
 }
 
 /**
@@ -61,18 +69,17 @@ function InfoDot({ text }: { text: string }) {
  *
  * Rein abgeleitete Read-Ansicht: berechnet sich vollständig aus Split + Stats.
  * Rendert nichts, wenn keine Datengrundlage vorhanden ist.
+ *
+ * Rollout-Etappe 3a: `frameless` ist weg — der Block bringt weder Fläche noch
+ * Kopfzeile mit (Begründung im Kopf von FightDnaSplit.tsx).
  */
 export default function FightInsights({
   split,
   stats,
-  frameless,
   only,
 }: {
   split: DnaSplit | null | undefined;
   stats: ActionStat[];
-  /** true = ohne eigene Karten-Flächen/Kopfzeile — der Rahmen kommt vom
-   * Akkordeon in FightProfileView (neues Token-System). */
-  frameless?: boolean;
   /** Nur einen Teil rendern: "insights" (§3+§4) bzw. "zones" (§5 Käfig-Karte)
    * — FightProfileView platziert die Käfig-Karte separat als festen Block. */
   only?: "insights" | "zones";
@@ -94,31 +101,13 @@ export default function FightInsights({
     <div className="flex flex-col gap-4">
       {/* §3 Auto-Insights — Icon-Badges mit Glow, Trennlinien zwischen den Zeilen */}
       {hasInsightCard && (
-        <div
-          className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
-          style={frameless ? undefined : CARD_STYLE}
-        >
-          {!frameless && (
-            <div className="mb-1 flex items-center justify-between">
-              <div
-                className="font-mono-ta text-[11px] font-bold uppercase"
-                style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
-              >
-                Auto-Insights
-              </div>
-              <InfoDot text="Automatisch abgeleitet aus Fight-DNA-Split und Technik-Statistik." />
-            </div>
-          )}
-
+        <div>
           {tendencies.map((t, i) => (
             <div
               key={t.id}
               className="flex items-center gap-3.5 py-3"
               style={{
-                borderTop:
-                  i > 0
-                    ? `1px dashed ${frameless ? "var(--line)" : "rgba(255,255,255,0.10)"}`
-                    : "none",
+                borderTop: i > 0 ? "1px dashed var(--line)" : "none",
               }}
             >
               <span
@@ -126,14 +115,16 @@ export default function FightInsights({
                 style={{
                   color: TONE_COLOR[t.tone],
                   border: `1.5px solid ${TONE_COLOR[t.tone]}`,
-                  background: "var(--ink-1)",
-                  boxShadow: `0 0 12px ${TONE_COLOR[t.tone]}44, inset 0 0 10px ${TONE_COLOR[t.tone]}22`,
+                  background: "var(--surface-card)",
+                  boxShadow: `0 0 12px color-mix(in oklab, ${TONE_COLOR[t.tone]} 27%, transparent), inset 0 0 10px color-mix(in oklab, ${TONE_COLOR[t.tone]} 13%, transparent)`,
                 }}
                 aria-hidden
               >
                 <Icon name={TONE_ICON[t.tone]} size={19} />
               </span>
-              <span className="text-sm leading-relaxed" style={{ color: "var(--fg)" }}>
+              <span
+                style={{ font: "var(--type-body)", color: "var(--text-1)" }}
+              >
                 {t.text}
               </span>
             </div>
@@ -143,34 +134,28 @@ export default function FightInsights({
           {suggestions.length > 0 && (
             <div
               className={tendencies.length > 0 ? "mt-2 border-t pt-3" : ""}
-              style={{ borderColor: frameless ? "var(--line)" : "var(--ink-4)" }}
+              style={{ borderColor: "var(--line)" }}
             >
-              <div
-                className="font-mono-ta mb-2 text-[10px] uppercase"
-                style={{ letterSpacing: "0.15em", color: "var(--fg-4)" }}
-              >
-                Vorschläge · frei anpassbar
-              </div>
+              <div className="mb-2 t-label">Vorschläge · frei anpassbar</div>
               <div className="flex flex-col gap-2">
                 {suggestions.map((s) => (
                   <div key={s.id} className="flex items-start gap-2">
+                    {/* Das Schild sagt „Drill" oder „Plan" — das ist der
+                        Unterschied. Zwei Farben daneben wären dieselbe
+                        Auskunft ein zweites Mal. */}
                     <span
-                      className="font-mono-ta mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                      className="mt-0.5 shrink-0 rounded-badge px-1.5 py-0.5"
                       style={{
-                        letterSpacing: "0.08em",
-                        background:
-                          s.kind === "drill"
-                            ? "rgba(35,196,206,0.12)"
-                            : "rgba(255,79,168,0.12)",
-                        border: `1px solid ${s.kind === "drill" ? "var(--ta-cyan)" : "var(--ta-pink)"}`,
-                        color: s.kind === "drill" ? "var(--ta-cyan)" : "var(--ta-pink)",
+                        ...META_FONT,
+                        background: "var(--surface-raised)",
+                        border: "1px solid var(--line)",
+                        color: "var(--text-2)",
                       }}
                     >
                       {s.kind === "drill" ? "Drill" : "Plan"}
                     </span>
                     <span
-                      className="text-sm leading-relaxed"
-                      style={{ color: "var(--fg)" }}
+                      style={{ font: "var(--type-body)", color: "var(--text-1)" }}
                     >
                       {s.text}
                     </span>
@@ -182,9 +167,9 @@ export default function FightInsights({
         </div>
       )}
 
-      {/* Haarlinie zwischen Insights und Käfig-Karte, wenn beide rahmenlos
-          in derselben Akkordeon-Fläche liegen */}
-      {frameless && hasInsightCard && showZones && zoneTotal > 0 && (
+      {/* Haarlinie zwischen Insights und Käfig-Karte, wenn beide in derselben
+          Fläche liegen */}
+      {hasInsightCard && showZones && zoneTotal > 0 && (
         <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
       )}
 
@@ -198,27 +183,15 @@ export default function FightInsights({
           const dom = order[0];
           const domPct = Math.round((zones[dom] / zoneTotal) * 100);
           return (
-            <div
-              className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
-              style={frameless ? undefined : CARD_STYLE}
-            >
-              {!frameless && (
-                <div
-                  className="font-mono-ta text-[12px] font-bold uppercase"
-                  style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
-                >
-                  Wo passiert die Aktion
-                </div>
-              )}
-              <div className={frameless ? "flex items-center gap-4" : "mt-3 flex items-center gap-4"}>
+            <div>
+              <div className="flex items-center gap-4">
                 <div className="relative min-w-0 flex-1">
                   {/* Speed-Lines hinter der Hero-Zahl */}
                   <span
                     aria-hidden
                     className="pointer-events-none absolute left-0 top-3 h-14 w-full"
                     style={{
-                      background:
-                        "repeating-linear-gradient(90deg, rgba(35,196,206,0.10) 0 3px, transparent 3px 15px)",
+                      background: `repeating-linear-gradient(90deg, ${heat(0.1)} 0 3px, transparent 3px 15px)`,
                       transform: "skewX(-24deg)",
                       maskImage:
                         "linear-gradient(90deg, transparent, black 25%, black 60%, transparent 95%)",
@@ -226,23 +199,35 @@ export default function FightInsights({
                         "linear-gradient(90deg, transparent, black 25%, black 60%, transparent 95%)",
                     }}
                   />
+                  {/* Bewusst GRÖSSER als jede Stufe der Typo-Skala: Die Zahl
+                      ist hier die Aussage, nicht eine Überschrift (Leons
+                      Käfig-Karten-Vorlage). Als Shorthand auf der Body-Schrift
+                      formuliert — dasselbe Muster wie `.join-slot` in
+                      globals.css, wo ein Hero-Element ebenfalls ein eigenes
+                      clamp() trägt. */}
                   <div
-                    className="font-display-ta relative font-bold leading-none"
+                    className="relative"
                     style={{
-                      fontSize: "clamp(54px, 11vw, 82px)",
-                      color: "var(--ta-cyan)",
-                      textShadow: "0 0 28px rgba(35,196,206,0.5)",
+                      font: "800 clamp(54px, 11vw, 82px)/1 var(--font-body)",
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--accent)",
+                      textShadow: `0 0 28px ${heat(0.5)}`,
                     }}
                   >
                     {domPct}
                     <span style={{ fontSize: "0.52em" }}>%</span>
                   </div>
-                  <div className="mt-1 text-sm" style={{ color: "var(--fg-3)" }}>
+                  <div
+                    className="mt-1"
+                    style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                  >
                     der Aktionen
                   </div>
                   <div
-                    className="text-base font-bold"
-                    style={{ color: "var(--fg)" }}
+                    style={{
+                      font: "var(--type-body-strong)",
+                      color: "var(--text-1)",
+                    }}
                   >
                     {CAGE_ZONE_PHRASE[dom]}
                   </div>
@@ -259,18 +244,26 @@ export default function FightInsights({
                             // Rang-Leiter wie im Octagon: Platz 2 heller als Platz 3
                             background:
                               zones[z] > 0
-                                ? `rgba(${HEAT_RGB},${i === 0 ? 0.6 : 0.3})`
-                                : "rgba(255,255,255,0.10)",
+                                ? heat(i === 0 ? 0.6 : 0.3)
+                                : "var(--line)",
                           }}
                           aria-hidden
                         />
                         <span
-                          className="font-mono-ta text-xs tabular-nums"
-                          style={{ color: "var(--fg-2)" }}
+                          style={{
+                            font: "var(--type-sub)",
+                            fontVariantNumeric: "tabular-nums",
+                            color: "var(--text-2)",
+                          }}
                         >
                           {Math.round((zones[z] / zoneTotal) * 100)}%
                         </span>
-                        <span className="text-xs" style={{ color: "var(--fg-3)" }}>
+                        <span
+                          style={{
+                            font: "var(--type-sub)",
+                            color: "var(--text-3)",
+                          }}
+                        >
                           {CAGE_ZONE_LABEL[z]}
                         </span>
                       </div>
@@ -314,29 +307,52 @@ function CageHeatmap({
   // zweithellster = zweitgrößter, schwächster = kleinster (0 % bleibt leer).
   // Die Ringe sind echte Ringe (Pfad mit Loch), damit sich die Flächen nicht
   // stapeln und die wahrgenommene Helligkeit wirklich der Rangfolge folgt.
-  // Die dominante Zone trägt zusätzlich die glühende Cyan-Kontur.
+  // Die dominante Zone trägt zusätzlich die glühende Akzent-Kontur.
+  //
+  // FARBEN LIEGEN IM `style`, NICHT IM ATTRIBUT: `fill="…"` ist eine
+  // Präsentations-Attribut-Kurzform, und `color-mix()` darin ist nicht überall
+  // verlässlich geparst. Als CSS-Deklaration ist es eindeutig.
   const share = (z: CageZone) => (total > 0 ? zones[z] / total : 0);
   const ranked = (["cage", "open", "center"] as CageZone[]).sort(
     (a, b) => zones[b] - zones[a],
   );
   const RANK_ALPHA = [0.5, 0.2, 0.08];
   const fill = (z: CageZone) =>
-    zones[z] > 0
-      ? `rgba(${HEAT_RGB},${RANK_ALPHA[ranked.indexOf(z)]})`
-      : "none";
+    zones[z] > 0 ? heat(RANK_ALPHA[ranked.indexOf(z)]) : "none";
   const dominant = ranked[0];
   const isDom = (z: CageZone) => z === dominant && zones[z] > 0;
-  const outline = (z: CageZone) =>
-    isDom(z)
-      ? { stroke: "var(--ta-cyan)", width: 2 }
-      : { stroke: "rgba(140,210,220,0.28)", width: 0.75 };
-  const glow = (z: CageZone): React.CSSProperties | undefined =>
+  const outline = (z: CageZone): React.CSSProperties =>
     isDom(z)
       ? {
-          filter:
-            "drop-shadow(0 0 4px rgba(35,196,206,0.9)) drop-shadow(0 0 12px rgba(35,196,206,0.45))",
+          fill: "none",
+          stroke: "var(--accent)",
+          strokeWidth: 2,
+          filter: `drop-shadow(0 0 4px ${heat(0.9)}) drop-shadow(0 0 12px ${heat(0.45)})`,
         }
-      : undefined;
+      : {
+          fill: "none",
+          stroke: "var(--line-strong)",
+          strokeWidth: 0.75,
+        };
+  /**
+   * DIE DOMINANTE ZAHL STEHT IN DER TEXTFARBE, NICHT IM AKZENT — nachgemessen
+   * am 04.09.2026 per Canvas-Pixel (getComputedStyle gibt oklch() unaufgelöst
+   * zurück, also ist Malen die einzige ehrliche Messung).
+   *
+   * Sie sitzt IM gefüllten Ring, und dessen Fläche ist der Akzent bei halber
+   * Deckkraft — in beiden Themes ein Mittelton. Akzentfarbe darauf ergab
+   * **3,18:1 im Dunkeln und 2,35:1 im Hellen**; bei 14 px fett verlangt WCAG AA
+   * 4,5:1. Der Wert war schon vor dem Umbau zu niedrig (dort lag das helle
+   * Tidal-Cyan auf demselben Halbton) — er fällt hier nur auf, weil die Stelle
+   * ohnehin angefasst wurde.
+   *
+   * `--text-1` trägt in BEIDEN Themes: hell 6,1:1, dunkel 5,5:1 — die
+   * Textfarbe ist per Definition die, die gegen jede Fläche des Systems steht.
+   * Verloren geht dabei nichts: Die dominante Zone ist schon an drei anderen
+   * Merkmalen zu erkennen — größere Schrift, fetterer Schnitt und die glühende
+   * Akzent-Kontur um ihren Ring. Die Farbe war das vierte und einzige, das
+   * Lesbarkeit gekostet hat.
+   */
   const label = (z: CageZone, y: number) => (
     <text
       x={50}
@@ -344,14 +360,15 @@ function CageHeatmap({
       textAnchor="middle"
       fontSize={isDom(z) ? 8.4 : 6.6}
       fontWeight={isDom(z) ? 700 : 400}
-      fill={
-        zones[z] === 0
-          ? "var(--fg-4)"
-          : isDom(z)
-            ? "var(--ta-cyan-bright)"
-            : "var(--fg-2)"
-      }
-      style={{ fontFamily: "var(--font-mono)" }}
+      style={{
+        fontFamily: "var(--font-mono)",
+        fill:
+          zones[z] === 0
+            ? "var(--text-3)"
+            : isDom(z)
+              ? "var(--text-1)"
+              : "var(--text-2)",
+      }}
     >
       {Math.round(share(z) * 100)}%
     </text>
@@ -370,38 +387,20 @@ function CageHeatmap({
       <path
         d={`${octagonPathD(44)} ${octagonPathD(30)}`}
         fillRule="evenodd"
-        fill={fill("cage")}
+        style={{ fill: fill("cage") }}
       />
       {/* Open-Ring */}
       <path
         d={`${octagonPathD(30)} ${octagonPathD(15)}`}
         fillRule="evenodd"
-        fill={fill("open")}
+        style={{ fill: fill("open") }}
       />
       {/* Center */}
-      <polygon points={octagon(15)} fill={fill("center")} />
+      <polygon points={octagon(15)} style={{ fill: fill("center") }} />
       {/* Konturen — die dominante Zone glüht */}
-      <polygon
-        points={octagon(44)}
-        fill="none"
-        stroke={outline("cage").stroke}
-        strokeWidth={outline("cage").width}
-        style={glow("cage")}
-      />
-      <polygon
-        points={octagon(30)}
-        fill="none"
-        stroke={outline("open").stroke}
-        strokeWidth={outline("open").width}
-        style={glow("open")}
-      />
-      <polygon
-        points={octagon(15)}
-        fill="none"
-        stroke={outline("center").stroke}
-        strokeWidth={outline("center").width}
-        style={glow("center")}
-      />
+      <polygon points={octagon(44)} style={outline("cage")} />
+      <polygon points={octagon(30)} style={outline("open")} />
+      <polygon points={octagon(15)} style={outline("center")} />
       {/* Prozente: Cage über dem Ring, Open im Band, Center mittig */}
       {label("cage", 5.8)}
       {label("open", 33.2)}

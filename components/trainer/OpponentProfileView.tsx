@@ -1,5 +1,6 @@
 "use client";
 
+import Icon, { type IconName } from "@/components/ui/Icon";
 import {
   FIGHTER_STANCE_LABEL,
   FIGHT_STYLE_LABEL,
@@ -7,52 +8,65 @@ import {
   type FightStyle,
 } from "@/lib/fight-camp";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
-import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
+import {
+  deriveSuggestions,
+  deriveTendencies,
+  hasActionData,
+  isDnaSplitEmpty,
+  zoneDistribution,
+  type ActionStat,
+  type DnaSplit,
+} from "@/lib/fight-stats";
 import DnaCategoryGrid from "./DnaCategoryGrid";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
 import FightInsights from "./FightInsights";
 
-// ── Kleine Marker-Icons (keine Emoji) ──────────────────────────────────────
-function MarkUp() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 19V6" />
-      <path d="M5 12l7-7 7 7" />
-    </svg>
-  );
-}
-function MarkDown() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 5v13" />
-      <path d="M5 12l7 7 7-7" />
-    </svg>
-  );
-}
-function MarkStar() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden>
-      <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" />
-    </svg>
-  );
-}
-
+/**
+ * Eine Zeile mit Marker — Stärke, Schwäche, Lieblings-Angriff.
+ *
+ * Die drei Zeichen kamen bis zur Rollout-Etappe 3a aus drei handgezeichneten
+ * SVGs in dieser Datei und trugen Cyan, Pink und ein hartkodiertes Violett.
+ * Jetzt kommen sie aus der Icon-Registry (DESIGN-BRIEF §1.4) und aus der
+ * SEMANTIK-Reihe — dieselbe Zuordnung, die `FightCampPlanView` für exakt
+ * dieselben drei Felder schon trägt: `+` Stärke, `−` Schwäche, `★` das, worauf
+ * sich der Athlet vorbereiten muss.
+ */
 function MarkerRow({
   icon,
   color,
   text,
 }: {
-  icon: React.ReactNode;
+  icon: IconName;
   color: string;
   text: string;
 }) {
   return (
     <div className="flex items-start gap-1.5">
-      <span style={{ color, flexShrink: 0, marginTop: "2px", lineHeight: 0 }}>
-        {icon}
+      <span
+        aria-hidden
+        style={{ color, flexShrink: 0, marginTop: "2px", lineHeight: 0 }}
+      >
+        <Icon name={icon} size={13} strokeWidth={2.8} />
       </span>
-      <span style={{ color: "var(--fg-2)" }}>{text}</span>
+      <span style={{ color: "var(--text-2)" }}>{text}</span>
+    </div>
+  );
+}
+
+/**
+ * Überschrift eines Blocks. Sie liegt seit Etappe 3a beim AUFRUFER und nicht
+ * mehr im Block selbst — Begründung im Kopf von `FightDnaSplit.tsx`. Titel und
+ * Unterzeile sind wortgleich zu `FightProfileView`, damit derselbe Block auf
+ * dem Kampfprofil und im Gegnerbericht dasselbe heißt.
+ */
+function BlockHead({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="mb-3">
+      <div className="t-label">{title}</div>
+      <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+        {sub}
+      </div>
     </div>
   );
 }
@@ -111,41 +125,52 @@ export default function OpponentProfileView({
   const showDna = section === "all" || section === "dna";
   const showStats = section === "all" || section === "stats";
 
+  /**
+   * Steht mehr als ein Block untereinander, braucht jeder seine Überschrift.
+   * Zeigt die Ansicht dagegen genau EINEN Block (die Tabs „DNA" und „Stats" im
+   * Gegner-Detail), sagt die Tab-Leiste darüber schon, was hier steht — eine
+   * zweite Überschrift wäre dieselbe Auskunft direkt darunter.
+   */
+  const mehrereBloecke = section === "all" || section === "overview";
+
+  /**
+   * WAS NICHTS ZU ZEIGEN HAT, BEKOMMT AUCH KEINE ÜBERSCHRIFT. Jeder der drei
+   * Blöcke gibt `null` zurück, wenn seine Datengrundlage fehlt — solange die
+   * Überschrift im Block steckte, verschwand sie mit ihm. Jetzt steht sie
+   * hier, also muss hier auch dieselbe Bedingung stehen; sonst bliebe
+   * „Fight-DNA · Verteilung der Kampfbereiche" über einer leeren Fläche
+   * stehen. Die Prüfungen sind genau die, die die Blöcke selbst anstellen.
+   */
+  const stats = opponent.actionStats ?? [];
+  const zonen = zoneDistribution(stats);
+  const hatSplit = !!opponent.dnaSplit && !isDnaSplitEmpty(opponent.dnaSplit);
+  const hatStats = stats.some(hasActionData);
+  const hatInsights =
+    deriveTendencies(stats).length > 0 ||
+    deriveSuggestions(opponent.dnaSplit, stats).length > 0 ||
+    zonen.center + zonen.open + zonen.cage > 0;
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {showOverview && showBasics && (
-        <div
-          className="rounded-2xl p-4 sm:p-5"
-          style={{
-            background:
-              "radial-gradient(400px 200px at 100% 0%, rgba(255,79,168,0.12), transparent 60%), linear-gradient(160deg, var(--ink-3), var(--ink-2))",
-            border: "1px solid rgba(255,79,168,0.3)",
-          }}
-        >
-          <div
-            className="font-mono-ta text-[9px] uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
-          >
-            Gegner
-          </div>
-          <div
-            className="font-display-ta mt-1 font-black uppercase"
-            style={{ fontSize: "20px", letterSpacing: "0.03em" }}
-          >
+        <div className="t-card p-4 sm:p-5">
+          <div className="t-label">Gegner</div>
+          {/* KEINE VERSALIEN: Ein Gegnername ist INHALT, keine Überschrift
+              (Typo-Regel; nachgemessen an „Night of Champions" auf der
+              Wettkampfkarte — Versalien plus Sperrung kosten rund ein Viertel
+              der Breite). */}
+          <div className="mt-1" style={{ font: "var(--type-h2)" }}>
             {opponent.name}
           </div>
           <div
-            className="font-mono-ta mt-1 text-[11px]"
-            style={{ color: "var(--fg-3)" }}
+            className="mt-1"
+            style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
           >
             {FIGHT_STYLE_LABEL[opponent.style]} ·{" "}
             {FIGHTER_STANCE_LABEL[opponent.stance]}
           </div>
           {measures.length > 0 && (
-            <div
-              className="font-mono-ta mt-1 text-[11px]"
-              style={{ color: "var(--fg-4)" }}
-            >
+            <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
               {measures.join(" · ")}
             </div>
           )}
@@ -154,32 +179,35 @@ export default function OpponentProfileView({
             weaknesses.length > 0 ||
             favorites.length > 0 ||
             opponent.notes) && (
-            <div className="mt-3 flex flex-col gap-1.5 text-xs">
+            <div
+              className="mt-3 flex flex-col gap-1.5"
+              style={{ font: "var(--type-sub)" }}
+            >
               {strengths.length > 0 && (
                 <MarkerRow
-                  icon={<MarkUp />}
-                  color="var(--ta-cyan)"
+                  icon="plus"
+                  color="var(--positive)"
                   text={strengths.join(", ")}
                 />
               )}
               {weaknesses.length > 0 && (
                 <MarkerRow
-                  icon={<MarkDown />}
-                  color="var(--ta-pink)"
+                  icon="minus"
+                  color="var(--negative)"
                   text={weaknesses.join(", ")}
                 />
               )}
               {favorites.length > 0 && (
                 <MarkerRow
-                  icon={<MarkStar />}
-                  color="#8A63E8"
+                  icon="star"
+                  color="var(--warning)"
                   text={favorites.join(", ")}
                 />
               )}
               {opponent.notes && (
                 <div
                   className="mt-1 italic"
-                  style={{ color: "var(--fg-4)", fontSize: "11px" }}
+                  style={{ color: "var(--text-3)" }}
                 >
                   &bdquo;{opponent.notes}&ldquo;
                 </div>
@@ -189,25 +217,53 @@ export default function OpponentProfileView({
         </div>
       )}
 
-      {showOverview && (
-        <>
-          {/* §1 Fight-DNA-Split */}
+      {showOverview && hatSplit && (
+        /* §1 Fight-DNA-Split */
+        <section>
+          {mehrereBloecke && (
+            <BlockHead title="Fight-DNA" sub="Verteilung der Kampfbereiche" />
+          )}
           <FightDnaSplit split={opponent.dnaSplit} />
+        </section>
+      )}
 
-          {/* §3/§4/§5 Auto-Insights aus den Zahlen */}
-          <FightInsights
-            split={opponent.dnaSplit}
-            stats={opponent.actionStats ?? []}
-          />
-        </>
+      {showOverview && hatInsights && (
+        /* §3/§4/§5 Auto-Insights aus den Zahlen */
+        <section>
+          {mehrereBloecke && (
+            <BlockHead
+              title="Auto-Insights"
+              sub="Abgeleitet aus Split und Statistik"
+            />
+          )}
+          <FightInsights split={opponent.dnaSplit} stats={stats} />
+        </section>
       )}
 
       {/* §2 Technik-Statistik (Detailzahlen) */}
-      {showStats && (
-        <FightStatsBlock stats={opponent.actionStats ?? []} />
+      {showStats && hatStats && (
+        <section>
+          {mehrereBloecke && (
+            <BlockHead
+              title="Technik-Statistik"
+              sub="Gezählt aus den KI-Video-Analysen"
+            />
+          )}
+          <FightStatsBlock stats={stats} />
+        </section>
       )}
 
-      {showDna && <DnaCategoryGrid answers={opponent.dna ?? {}} />}
+      {showDna && (
+        /* Der Kategorien-Rost bleibt AUCH LEER stehen: Scouting-Lücken sollen
+           auffallen, nicht verschwinden — er bringt dafür seinen eigenen
+           Leerzustand mit. */
+        <section>
+          {mehrereBloecke && (
+            <BlockHead title="Kampf-DNA" sub="Beobachtungen in 9 Kategorien" />
+          )}
+          <DnaCategoryGrid answers={opponent.dna ?? {}} />
+        </section>
+      )}
     </div>
   );
 }

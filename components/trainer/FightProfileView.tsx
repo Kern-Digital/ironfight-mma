@@ -7,9 +7,14 @@
  * IMMER sichtbaren Blöcken — Fight-DNA-Split und Käfig-Karte („Wo passiert
  * die Aktion") — und darunter aufklappbaren Punkten (Auto-Insights,
  * Technik-Statistik, Kampf-DNA) mit Kurzfazit in der Zeile. Höchstens ein
- * Punkt zugleich geöffnet, Start zugeklappt. Die Innen-Blöcke rendern
- * `frameless` (Fläche + Rahmen liefert die Karte); OpponentProfileView/
- * OpponentEditor nutzen sie weiter gerahmt im alten Look.
+ * Punkt zugleich geöffnet, Start zugeklappt. Die Innen-Blöcke bringen weder
+ * Fläche noch Kopfzeile mit — beides liefert diese Karte.
+ *
+ * Bis zur Rollout-Etappe 3a (04.09.2026) war das ein `frameless`-Prop an jedem
+ * Block, und ohne ihn zeichneten dieselben Blöcke eine `--ink-*`-Karte im alten
+ * Look für OpponentProfileView/OpponentEditor. Zwei Fassungen, die auseinander
+ * liefen; jetzt gibt es nur noch eine (Begründung im Kopf von
+ * `FightDnaSplit.tsx`).
  */
 
 import { Collapse } from "@/components/motion";
@@ -88,7 +93,7 @@ export default function FightProfileView({
       icon: "chart",
       title: "Fight-DNA",
       sub: "Verteilung der Kampfbereiche",
-      content: <FightDnaSplit split={dnaSplit} frameless />,
+      content: <FightDnaSplit split={dnaSplit} />,
     });
   }
 
@@ -100,7 +105,7 @@ export default function FightProfileView({
       icon: "mat",
       title: "Wo passiert die Aktion",
       sub: "Anteil der Aktionen nach Käfig-Zone",
-      content: <FightInsights split={dnaSplit} stats={stats} frameless only="zones" />,
+      content: <FightInsights split={dnaSplit} stats={stats} only="zones" />,
     });
   }
 
@@ -115,7 +120,7 @@ export default function FightProfileView({
       sub: "Abgeleitet aus Split und Statistik",
       summary: `${hintCount} Hinweise`,
       content: (
-        <FightInsights split={dnaSplit} stats={stats} frameless only="insights" />
+        <FightInsights split={dnaSplit} stats={stats} only="insights" />
       ),
     });
   }
@@ -129,7 +134,7 @@ export default function FightProfileView({
       title: "Technik-Statistik",
       sub: "Gezählt aus den KI-Video-Analysen",
       summary: `${techCount} Techniken · ${Math.round(totals.rate * 100)} %`,
-      content: <FightStatsBlock stats={stats} frameless />,
+      content: <FightStatsBlock stats={stats} />,
     });
   }
 
@@ -140,7 +145,7 @@ export default function FightProfileView({
       title: "Kampf-DNA",
       sub: "Beobachtungen in 9 Kategorien",
       summary: `${dnaCompleteness(dna)} %`,
-      content: <DnaCategoryGrid answers={dna} frameless />,
+      content: <DnaCategoryGrid answers={dna} />,
     });
   }
 

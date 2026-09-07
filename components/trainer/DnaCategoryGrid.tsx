@@ -11,21 +11,45 @@ import {
 } from "@/lib/gegner-dna";
 import DnaCategoryIcon from "./DnaCategoryIcon";
 
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+
 /**
  * Gegner-DNA als scanbares Kategorien-Grid (Read-only-Ersatz für das
  * Accordion in der Profilansicht): 9 Karten mit Fortschritt und der ersten
  * Kernaussage als Vorschau. Klick öffnet die Kategorie im Detail-Panel
  * darunter. Leere Kategorien bleiben sichtbar (gedimmt) — Scouting-Lücken
  * sollen auffallen, nicht verschwinden.
+ *
+ * ─── DER ZUSTAND FÄRBT, NICHT DIE KATEGORIE (Leon, 04.09.2026) ─────────────
+ *
+ * Bis zur Rollout-Etappe 3a trug jede Kategorie eine Farbe aus
+ * `DnaCategory.accent` — vier Farben, die sich über neun Kategorien im Kreis
+ * wiederholten. „Real Habits", „Cage- und Raumverhalten" und „Drills" waren
+ * deshalb alle drei cyan, ohne dass sie irgendetwas verbindet; zwei der vier
+ * Farben waren Violett, also DeepFights eigene Farbe, mitten auf der
+ * DeepFight-Seite.
+ *
+ * Eine Farbe, die nichts trennt, ist Dekoration. Was ein Trainer hier wirklich
+ * wissen will, ist: WAS IST SCHON GESCOUTET? Also färbt jetzt der Zustand —
+ * gescoutet trägt den Gym-Akzent, leer steht neutral und gedämpft, die
+ * geöffnete Kategorie ist zusätzlich gefüllt. Unterschieden bleiben die
+ * Kategorien durch das, was sie ohnehin schon unterscheidet: ihr Symbol, ihren
+ * Namen und den Zähler.
+ *
+ * Dieselbe Regel wie bei den Camp-Phasen und bei „Archiviert" in der
+ * Wettkampf-Übersicht (`components/trainer/FightCampPlanView.tsx`).
+ *
+ * Rollout-Etappe 3a: `frameless` ist ebenfalls weg (Begründung im Kopf von
+ * FightDnaSplit.tsx).
  */
 export default function DnaCategoryGrid({
   answers,
-  frameless,
 }: {
   answers: GegnerDnaAnswers;
-  /** true = Flächen im neuen Token-System (Akkordeon in FightProfileView
-   * liefert die Karte); false = alter Ink-Look für die Scouting-Ansichten. */
-  frameless?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -41,15 +65,18 @@ export default function DnaCategoryGrid({
   if (totalAnswered(answers) === 0) {
     return (
       <div
-        className="rounded-2xl p-6 text-center"
-        style={{ background: "var(--ink-2)", border: "1px dashed var(--ink-5)" }}
+        className="t-card p-6 text-center"
+        style={{ borderStyle: "dashed", borderColor: "var(--line-strong)" }}
       >
-        <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
+        <p style={{ font: "var(--type-body-strong)" }}>
           Noch keine DeepFight-Daten erfasst.
         </p>
-        <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
-          Über &bdquo;Bearbeiten&ldquo; lassen sich Scouting-Infos zum Gegner
-          ergänzen — nur was du wirklich weißt.
+        <p
+          className="mt-1"
+          style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+        >
+          Über &bdquo;Bearbeiten&ldquo; ergänzt du Scouting-Infos zum Gegner —
+          nur was du wirklich weißt.
         </p>
       </div>
     );
@@ -64,6 +91,11 @@ export default function DnaCategoryGrid({
           const first = answeredQuestions(category, answers)[0];
           const active = selectedId === category.id;
           const isEmpty = count === 0;
+          // Drei Zustände, drei Mittel: leer = neutral und gedämpft ·
+          // gescoutet = Akzent in Symbol, Zähler und Kante ·
+          // geöffnet = zusätzlich gefüllte Fläche (Muster der Athleten-Auswahl
+          // in „Neuer Wettkampf").
+          const akzent = isEmpty ? "var(--text-3)" : "var(--accent-text)";
 
           return (
             <button
@@ -72,52 +104,46 @@ export default function DnaCategoryGrid({
               onClick={() => setSelectedId(active ? null : category.id)}
               aria-expanded={active}
               data-press="surface"
-              className="flex flex-col rounded-2xl p-3.5 text-left transition-colors"
+              className="t-interactive flex flex-col rounded-card p-3.5 text-left"
               style={{
-                background: frameless
-                  ? active
-                    ? "var(--surface-raised)"
-                    : "transparent"
-                  : active
-                    ? "linear-gradient(180deg, var(--ink-4), var(--ink-3))"
-                    : "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+                background: active
+                  ? "var(--accent-subtle)"
+                  : "var(--surface-raised)",
                 border: `1px solid ${
                   active
-                    ? category.accent
-                    : frameless
-                      ? isEmpty
-                        ? "var(--line)"
-                        : "var(--line-strong)"
-                      : isEmpty
-                        ? "var(--ink-4)"
-                        : "var(--ink-5)"
+                    ? "var(--accent)"
+                    : isEmpty
+                      ? "var(--line)"
+                      : "color-mix(in oklab, var(--accent) 30%, var(--line))"
                 }`,
                 opacity: isEmpty ? 0.6 : 1,
               }}
             >
               <div className="flex w-full items-center justify-between gap-2">
                 <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-field"
                   style={{
-                    background: frameless ? "var(--surface-raised)" : "var(--ink-4)",
+                    // Die Symbol-Kachel bleibt in BEIDEN Zuständen die
+                    // Kartenfläche: Auf der gefüllten Akzent-Fläche der
+                    // geöffneten Karte hebt sie sich dadurch ab, auf der
+                    // ruhenden sinkt sie leicht ein.
+                    background: "var(--surface-card)",
                     border: `1px solid ${
                       isEmpty
-                        ? frameless
-                          ? "var(--line)"
-                          : "var(--ink-5)"
-                        : category.accent
+                        ? "var(--line)"
+                        : "color-mix(in oklab, var(--accent) 35%, transparent)"
                     }`,
-                    color: isEmpty ? "var(--fg-4)" : category.accent,
+                    color: akzent,
                   }}
                   aria-hidden
                 >
                   <DnaCategoryIcon id={category.id} size={16} />
                 </span>
                 <span
-                  className="font-mono-ta text-[10px] font-bold"
                   style={{
-                    letterSpacing: "0.1em",
-                    color: isEmpty ? "var(--fg-4)" : category.accent,
+                    ...META_FONT,
+                    fontVariantNumeric: "tabular-nums",
+                    color: akzent,
                   }}
                 >
                   {count}/{total}
@@ -125,11 +151,10 @@ export default function DnaCategoryGrid({
               </div>
 
               <span
-                className="font-display-ta mt-2 block truncate font-bold uppercase"
+                className="mt-2 block truncate"
                 style={{
-                  fontSize: "13px",
-                  letterSpacing: "0.06em",
-                  color: isEmpty ? "var(--fg-3)" : "var(--fg-2)",
+                  font: "var(--type-body-strong)",
+                  color: isEmpty ? "var(--text-3)" : "var(--text-1)",
                 }}
               >
                 {category.label}
@@ -137,17 +162,14 @@ export default function DnaCategoryGrid({
 
               {/* Fortschritt */}
               <span
-                className="mt-1.5 block h-1 w-full overflow-hidden rounded-full"
-                style={{
-                  background: frameless ? "var(--surface-raised)" : "var(--ink-4)",
-                }}
+                className="t-progress mt-1.5 block"
+                style={{ height: "4px" }}
                 aria-hidden
               >
                 <span
-                  className="block h-full rounded-full"
                   style={{
                     width: `${(count / total) * 100}%`,
-                    background: category.accent,
+                    background: isEmpty ? "var(--line)" : "var(--accent)",
                     transition: "width 0.3s ease",
                   }}
                 />
@@ -155,16 +177,17 @@ export default function DnaCategoryGrid({
 
               {/* Kernaussage-Vorschau */}
               <span
-                className="mt-2 block text-[11px] leading-snug"
+                className="mt-2 block"
                 style={{
-                  color: isEmpty ? "var(--fg-4)" : "var(--fg-3)",
+                  font: "var(--type-sub)",
+                  color: "var(--text-3)",
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
                   overflow: "hidden",
                 }}
               >
-                {first ? first.value : "— noch nicht gescoutet"}
+                {first ? first.value : "Noch nicht gescoutet"}
               </span>
             </button>
           );
@@ -176,74 +199,81 @@ export default function DnaCategoryGrid({
           die Austritts-Feder behält dabei die zuletzt gerenderte Fassung. */}
       <Collapse open={selected !== null}>
         {selected && (
-        <div
-          ref={panelRef}
-          className="mt-3 rounded-2xl p-4 sm:p-5"
-          style={{
-            background: frameless
-              ? "var(--surface-raised)"
-              : "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-            border: `1px solid ${
-              frameless
-                ? `color-mix(in oklab, ${selected.accent} 45%, transparent)`
-                : selected.accent
-            }`,
-          }}
-        >
-          <div className="mb-3 flex items-center gap-3">
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-              style={{
-                background: frameless ? "transparent" : "var(--ink-4)",
-                border: `1px solid ${selected.accent}`,
-                color: selected.accent,
-              }}
-              aria-hidden
-            >
-              <DnaCategoryIcon id={selected.id} size={18} />
-            </span>
-            <div className="min-w-0">
-              <div
-                className="font-display-ta truncate font-bold uppercase"
-                style={{ fontSize: "15.5px", letterSpacing: "0.08em", color: "var(--fg-2)" }}
+          <div
+            ref={panelRef}
+            className="mt-3 rounded-card p-4 sm:p-5"
+            style={{
+              background: "var(--surface-raised)",
+              border:
+                "1px solid color-mix(in oklab, var(--accent) 45%, transparent)",
+            }}
+          >
+            <div className="mb-3 flex items-center gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field"
+                style={{
+                  background: "var(--surface-card)",
+                  border:
+                    "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
+                  color: "var(--accent-text)",
+                }}
+                aria-hidden
               >
-                {selected.label}
-              </div>
-              <div
-                className="font-mono-ta truncate text-[10px]"
-                style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
-              >
-                {selected.hint}
-              </div>
-            </div>
-          </div>
-
-          {answeredCount(selected, answers) === 0 ? (
-            <p className="text-xs" style={{ color: "var(--fg-4)" }}>
-              Zu dieser Kategorie ist noch nichts gescoutet — über
-              &bdquo;Bearbeiten&ldquo; ergänzen.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {answeredQuestions(selected, answers).map(({ question, value }) => (
-                <div key={question.id}>
-                  <div
-                    className="font-mono-ta text-[13px] font-bold uppercase leading-snug"
-                    style={{ color: selected.accent }}
-                  >
-                    {question.label}
-                  </div>
-                  <p
-                    className="mt-1 whitespace-pre-wrap text-sm leading-relaxed"
-                    style={{ color: "var(--fg-1)" }}
-                  >
-                    {value}
-                  </p>
+                <DnaCategoryIcon id={selected.id} size={18} />
+              </span>
+              <div className="min-w-0">
+                <div
+                  className="truncate"
+                  style={{
+                    font: "var(--type-h3)",
+                    letterSpacing: "var(--ls-display)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {selected.label}
                 </div>
-              ))}
+                <div
+                  className="truncate"
+                  style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+                >
+                  {selected.hint}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {answeredCount(selected, answers) === 0 ? (
+              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                Zu dieser Kategorie ist noch nichts gescoutet — über
+                &bdquo;Bearbeiten&ldquo; ergänzt du sie.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {answeredQuestions(selected, answers).map(
+                  ({ question, value }) => (
+                    <div key={question.id}>
+                      <div
+                        className="t-label"
+                        style={{ color: "var(--accent-text)" }}
+                      >
+                        {question.label}
+                      </div>
+                      {/* Stand bis 04.09.2026 auf einem Token namens „fg-1" —
+                          das es in globals.css nie gab. */}
+                      <p
+                        className="mt-1 whitespace-pre-wrap"
+                        style={{
+                          font: "var(--type-body)",
+                          color: "var(--text-1)",
+                        }}
+                      >
+                        {value}
+                      </p>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
         )}
       </Collapse>
     </div>

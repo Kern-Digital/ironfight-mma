@@ -16,49 +16,36 @@ import {
  * ausschließlich aus Video-Analysen berechnet (gewichteter Mittelwert, siehe
  * mergeDnaSplit in lib/fight-stats.ts) — die manuelle Eingabe wurde 2026-08-20
  * bewusst entfernt, damit die Gewichtung nicht von Hand-Rohwerten verzerrt wird.
+ *
+ * ─── ROLLOUT-ETAPPE 3a (04.09.2026): DER `frameless`-SCHALTER IST WEG ───────
+ *
+ * Der Block trug zwei Fassungen: `frameless` (neue Tokens, für das Akkordeon
+ * in FightProfileView) und ohne (eine `--ink-*`-Karte mit eigener Kopfzeile,
+ * für die Gegner-Ansichten). Ein Schalter, zwei Fragen:
+ *
+ *   1. Bringt der Block seine eigene KARTENFLÄCHE mit?
+ *   2. Bringt er seine eigene ÜBERSCHRIFT mit?
+ *
+ * Die erste ist im DESIGN-BRIEF längst beantwortet — reine Anzeige-Sektionen
+ * liegen flach auf dem Seitengrund, Rahmen sind der Hervorhebung vorbehalten.
+ * Die zweite gehört dem Aufrufer: Er weiß, ob über ihm schon eine Überschrift
+ * steht. Beide zusammen in einem Boolean ergaben zwei Looks, die auseinander
+ * liefen — der eine bekam beim Redesign neue Tokens, der andere blieb stehen.
+ *
+ * Jetzt: keine Fläche, keine Kopfzeile, ein Look. Die Überschrift setzt, wer
+ * den Block platziert (OpponentProfileView, OpponentEditor, FightProfileView).
  */
 export default function FightDnaSplit({
   split,
-  frameless,
 }: {
   split: DnaSplit | null | undefined;
-  /** true = ohne eigene Karten-Fläche/Kopfzeile — der Rahmen kommt vom
-   * Akkordeon in FightProfileView (neues Token-System). */
-  frameless?: boolean;
 }) {
   if (!split || isDnaSplitEmpty(split)) return null;
   const norm = normalizeDnaSplit(split);
   const activeKeys = DNA_SPLIT_KEYS.filter((k) => norm[k] > 0);
 
   return (
-    <div
-      className={frameless ? undefined : "rounded-2xl p-4 sm:p-5"}
-      style={
-        frameless
-          ? undefined
-          : {
-              background: "linear-gradient(180deg, var(--ink-2), var(--ink-1))",
-              border: "1px solid var(--ink-4)",
-            }
-      }
-    >
-      {!frameless && (
-        <div className="mb-4 flex items-center justify-between">
-          <div
-            className="font-mono-ta text-[11px] font-bold uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
-          >
-            Fight DNA
-          </div>
-          <span
-            className="font-mono-ta flex h-5 w-5 items-center justify-center rounded-full text-[10px]"
-            title="Prozentuale Verteilung der Kampfbereiche — automatisch aus der KI-Video-Analyse berechnet."
-            style={{ border: "1px solid var(--ink-6)", color: "var(--fg-4)" }}
-          >
-            i
-          </span>
-        </div>
-      )}
+    <div>
       <StackedBar norm={norm} />
       <div className="mt-4 flex">
         {activeKeys.map((k, i) => (
@@ -66,19 +53,28 @@ export default function FightDnaSplit({
             key={k}
             className="flex flex-1 flex-col items-center gap-1.5 px-1 text-center"
             style={{
-              borderLeft:
-                i > 0
-                  ? `1px solid ${frameless ? "var(--line)" : "var(--ink-4)"}`
-                  : "none",
+              borderLeft: i > 0 ? "1px solid var(--line)" : "none",
             }}
           >
+            {/* `--type-num-xl` ist genau dafür da: die große Zahl. Vorher stand
+                hier ein clamp() auf der Mono-Schrift — bei fünf Spalten trägt
+                die Skala das aber selbst (mobil 32 px, fünf Spalten auf 390 px
+                = 78 px je Spalte), und dreistellig wird der Wert nur, wenn ein
+                einziger Bereich übrig bleibt. */}
             <span
-              className="font-mono-ta font-bold leading-none"
-              style={{ fontSize: "clamp(17px, 3.4vw, 24px)", color: "var(--fg)" }}
+              style={{
+                font: "var(--type-num-xl)",
+                fontVariantNumeric: "tabular-nums",
+                color: "var(--text-1)",
+              }}
             >
               {norm[k]}
               <span
-                style={{ fontSize: "0.62em", color: "var(--fg-2)", marginLeft: 1 }}
+                style={{
+                  fontSize: "0.62em",
+                  color: "var(--text-2)",
+                  marginLeft: 1,
+                }}
               >
                 %
               </span>
@@ -92,8 +88,12 @@ export default function FightDnaSplit({
               }}
             />
             <span
-              className="truncate text-[12px]"
-              style={{ color: "var(--fg-3)", maxWidth: "100%" }}
+              className="truncate"
+              style={{
+                font: "var(--type-sub)",
+                color: "var(--text-2)",
+                maxWidth: "100%",
+              }}
             >
               {DNA_SPLIT_META[k].label}
             </span>

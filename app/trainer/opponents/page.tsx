@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * DeepFight-Bibliothek — Rollout-Etappe 3a (04.09.2026).
+ *
+ * Umzug vom alten Token-System auf das neue: `.t-card` statt Ink-Verlauf, Typo
+ * aus den `--type-*`-Tokens statt Barlow mit Inline-Pixelgrößen, Aktionsleiste
+ * als Pillen-Reihe wie in der Athletenliste und im Wettkampfbereich. Kopf,
+ * Gooey-Suche und der fließende Karten-Rost standen schon.
+ */
+
 import { Collapse } from "@/components/motion";
 import GooeySearch from "@/components/ui/GooeySearch";
 import PageHead from "@/components/shell/PageHead";
@@ -8,6 +17,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import TrainerHint from "@/components/TrainerHint";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import ErrorState from "@/components/ui/ErrorState";
 import { StaggerFlow, FlowItem } from "@/components/motion";
@@ -25,6 +35,18 @@ import {
   type Opponent,
 } from "@/lib/opponents";
 import { DNA_CATEGORIES, answeredCount } from "@/lib/gegner-dna";
+
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("de-DE", {
@@ -44,12 +66,9 @@ function OpponentCard({ opponent }: { opponent: Opponent }) {
   return (
     <Link
       href={`/trainer/opponents/${opponent.id}`}
-      className="block rounded-2xl p-4 transition-colors"
-      style={{
-        background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-        border: "1px solid var(--ink-4)",
-        textDecoration: "none",
-      }}
+      data-press="surface"
+      className="t-card t-interactive block p-4"
+      style={{ textDecoration: "none", color: "inherit" }}
     >
       <div className="flex items-start gap-3">
         <DnaCompletenessRing
@@ -59,34 +78,40 @@ function OpponentCard({ opponent }: { opponent: Opponent }) {
           stroke={3.5}
         />
         <div className="min-w-0 flex-1">
-          <div
-            className="font-display-ta truncate font-black uppercase"
-            style={{ fontSize: "15px", letterSpacing: "0.03em", color: "var(--fg)" }}
-          >
+          {/* KEINE VERSALIEN: Ein Gegnername ist Inhalt, keine Überschrift —
+              dieselbe Lehre wie auf der Wettkampfkarte, wo „Night of
+              Champions" in Versalien abbrach. */}
+          <div className="truncate" style={{ font: "var(--type-h3)" }}>
             {opponent.name}
           </div>
           <div
-            className="font-mono-ta mt-1 truncate text-[10px]"
-            style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+            className="mt-1 truncate"
+            style={{ ...META_FONT, color: "var(--text-3)" }}
           >
-            {FIGHT_STYLE_LABEL[opponent.style]} · {formatDate(opponent.updatedAt)}
+            {FIGHT_STYLE_LABEL[opponent.style]} ·{" "}
+            {formatDate(opponent.updatedAt)}
           </div>
         </div>
       </div>
       {(opponent.strengths.length > 0 || opponent.weaknesses.length > 0) && (
-        <div className="mt-2.5 flex flex-col gap-0.5 text-[11px]">
+        <div
+          className="mt-2.5 flex flex-col gap-0.5"
+          style={{ font: "var(--type-sub)" }}
+        >
+          {/* Semantik statt Marken-Akzenten — dieselbe Zuordnung wie im
+              Camp-Plan und im Gegnerbericht: + Stärke, − Schwäche. */}
           {opponent.strengths.length > 0 && (
             <div className="truncate">
-              <span style={{ color: "var(--ta-cyan)" }}>+ </span>
-              <span style={{ color: "var(--fg-3)" }}>
+              <span style={{ color: "var(--positive)" }}>+ </span>
+              <span style={{ color: "var(--text-2)" }}>
                 {opponent.strengths.join(", ")}
               </span>
             </div>
           )}
           {opponent.weaknesses.length > 0 && (
             <div className="truncate">
-              <span style={{ color: "var(--ta-pink)" }}>− </span>
-              <span style={{ color: "var(--fg-3)" }}>
+              <span style={{ color: "var(--negative)" }}>− </span>
+              <span style={{ color: "var(--text-2)" }}>
                 {opponent.weaknesses.join(", ")}
               </span>
             </div>
@@ -142,7 +167,10 @@ function OpponentsLibraryContent() {
         gymId,
         createdBy: user.uid,
         createdByName:
-          profile?.displayName ?? profile?.authProviderName ?? profile?.email ?? null,
+          profile?.displayName ??
+          profile?.authProviderName ??
+          profile?.email ??
+          null,
         ...value,
       });
       router.push(`/trainer/opponents/${created.id}`);
@@ -153,56 +181,76 @@ function OpponentsLibraryContent() {
   }
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
+    <main
+      className="min-h-screen"
+      style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
+    >
       <PageHead
         lane="wide"
         title={<DeepFightWordmark />}
         description="KI-Gegneranalyse für dein ganzes Gym: Jedes Profil steht allen Trainern offen."
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-1 sm:px-6">
         <TrainerHint id="opponents-library" title="DeepFight-Bibliothek">
           Jedes Profil ist die lebende Analyse eines Gegners: Muster, Waffen,
           Schwächen, Gameplan. Alle Trainer deines Gyms arbeiten an denselben
           Profilen. Der Ring zeigt, wie viele der {DNA_CATEGORIES.length}{" "}
-          Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen
-          den damaligen Stand ein.
+          Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen den
+          damaligen Stand ein.
         </TrainerHint>
 
         {error && (
-          <div className="mb-5">
-            <ErrorState
-              title="Daten konnten nicht geladen werden"
-              message={error}
-              onRetry={load}
-            />
-          </div>
+          <ErrorState
+            title="Daten konnten nicht geladen werden"
+            message={error}
+            onRetry={load}
+          />
         )}
 
-        {/* Aktionsleiste */}
-        <div className="mb-2 flex flex-wrap items-center gap-3">
+        {/* Aktionsleiste — Knopf und Suche in EINER Reihe aus Pillen, wie in
+            der Athletenliste und im Wettkampfbereich. */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
             onClick={() => setShowNewOpponent((v) => !v)}
-            className="btn-primary px-4 py-2 text-xs"
+            aria-expanded={showNewOpponent}
+            className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
+            style={{
+              ...BTN_FONT,
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
+            }}
           >
-            {showNewOpponent ? "Schließen" : "+ Neues DeepFight-Profil"}
+            <Icon
+              name={showNewOpponent ? "x" : "plus"}
+              size={13}
+              strokeWidth={2.4}
+            />
+            {showNewOpponent ? "Schließen" : "Neues DeepFight-Profil"}
           </button>
           <GooeySearch
             value={search}
             onChange={setSearch}
+            label="Suchen"
             placeholder="Gegner suchen…"
           />
         </div>
 
         {/* Inline-Editor: neue Gegner-DNA */}
         <Collapse open={showNewOpponent}>
-          <div className="mb-6 mt-4">
-            <h3
-              className="font-display-ta mb-4 font-black uppercase"
-              style={{ fontSize: "16px", letterSpacing: "0.04em" }}
+          <div className="pb-2">
+            <h2
+              className="mb-4"
+              style={{
+                font: "var(--type-h2)",
+                letterSpacing: "var(--ls-display)",
+                textTransform: "uppercase",
+              }}
             >
-              Neues DeepFight-Profil anlegen
-            </h3>
+              Neues DeepFight-Profil
+            </h2>
             <OpponentEditor
               busy={creating}
               submitLabel="DeepFight-Profil anlegen"
@@ -214,30 +262,38 @@ function OpponentsLibraryContent() {
 
         {/* Bibliothek */}
         {opponents === null ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+              <Skeleton key={i} className="h-28 w-full rounded-card" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div
-            className="mt-3 rounded-2xl p-10 text-center"
-            style={{ border: "1px dashed var(--ink-5)", background: "var(--ink-2)" }}
+            className="rounded-card p-10 text-center"
+            style={{
+              border: "1px dashed var(--line-strong)",
+              background: "var(--surface-card)",
+            }}
           >
-            <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
-              {search ? "Keine DeepFight-Profile gefunden." : "Noch keine DeepFight-Profile angelegt."}
+            <p style={{ font: "var(--type-body-strong)" }}>
+              {search
+                ? "Kein DeepFight-Profil gefunden."
+                : "Noch kein DeepFight-Profil angelegt."}
             </p>
-            {!search && (
-              <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
-                Leg ein erstes Gegnerprofil an — dein ganzes Trainerteam
-                arbeitet damit.
-              </p>
-            )}
+            <p
+              className="mt-1"
+              style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+            >
+              {search
+                ? "Such nach einem anderen Namen oder leer die Suche."
+                : "Leg ein erstes Gegnerprofil an — dein ganzes Trainerteam arbeitet damit."}
+            </p>
           </div>
         ) : (
-          // Die Bibliothek filtert live nach Stil und Suchbegriff — die
-          // Karten sollen dabei zu ihrer neuen Rasterposition rutschen.
-          <StaggerFlow className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          // Die Bibliothek filtert live nach Suchbegriff — die Karten sollen
+          // dabei zu ihrer neuen Rasterposition rutschen statt zu springen.
+          // Schlüssel ist die Firestore-ID, nie der Index (MOTION-BRIEF §3.7).
+          <StaggerFlow className="grid gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((o, i) => (
               <FlowItem key={o.id} index={i}>
                 <OpponentCard opponent={o} />
