@@ -249,6 +249,24 @@ export default function MultiFilter({
         reduced ? { duration: 0 } : { duration: DAUER, ease: [...KURVE] }
       }
     >
+      {/* OFFEN BEWEGT SICH DAS FELD NICHT (Leons Befund 08.09.2026: „unten ist
+          der Rahmen zur Liste abgerissen").
+
+          Das Feld ist ein `<button>` und bekam damit die Grundhaptik aller
+          Knöpfe: unter der Maus `scale(1.02)`. Zugeklappt ist das richtig —
+          eine freistehende Pille darf entgegenkommen. AUFGEKLAPPT ist das Feld
+          aber kein Knopf mehr, sondern die OBERE HÄLFTE EINER Form: Es teilt
+          seine Kante mit dem Panel (`border-bottom-color: transparent`), und
+          das Panel ist ein Geschwister, das sich nicht mitskaliert. Gemessen
+          auf 1440 px: Feld 479,4 px breit gegen Panel 470 px — **4,7 px
+          Überstand pro Seite**, genau 2 % der halben Breite. Der Rahmen riss
+          an beiden Seiten auf.
+
+          `data-motion` ist dafür der vorgesehene Weg (MOTION-BRIEF §3.8: „Nie
+          zwei Federn auf einem Element … wer von Hand animiert, setzt das
+          Attribut"), und die Lage ist genau die beschriebene: Die Breite
+          dieses Feldes animiert bereits eine Framer-Feder an `.mf-root`, und
+          die CSS-Skalierung multiplizierte sich darauf. */}
       <button
         type="button"
         aria-haspopup="listbox"
@@ -256,6 +274,7 @@ export default function MultiFilter({
         onClick={() => setOpen((o) => !o)}
         className="mf-trigger"
         data-mit-x={zeigeX || undefined}
+        data-motion={open ? "offen" : undefined}
       >
         <span className="mf-trigger-text">{anzeige}</span>
       </button>
@@ -311,6 +330,7 @@ export default function MultiFilter({
                   aria-selected={false}
                   onClick={() => onChange([])}
                   className="mf-row mf-row-voll"
+                  data-press="quiet"
                 >
                   <span className="truncate">{label}</span>
                 </button>
@@ -318,6 +338,13 @@ export default function MultiFilter({
               </>
             )}
 
+            {/* `data-press="quiet"`: Zeilen dichter Listen heben sich NIE
+                (MOTION-BRIEF, die drei Stärken — Leon 04.09. im Kurs-Editor:
+                „das nervt"). Ohne das Attribut hob die Grundhaptik jede
+                der achtzehn Zeilen um 2 % an, sobald die Maus darüberfuhr;
+                bei zwei Spalten wackelte die halbe Liste. Die
+                Hover-Rückmeldung ist hier die Flächen-Tönung (.mf-row:hover),
+                nicht die Bewegung. */}
             {options.map((o) => {
               const gewaehlt = value.includes(o.value);
               return (
@@ -329,6 +356,7 @@ export default function MultiFilter({
                   onClick={() => umschalten(o.value)}
                   className="mf-row"
                   data-gewaehlt={gewaehlt || undefined}
+                  data-press="quiet"
                 >
                   <span className="truncate">{o.label}</span>
                 </button>
