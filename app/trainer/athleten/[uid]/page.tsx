@@ -19,7 +19,6 @@ import {
   type StudentEntry,
 } from "@/lib/admin";
 import { getRecentWorkouts, type WorkoutSession } from "@/lib/workouts";
-import { listVideoAnalyses, type VideoAnalysis } from "@/lib/video-analysis";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
 import {
   getStudentProgress,
@@ -179,7 +178,6 @@ function StudentDetailContent({ uid }: { uid: string }) {
   // Verknüpfte DeepFight-Profile der Wettkämpfe — zeigt den aktuellen
   // Scouting-Stand statt nur den eingefrorenen Snapshot.
   const [opponents, setOpponents] = useState<Map<string, Opponent>>(new Map());
-  const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
   // App-Nutzung (Bibliothek, Kurs-Abos, Rückmeldungen, letzte Aktivität).
   // Diese vier Zahlen standen bis zum 03.09.2026 im Aufklapp-Panel der
   // Athletenliste. Mit der Umstellung auf eine reine Namensliste (Leons
@@ -201,7 +199,6 @@ function StudentDetailContent({ uid }: { uid: string }) {
     setWorkouts(null);
     setProgress(null);
     setCamps(null);
-    setAnalyses(null);
     setUsage(null);
     setGesperrtFuer(null);
     setOpponents(new Map());
@@ -221,17 +218,19 @@ function StudentDetailContent({ uid }: { uid: string }) {
         return;
       }
       if (!e) throw new Error("Athlet nicht gefunden");
-      const [w, p, c, a] = await Promise.all([
+      // Die Analysen wurden bis zum 08.09.2026 hier mitgeladen — allein für
+      // den Zähler am DeepFight-Knopf („3 Auswertungen · 1 frei"). Mit dem
+      // Knopf ist auch die Abfrage weg: Ein Firestore-Lesevorgang pro
+      // Seitenaufruf für eine Zahl, die niemand mehr sieht.
+      const [w, p, c] = await Promise.all([
         getRecentWorkouts(uid, 500),
         getAllProgress(uid).catch(() => [] as TechniqueProgress[]),
         listFightCamps(uid).catch(() => [] as FightCamp[]),
-        listVideoAnalyses("athlete", uid).catch(() => [] as VideoAnalysis[]),
       ]);
       setEntry(e);
       setWorkouts(w);
       setProgress(p);
       setCamps(c);
-      setAnalyses(a);
       setOpponents(await loadOpponentsByIds(c.map(campOpponentId)));
 
       // Nachgelagert und ohne `await` im kritischen Pfad: Vier Zählabfragen
@@ -382,41 +381,60 @@ function StudentDetailContent({ uid }: { uid: string }) {
             dadurch als Balken über den ganzen Kopf. */}
         <div className="flex flex-col items-start gap-2">
           {/* DeepFight-Einstieg für diesen Athleten — die Analyse selbst lebt
-              unter /trainer/deepfight/athletes/[uid]. Violett ist hier
-              richtig und bleibt: --accent-2 ist die BRAND-Konstante von
-              DeepFight und folgt bewusst KEINEM Gym-Akzent (Token-Kommentar
-              in globals.css). Vorher stand dasselbe Violett dreimal als
-              hartkodierter Hex-Wert in dieser Zeile. */}
+              unter /trainer/deepfight/athleten/[uid].
+
+              KEIN KNOPF MEHR, NUR DIE WORTMARKE (Leon 08.09.2026: „nur
+              DeepFight, aber so groß wie der Button jetzt ist — ohne Button,
+              reiner Text und Symbol vorne dran"). Weg sind damit drei Dinge,
+              die alle dasselbe sagten: der Kasten aus Violett-Fläche und
+              Violett-Rand, ein `video`-Symbol vor einer Wortmarke, die ihr
+              Funkeln schon selbst mitbringt, und der Pfeil hinten.
+
+              DAS VIOLETT WAR DER ALTE STAND. `--accent-2` ist im
+              Token-System zwar weiter die Brand-Konstante von DeepFight,
+              aber der Bereich selbst hat sich seit dem 06.09. anders
+              entschieden: Tidal-Blau für die eigenen Leute, Silber für
+              Gegner, und die Bedienelemente folgen dem GYM-Akzent. Ein
+              violetter Kasten daneben war der letzte Rest der alten
+              Identität. Die Marke trägt jetzt ihr Funkeln-Symbol, die
+              Schrift den Akzent — wie jeder andere Einstieg im Coach-Bereich.
+
+              GRÖSSE IST GEMESSEN, NICHT GERATEN: Der Kasten war 42 px hoch
+              (1440 px, beide Themes). `--type-display` liegt mit 36 px/1.1
+              bei 39,6 px Zeilenhöhe und trifft das; mit der Polsterung für
+              das Touch-Ziel kommt die Zeile wieder auf 44 px.
+
+              `t-interactive` bleibt WEGEN DES FOKUSRINGS, seine Hover-Fläche
+              wird per Inline-Stil abgeschaltet — sonst käme unter der Maus
+              genau der Kasten zurück, der hier verschwinden soll (Inline
+              schlägt die Klasse).
+
+              DIE RÜCKMELDUNG IST DER REGENBOGEN (Leon 08.09.2026): Das
+              Funkeln steht weiß mit langsam wanderndem Regenbogen darin, und
+              unter der Maus wächst derselbe Verlauf als Fläche hinter dem
+              Text auf. Beides liegt in globals.css unter „DeepFight-Einstieg"
+              — dort stehen auch die Gründe für Tempo, Deckkraft und die
+              Schriftfarbe im Hover. Die waagerechte Polsterung ist mit einem
+              negativen Rand ausgeglichen: Der Text steht damit an derselben
+              Stelle wie ohne Fläche, und der Regenbogen bekommt trotzdem
+              Raum um ihn herum. */}
           <Link data-press
             id="deepfight"
-            href={`/trainer/deepfight/athletes/${uid}`}
-            className="t-interactive inline-flex scroll-mt-24 items-center gap-2 rounded-field px-3 py-2"
+            href={`/trainer/deepfight/athleten/${uid}`}
+            className="df-einstieg t-interactive -mx-3 -my-1 inline-flex scroll-mt-24 items-center rounded-field px-3 py-1"
+            /* Die FARBE steht in globals.css, nicht hier: Ein Inline-Stil
+               schlägt jede Klassenregel, und der Hover-Zustand muss sie
+               wechseln können (erst so gemessen — cyan auf dem Regenbogen
+               ergab 1,08:1). Die Fläche bleibt inline, denn dort ist die
+               Regel genau umgekehrt gewollt: Sie soll die Hover-Fläche von
+               `t-interactive` schlagen. */
             style={{
-              background: "var(--accent-2-subtle)",
-              border:
-                "1px solid color-mix(in oklab, var(--accent-2) 45%, transparent)",
+              background: "transparent",
+              font: "var(--type-display)",
               textDecoration: "none",
             }}
           >
-            <span style={{ color: "var(--accent-2)", lineHeight: 0 }}>
-              <Icon name="video" size={14} strokeWidth={2.2} />
-            </span>
-            <span style={{ font: "var(--type-body-strong)", fontSize: "14px" }}>
-              <DeepFightWordmark />
-            </span>
-            <span
-              className="text-[11px]"
-              style={{ ...META_BASE, color: "var(--text-3)" }}
-            >
-              {analyses === null
-                ? "Öffnen"
-                : analyses.length === 0
-                  ? "Analyse starten"
-                  : `${analyses.length} ${analyses.length === 1 ? "Auswertung" : "Auswertungen"} · ${analyses.filter((a) => a.sharedWithAthlete).length} frei`}
-            </span>
-            <span style={{ color: "var(--accent-2)", lineHeight: 0 }}>
-              <Icon name="arrow-right" size={13} strokeWidth={2.2} />
-            </span>
+            <DeepFightWordmark shimmer />
           </Link>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">

@@ -66,6 +66,29 @@ const nextConfig = {
         destination: "/trainer/athleten/:pfad*",
         permanent: true,
       },
+      /**
+       * DeepFight-Neuaufbau (Leon 05.09.2026, gebaut 07.09.): EIN Bereich
+       * unter /trainer/deepfight — Landung mit Werkbank, darunter die zwei
+       * Bibliotheken als Segmente. Die Gegner-Bibliothek zog von
+       * /trainer/opponents nach /trainer/deepfight/gegner, das Athleten-Grid
+       * von /trainer/deepfight/athletes nach /trainer/deepfight/athleten.
+       *
+       * ADRESSEN DÜRFEN NICHT BRECHEN: /trainer/opponents/[id] hängt am
+       * Wettkampfbereich (campOpponentId), die Athleten-Detailseite an der
+       * Athletenliste. `:pfad*` nimmt beide Detailseiten mit; die Query
+       * (`?new=1` vom Dashboard) reicht Next durch. Wieder nur die ADRESSE —
+       * Collection und Typen heißen weiter `opponents`/`student`.
+       */
+      {
+        source: "/trainer/opponents/:pfad*",
+        destination: "/trainer/deepfight/gegner/:pfad*",
+        permanent: true,
+      },
+      {
+        source: "/trainer/deepfight/athletes/:pfad*",
+        destination: "/trainer/deepfight/athleten/:pfad*",
+        permanent: true,
+      },
       // FRÜHER STAND HIER `/verwaltung` → `/verwaltung/mitglieder`, weil die
       // nackte Bereichs-Adresse keinen eigenen Inhalt hatte. Seit dem
       // 02.09.2026 hat sie einen (`app/verwaltung/page.tsx`), und die Zeile

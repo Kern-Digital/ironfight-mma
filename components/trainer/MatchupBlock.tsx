@@ -286,7 +286,7 @@ export default function MatchupBlock({
         </Link>
         {camp.opponentId && (
           <Link
-            href={`/trainer/opponents/${camp.opponentId}`}
+            href={`/trainer/deepfight/gegner/${camp.opponentId}`}
             className="btn-secondary px-3 py-1.5 text-[11px]"
           >
             DeepFight-Profil öffnen

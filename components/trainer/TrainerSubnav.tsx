@@ -21,7 +21,7 @@ const ITEMS: SubnavItem[] = [
     isActive: (p) => p.startsWith("/trainer/athleten"),
   },
   {
-    href: "/trainer/opponents",
+    href: "/trainer/deepfight",
     label: <DeepFightWordmark />,
     isActive: (p) =>
       p.startsWith("/trainer/opponents") || p.startsWith("/trainer/deepfight"),

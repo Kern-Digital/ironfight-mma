@@ -98,7 +98,7 @@ function CompetitionsHubContent() {
 
   // Die Gegner-DNA lebt jetzt im eigenen Bereich — alte Links (?tab=dna) umleiten.
   useEffect(() => {
-    if (searchParams.get("tab") === "dna") router.replace("/trainer/opponents");
+    if (searchParams.get("tab") === "dna") router.replace("/trainer/deepfight/gegner");
   }, [searchParams, router]);
 
   const load = useCallback(async () => {

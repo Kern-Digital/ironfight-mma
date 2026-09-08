@@ -6,10 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import Skeleton from "@/components/ui/Skeleton";
 
 /**
- * „Meine Analyse" — Trainer-Selbstanalyse. Stabile Menü-URL, die auf die
- * bestehende Athleten-Analyseseite mit der eigenen uid weiterleitet: ein
- * Trainer analysiert sich selbst exakt wie einen Schüler (mode="athlete",
- * Merge-Ziel users/{uid}.fightProfile).
+ * „Meine Analyse" — stabile Adresse aus dem Kampfprofil („Meine Analyse
+ * starten"). Seit dem Neuaufbau (07.09.2026) führt sie auf die Landung des
+ * Bereichs mit der eigenen uid als vorgewähltem Ziel: Ein Trainer
+ * analysiert sich exakt wie einen Athleten, in derselben Werkbank.
+ *
+ * Bleibt eine Client-Weiterleitung, weil next.config.mjs die uid nicht
+ * kennt — und sie läuft im Bereichs-Layout, also schon auf der Schicht.
  */
 export default function MyAnalysisPage() {
   const { user, loading } = useAuth();
@@ -17,13 +20,13 @@ export default function MyAnalysisPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(`/trainer/deepfight/athletes/${user.uid}`);
+      router.replace(`/trainer/deepfight?modus=leute&ziel=${user.uid}`);
     }
   }, [loading, user, router]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <Skeleton className="h-40 w-full rounded-2xl" />
+      <Skeleton className="h-40 w-full rounded-card" />
     </div>
   );
 }

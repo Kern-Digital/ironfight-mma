@@ -229,25 +229,26 @@ const verwaltungNavChildren: NavChild[] = [
 ];
 
 // DeepFight als eigener Menüpunkt — nur für Trainer/Admins sichtbar.
-// Alle drei Richtungen: Gegner (Bibliothek), eigene Schüler, sich selbst.
+// Seit dem Neuaufbau (07.09.2026) EIN Ziel: die Landung /trainer/deepfight
+// mit der Werkbank; Gegner und Athleten liegen dort als Segmente.
 const deepFightNavGroup: NavGroup = {
   id: "deepfight",
   label: <DeepFightWordmark />,
   children: [
     {
-      href: "/trainer/opponents",
-      label: "Gegner-Scouting",
-      activePattern: /^\/trainer\/opponents/,
+      href: "/trainer/deepfight",
+      label: "Analysieren",
+      activePattern: /^\/trainer\/deepfight\/?$/,
     },
     {
-      href: "/trainer/deepfight/athletes",
-      label: "Athleten-Analysen",
-      activePattern: /^\/trainer\/deepfight\/athletes/,
+      href: "/trainer/deepfight/gegner",
+      label: "Gegner",
+      activePattern: /^\/trainer\/deepfight\/gegner/,
     },
     {
-      href: "/trainer/deepfight/me",
-      label: "Meine Analyse",
-      activePattern: /^\/trainer\/deepfight\/me/,
+      href: "/trainer/deepfight/athleten",
+      label: "Athleten",
+      activePattern: /^\/trainer\/deepfight\/athleten/,
     },
   ],
 };

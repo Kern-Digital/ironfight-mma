@@ -10,7 +10,6 @@ import { MorphSwap } from "@/components/motion";
 import OpponentEditor, {
   type OpponentEditorValue,
 } from "@/components/trainer/OpponentEditor";
-import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import DnaCompletenessRing from "@/components/trainer/DnaCompletenessRing";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
@@ -26,13 +25,21 @@ import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { DNA_CATEGORIES, answeredCount, dnaCompleteness } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 
-type DetailTab = "uebersicht" | "dna" | "stats" | "videos";
+/**
+ * DER TAB „VIDEOS" IST WEG (Teilschritt 4 des DeepFight-Neuaufbaus,
+ * 08.09.2026). Er trug eine EIGENE `VideoAnalysisSection`, gleich neben der
+ * auf `/trainer/deepfight` — zwei Ablagen für denselben Gegner, jede mit
+ * eigenem Zwischenstand im localStorage. Wer hier ein Video hochlud und
+ * drüben nachsah, fand nichts. Analysiert wird ab jetzt an EINER Stelle, der
+ * Werkbank; diese Seite zeigt, was dabei herausgekommen ist, und führt mit
+ * einem Knopf hinüber.
+ */
+type DetailTab = "uebersicht" | "dna" | "stats";
 
 const DETAIL_TABS: [DetailTab, string, IconName | null][] = [
   ["uebersicht", "Übersicht", null],
   ["dna", "DeepFight", "shield"],
   ["stats", "Stats", "chart"],
-  ["videos", "Videos", "video"],
 ];
 
 // ─── Auf einen Blick: Stärken / Schwächen / Lieblingsangriffe als Chips ──────
@@ -334,7 +341,7 @@ function OpponentDetailContent({ id }: { id: string }) {
     setDeleting(true);
     try {
       await deleteOpponent(opponent.id);
-      router.push("/trainer/opponents");
+      router.push("/trainer/deepfight/gegner");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
       setDeleting(false);
@@ -381,7 +388,7 @@ function OpponentDetailContent({ id }: { id: string }) {
       <div className="px-4 pt-4 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <Link
-            href="/trainer/opponents"
+            href="/trainer/deepfight/gegner"
             aria-label="Zurück zur DeepFight-Bibliothek"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-white/5"
             style={{ color: "var(--fg-2)" }}
@@ -620,16 +627,25 @@ function OpponentDetailContent({ id }: { id: string }) {
               </MorphSwap>
             </div>
           </>
-        ) : tab === "videos" ? (
-          <VideoAnalysisSection
-            mode="opponent"
-            targetId={opponent.id}
-            targetName={opponent.name}
-            opponent={opponent}
-            onOpponentUpdated={reload}
-          />
         ) : (
           <div className="flex flex-col gap-4">
+            {/* Der Weg in die Werkbank — sie ist seit Teilschritt 4 die eine
+                Stelle, an der analysiert wird (siehe Kopf dieser Datei). */}
+            <Link
+              href={`/trainer/deepfight?modus=gegner&ziel=${opponent.id}`}
+              data-press
+              className="t-interactive inline-flex min-h-hit w-fit items-center gap-2 rounded-field px-5"
+              style={{
+                ...BTN_FONT,
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+                textDecoration: "none",
+              }}
+            >
+              <Icon name="spark" size={13} strokeWidth={2.4} />
+              Video analysieren
+            </Link>
             {/* Übersicht: Auf-einen-Blick-Chips vor Split + Auto-Insights */}
             {tab === "uebersicht" && <GlanceCard opponent={opponent} />}
             <OpponentProfileView

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import * as THREE from "three";
 
 export type ResolvedTokenMap = Record<string, THREE.Color>;
@@ -57,11 +57,11 @@ function parseComputedColor(value: string): THREE.Color {
   return new THREE.Color(value);
 }
 
-function readTokens(names: readonly string[]): ResolvedTokenMap {
+function readTokens(names: readonly string[], host: HTMLElement): ResolvedTokenMap {
   const probe = document.createElement("span");
   probe.setAttribute("aria-hidden", "true");
   probe.style.cssText = "position:fixed;inline-size:0;block-size:0;overflow:hidden;pointer-events:none";
-  document.body.appendChild(probe);
+  host.appendChild(probe);
   const colors: ResolvedTokenMap = {};
   for (const name of names) {
     probe.style.color = `var(${name})`;
@@ -71,20 +71,56 @@ function readTokens(names: readonly string[]): ResolvedTokenMap {
   return colors;
 }
 
-/** Resolves CSS color tokens (including oklch) into colors three.js can consume. */
-export function useResolvedTokens(names: readonly string[]): ResolvedTokenMap {
+/**
+ * Resolves CSS color tokens (including oklch) into colors three.js can consume.
+ *
+ * `host` sagt, WO gemessen wird. Ohne Angabe steht die Sonde am <body> und
+ * liest damit die Tokens des :root — richtig für alles, was keine
+ * Bereichsfärbung kennt. Ein Bereich überschreibt seine Akzent-Familie aber
+ * per `data-area` auf einem Element MITTEN im Baum (globals.css,
+ * Bereichsfarben): Wer dort die Gym-Farbe messen will, muss die Sonde INS
+ * gefärbte Element hängen, sonst bekommt er den Akzent des Gyms statt den
+ * des Bereichs. Deshalb beobachtet der Hook mit `host` auch dessen Attribute
+ * — wechselt der Modus (und damit `data-area`/`data-gegner`), wird neu
+ * gelesen.
+ */
+export function useResolvedTokens(
+  names: readonly string[],
+  host?: RefObject<HTMLElement | null>,
+): ResolvedTokenMap {
   const stableNames = useMemo(() => Array.from(new Set(names)), [names.join("|")]);
   const [colors, setColors] = useState<ResolvedTokenMap>({});
 
   useEffect(() => {
-    const refresh = () => setColors(readTokens(stableNames));
+    const refresh = () => setColors(readTokens(stableNames, host?.current ?? document.body));
     refresh();
-    const observer = new MutationObserver((records) => {
-      if (records.some((record) => record.attributeName === "data-theme")) refresh();
+
+    const wurzel = new MutationObserver(refresh);
+    // Ohne `host` bleibt es beim bisherigen Verhalten: nur der Theme-Wechsel.
+    // Mit `host` kommt der Inline-Stil am <html> dazu — dort setzt das
+    // Branding-Kit (und heute die Prüfseite) --accent-h/--gym-h.
+    wurzel.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: host ? ["data-theme", "style"] : ["data-theme"],
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
-  }, [stableNames]);
+
+    let bereich: MutationObserver | null = null;
+    if (host) {
+      // Die Bereichsfärbung hängt an einem Vorfahren, nicht am Host selbst —
+      // ein Moduswechsel ändert dort `data-area`. Nur Attribute, kein
+      // Kindwechsel: das feuert selten und kostet nichts.
+      bereich = new MutationObserver(refresh);
+      bereich.observe(document.documentElement, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ["data-area"],
+      });
+    }
+    return () => {
+      wurzel.disconnect();
+      bereich?.disconnect();
+    };
+  }, [stableNames, host]);
 
   return colors;
 }

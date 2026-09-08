@@ -656,7 +656,7 @@ export default function TrainerDashboardPage() {
               </div>
               <div className="flex flex-col gap-2.5 sm:flex-row lg:shrink-0 lg:flex-col xl:flex-row">
                 <Link data-press
-                  href="/trainer/opponents?new=1"
+                  href="/trainer/deepfight/gegner?new=1"
                   className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-6"
                   style={{
                     ...BTN_FONT,
@@ -670,7 +670,7 @@ export default function TrainerDashboardPage() {
                   Gegner scouten
                 </Link>
                 <Link data-press
-                  href="/trainer/deepfight/athletes"
+                  href="/trainer/deepfight/athleten"
                   className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-6"
                   style={{
                     ...BTN_FONT,

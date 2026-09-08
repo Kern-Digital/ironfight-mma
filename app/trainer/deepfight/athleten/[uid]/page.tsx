@@ -8,7 +8,6 @@ import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
-import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import {
   getMemberEntry,
@@ -110,7 +109,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
       >
         <PageHead
           lane="wide"
-          back={{ href: "/trainer/deepfight/athletes", label: "Athleten-Analysen" }}
+          back={{ href: "/trainer/deepfight/athleten", label: "Athleten-Analysen" }}
           title={gesperrt}
           description="Ein Trainer entscheidet selbst, wer seine DeepFight-Analysen sieht."
         />
@@ -152,7 +151,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
     <main className="min-h-screen" style={{ background: "var(--ink-1)" }}>
       <PageHead
         lane="wide"
-        back={{ href: "/trainer/deepfight/athletes", label: "Athleten-Analysen" }}
+        back={{ href: "/trainer/deepfight/athleten", label: "Athleten-Analysen" }}
         initials={entry ? initialsOf(entry) : undefined}
         title={<DeepFightWordmark />}
         description={entry ? labelOf(entry) : undefined}
@@ -227,13 +226,30 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
           </div>
         ) : (
           <div className="flex flex-col gap-10">
-            <VideoAnalysisSection
-              mode="athlete"
-              targetId={uid}
-              targetName={labelOf(entry)}
-              fightProfile={fightProfile}
-              onFightProfileUpdated={loadFightProfile}
-            />
+            {/* DER WEG IN DIE WERKBANK — Teilschritt 4 des Neuaufbaus
+                (08.09.2026). Bis hierher trug diese Seite ihre EIGENE
+                VideoAnalysisSection, gleich neben der auf /trainer/deepfight:
+                zwei Ablagen für dasselbe Ziel, jede mit eigenem
+                Zwischenstand-Speicher. Wer hier ein Video hochlud und dort
+                nachsah, fand nichts. Analysiert wird ab jetzt an EINER Stelle;
+                diese Seite zeigt, was dabei herausgekommen ist. */}
+            <Link
+              href={`/trainer/deepfight?modus=leute&ziel=${uid}`}
+              data-press
+              className="t-card t-interactive inline-flex min-h-hit w-fit items-center gap-2 rounded-field px-5"
+              style={{
+                font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+                textDecoration: "none",
+              }}
+            >
+              <Icon name="spark" size={13} strokeWidth={2.4} />
+              {isSelf ? "Mich analysieren" : "Video analysieren"}
+            </Link>
 
             {/* Gemergtes Kampfprofil — Stand aller übernommenen Befunde */}
             {fightProfile && !isFightProfileEmpty(fightProfile) && (
@@ -266,6 +282,26 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                     actionStats={fightProfile.actionStats}
                   />
                 </div>
+              </section>
+            )}
+
+            {/* Leer heißt hier: Es gibt noch nichts zu zeigen, weil noch
+                niemand etwas übernommen hat. Ohne diesen Satz stünde die
+                Seite nach dem Umzug der Ablage fast leer da. */}
+            {fightProfile && isFightProfileEmpty(fightProfile) && (
+              <section className="t-card p-8 text-center">
+                <p style={{ font: "var(--type-body-strong)" }}>
+                  {isSelf
+                    ? "Dein Kampfprofil ist noch leer."
+                    : `Das Kampfprofil von ${labelOf(entry)} ist noch leer.`}
+                </p>
+                <p
+                  className="mx-auto mt-1 max-w-md"
+                  style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                >
+                  Analysier ein Kampf-Video und übernimm die Befunde — ab dann
+                  wächst das Profil hier mit jedem Video.
+                </p>
               </section>
             )}
           </div>

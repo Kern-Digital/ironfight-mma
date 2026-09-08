@@ -107,29 +107,19 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
           icon: "users",
           isActive: under("/trainer/athleten"),
         },
+        // EIN PUNKT, KEINE KINDER (Leons Neuaufbau 05.09.2026): Die drei
+        // Unterpunkte (Gegner-Scouting, Athleten-Analysen, Meine Analyse)
+        // waren drei Türen zu EINEM Werkzeug — wen du analysierst, ist ein
+        // Parameter, kein Ort. Die Wahl steht jetzt IM Bereich als
+        // Segment-Leiste (Analysieren · Gegner · Athleten). Der alte Pfad
+        // /trainer/opponents bleibt in isActive, damit die Rubrik auch
+        // während der Weiterleitung (next.config.mjs) offen steht.
         {
-          href: "/trainer/opponents",
+          href: "/trainer/deepfight",
           label: "DeepFight",
           wordmark: true,
           isActive: (p) =>
-            under("/trainer/opponents")(p) || under("/trainer/deepfight")(p),
-          children: [
-            {
-              href: "/trainer/opponents",
-              label: "Gegner-Scouting",
-              isActive: under("/trainer/opponents"),
-            },
-            {
-              href: "/trainer/deepfight/athletes",
-              label: "Athleten-Analysen",
-              isActive: under("/trainer/deepfight/athletes"),
-            },
-            {
-              href: "/trainer/deepfight/me",
-              label: "Meine Analyse",
-              isActive: under("/trainer/deepfight/me"),
-            },
-          ],
+            under("/trainer/deepfight")(p) || under("/trainer/opponents")(p),
         },
         {
           href: "/trainer/competitions",

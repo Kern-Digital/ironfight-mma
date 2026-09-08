@@ -360,6 +360,25 @@ export interface AnalysisUsage {
 export const DEFAULT_AI_BUDGET_EUR = 5;
 
 /**
+ * Euro-Beträge in der Schreibweise, die die ganze App benutzt.
+ *
+ * Sie stand bis 08.09.2026 in `AiBudgetGauge` — dieser Guthaben-Ring ist mit
+ * Teilschritt 4 des DeepFight-Neuaufbaus weggefallen (Leon: „der Ring und die
+ * Anzeige, was es verbraucht hat, soll für alle entfernt werden"). Die
+ * Formatierung selbst bleibt gebraucht: Die Kosten je Analyse sieht weiterhin,
+ * wer Plattform-Admin ist. Sie gehört deshalb hierher, zu den anderen
+ * Kosten-Werkzeugen, und nicht in eine Komponente.
+ */
+export function formatEur(n: number): string {
+  return n.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
  * Laufende Summe über ALLE Analysen (Gegner + Athleten), als einzelnes
  * Firestore-Dokument — so braucht die Anzeige keine Collection-Group-Query.
  * Gelöschte Analysen reduzieren die Summe bewusst nicht: ausgegebenes
@@ -901,7 +920,10 @@ export async function runVideoAnalysis(
     else if (event.type === "observation")
       onObservation?.(event.observation, event.model);
     else if (event.type === "result") {
-      const { type: _t, ...rest } = event;
+      // `type` ist nur der Umschlag des NDJSON-Ereignisses, kein Teil des
+      // Ergebnisses — der Rest IST der AnalyzeResult.
+      const { type, ...rest } = event;
+      void type;
       result = rest;
     } else if (event.type === "error") throw new Error(event.message);
   };

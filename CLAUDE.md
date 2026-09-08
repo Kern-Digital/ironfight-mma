@@ -14,15 +14,91 @@
   `public/deepfight-icon.png` + Schriftzug, untrennbar). Code/Datenmodell
   behält bewusst die alten Namen (`lib/gegner-dna.ts`, `opponents/…`, Feld
   `dna` — Firestore-Migration unnötig).
-- **DeepFight-Navigation & Rollen** (seit 2026-08-19): eigener Top-Level-
-  Menüpunkt (nur Trainer/Admin) mit drei Richtungen — „Gegner-Scouting"
-  (`/trainer/opponents`), „Schüler-Analysen" (`/trainer/deepfight/athletes`)
-  und „Meine Analyse" (`/trainer/deepfight/me` → Redirect auf
-  `/trainer/deepfight/athletes/{eigene uid}`; Trainer analysieren sich selbst
-  exakt wie einen Schüler). Schüler haben KEINEN Zugriff auf das Werkzeug;
-  sie sehen in ihrem **Kampfprofil** nur explizit Freigegebenes plus ihr
-  gemergtes Profil (siehe nächster Punkt). Timer ist kein Top-Level-Punkt
-  mehr: er hängt unter „Training" (alle) und „Trainer".
+- **DeepFight-Navigation & Rollen — NEUAUFBAU (Leon 05.09.2026, Teilschritt
+  2 gebaut 07.09.):** EIN Menüpunkt „DeepFight" (nur Trainer/Admin) auf
+  `/trainer/deepfight`, die **Werkbank**. Wen du analysierst, ist ein
+  PARAMETER, kein Ort: Die Landung fragt „Wen analysierst du?" — **zwei
+  Modi**, „Unsere Leute" (Athleten + Trainer + ich selbst, Merge-Ziel
+  Kampfprofil) gegen „Gegner" (Bibliothek, Merge-Ziel `opponents/{id}`).
+  Der Modus liegt als `data-modus` am Bereichs-Layout
+  (`app/trainer/deepfight/layout.tsx`, Context in
+  `components/deepfight/deepfight-modus.tsx`) und färbt den ganzen Bereich:
+  bewegte Schicht `components/ui/Synthesis.tsx` (Tidal-Blau gegen Silber,
+  folgt dem Branding-Kit BEWUSST NICHT, Tokens `--df-*`), im Gegner-Modus
+  wird die Akzent-Familie NEUTRAL (eine Zeile in globals.css), alle
+  `.t-card` im Bereich sind Glas (eine Bereichsregel). Drei Segmente IM
+  Inhalt auf einer Glas-Leiste (`DeepFightLeiste`): Analysieren ·
+  Gegner (`/trainer/deepfight/gegner`, ehem. `/trainer/opponents`) ·
+  Athleten (`/trainer/deepfight/athleten`, ehem. `/trainer/deepfight/athletes`);
+  alte Adressen laufen über `next.config.mjs` um. Die Ziel-Auswahl ist die
+  EINE Stelle für die Rechte: Kollegen nur mit Freigabe `deepfight`
+  (`darfSehen`), Ghost-Konten raus. „Meine Analysen" oben ist Leons Wahl
+  (07.09.): die eigene Liste quer über Gegner und Athleten — heute per
+  Fächer (eine Abfrage je Ziel, erst beim Öffnen), der collectionGroup-Weg
+  steht im Backlog. `/trainer/deepfight/me` leitet auf die Landung mit
+  eigener uid als Ziel. Regel für den Bereich: Text sitzt IMMER auf einer
+  Karte, nie direkt auf der Schicht. Prüfseite: `/dev/deepfight-farbe`
+  (misst die echten Regeln, Regler für `--df-deckkraft`).
+  **TEILSCHRITT 3 (die zwei Bibliotheken) ist seit 07.09. gebaut:** Beide
+  Seiten haben die Form der Werkbank — Leiste → TrainerHint →
+  Werkzeugzeile auf Glas → Rost aus Glaskarten. **Sie tragen KEINEN
+  `PageHead` mehr** (Leons Entscheidung 07.09.): Die Leiste sagt bereits,
+  wo man steht, ein Titel darüber saß direkt auf der Schicht und wiederholte
+  nur das aktive Segment; es bleibt eine `sr-only`-Überschrift. Wer eine
+  weitere Seite unter die Segmente hängt, bringt ebenfalls keinen Kopf mit.
+  Die Athletenliste filtert jetzt mit `darfSehen(…, "deepfight", …)` UND
+  `isGhostAccount`; bleibt die Kollegen-Gruppe dadurch leer, sagt sie WARUM
+  (eine verschwundene Gruppe hätte die Sackgasse nur unsichtbar gemacht).
+  Jede Karte hat zwei Wege: aufs Profil (die ganze Karte, Muster
+  `.t-row-card`/`.t-row-target`) und in die Werkbank (`?modus=…&ziel=…`).
+  Dazu eine neue Token-Regel — `[data-area="deepfight"] { --text-3:
+  var(--text-2) }`: Die dritte, gedämpfte Textstufe hält auf Glas über der
+  bewegten Schicht kein AA (gemessen: dunkel 3,69:1, hell 2,66:1), und im
+  hellen Theme gibt es unter `--text-2` keinen Platz mehr (L 0,50 → 3,50;
+  erst L 0,44 = `--text-2` erreicht 5,14). Im Bereich gibt es deshalb ZWEI
+  Textstufen statt drei. **Nachtrag 08.09. (Teilschritt 4): Auch die ZWEITE
+  Stufe reißt im HELLEN Theme** — `--text-label` 4,15:1, `--text-2` 4,41:1 an
+  den schwächsten Stellen. Eine Helligkeitsreihe über 19 Stellen: L 0,44
+  (heute) 4,44 · L 0,42 4,80 · **L 0,40 5,27 — gewählt**, weil die Schicht
+  schwankt und 4,80 keine Luft hätte. Als Bereichsregel
+  `[data-theme="light"] [data-area="deepfight"]`; `--text-label` und
+  `--text-muted` sind ausdrücklich mitgeschrieben (Falle 37: `color-mix`-
+  Aliase werden am `:root` einmal ausgerechnet). Im Dunkeln kein Eingriff,
+  dort hält alles ≥ 6,8:1. Dazu **zwei neue feste Tokens** für die
+  Ecken-Auswahl im Analyse-Formular (Leon 08.09.: rot und blau sind
+  Kampfsport-Konvention, keine Dekoration): `--corner-red`/`--corner-blue` auf
+  L 0,50 plus `--on-corner` — theme-unabhängig wie `--accent2` und die
+  `--cat-*`, gemessen 7,02:1 bzw. 6,37:1 für die Schrift darauf.
+  **TEILSCHRITT 4 (die Ablage) ist seit 08.09. gebaut:**
+  `VideoAnalysisSection` steht im Token-Look, **an der Pipeline hat sich
+  nichts geändert** (Zwei-Phasen-Betrieb, die Wortmarken „überlastet"/„kein
+  Ergebnis", `readTarget` frisch aus Firestore, `isConflict` gegen den
+  frischen Stand, Schätzer, Speicher-Key, Direkt-Upload). Vier Dinge sind neu:
+  (1) **Die Ablage steht sofort da** — der Zwischenklick auf „Neue Analyse"
+  ist weg, sobald ein Ziel gewählt ist (Leons „ich habe dort direkt mein
+  Upload-Fenster"); sie nimmt gezogene Dateien und Eingefügtes aus der
+  Zwischenablage (Videodatei ODER YouTube-Link, der Link schaltet die Quelle
+  selbst um) und bleibt ein normaler Knopf, weil es auf Touch kein Ziehen
+  gibt. (2) **Angefangenes ist sichtbar** — eine Zeile oben nennt das
+  wartende Video, was schon geschafft ist, die Restzeit und zwei Wege
+  (fortsetzen / verwerfen); dafür kam EIN Feld in den gespeicherten Zustand
+  (`pendingSavedAt`), die Pipeline-Objekte selbst blieben unangetastet.
+  (3) **Der Guthaben-Ring ist weg** (Leon 08.09.: „der Ring und die Anzeige,
+  was es verbraucht hat, soll für alle entfernt werden") — `AiBudgetGauge`
+  ist gelöscht, damit auch der letzte native Dialog der App; was eine Analyse
+  gekostet hat, sieht nur noch, wer Plattform-Admin ist. `recordAiUsage`
+  schreibt weiter, siehe Backlog „KI-Kosten je Gym". (4) **Die Detailseiten
+  tragen keine zweite Ablage mehr**: `gegner/[id]` hat den Tab „Videos"
+  verloren, `athleten/[uid]` ihre eingebettete Sektion; beide führen mit
+  einem Knopf in die Werkbank. Zwei Ablagen für dasselbe Ziel hatten je einen
+  eigenen Zwischenstand-Speicher — wer hier hochlud und dort nachsah, fand
+  nichts.
+  NOCH OFFEN: Teilschritt 5 (`VideoAnalysisResult` + sichtbares Ende der
+  Übernahme).
+  Athleten haben KEINEN Zugriff auf das Werkzeug; sie sehen in ihrem
+  **Kampfprofil** nur explizit Freigegebenes plus ihr gemergtes Profil
+  (siehe nächster Punkt). Timer ist kein Top-Level-Punkt mehr: er hängt
+  unter „Training" (alle) und „Trainer".
 - **Kampfprofil vs. Account** (seit 2026-08-19): Das Profil ist zweigeteilt.
   `/kampfprofil` (alle Rollen, Profil-Menü) = „Wer bin ich als Kämpfer":
   gemergtes DeepFight-Profil (`users/{uid}.fightProfile`, siehe
@@ -46,7 +122,7 @@
   `lib/admin.ts`: **`listAllMembers()`** (alle User, kein Rollenfilter) für
   Kampfkontexte — „Neuer Wettkampf" (Schritt 1), Wettkampf-Übersicht +
   Trainer-Dashboard (Namensauflösung) und das DeepFight-Grid
-  `/trainer/deepfight/athletes`; **`listAllStudents()`** (= Members ohne
+  `/trainer/deepfight/athleten` und die Werkbank; **`listAllStudents()`** (= Members ohne
   Trainer/Admin, via `isStaffEntry`) bleibt für die reine Schülerverwaltung
   (`/trainer/students`, Admin-Seed, Freigabe-Panel im Gegnerprofil) und für die
   „Schüler"-Kachel auf dem Dashboard. UI-Gruppierung in beiden Kampfkontexten
@@ -54,10 +130,11 @@
   (violet) · „Schüler" (neutral). ACHTUNG, seit 2026-09-04 eingeschränkt: Bei
   einem KOLLEGEN braucht es dessen Freigabe (siehe „Privates Athletenprofil").
   „Neuer Wettkampf" listet deshalb seit 2026-09-04 nur noch Kollegen mit dem
-  Bereich `wettkampf`. Das DeepFight-Grid (`/trainer/deepfight/athletes`)
-  filtert NOCH NICHT nach `deepfight` — dort steht ein Kollege ohne Freigabe
-  weiter in der Liste und läuft erst auf der Detailseite in den Hinweis
-  „noch nicht freigegeben". Nachzuziehen zusammen mit dem Ghost-Filter.
+  Bereich `wettkampf`, die Werkbank auf `/trainer/deepfight` seit 07.09. nach
+  `deepfight` — und die Athletenliste `/trainer/deepfight/athleten` seit
+  Teilschritt 3 (07.09.) ebenso, samt Ghost-Filter. Der DeepFight-Bereich ist
+  damit vollständig gefiltert; die Sackgasse „anklicken → noch nicht
+  freigegeben" gibt es dort nicht mehr.
 - **Wettkampf-Gegner: Snapshot + verknüpftes Profil** (seit 2026-08-20):
   Der Snapshot in `fightCamps/{id}.opponent` bleibt gespeichert wie bisher,
   ist aber **nicht mehr das, was angezeigt wird**. Anzeige und Editor-Vorbelegung
@@ -596,9 +673,40 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
 
 ### Kosten-Tracking
 - Claude-Token je Analyse → Firestore `aiUsage/summary` (increment; Löschen
-  einer Analyse reduziert bewusst nicht). Anzeige: orangener Guthaben-Ring
-  (`AiBudgetGauge.tsx`, Budget per Klick änderbar, Start 5 €). Preise in
+  einer Analyse reduziert bewusst nicht). Preise in
   `claude.ts → priceFor()` (EUR≈USD, Schätzung — Anthropic hat keine Saldo-API).
+- **DIE VERBRAUCHSANZEIGE IST SEIT 08.09.2026 BETREIBER-SACHE** (Leon:
+  „der Ring und die Anzeige, was es verbraucht hat, soll für alle entfernt
+  werden"): `AiBudgetGauge.tsx` ist gelöscht — mit ihr der orangene
+  Guthaben-Ring in der Analyse-Sektion UND der letzte `window.prompt()` der
+  App. Was eine einzelne Analyse gekostet hat, steht weiterhin an ihrer Zeile,
+  aber nur für `rights.admin`. Die Karte „KI-Guthaben" auf `/admin` bleibt
+  unberührt; sie liest `getAiUsageSummary()` direkt und hat ihre eigene
+  Euro-Formatierung. `formatEur` wohnt seither in `lib/video-analysis.ts`.
+  Was Leon im Admin-Bereich zusätzlich will — Monatskosten, welches Gym am
+  meisten verursacht — steht im Backlog („KI-Kosten je Gym"); heute ist es
+  nicht rechenbar.
+
+### Der gespeicherte Formularzustand — eine Falle, teuer gemessen (08.09.2026)
+`ta-video-analysis-form:{mode}:{targetId}` wird von zwei Effekten bedient:
+einer liest beim Mounten, einer schreibt bei jeder Änderung. Die Marke
+dazwischen war ein `useRef` — und ein Ref ist SOFORT wahr. Der Schreib-Effekt
+lief deshalb noch im ersten Durchgang, mit den Werten aus dem Render VOR dem
+Lesen, und legte die Vorgaben über den gerade geladenen Zwischenstand.
+
+Sichtbar wurde es an einer Merkwürdigkeit: Kleidung und Merkmale kamen zurück,
+**Ecke, Analyse-Stufe und Zeitpunkt nicht**. Der Grund ist die Vorgabe selbst —
+`if (s.clothing)` überspringt einen leeren Text und lässt den geladenen Wert
+stehen, `if (s.corner)` sieht in `"unknown"` einen gültigen Wert und schreibt
+ihn drüber. Im Entwicklungs-Modus (React führt Effekte doppelt aus) traf es
+JEDES Laden, in Produktion das Fenster zwischen zwei Rendern.
+
+Die Marke ist jetzt ein **State und trägt den Schlüssel**, nicht nur ein Ja:
+`hydriertFuer === storageKey`. Ein bloßes Ja zeigte beim Zielwechsel weiter auf
+den alten Stand — und der Schreib-Effekt legte die Werte des vorigen Ziels in
+den Speicher des neuen. **Merke: Eine „schon geladen"-Marke gehört in den
+State, nicht in ein Ref — und wenn sie einen Schlüssel bewacht, merkt sie sich
+den Schlüssel.**
 
 ## Konventionen
 - Deutsch in UI-Texten, Englisch im Code.
@@ -848,10 +956,14 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Der Helfer steht schon: `isGhostAccount()` in `lib/admin.ts`; angewandt
       ist er bisher NUR im Freigabe-Knopf (`ProfileShareButton`).
       Nachzuziehen: `/verwaltung/mitglieder` (zeigt Admins heute als
-      „Trainer · Verwaltung"), `/trainer/athleten`,
-      `/trainer/deepfight/athletes`, „Neuer Wettkampf" (Schritt 1), das
-      Freigabe-Panel im Gegnerprofil und die Kennzahlen auf `/trainer` +
-      `/verwaltung` (ein Ghost darf keine Mitgliederzahl erhöhen).
+      „Trainer · Verwaltung"), `/trainer/athleten` und die Kennzahlen auf
+      `/trainer` + `/verwaltung` (ein Ghost darf keine Mitgliederzahl
+      erhöhen). ERLEDIGT: „Neuer Wettkampf" (Schritt 1, 04.09.), die
+      Ziel-Auswahl der Werkbank (07.09.) und die Athletenliste
+      `/trainer/deepfight/athleten` (07.09., Teilschritt 3) — der ganze
+      DeepFight-Bereich ist durch. Das Freigabe-Panel im Gegnerprofil
+      braucht den Filter NICHT: Es liest über `listAllStudents`, und
+      `isStaffEntry` wirft einen Plattform-Admin schon heraus.
       **AUSDRÜCKLICH NICHT in `/admin/*`** — dort ist der Ort, an dem diese
       Konten sichtbar sein müssen (`listAllUsers`).
       ACHTUNG, zwei Fallen: (1) `effectiveRights` rechnet den Plattform-Rang in
@@ -863,20 +975,40 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       `firestore.rules` jede Freigabe-Prüfung) verschwindet damit aus der
       Oberfläche und MUSS in den Datenschutzhinweisen und im AVV stehen —
       derselbe Punkt wie „vor der ersten Zahlung fällig".
-      GLEICHER GRIFF, ANDERE FRAGE — beim selben Durchgang mitnehmen: Das
-      DeepFight-Grid `/trainer/deepfight/athletes` listet Kollegen OHNE
-      Rücksicht auf ihre `deepfight`-Freigabe; wer einen anklickt, landet auf
-      der Detailseite im Hinweis „noch nicht freigegeben". „Neuer Wettkampf"
-      ist am 2026-09-04 schon auf `darfSehen(…, "wettkampf", …)` umgestellt —
-      dasselbe Muster, ein Aufruf von `darfSehen`.
-- [ ] **`AiBudgetGauge` benutzt `window.prompt()`** (gefunden 04.09.2026 beim
-      Ausbau der Browser-Dialoge): Die Guthaben-Eingabe („Aufgeladenes
-      Claude-Guthaben in Euro") öffnet das Browser-Fenster — dieselbe Sache,
-      die Leon beim Löschen abgeschafft haben wollte, nur mit Eingabefeld
-      statt Ja/Nein. Braucht deshalb kein Inline-Muster, sondern ein kleines
-      Sheet mit Zahlenfeld (`SheetShell`, Muster `InviteCreateSheet`). Steht
-      auf dem Trainer-Dashboard und in `/admin`. Alle `confirm()` sind seit
-      dem 04.09. weg; das hier ist der letzte native Dialog der App.
+      GLEICHER GRIFF, ANDERE FRAGE — ERLEDIGT am 2026-09-07 (Teilschritt 3):
+      Die DeepFight-Athletenliste `/trainer/deepfight/athleten` listete
+      Kollegen OHNE Rücksicht auf ihre `deepfight`-Freigabe; wer einen
+      anklickte, landete auf der Detailseite im Hinweis „noch nicht
+      freigegeben". Sie filtert jetzt wie „Neuer Wettkampf" mit einem Aufruf
+      von `darfSehen`. **Lehre für die übrigen Stellen:** Der leere Fall
+      braucht einen Satz. Verschwindet die Gruppe wortlos, ist die Sackgasse
+      nur unsichtbar geworden — dort steht jetzt, wie viele Kollegen
+      freigeben KÖNNTEN und wo sie das tun.
+- [x] ~~**`AiBudgetGauge` benutzt `window.prompt()`**~~ — ERLEDIGT am
+      08.09.2026, aber anders als geplant: Statt eines Sheets mit Zahlenfeld
+      ist die ganze Komponente weg (Leons Entscheidung, siehe Kosten-Tracking
+      oben). Damit ist der LETZTE native Dialog der App verschwunden;
+      `confirm()` gab es seit dem 04.09. keinen mehr.
+- [ ] **KI-KOSTEN JE GYM — Auswertung im Admin-Bereich** (Leons Wunsch
+      08.09.2026, beim Entfernen des Guthaben-Rings: „als Admin sehen, wie
+      viel jede Analyse gekostet hat, egal welches Gym … monatliche Kosten,
+      welches Gym am meisten Kosten verursacht hat, sofern das trackbar ist").
+      **Heute NICHT rechenbar, und zwar aus drei Gründen gleichzeitig:**
+      (a) `aiUsage/summary` ist EIN Zähler für die ganze Plattform — kein Gym,
+      kein Verlauf, nur eine laufende Summe (Multi-Gym Phase 3 stellt auf
+      `aiUsage/{gymId}` um, siehe Verwaltungs-Dashboard-Ausbau (c));
+      (b) die Kosten je Analyse liegen zwar am Analyse-Dokument (`usage`),
+      aber verstreut in `users/{uid}/videoAnalyses` und
+      `opponents/{id}/videoAnalyses` — gym-übergreifend gibt es dafür keinen
+      Leser; (c) die Analyse-Dokumente tragen kein `gymId`.
+      **Der Weg ist derselbe wie bei „Meine Analysen per collectionGroup"** —
+      `gymId` (und für die Monatsansicht ein Datumsfeld, `createdAt` steht
+      schon da) am Analyse-Dokument, Backfill, Regel mit DIREKTEM Feldzugriff
+      (kein `get(feld,default)`, Falle 28), Composite-Index. Beide Punkte
+      brauchen dieselbe Vorarbeit und gehören deshalb in EINEN Vorgang;
+      der Betreiber-Leser darf dann `isAdmin()` nutzen und über alle Gyms
+      lesen. Zeitraum-Aggregation in Code, nicht im Client-Loop.
+      Bis dahin zeigt `/admin` weiter die eine Gesamtsumme.
 - [ ] **Übergangs-Spiegel `role` entfernen** (fällig, sobald die Produktion
       länger als eine Stunde auf dem Checkpoint-3-Stand läuft): `legacyRole()`
       in `firestore.rules`, der `|| legacy === …`-Rückfall in `readRoleSet`
@@ -1022,6 +1154,45 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       Coach darf mit Nutzer-Bestätigung handeln („Trag mich Donnerstag
       ein" → recordParticipation; Verwaltung: Ankündigungs-Entwurf →
       vorbefüllter News-Post); erst nach stabilem v1.
+- [ ] **Athleten-Einreichung für DeepFight-Analysen** (Idee 2026-09-06, mit
+      Leon besprochen, NICHT beschlossen — steht im Ideen-Becken der
+      Roadmap): Athlet lädt sein Analyse-Video selbst hoch und füllt die
+      Felder vor, die heute der Trainer schreibt (Kämpferbeschreibung/
+      Identifikation, recency, Disziplin); Trainer bekommt es als
+      Warteschlange, prüft Video + Text, redigiert, bestätigt → ab da läuft
+      die NORMALE Pipeline. SICHERHEITSMODELL BLEIBT: Athleten schreiben
+      weiterhin NIE videoAnalyses — die Einreichung ist ein EIGENES Objekt
+      (z. B. users/{uid}/videoSubmissions: create nur eigene uid + gymId,
+      Lesen Trainer/Verwaltung desselben Gyms, Athlet darf eigene PENDING
+      zurückziehen; Athleten-Text ist Nutzereingabe und geht NIE ungeprüft
+      in den Prompt). ZWISCHENSPEICHER (Leons 3-Monats-Frage): Firebase
+      Storage im selben Projekt — heute existiert KEIN Videospeicher
+      (Browser lädt direkt zu Google, dort 48-h-Auto-Expiry). Upload direkt
+      Browser→Storage (resumable, umgeht Vercel-4,5-MB wie der heutige
+      Google-Pfad); Storage-Rules: nur eigener Pfad, Größenlimit
+      (request.resource.size) + contentType video/*; **Objekt-Lifecycle-
+      Regel am Bucket löscht nach 90 Tagen automatisch — null eigener
+      Code**; nach erfolgreicher Analyse SOFORT löschen (Ergebnis liegt in
+      Firestore, die 90 Tage sind nur das Netz für nie bestätigte);
+      Status-Anzeige „abgelaufen" lazy über createdAt, kein Cron. ACHTUNG:
+      Firebase Storage braucht ggf. Blaze-Plan (prüfen); Kosten
+      ~2,6 Ct/GB/Monat, Handyvideo 8 min ≈ 0,5–1 GB → Limits: max. 2
+      offene Einreichungen je Athlet, Längen-/Auflösungs-Hinweis. TRANSFER
+      BEI BESTÄTIGUNG: Trainer-Browser lädt aus Storage und nutzt den
+      VORHANDENEN Google-Upload-Pfad samt Fortschritts-UI weiter (Vercel
+      transportiert nie Videobytes; Server-Kopie wäre 300-s-Risiko).
+      VERWORFENE VARIANTE: Gemini-Phase-1 sofort bei Einreichung (nur
+      Beobachtungs-JSON speichern, kein Storage nötig) — scheitert daran,
+      dass der Trainer das Video nach 48 h nicht mehr ansehen kann und
+      Müll-Einreichungen Tokens kosten. KONTINGENT: Einreichen kostet kein
+      KI-Guthaben, erst die Trainer-Bestätigung. BENACHRICHTIGUNG v1:
+      Badge/Karte im Trainer-Bereich (kein Push-System vorhanden; Push =
+      Capacitor-Thema). RECHT: Einwilligungs-Hinweis beim Upload
+      (Sparringspartner, ggf. Minderjährige im Bild!), feste 90-Tage-
+      Löschfrist ist DSGVO-seitig ein Plus; gehört mit ins AGB-Paket.
+      STRATEGIE: füttert direkt das Datengate von Workout-Pläne Stufe 2
+      („3 übernommene Analysen je Athlet") — Motivation liegt beim
+      Athleten.
 - [ ] Multi-Gym Phase 3: trainingSessions/aiUsage/techniqueStats gym-scopen,
       Wochenplan-Mehrplan-Modell, Admin-Konsole
 - [ ] Stripe Pro-Membership (Checkout, Webhook, Premium-Gate)
@@ -1044,6 +1215,20 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
       der einzige Weg, einen falschen Split oder eine falsche Technik-Zählung
       zu korrigieren. Kosten: eine
       Collection-Query pro Übernahme
+- [ ] **„Meine Analysen" per collectionGroup statt Fächer** (DeepFight-
+      Neuaufbau, 07.09.2026): Die Liste auf `/trainer/deepfight` liest heute
+      eine Abfrage je Ziel (Gegner der Bibliothek + jedes sichtbare
+      Mitglied, ~30 Abfragen, nur beim Öffnen). Sauber wäre
+      `collectionGroup("videoAnalyses")` mit `where("createdBy","==",uid)`
+      — dafür braucht `firestore.rules` eine `{path=**}/videoAnalyses`-
+      Regel, die ALLEIN aus dem Dokument beweisbar ist (Falle: `{path=**}`
+      matcht auch direkte Pfade und Regeln sind ODER-verknüpft, siehe
+      Wettkampf-Lücke). `createdBy == uid` allein reicht NICHT: Ein Trainer
+      läse damit weiter seine Analysen über einen Kollegen, der die
+      Freigabe inzwischen zurückgezogen hat, und nach einem Gym-Wechsel die
+      Analysen des alten Gyms. Nötig: `gymId` am Analyse-Dokument (Backfill
+      + beide Schreibstellen), Regel mit direktem Feldzugriff (kein
+      `get(…, default)`), Composite-Index, `check-privacy-gate.mjs` erweitern.
 - [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert — die
       Konflikt-Anzeige kann daher nicht sagen, aus welchem (wie gewichteten)
       Video die bisherige Antwort stammt

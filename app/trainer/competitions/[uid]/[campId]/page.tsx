@@ -243,7 +243,7 @@ function CompetitionDetailContent({
           <>
             {camp.opponent.opponentId && (
               <Link
-                href={`/trainer/opponents/${camp.opponent.opponentId}`}
+                href={`/trainer/deepfight/gegner/${camp.opponent.opponentId}`}
                 data-press
                 className="t-interactive inline-flex min-h-hit items-center rounded-field px-4"
                 style={SEC_BTN}

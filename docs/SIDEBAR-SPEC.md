@@ -137,7 +137,7 @@ Gruppen untereinander (Admin hat trainer + verwaltung eingerechnet).
 
 **Gruppe „Trainerbereich" (`rights.trainer`)**
 - Übersicht → `/trainer` · Schüler → `/trainer/students`
-- DeepFight (aufklappbar): Gegner-Scouting → `/trainer/opponents` · Schüler-Analysen → `/trainer/deepfight/athletes` · Meine Analyse → `/trainer/deepfight/me`
+- DeepFight → `/trainer/deepfight` (EIN Punkt seit dem Neuaufbau 07.09.2026; Gegner und Athleten sind Segmente IM Bereich, nicht Unterpunkte)
 - Wettkampf → `/trainer/competitions` · Workout-Pläne → `/trainer/plans` · Stundenplan → `/schedule`
 
 **Gruppe „Gym führen" (`rights.verwaltung`)**

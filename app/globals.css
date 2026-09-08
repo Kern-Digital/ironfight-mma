@@ -203,6 +203,39 @@
   --grad-progress: linear-gradient(90deg, oklch(0.62 calc(var(--accent-c)*0.95) var(--accent-h)), oklch(0.82 calc(var(--accent-c)*0.9) var(--accent-h)));
   /* Jazz-Verlauf (Akzent → Brand-Violett) — AUSSCHLIESSLICH DeepFight */
   --grad-fight: linear-gradient(120deg, var(--accent), var(--accent-2));
+
+  /* ─── Die bewegte Hintergrund-Schicht des DeepFight-Bereichs ──────────────
+     (components/ui/Synthesis.tsx, Leons Ansage 06.09.2026)
+
+     SIE FOLGT DEM BRANDING-KIT BEWUSST NICHT. Leon: „egal ob branding kit
+     oder nicht" — der Hintergrund ist bei „Unsere Leute" IMMER der
+     Tidal-Blauton, beim Gegner IMMER Silber, und der Grund ist schwarz bzw.
+     weiß. Damit steht er in derselben Reihe wie --accent2 (Brand-Violett) und
+     die --cat-*: feste Werte, keine Gym-Ableitung. Der einzige Unterschied,
+     den diese Schicht kennt, ist hell gegen dunkel.
+
+     WARUM ÜBERHAUPT TOKENS UND NICHT DREI WERTE IN DER KOMPONENTE: Sonst
+     stünden Farben in einer Komponente, und die Abnahme-Suche nach Hex
+     schlüge an (DESIGN-BRIEF §5). Hier stehen sie an dem einen Ort, an dem
+     Farben stehen dürfen — und ein späterer Wechsel ist eine Zeile.
+
+     SILBER IST DERSELBE GRIFF WIE IN DER DNA: Die Helix zieht den
+     Gegner-Zweig auf --text-1/--text-2/--line-strong, also ins Neutrale
+     (components/deepfight/HelixScene.tsx). Der Hintergrund macht es genauso —
+     dem Gegner fehlt die Farbe, die uns gehört. Die Buntheit ist NICHT null,
+     sondern ein Hauch Blau: reines Grau wirkt neben dem Tidal-Ton tot. */
+  --df-grund: oklch(0 0 0);                     /* Schwarz */
+  --df-ton-leute: oklch(0.74 0.13 197);         /* Tidal-Blauton, fest */
+  --df-ton-leute-tief: oklch(0.32 0.07 197);
+  --df-ton-gegner: oklch(0.80 0.012 235);       /* Silber */
+  --df-ton-gegner-tief: oklch(0.34 0.008 235);
+  /* DECKKRAFT DER SCHICHT — Leons Zahl (07.09.2026): 45 %. Gemessen auf
+     /dev/deepfight-farbe: Bei 55 % fiel --text-2 auf Glas im Gegner-Modus
+     (dunkel, hellste Stelle des Silbers) auf 4,28:1 — knapp unter AA. 45 %
+     ist der höchste Wert, bei dem alles ≥ 4,5:1 hält. Ein Wert für beide
+     Themes: Im Hellen lagen alle Messwerte ohnehin über 5. Die Komponente
+     liest das Token, der Regler der Prüfseite schreibt es. */
+  --df-deckkraft: 0.45;
   /* Alt-Token aus der Designphase — in neuem Code NICHT verwenden (Ambient nutzen) */
   --grad-bg: radial-gradient(120% 90% at 80% -10%, oklch(0.22 calc(var(--accent-c)*0.35) var(--accent-h) / 0.4), transparent 60%), radial-gradient(100% 80% at -10% 110%, oklch(0.21 calc(var(--accent2-c)*0.4) var(--accent2-h) / 0.35), transparent 55%);
 
@@ -268,6 +301,44 @@
   --ambient-fight: radial-gradient(70% 65% at 80% 4%, oklch(0.78 var(--accent-c) var(--accent-h) / 0.55), oklch(0.78 var(--accent-c) var(--accent-h) / 0) 68%), radial-gradient(60% 55% at 2% 96%, oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0.46), oklch(0.82 calc(var(--accent2-c)*0.75) var(--accent2-h) / 0) 62%);
   --grad-progress: linear-gradient(90deg, oklch(0.40 var(--accent-c) var(--accent-h)), oklch(0.58 var(--accent-c) var(--accent-h)));
   --grad-bg: radial-gradient(120% 90% at 80% -10%, oklch(0.90 calc(var(--accent-c)*0.4) var(--accent-h) / 0.7), transparent 60%), radial-gradient(100% 80% at -10% 110%, oklch(0.92 calc(var(--accent2-c)*0.4) var(--accent2-h) / 0.6), transparent 55%);
+
+  /* DeepFight-Hintergrund, helle Fassung. Der Grund ist Weiß; die beiden
+     Tonstufen wandern nach UNTEN statt nach oben, sonst mischte sich Weiß mit
+     Fast-Weiß und die Schicht wäre ein grauer Schleier ohne Zeichnung. */
+  --df-grund: oklch(1 0 0);                     /* Weiß */
+  --df-ton-leute: oklch(0.62 0.13 197);
+  --df-ton-leute-tief: oklch(0.86 0.06 197);
+  --df-ton-gegner: oklch(0.62 0.012 235);       /* Silber */
+  --df-ton-gegner-tief: oklch(0.88 0.006 235);
+}
+
+/* ─── Die Ecke im Kampf: rot und blau sind Sache, nicht Schmuck ──────────────
+ * (Leons Entscheidung 08.09.2026, Teilschritt 4 des DeepFight-Neuaufbaus)
+ *
+ * Im Analyse-Formular sagt der Trainer, in welcher Ecke sein Kämpfer steht.
+ * Zur Wahl stand, die Auswahl neutral zu halten wie jede andere — Leon wollte
+ * die Sportfarbe. Rote und blaue Ecke sind Kampfsport-Konvention: Wer das
+ * Video vor sich hat, sucht nach genau diesen zwei Farben.
+ *
+ * SIE STEHEN HIER UND NICHT IM THEME-BLOCK, weil sie zu keinem der beiden
+ * Themes gehören — dieselbe Reihe wie --accent2 (Brand-Violett) und die
+ * --cat-*: feste Werte, keine Gym-Ableitung, kein Hell-Dunkel-Paar. Eine rote
+ * Ecke ist rot, im hellen wie im dunklen Theme.
+ *
+ * DIE HELLIGKEIT IST GEMESSEN, NICHT GEWÄHLT: L 0.50 ist der Ton, der beides
+ * trägt — weiße Schrift darauf (5,8:1 rot / 5,3:1 blau) UND eine Fläche, die
+ * sich in BEIDEN Themes vom Grund abhebt. Heller, und die Schrift fällt durch;
+ * dunkler, und die Fläche versinkt im dunklen Glas. Blau liegt auf 255° und
+ * damit weit weg vom Akzent-Cyan (197°), sonst sähe die blaue Ecke im
+ * Standard-Gym wie ein aktiver Zustand aus.
+ *
+ * ACHTUNG, sie sind KEIN Alarm: --negative (25°) liegt farblich daneben, meint
+ * aber etwas ganz anderes. Wer hier eine dritte rote Fläche einführt, prüft
+ * vorher, ob sie nicht als Fehler gelesen wird. */
+:root {
+  --corner-red: oklch(0.50 0.20 27);
+  --corner-blue: oklch(0.50 0.18 255);
+  --on-corner: oklch(0.99 0 0);
 }
 
 /* ─── Neues Token-System: Typografie ─────────────────────────────────────────
@@ -579,6 +650,143 @@
     radial-gradient(120% 95% at 0% 0%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 72%),
     linear-gradient(155deg, color-mix(in oklab, var(--accent-subtle) 85%, transparent) 0%, color-mix(in oklab, var(--accent-subtle) 28%, transparent) 58%, transparent 100%);
   --sb-group-edge: inset 0 0 0 1px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+/* ─── Der DeepFight-Bereich: zwei Modi, ein Glas (Leons Entscheidungen 06.09.2026)
+ *
+ * Der Bereich liegt unter /trainer/deepfight; sein Layout setzt
+ * `data-area="deepfight"` und `data-modus="leute" | "gegner"` — wen die
+ * Werkbank gerade analysiert. Dahinter läuft die bewegte Schicht
+ * (components/ui/Synthesis.tsx, Tokens --df-* oben).
+ *
+ * „UNSERE LEUTE" BRAUCHT KEINE ÜBERSCHREIBUNG: Der Akzent bleibt der des
+ * Gyms, wie im ganzen Trainerbereich. Der Bereich trägt data-area nur, damit
+ * die Regeln hier an einer Stelle stehen — und ein rotes Gym bekommt rote
+ * Knöpfe auf dem Tidal-Blau (Gegenprobe gemessen).
+ *
+ * DER GEGNER BEKOMMT KEINEN EIGENEN FARBTON (Leon: „einfach dunkel/hell als
+ * Button-Farbe, so dass es zum Hintergrund passt"). Vier Varianten einer
+ * Komplementär-Formel wurden gemessen und verworfen — die reine Formel klemmt
+ * im Dunkeln auf Lachsrosa, und der abgeleitete Ton lag praktisch AUF dem
+ * Alarm-Rot (Abstand 0,029 im OKLab-Raum). Stattdessen nimmt dieser eine
+ * Eintrag der Akzent-Familie die Farbe: Buntheit 0,012 statt 0,14 — derselbe
+ * Hauch Blau wie im Silber des Hintergrunds, weil reines Grau neben dem
+ * Tidal-Ton tot wirkt. Alles Weitere rechnet der [data-area]-Block darüber:
+ * Knopf, Text, Tönung, Rand und Schein werden grau, in beiden Themes. */
+[data-area="deepfight"][data-modus="gegner"] {
+  --accent-h: 235;
+  --accent-c: 0.012;
+}
+
+/* GLAS — EINE Regel für jede Karte im Bereich, nicht eine Klasse pro Karte.
+ * So bleibt es stimmig, und die Karten der Rollout-Etappe 3a
+ * (OpponentProfileView, FightStatsBlock …) werden hier automatisch
+ * durchsichtig, ohne dass jemand sie anfasst. Die Glas-Tokens existieren
+ * längst (.t-glass, die Glas-Lupe der Sidebar) — hier gelten sie für .t-card.
+ * --surface-raised (Chips, inaktive Knöpfe, Felder) wird halbdurchsichtig,
+ * damit auch die kleinen Flächen den Hintergrund durchlassen.
+ *
+ * REGEL FÜR DEN BEREICH: Text sitzt IMMER auf einer Karte, nie direkt auf dem
+ * bewegten Hintergrund — auch die Segment-Leiste steht auf Glas.
+ *
+ * Ohne @layer, damit die Regel die .t-card aus @layer components schlägt.
+ *
+ * MOTION-BRIEF §3.5: backdrop-filter ist auf WKWebView ein Repaint je Bild,
+ * und der Hintergrund bewegt sich. Ruckelt es auf dem Handy, ist der
+ * Notausgang ein niedrigeres --glass-blur NUR hier (nächste Zeile). */
+[data-area="deepfight"] {
+  --surface-raised: color-mix(in oklab, var(--bg-2) 62%, transparent);
+  /* DIE DRITTE TEXTSTUFE ÜBERLEBT DAS GLAS NICHT (gemessen 07.09.2026,
+     Teilschritt 3, Canvas-Pixel gegen den echten Grund an der Stelle des
+     Textes, schlechtester von vier Zeitpunkten — die Schicht bewegt sich, der
+     Kontrast schwankt mit).
+
+     Auf einer normalen Seite steht --text-3 auf einer DECKENDEN Karte. Hier
+     steht es auf Glas, und dahinter läuft die Schicht. Gemessen an der
+     Meta-Zeile der Gegnerkarte:
+
+        dunkel   3,69:1     hell   2,66:1        (WCAG AA verlangt 4,5:1)
+
+     Eine Helligkeitsreihe hat gezeigt, dass es für eine dritte Stufe keinen
+     Platz gibt: Im HELLEN Theme trägt erst L 0,44 (5,14:1) — und das IST
+     bereits --text-2. Alles Hellere fällt durch (L 0,50 → 3,50). Ein dimmerer
+     Ton müsste im hellen Theme DUNKLER werden als --text-2, also kräftiger
+     wirken als die Stufe über ihm — die Hierarchie stünde auf dem Kopf.
+
+     Deshalb fällt die Stufe hier zusammen, statt einen dritten Farbwert zu
+     erfinden: Im DeepFight-Bereich gibt es zwei Textstufen, nicht drei.
+     Gedämpft bleibt gedämpft (--text-2 gegen --text-1), nur eben lesbar. Die
+     Seiten müssen dafür nichts wissen — dieselbe Arbeitsteilung wie beim Glas
+     eine Regel höher.
+
+     Nachher gemessen: dunkel ≥ 8:1, hell 5,14:1. Wer die Schicht je
+     kräftiger stellt (--df-deckkraft), misst das hier neu. */
+  --text-3: var(--text-2);
+}
+
+/* DIE ZWEITE TEXTSTUFE IM HELLEN THEME — nachgemessen 08.09.2026
+   (Teilschritt 4). Teilschritt 3 hatte für `--text-3` gemessen und dabei
+   notiert, das Helle liege bei 4,4–4,7:1 „genau auf der Linie". Mit der
+   Ablage kamen Stellen dazu, an denen die Linie reißt:
+
+      --text-label „KI-Video-Analyse"        4,15:1   (mobil)
+      --text-2     „Leg ein Kampf-Video ab"  4,41:1   (mobil)
+      --text-label „Wen analysierst du?"     4,44:1   (beide Breiten)
+
+   Verfahren wie in Teilschritt 3: Vordergrund aus der aufgelösten CSS-Farbe,
+   Hintergrund aus einem echten Bildpixel AN DER STELLE DES TEXTES, über vier
+   Zeitpunkte, der schlechteste zählt (Falle 45). Die Helligkeitsreihe über
+   19 Stellen auf 1440 und 390 px:
+
+      L 0,44 (heute)  4,44:1  fällt durch
+      L 0,42          4,80:1  trägt knapp
+      L 0,40          5,27:1  trägt mit Reserve   ← gewählt
+      L 0,38          5,72:1
+
+   Gewählt ist 0,40 und nicht 0,42, weil die Schicht sich bewegt und der
+   Kontrast an derselben Stelle um ±0,3 schwankt — 4,80 wäre eine Zahl ohne
+   Luft. Gegen `--text-1` (L 0,21) bleibt die Stufe klar die schwächere.
+
+   NUR IM HELLEN THEME: Im Dunkeln hält alles ≥ 6,9:1, dort wäre der Eingriff
+   grundlos.
+
+   `--text-label` MUSS AUSDRÜCKLICH MITGESCHRIEBEN WERDEN (Falle 37): Es ist
+   ein `color-mix`-Alias über `--accent-text` und `--text-2`, am `:root`
+   einmal ausgerechnet — ein neues `--text-2` allein erreicht es nicht. Es
+   behält dabei seinen Akzentstich (Leon-Befund 26.08.: Label und Fließtext
+   dürfen nie denselben Ton tragen); die Abhebung kommt hier aus der
+   Buntheit, nicht aus der Helligkeit. `--text-muted` hängt aus demselben
+   Grund mit dran.
+
+   Wer `--df-deckkraft` je ändert, misst diese Reihe neu. */
+[data-theme="light"] [data-area="deepfight"] {
+  --text-2: oklch(0.40 calc(var(--accent-c)*0.15) var(--accent-h));
+  --text-muted: var(--text-2);
+  --text-label: color-mix(
+    in oklab,
+    oklch(0.40 var(--accent-c) var(--accent-h)) 40%,
+    var(--text-2)
+  );
+}
+[data-area="deepfight"] .t-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Die bewegte Schicht selbst: fixiert hinter allem, wie .shell-ambient.
+ * z-index −1 statt 0, weil sie INNERHALB des Stapelkontexts der Hülle
+ * (`relative z-10` in StaffShell) liegt: Mit 0 stünde sie in Baumreihenfolge
+ * ÜBER der Sidebar, die vor ihr im Baum kommt. Negativ liegt sie unter allem
+ * Inhalt des Kontexts, aber über dessen (durchsichtigem) Grund — Sidebar und
+ * Kopf blicken damit durch ihr Glas auf die Schicht. */
+.df-schicht {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Konto-Panel der Sidebar (Vorlage: fade-in zoom-in-95, 100 ms). Der
@@ -1052,6 +1260,109 @@
 @keyframes t-ai-flow {
   from { background-position: 200% 50%; }
   to   { background-position: 0% 50%; }
+}
+
+/* ─── DeepFight-Einstieg: weißes Funkeln, Regenbogen darin ─────────────────
+ *
+ * Leons Ansage 08.09.2026: „das Symbol in weiß, und innerhalb des Symbols
+ * schimmern die Regenbogenfarben — wie beim DNA-%-Regenbogen, jedoch etwas
+ * langsamer. Hoverst du über DeepFight, soll der Hintergrund (außerhalb des
+ * Textes) der Regenbogen sein."
+ *
+ * DIESELBE UHR WIE DAS DNA-BADGE, NUR HALBES TEMPO: `t-ai-flow` und
+ * `--grad-ai` sind schon da (.t-ai-badge, „DNA 33 %"). „Etwas langsamer" ist
+ * deshalb eine Zahl und keine zweite Animation — 6 s statt 3 s. Wer den
+ * Regenbogen je ändert, ändert ihn an EINER Stelle für beide.
+ *
+ * WEISS IST `--text-1`, NICHT `#fff`: Im dunklen Theme IST --text-1 das
+ * gedämpfte Weiß der App (OLED-Bloom, siehe Token-Kopf) — dort sieht Leon
+ * genau das Weiß, das er meint. Ein hartes Weiß im HELLEN Theme wäre ein
+ * unsichtbares Funkeln auf fast weißem Grund (DESIGN-BRIEF §1.3: Light ist
+ * gleichwertig, nicht Beiwerk).
+ *
+ * Die Maske nimmt nur den ALPHAKANAL des PNG — die Form bleibt, die türkise
+ * Eigenfarbe des Bildes fällt weg. Der Regenbogen liegt als ::after darüber
+ * und wird von der Maske des Elternteils mitgeschnitten; er schimmert also
+ * IM Funkeln statt darum herum. */
+.df-funke {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  transform: translateY(-0.04em);
+  background: var(--text-1);
+  -webkit-mask-image: url("/deepfight-icon.png");
+  mask-image: url("/deepfight-icon.png");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.df-funke::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--grad-ai);
+  background-size: 200% 100%;
+  animation: t-ai-flow 6s linear infinite;
+  /* Nicht deckend: Darunter bleibt das Weiß stehen, der Regenbogen legt sich
+     nur als Schimmer darüber. Bei 1.0 wäre das Funkeln bunt statt weiß. */
+  opacity: 0.55;
+}
+
+/* Der Einstieg selbst: im Ruhezustand reiner Text (Leon 08.09.: „ohne
+   Button"), unter der Maus wächst der Regenbogen als HINTERGRUND hinter dem
+   Text auf. `isolation: isolate` ist Pflicht — ohne eigenen Stapelkontext
+   fiele das `z-index: -1` des Verlaufs hinter den Seitengrund und wäre gar
+   nicht zu sehen.
+   Die Polsterung steht IMMER (nicht erst im Hover): Sonst spränge der Text
+   in dem Moment zur Seite, in dem die Fläche erscheint. */
+.df-einstieg {
+  position: relative;
+  isolation: isolate;
+  /* DIE RUHEFARBE STEHT HIER UND NICHT INLINE IN DER SEITE: Ein Inline-Stil
+     schlägt jede Klassenregel — mit `color` am Element gewann die Ruhefarbe
+     auch im Hover, und der Akzent stand auf dem Regenbogen bei 1,08:1
+     (gemessen 08.09.2026, bevor die Farbe hierher zog). */
+  color: var(--accent-text);
+  /* Die Schrift wechselt mit der Fläche die Farbe — ohne Übergang schnappte
+     sie um, während der Regenbogen noch aufblendet. */
+  transition: color var(--dur-med) var(--ease-out);
+}
+.df-einstieg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  background: var(--grad-ai);
+  background-size: 200% 100%;
+  animation: t-ai-flow 6s linear infinite;
+  opacity: 0;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+@media (hover: hover) {
+  .df-einstieg:hover::before {
+    opacity: 1;
+  }
+  /* Auf dem Regenbogen trägt der Akzent nicht: Der Verlauf wandert, und mit
+     ihm der Kontrast. Die --ai-*-Stopps liegen in BEIDEN Themes zwischen
+     L 0.58 und L 0.80 — dagegen hält nur ein sehr dunkler Ton, und der hält
+     gegen jeden Stopp gleich gut. Er ist bewusst NICHT aus dem Gym-Akzent
+     abgeleitet: Der Regenbogen ist eine feste Palette (--ai-1..5), keine
+     Marken-Fläche. */
+  .df-einstieg:hover {
+    color: oklch(0.17 0.03 285);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-funke::after,
+  .df-einstieg::before {
+    animation: none;
+  }
 }
 @keyframes t-select-open {
   from { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
@@ -1651,14 +1962,20 @@ h1, h2 { overflow-wrap: anywhere; }
   width: 190px;
   height: 190px;
 }
+/* TOKEN-LOOK seit 08.09.2026 (Teilschritt 4): Die beiden Ringe liefen auf
+   --ta-violet und --ta-pink des alten Systems. Der Loader steht nur an EINER
+   Stelle — mitten im DeepFight-Bereich, dessen Akzent-Familie der Modus
+   färbt. Ein violett-pinker Kreisel im silbernen Gegner-Modus war genau der
+   Fremdkörper, den Leon am 06.09. abgeschafft hat. Beide Ringe kommen jetzt
+   aus dieser Familie und folgen dem Modus mit. */
 .ai-loader {
   position: absolute;
   inset: 0;
   border-radius: 50%;
   border: 3px solid transparent;
-  border-top-color: var(--ta-violet);
-  border-right-color: rgba(157, 123, 250, 0.35);
-  filter: drop-shadow(0 0 10px rgba(157, 123, 250, 0.65));
+  border-top-color: var(--accent);
+  border-right-color: color-mix(in oklab, var(--accent) 35%, transparent);
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--accent) 55%, transparent));
   animation: ai-loader-spin 1.6s linear infinite;
 }
 .ai-loader::after {
@@ -1667,8 +1984,8 @@ h1, h2 { overflow-wrap: anywhere; }
   inset: 12px;
   border-radius: 50%;
   border: 2px solid transparent;
-  border-bottom-color: var(--ta-pink);
-  border-left-color: rgba(255, 79, 168, 0.25);
+  border-bottom-color: var(--accent-text);
+  border-left-color: color-mix(in oklab, var(--accent-text) 25%, transparent);
   animation: ai-loader-spin 2.4s linear infinite reverse;
 }
 .ai-loader-letter {
@@ -1677,7 +1994,7 @@ h1, h2 { overflow-wrap: anywhere; }
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--fg-2);
+  color: var(--text-1);
   opacity: 0.2;
   animation: ai-loader-letter 1.8s ease-in-out infinite;
 }
