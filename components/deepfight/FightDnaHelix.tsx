@@ -77,17 +77,29 @@ export interface FightDnaHelixProps {
   className?: string;
 }
 
+/**
+ * Jede Stufe auf ihrem EIGENEN Canvas — dieselbe Sonde wie `kannWebGl()` in
+ * components/ui/Synthesis.tsx (08.09.2026). Ein Canvas, das einmal nach
+ * „webgl2" gefragt wurde, soll laut HTML-Spezifikation keinen anderen
+ * Kontexttyp mehr liefern; ob ein GESCHEITERTER Versuch das schon auslöst,
+ * ist zwischen den Engines nicht einheitlich. Getrennte Canvas kosten nichts
+ * und nehmen die Frage vom Tisch: Ein Rechner, der nur WebGL 1 hergibt,
+ * bekommt die WebGL-Helix statt des Glyphs.
+ */
 function canCreateWebGlContext(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
-    if (!context) return false;
-    const extension = context.getExtension("WEBGL_lose_context");
-    extension?.loseContext();
-    return true;
-  } catch {
-    return false;
+  for (const stufe of ["webgl2", "webgl"] as const) {
+    try {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext(stufe) as WebGLRenderingContext | null;
+      if (context) {
+        context.getExtension("WEBGL_lose_context")?.loseContext();
+        return true;
+      }
+    } catch {
+      /* naechste Stufe */
+    }
   }
+  return false;
 }
 
 function focusTokenAt(model: ReturnType<typeof buildHelixModel>, categoryId: string, mode: "completeness" | "split", variant: "athlete" | "opponent") {
