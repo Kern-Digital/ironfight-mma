@@ -110,6 +110,107 @@ type Messung = {
   textAufGlas: number;
 };
 
+/**
+ * WAS DER BROWSER ZU WEBGL SAGT — die Zeile, die eine Ferndiagnose erspart.
+ *
+ * `Synthesis` rendert ohne WebGL-Kontext GAR NICHTS; übrig bleibt der normale
+ * Seitengrund. Von aussen sieht das genauso aus wie ein Fehler im Code, und
+ * am 08.09.2026 hat genau diese Ununterscheidbarkeit einen halben Nachmittag
+ * gekostet: Im Prüfbrowser lief alles, bei Leon war die Schicht weg — auch
+ * nach F5.
+ *
+ * Deshalb steht hier, was der Browser wirklich hergibt: ob es einen Kontext
+ * gibt, welcher Treiber dahinter steckt (SwiftShader = Software, also
+ * Hardwarebeschleunigung aus) und wie viele Canvas die Seite gerade hält —
+ * Chromium deckelt die Zahl gleichzeitiger Kontexte und wirft bei
+ * Überschreitung den ältesten weg.
+ */
+function WebGlStatus() {
+  const [befund, setBefund] = useState<{
+    kontext: boolean;
+    webgl1: string;
+    webgl2: string;
+    treiber: string;
+    canvas: number;
+  } | null>(null);
+
+  useEffect(() => {
+    /**
+     * Jede Stufe auf ihrem EIGENEN Canvas — ein Canvas, das einmal nach
+     * „webgl2" gefragt wurde, liefert danach keinen anderen Kontexttyp mehr
+     * (HTML-Spezifikation). Die erste Fassung fragte beide auf einem und
+     * hätte einen reinen WebGL-1-Rechner fälschlich als „kein Kontext"
+     * gemeldet. Getrennt gefragt steht hier, WAS genau fehlt.
+     */
+    const sonde = (stufe: "webgl" | "webgl2") => {
+      try {
+        const c = document.createElement("canvas");
+        const gl = c.getContext(stufe) as WebGLRenderingContext | null;
+        if (!gl) return { da: false, treiber: "" };
+        const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+        const treiber = dbg
+          ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL))
+          : "Kontext da, Treibername verborgen";
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+        return { da: true, treiber };
+      } catch (e) {
+        return { da: false, treiber: e instanceof Error ? e.message : "Fehler" };
+      }
+    };
+    const pruefen = () => {
+      const v2 = sonde("webgl2");
+      const v1 = sonde("webgl");
+      setBefund({
+        kontext: v1.da || v2.da,
+        webgl1: v1.da ? "ja" : `nein${v1.treiber ? ` (${v1.treiber})` : ""}`,
+        webgl2: v2.da ? "ja" : `nein${v2.treiber ? ` (${v2.treiber})` : ""}`,
+        treiber: v2.treiber || v1.treiber || "—",
+        canvas: document.querySelectorAll("canvas").length,
+      });
+    };
+    pruefen();
+    // Nach dem Aufbau der Felder noch einmal — dann stehen ihre Canvas.
+    const id = window.setTimeout(pruefen, 1500);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  if (!befund) return null;
+  const gut = befund.kontext;
+  const software = /swiftshader|llvmpipe|software/i.test(befund.treiber);
+
+  return (
+    <div
+      className="mt-1 flex flex-col gap-1 rounded-card px-4 py-3"
+      style={{
+        background: gut ? "var(--surface-raised)" : "color-mix(in oklab, var(--negative) 12%, transparent)",
+        border: `1px solid ${gut ? "var(--line)" : "color-mix(in oklab, var(--negative) 45%, transparent)"}`,
+      }}
+    >
+      <span className="t-label" style={{ color: gut ? "var(--text-label)" : "var(--negative)" }}>
+        WebGL in diesem Browser
+      </span>
+      <span style={{ font: "var(--type-body-strong)" }}>
+        {gut ? "Kontext vorhanden" : "KEIN Kontext — die bewegte Schicht kann hier nicht rendern"}
+      </span>
+      <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+        WebGL 1: {befund.webgl1} · WebGL 2: {befund.webgl2} · Treiber: {befund.treiber}
+        {software && " — Software-Rendering, also Hardwarebeschleunigung aus"}
+        {" · "}
+        Canvas auf dieser Seite: {befund.canvas}
+      </span>
+      {!gut && (
+        <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+          Ging es bis eben noch: Chrome KOMPLETT beenden und neu starten — nach
+          einem Absturz des GPU-Prozesses verweigert Chrome WebGL für die
+          ganze Sitzung, auch inkognito. Bleibt es danach aus: unter
+          chrome://gpu die Zeilen WebGL/WebGL2 und &bdquo;Problems
+          Detected&ldquo; lesen.
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function DeepFightFarbePruefseite() {
   const { theme, toggleTheme } = useTheme();
   const [gymH, setGymH] = useState(197);
@@ -220,6 +321,7 @@ export default function DeepFightFarbePruefseite() {
             bei unseren Leuten dem Gym und werden beim Gegner neutral. Stell
             das Gym um und sieh, was mitgeht und was nicht.
           </p>
+          <WebGlStatus />
         </header>
 
         <Steuerung

@@ -789,6 +789,82 @@
   pointer-events: none;
 }
 
+/* ─── DER RÜCKFALL OHNE WEBGL (Leons Befund 08.09.2026) ────────────────────
+ *
+ * „warum sehe ich bei dem DeepFight nicht mehr unseren animierten
+ * Hintergrund?" — sein Chrome gab KEINEN WebGL-Kontext her (Prüfseite:
+ * „KEIN Kontext", kein Treibername, 1 Canvas statt 4). Bis dahin rendert
+ * `Synthesis` in dieser Lage AUSDRÜCKLICH NICHTS, und damit hing die ganze
+ * Farbidentität des Bereichs — Tidal-Blau für unsere Leute, Silber für den
+ * Gegner — an einer Ressource, die der Browser jederzeit verweigern darf.
+ * Von aussen ist so ein Ausfall von einem Fehler im Code nicht zu
+ * unterscheiden; genau das hat einen halben Nachmittag gekostet.
+ *
+ * DIESER RÜCKFALL IST DIE FASSUNG, DIE DER DESIGN-BRIEF OHNEHIN VORSIEHT
+ * (§3): weiche Verläufe, langsame Drift 20–40 s, NUR transform und opacity
+ * — akkuschonend, native-tauglich, und sie hält bei `prefers-reduced-motion`
+ * an. Die WebGL-Schicht bleibt die Kür, das hier ist der Boden: Es fehlt das
+ * Wirbeln, nicht die Farbe.
+ *
+ * Die Töne sind dieselben Tokens. `--df-ton` und `--df-ton-tief` stehen als
+ * Alias am BEREICHS-Element (nicht am :root, Falle 37) und wechseln dort mit
+ * `data-modus`; der Rückfall ist ein Nachfahre und erbt den fertigen Wert. */
+[data-area="deepfight"] {
+  --df-ton: var(--df-ton-leute);
+  --df-ton-tief: var(--df-ton-leute-tief);
+}
+[data-area="deepfight"][data-modus="gegner"] {
+  --df-ton: var(--df-ton-gegner);
+  --df-ton-tief: var(--df-ton-gegner-tief);
+}
+
+.df-rueckfall {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Der Grund deckt, die Schlieren darüber tragen die Deckkraft — dieselbe
+     Schichtung wie in Synthesis (dort Grund am Rahmen, Canvas im
+     Deckkraft-Kasten). Sonst stünde der Bereich heller als mit WebGL. */
+  background: var(--df-grund);
+}
+.df-rueckfall > span {
+  position: absolute;
+  inset: -30%;
+  opacity: var(--df-deckkraft);
+  will-change: transform;
+}
+.df-rueckfall > span:first-child {
+  background:
+    radial-gradient(42% 38% at 28% 30%, var(--df-ton), transparent 70%),
+    radial-gradient(38% 34% at 72% 18%, var(--df-ton-tief), transparent 72%);
+  animation: df-drift-a 34s ease-in-out infinite alternate;
+}
+.df-rueckfall > span:last-child {
+  background:
+    radial-gradient(46% 42% at 74% 68%, var(--df-ton-tief), transparent 72%),
+    radial-gradient(34% 30% at 18% 78%, var(--df-ton), transparent 70%);
+  animation: df-drift-b 27s ease-in-out infinite alternate;
+}
+@keyframes df-drift-a {
+  from { transform: translate3d(-4%, -3%, 0) scale(1.04); }
+  to   { transform: translate3d(5%, 4%, 0) scale(1.16); }
+}
+@keyframes df-drift-b {
+  from { transform: translate3d(4%, 4%, 0) scale(1.14); }
+  to   { transform: translate3d(-5%, -3%, 0) scale(1.02); }
+}
+/* SPEZIFITÄT, GEMESSEN STATT ANGENOMMEN: `.df-rueckfall > span` ist (0,1,1)
+   und verliert gegen die beiden Regeln oben, die mit `:first-child` bzw.
+   `:last-child` auf (0,2,1) kommen — der erste Anlauf lief bei abbestellter
+   Bewegung munter weiter (gemessen 08.09.2026). Die Sperre muss dieselben
+   Selektoren tragen, sonst greift sie nicht. */
+@media (prefers-reduced-motion: reduce) {
+  .df-rueckfall > span:first-child,
+  .df-rueckfall > span:last-child {
+    animation: none;
+  }
+}
+
 /* Konto-Panel der Sidebar (Vorlage: fade-in zoom-in-95, 100 ms). Der
    Ursprung sitzt oben links, weil das Panel unter dem Konto-Block hängt —
    mit mittigem Ursprung sähe es aus, als käme es aus der Mitte der Sidebar. */

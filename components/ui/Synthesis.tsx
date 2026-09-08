@@ -246,16 +246,28 @@ function Effekt({
   );
 }
 
+/**
+ * Gibt der Browser einen WebGL-Kontext her? JEDE Stufe auf ihrem EIGENEN
+ * Canvas: Ein Canvas, das einmal nach „webgl2" gefragt wurde, darf laut
+ * HTML-Spezifikation danach keinen Kontext eines anderen Typs mehr liefern.
+ * Auf einem Rechner, dessen Treiber nur WebGL 1 hergibt, hätte die alte
+ * Sonde (beide Stufen auf einem Canvas) deshalb „nein" gesagt, obwohl die
+ * Schicht dort liefe — der Shader ist GLSL ES 1.0 und braucht kein WebGL 2.
+ */
 function kannWebGl(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
-    if (!context) return false;
-    context.getExtension("WEBGL_lose_context")?.loseContext();
-    return true;
-  } catch {
-    return false;
+  for (const stufe of ["webgl2", "webgl"] as const) {
+    try {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext(stufe) as WebGLRenderingContext | null;
+      if (context) {
+        context.getExtension("WEBGL_lose_context")?.loseContext();
+        return true;
+      }
+    } catch {
+      /* naechste Stufe */
+    }
   }
+  return false;
 }
 
 export default function Synthesis({
@@ -279,6 +291,13 @@ export default function Synthesis({
   const [reduziert, setReduziert] = useState(false);
   const [imBild, setImBild] = useState(true);
   const [tabVorn, setTabVorn] = useState(true);
+  /**
+   * Zählt die Anläufe. Jede Erhöhung hängt den Canvas neu ein und holt damit
+   * einen frischen WebGL-Kontext (siehe „DER KONTEXT KANN WEGGENOMMEN
+   * WERDEN" beim Canvas weiter unten).
+   */
+  const [anlauf, setAnlauf] = useState(0);
+  const anlaeufeRef = useRef(0);
 
   const tokenNamen = useMemo(() => [...tokens], [tokens]);
   const aufgeloest = useResolvedTokens(tokenNamen, hostRef);
@@ -324,20 +343,80 @@ export default function Synthesis({
       className={["pointer-events-none absolute inset-0 h-full w-full overflow-hidden", className]
         .filter(Boolean)
         .join(" ")}
-      // Der Grund kommt NUR mit WebGL: Ohne rendert die Schicht gar nichts,
-      // und die Ambient-Schicht der Hülle trägt den Bereich allein. Ein
-      // schwarzer Grund ohne Bild darüber hätte sie schlicht verdeckt.
+      // Der Grund kommt NUR mit WebGL — ohne trägt ihn der Rückfall selbst
+      // (siehe unten). Ein schwarzer Grund ohne irgendein Bild darüber hätte
+      // die Ambient-Schicht der Hülle schlicht verdeckt.
       style={webGl ? { background: `var(${groundToken})` } : undefined}
     >
+      {/* OHNE WEBGL BLEIBT DER BEREICH TROTZDEM FARBIG (Leons Befund
+          08.09.2026: sein Chrome gab keinen Kontext her, und die Schicht war
+          weg — von einem Fehler im Code nicht zu unterscheiden).
+
+          Vorher rendete diese Komponente in dieser Lage NICHTS, und damit
+          hing die Farbidentität des ganzen Bereichs an einer Ressource, die
+          der Browser jederzeit verweigern darf. Jetzt übernimmt ein reiner
+          CSS-Verlauf in denselben --df-*-Tönen: weiche Schlieren, langsame
+          Drift, nur transform und opacity. Das ist die Fassung, die
+          DESIGN-BRIEF §3 ohnehin vorschreibt — die WebGL-Schicht ist die
+          Kür, das hier der Boden. Es fehlt das Wirbeln, nicht die Farbe.
+          Alles Weitere (Töne, Zeiten, Halt bei reduced-motion) steht in
+          globals.css unter „DER RÜCKFALL OHNE WEBGL". */}
+      {!webGl && (
+        <div className="df-rueckfall" aria-hidden>
+          <span />
+          <span />
+        </div>
+      )}
       {/* Erst gerendert wird, wenn die Farben gelesen sind: ein Frame in den
           Vorlagen-Hexwerten wäre genau der Ausreißer, den §1.1 verbietet. */}
       {webGl && farben && (
         <div style={{ opacity, height: "100%", width: "100%" }}>
+          {/* ─── DER KONTEXT KANN WEGGENOMMEN WERDEN (Leons Befund 08.09.2026:
+              „warum sehe ich den animierten Hintergrund nicht mehr?") ────────
+
+              Ein Browser nimmt einen WebGL-Kontext von sich aus weg: Er
+              deckelt ihre Zahl (Chromium ~16) und wirft bei Überschreitung
+              den ÄLTESTEN weg — wer mehrere Tabs offen hat, verliert damit
+              genau den, der am längsten steht. Dazu kommen Ruhezustand und
+              Treiber-Reset.
+
+              VORHER STARB DIE SCHICHT DARAN ENDGÜLTIG UND STUMM. Nachgestellt
+              am 08.09.: Kontext weggenommen → kein Bild mehr, auch nicht nach
+              sieben Sekunden, und KEINE Konsolenmeldung. Übrig blieb der
+              normale Seitengrund — kein Fehlerbild, nur ein Bereich, der
+              plötzlich sein Gesicht verloren hat.
+
+              `preventDefault()` ist dabei nicht Kür, sondern Bedingung: Ohne
+              es darf der Browser den Kontext gar nicht erst wiederherstellen
+              und feuert `webglcontextrestored` nie. Danach hängt der Zähler
+              den Canvas neu ein — das ist der zuverlässige Weg, weil three.js
+              seine Puffer sonst gegen einen toten Kontext hält.
+
+              DREI ANLÄUFE, DANN RUHE: Ist der Deckel wirklich erreicht (viele
+              Tabs), brächte eine Endlosschleife nur Last. Dann trägt die
+              normale Ambient-Schicht den Bereich allein — dieselbe Lage wie
+              auf einem Gerät ganz ohne WebGL. */}
           <Canvas
+            key={anlauf}
             camera={{ position: [0, 0, 1] }}
             dpr={1}
             frameloop={animiert ? "always" : "demand"}
             gl={{ antialias: false, powerPreference: "high-performance" }}
+            onCreated={({ gl }) => {
+              const flaeche = gl.domElement;
+              const verloren = (e: Event) => {
+                // Erlaubt dem Browser überhaupt erst, ihn zurückzugeben.
+                e.preventDefault();
+                if (anlaeufeRef.current >= 3) return;
+                anlaeufeRef.current += 1;
+                // Nicht im Ereignis selbst neu einhängen — der Kontext ist in
+                // diesem Moment noch als verloren markiert.
+                window.setTimeout(() => setAnlauf((n) => n + 1), 150);
+              };
+              const zurueck = () => setAnlauf((n) => n + 1);
+              flaeche.addEventListener("webglcontextlost", verloren);
+              flaeche.addEventListener("webglcontextrestored", zurueck);
+            }}
           >
             <Effekt
               speed={speed}
