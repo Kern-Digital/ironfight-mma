@@ -66,7 +66,11 @@ async function main() {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 }, colorScheme: THEME });
     const page = await ctx.newPage();
     const konsole = [];
-    page.on("console", (m) => { if (m.type() === "error") konsole.push(m.text()); });
+    // Googles FINALE Upload-Antwort kommt ohne CORS-Header (CLAUDE.md, „Upload"):
+    // der Browser meldet das als Fehler, die App holt die Datei dann über
+    // /resolve-upload nach. Erwartet, kein Befund.
+    const erwartet = (t) => /generativelanguage\.googleapis\.com\/upload|net::ERR_FAILED/.test(t);
+    page.on("console", (m) => { if (m.type() === "error" && !erwartet(m.text())) konsole.push(m.text()); });
 
     for (let a = 0; a < 3; a++) {
       await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
@@ -154,7 +158,8 @@ async function main() {
     text = await main.innerText();
     sagt(true, `Analyse beider Personen fertig in ${Math.floor(dauer / 60)} min ${dauer % 60} s`);
     sagt(text.includes("2 Auswertungen sind gespeichert"), "Ergebnis: zwei Auswertungen");
-    sagt(text.includes("Mess E2b Athlet") && text.includes("zählt zu"), "Je Person eine Zeile mit Gewicht");
+    // Die Meta-Zeile steht in CSS-Versalien → kleingeschrieben vergleichen.
+    sagt(text.includes("Mess E2b Athlet") && text.toLowerCase().includes("zählt zu"), "Je Person eine Zeile mit Gewicht");
     await page.screenshot({ path: `tmp-e2-fertig-${THEME}.png`, fullPage: true });
     const stand = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("ta-video-analysis-form:")));
     sagt(stand.length === 0, "Zwischenstand aufgeräumt");
