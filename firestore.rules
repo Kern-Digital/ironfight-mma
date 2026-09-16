@@ -241,8 +241,15 @@ service cloud.firestore {
         // ausgenommen, damit der `ownerIsStaff`-Vergleich unten AUSNAHMSLOS
         // gilt. Ein Camp, das an dieser Regel vorbei mit falschem Feld
         // entstuende, waere in keiner Liste zu sehen und in keiner zu suchen.
+        // SEIT DER AUTOMATIK (16.09.2026) AUCH `videoAnalyses` AUSGENOMMEN:
+        // Analysen schreibt ausschliesslich der Server (Admin-SDK umgeht
+        // diese Regeln ohnehin); ein Admin im Client soll dieselbe Kante
+        // haben wie ein Trainer — sonst gaebe es zwei Wahrheiten darueber,
+        // wer eine Analyse loeschen darf. `fightProfile` bleibt fuer den
+        // Admin schreibbar (Demo-Seeder in der App).
         allow write: if request.auth != null && isAdmin()
-                     && subcollection != "fightCamps";
+                     && subcollection != "fightCamps"
+                     && subcollection != "videoAnalyses";
       }
 
       // Persoenliche Workoutplan-Kopien (Etappe Workout-Plaene, Teilschritt 3):
@@ -287,21 +294,68 @@ service cloud.firestore {
       // „deepfight". Er umfasst Kampfprofil UND Analysen gemeinsam: Das eine
       // IST die Auswertung des anderen, getrennt freizugeben ergaebe fachlich
       // nichts.
+      //
+      // SEIT DER AUTOMATIK (Leon 14./15.09.2026, gebaut 16.09.) IST DAS
+      // KAMPFPROFIL EINE ABLEITUNG: Antworten, Split, Gewicht, Zaehler und
+      // die Rechnung dahinter (`evidence`) schreibt der SERVER aus allen
+      // Analysen (lib/server/profile-recompute.ts, Admin-SDK). Ein Trainer
+      // schreibt hier deshalb NICHT mehr — es gibt nichts, was er von Hand
+      // hineinlegen koennte, das die naechste Rechnung nicht ueberschriebe.
+      // Der Plattform-Admin behaelt den Schreibweg fuer den Demo-Seeder
+      // (lib/demo-seed.ts) ueber die Wildcard oben.
       match /fightProfile/{docId} {
         allow read: if request.auth != null && request.auth.uid == uid;
-        allow read, write: if request.auth != null
-                           && canAccessMemberData(uid, "deepfight");
+        allow read: if request.auth != null
+                    && canAccessMemberData(uid, "deepfight");
       }
 
       // KI-Video-Analysen des Athleten (Konzept §6, mode=athlete).
       // Athlet: liest NUR vom Trainer freigegebene Auswertungen, schreibt NIE.
       // (Queries brauchen where("sharedWithAthlete","==",true).)
+      //
+      // TRAINER SCHREIBEN NUR NOCH EIN FELD: `sharedWithAthlete`. Anlegen,
+      // Markieren („falscher Kaempfer") und Loeschen laufen ueber
+      // /api/video-analysis/commit und /flag — der Server prueft dasselbe
+      // Tor (lib/server/member-access.ts) und rechnet das Profil neu. Ein
+      // Client, der eine Analyse direkt anlegte, umginge die Rechnung; einer,
+      // der loeschte, liesse das Profil auf einer Analyse stehen, die es
+      // nicht mehr gibt. Falle 4 beachten: `affectedKeys()` enthaelt nur
+      // ECHTE Aenderungen — eine Messzeile muss einen anderen Wert setzen.
       match /videoAnalyses/{analysisId} {
         allow read: if request.auth != null && request.auth.uid == uid
                     && resource.data.sharedWithAthlete == true;
-        allow read, write: if request.auth != null
-                           && canAccessMemberData(uid, "deepfight");
+        allow read: if request.auth != null
+                    && canAccessMemberData(uid, "deepfight");
+        allow update: if request.auth != null
+                      && canAccessMemberData(uid, "deepfight")
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(["sharedWithAthlete"]);
       }
+    }
+
+    // CollectionGroup-Query: die DeepFight-Landung liest alle Analysen des
+    // Gyms mit EINER Abfrage (lib/video-analysis.ts, listGymVideoAnalyses)
+    // statt mit einem Faecher je Ziel. Die Query braucht BEIDE Filter:
+    //   where("gymId","==",…) und where("targetIsStaff","==",false)
+    // — direkter Feldzugriff, kein get(feld, default) (Falle 28: die
+    // Query-Analyse versteht die get()-Form nicht als Einschraenkung).
+    //
+    // WARUM `targetIsStaff`: `{path=**}` matcht auch den direkten Pfad
+    // users/{uid}/videoAnalyses/{id} (Falle 24), und Regeln sind
+    // ODER-verknuepft. Stuende hier nur `sameGym`, laese jeder Trainer die
+    // Analysen ueber jeden KOLLEGEN — die Freigabe im Bereich `deepfight`
+    // waere wirkungslos. Analysen zu Stab-Konten (`targetIsStaff == true`)
+    // finden ihren Weg deshalb AUSSCHLIESSLICH ueber die strenge Regel oben
+    // und damit ueber die Freigabe. Gegner-Analysen tragen false.
+    //
+    // Das Feld setzt der SERVER beim Anlegen (aus dem users-Dokument bzw.
+    // fuer Gegner fest false) — der Client legt keine Analysen mehr an.
+    // Bestand ohne das Feld (Demo) faellt hier durch (Auswertungsfehler =
+    // verboten) und ist ueber den direkten Pfad weiter lesbar.
+    match /{path=**}/videoAnalyses/{analysisId} {
+      allow read: if request.auth != null
+                  && resource.data.targetIsStaff == false
+                  && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));
     }
 
     // CollectionGroup-Query: zentraler Wettkampfbereich liest fightCamps
@@ -451,22 +505,42 @@ service cloud.firestore {
     // Bibliothek des eigenen Gyms; Schueler lesen explizit freigegebene
     // Profile (sharedWith enthaelt ihre uid). Ein Update kann das Profil
     // nicht in ein anderes Gym verschieben.
+    //
+    // ABGELEITETE FELDER (seit der Automatik, 16.09.2026): Split, Gewicht,
+    // Zaehler und die Rechnung `evidence` schreibt NUR der Server aus den
+    // Analysen. Ein Trainer-Update, das eines davon AENDERT, wird abgelehnt;
+    // ein unveraendertes Durchreichen (OpponentEditor) ist keine Aenderung
+    // (Falle 4) und geht durch. `dna` bleibt bis zum Trainer-Kommentar
+    // (Etappe 4) von Hand schreibbar — die Rechnung behaelt Handtext fuer
+    // Fragen ohne Analyse dahinter (Seite `manual`). Der Plattform-Admin
+    // darf alles (Demo-Seeder). Dieselbe Liste: DERIVED_PROFILE_FIELDS in
+    // lib/opponents.ts.
+    function abgeleiteteFelderUnveraendert() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(["dnaSplit", "dnaSplitWeight", "actionStats", "evidence"]);
+    }
     match /opponents/{opponentId} {
       allow read: if request.auth != null
                   && (isGymStaffFor(resource.data)
                       || request.auth.uid in resource.data.sharedWith);
-      allow create: if request.auth != null && isGymStaffFor(request.resource.data);
+      allow create: if request.auth != null && isGymStaffFor(request.resource.data)
+                    && (isAdmin()
+                        || !request.resource.data.keys().hasAny(["dnaSplit", "dnaSplitWeight", "actionStats", "evidence"]));
       allow update: if request.auth != null && isGymStaffFor(resource.data)
-                    && isGymStaffFor(request.resource.data);
+                    && isGymStaffFor(request.resource.data)
+                    && (isAdmin() || abgeleiteteFelderUnveraendert());
       allow delete: if request.auth != null && isGymStaffFor(resource.data);
 
       // KI-Video-Analysen zum Gegner (Konzept §6, mode=opponent) —
-      // Gym-Scope ueber das Eltern-Gegnerprofil.
+      // Gym-Scope ueber das Eltern-Gegnerprofil. NUR LESEN: Anlegen,
+      // Markieren und Loeschen laufen ueber den Server (siehe die Regel bei
+      // users/{uid}/videoAnalyses). Kein `sharedWithAthlete` beim Gegner,
+      // also auch kein Update-Feld fuer den Client.
       match /videoAnalyses/{analysisId} {
-        allow read, write: if request.auth != null
-                           && (isAdmin()
-                               || (isTrainerOrAdmin()
-                                   && sameGym(get(/databases/$(database)/documents/opponents/$(opponentId)).data)));
+        allow read: if request.auth != null
+                    && (isAdmin()
+                        || (isTrainerOrAdmin()
+                            && sameGym(get(/databases/$(database)/documents/opponents/$(opponentId)).data)));
       }
     }
 
@@ -480,10 +554,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Laufende KI-Kosten-Summe + Budget (Guthaben-Anzeige der Video-Analyse).
-    // Pro-Gym-Kontingent folgt in Phase 3 (aiUsage/{gymId}).
+    // KI-Kosten: `aiUsage/summary` (Plattform) und `aiUsage/gym-{gymId}`
+    // (je Gym, mit Monatsverlauf). SEIT DER AUTOMATIK NUR NOCH SERVERSEITIG
+    // GESCHRIEBEN (/api/video-analysis/commit bucht mit dem Admin-SDK) —
+    // ein Client, der hier schriebe, koennte den Verbrauch schoenen.
+    // Lesen ist Betreiber-Sache (Leon 08.09.: die Anzeige ist fuer alle
+    // anderen weg); das Kontingent je Gym fuer die Verwaltung kommt mit
+    // Konzept §6 als eigene, serverseitige Pruefung.
     match /aiUsage/{docId} {
-      allow read, write: if request.auth != null && isTrainerOrAdmin();
+      allow read: if request.auth != null && isAdmin();
+      allow write: if false;
     }
 
     // Trainer-zugewiesene Trainingsinhalte (Curriculum) — bewusst fuer alle

@@ -93,8 +93,284 @@
   einem Knopf in die Werkbank. Zwei Ablagen für dasselbe Ziel hatten je einen
   eigenen Zwischenstand-Speicher — wer hier hochlud und dort nachsah, fand
   nichts.
-  NOCH OFFEN: Teilschritt 5 (`VideoAnalysisResult` + sichtbares Ende der
-  Übernahme).
+  **DIE LANDUNG IST SEIT 08.09. NEU GESTALTET — und das ist eine bewusste
+  UMKEHR gegenüber Teilschritt 2** (Leons Entwurf am selben Abend): Die
+  Werkbank („alles auf einer Seite, wen du analysierst ist ein Parameter")
+  wurde mit der Ablage darunter zu voll. **Der Weg ist jetzt ein FLUSS über
+  drei Seiten**, die Landung ist ruhig:
+
+  ```
+  /trainer/deepfight                        Landung
+  /trainer/deepfight/athleten               Auswahl = Athletenliste
+  /trainer/deepfight/gegner                 Auswahl = Gegner-Bibliothek
+  /trainer/deepfight/analyse?modus=&ziel=   Konfiguration (NEU)
+  ```
+
+  Der Parameter-Gedanke stirbt nicht, er wird zur ADRESSE. **Kein neuer
+  Redirect:** Die sechs Einstiege zeigen jetzt direkt auf `/analyse`, und die
+  Landung reicht ein ankommendes `?modus=&ziel=` selbst weiter (Lesezeichen).
+  `ta-deepfight-ziel` ist ersatzlos weg — eine ruhige Landung springt nicht in
+  eine Konfiguration, die niemand angefordert hat.
+  **DIE AUSWAHLSEITEN SIND DIE BIBLIOTHEKEN** (Leons eigene Frage: „macht das
+  im Endeffekt das gleiche?"). Die Segmente fallen deshalb aus der Glas-Leiste;
+  sie trägt nur noch Wortmarke (Weg zurück) und Ortsangabe. Kommt man über
+  „Analyse starten" (`?fuer=analyse`), TAUSCHEN die zwei Wege je Karte — die
+  ganze Karte führt in die Konfiguration, der kleine Knopf aufs Profil — und
+  der Hinweis oben sagt etwas anderes. **Die Rechte-Prüfung ist mitgewandert**
+  (`darfSehen(…,"deepfight",…)` + `isGhostAccount` auf den Auswahlseiten, dazu
+  der „noch nicht freigegeben"-Fall auf `/analyse`, weil eine Adresse niemanden
+  um Erlaubnis fragt).
+  Auf der Landung: links der große DNA-Strang mit **echten Daten eines
+  fiktiven Nutzers als CODE-KONSTANTE** (`lib/demo-fight-profile.ts`, 55 von 60
+  Antworten = 92 %, alle neun Kategorien) — ein echtes Konto hätte aus jeder
+  Liste gefiltert werden müssen und wäre in Phase 4 ein beitragspflichtiger
+  Phantom-Athlet. **Stand nach Leons METALL-ENTWURF 12.09.2026** (kam als eigenständige
+  Vorschau in `D:\Tidal-Athletics\GPT\deepfight-entry`, Auftrag: „nimm
+  diese und passe sie an, was die zwei Felder rechts angeht — die Rundung der
+  Ecken etc.; DNA-Feld, Start und Überschrift bleiben"): Kopfzeile =
+  Wortmarke ohne Rahmen links, Suche als reine Lupe rechts (unverändert).
+  Darunter `FightDnaHeading` — „Entschlüssle die Fight-DNA" in SILBER
+  (Barlow Condensed 900 kursiv, Verlauf IN der Schrift, Lichtlauf und
+  Glanzpunkt beim Laden, `5.6cqi` gegen `.df-kopfspalte`, auf dem
+  Schreibtisch einzeilig). **Der Strang IST der Knopf** (`FightDnaEntry`,
+  `components/deepfight/`): Helix `inert`, Klickziel als Geschwister
+  darüber; unter dem Zeiger wächst der Strang (1,035) und sättigt sich, in
+  seiner Mitte erscheint „Start" in Silber mit zwei türkisen Pfeilen (auf
+  Touch immer, §3.3); ein Tipp verwandelt es am selben Ort in zwei Platten
+  „Athleten" (Silber) / „Gegner" (Türkis, Radius 10 px, CSS-Keyframe statt
+  MorphSwap), Escape oder ein Klick daneben nimmt sie zurück, der Fokus geht
+  auf den Strang zurück. **Die Farben des Einstiegs sind FEST** (Material wie
+  beim VS-Banner, Ausnahme von §1.1) und gelten in beiden Themes — im hellen
+  Theme trägt die Schrift über ihre dunklen Schlagschatten. Die Höhe des
+  Strangs ist Leons Maß aus der Vorschau je Fensterbreite (550 / 610 ab 1550
+  / 530 unter 1150 / 510 unter 860 / 410 unter 680 px, `!important` gegen den
+  Inline-Stil der Helix; `size="lg"` immer). Alles in globals.css unter „DER
+  METALL-EINSTIEG DER DEEPFIGHT-LANDUNG".
+  **Rechts ZWEI FELDER** (`components/deepfight/AnalysenFelder.tsx`), an die
+  App angepasst: beide `.t-card` (im Bereich Glas, `--r-lg`), Zeilen
+  `--r-md`, Farben aus den Tokens, Symbole aus der Registry, nur die Titel in
+  der Display-Schrift des Einstiegs (Kursive braucht `padding-right`, sonst
+  schneidet `background-clip: text` den letzten Buchstaben an — gesehen).
+  **Leons zweite Runde (12.09., „lass die ganzen kleinen unnötigen Dinge
+  weg"):** keine Pfeile an den Zeilen, keine Zähler in den Köpfen, kein
+  „Bereit fürs Profil", keine Filter auf der Seite; das Symbol ist IMMER die
+  Person — eigene Athleten in der Gym-Farbe (`--accent-text`), Gegner grau
+  (`--text-2`), die Rolle trägt die Farbe, nicht die Form. „Analysen in
+  Arbeit" = nur die Zwischenstände (Tipp = weitermachen), „Analyse-Archiv" =
+  die letzten SIEBEN eigenen Analysen, als ACHTE Zeile immer „Alle anzeigen".
+  Ein Tipp auf eine Archiv-Zeile öffnet das zentrierte Sheet mit ALLEN
+  Analysen, diese vorgewählt (die Vorwahl kommt direkt aus dem Zustand —
+  `useLetzterWert` hielte beim Öffnen über „Alle anzeigen" die alte
+  Markierung fest, gemessen); die Filter Alle / Athleten / Gegner sitzen IM
+  Sheet (`.df-filter`). Damit sind „Bereit fürs Profil", die Kartei „Meine
+  Analysen" (`AnalysenKartei` gelöscht, `.df-kartei` raus) und „Mach weiter,
+  wo du aufgehört hast" in den zwei Feldern aufgegangen; `.df-strang*` ist
+  raus, `.df-start` bleibt (Wettkampf-Plus).
+  **Dritte Runde (12.09., nach dem Screenshot):** das Archiv steht OHNE
+  Rahmen (nur „In Arbeit" ist die Glas-Karte), die Trenner zwischen den
+  Zeilen sind gerade Striche als `::before` (ein `border-top` folgte der
+  Rundung und sah aus wie halbe Rahmen), und „Analysen in Arbeit"
+  VERSCHWINDET ganz, wenn nichts offen ist — kein „Nichts wartet auf dich".
+  Für Zwischenstände gibt es `scripts/tmp-df-blick.mjs` (EIN Screenshot,
+  1440, `THEME=light` möglich); der Volllauf nur am Etappenende.
+  **DER LICHTREFLEX HÄNGT AN EINEM ENTPRELLTEN ZÄHLER** (Leon: „der
+  Lichtreflex fehlt sowohl bei der Überschrift als auch beim Start"): Die
+  Vorschau startete ihn mit dem Style-Apply bzw. dem ersten `pointerenter`.
+  In der App lief er messbar durch — nur BEVOR Schrift, Hydration und
+  WebGL-Schicht standen, und Chrome feuert `pointerenter` auch für einen
+  ruhenden Zeiger, sobald das Element auftaucht: der eine Lauf verpuffte beim
+  Laden. Jetzt (`useGlanz` in FightDnaEntry.tsx): einmal nach
+  `document.fonts.ready` + zwei Bildern (`data-shone`, auch auf Touch), dann
+  bei jedem Zeiger-Eintritt neu, der `key` am Schriftzug hängt das
+  Pseudo-Element neu ein. ENTPRELLT auf 1,8 s, Falle gemessen: ohne
+  Entprellung feuerte das Neu-Einhängen unter dem ruhenden Zeiger 27 neue
+  `pointerenter` je Überfahren, die Animation startete endlos neu und kam nie
+  aus ihrer Verzögerung (Spitze 0,00).
+  Gemessen mit `scripts/mess-df-metall.mjs` (dunkel/hell × 1440/390, Login
+  per Prüfkonto mit neun markierten Mess-Analysen, `BASE=` wenn der
+  Dev-Server nicht auf 3000 liegt; 116 Punkte grün): Reflex-Spitze 1,00 nach
+  dem Malen und beim zweiten Überfahren (Überschrift und Start),
+  Einzeiligkeit, kein Überlauf, Platten/Escape/Klick daneben, Navigation +
+  `data-modus`, Glas-Radien, 7 + „Alle anzeigen", Sheet mit Vorwahl und
+  Filter. Zwei Dev-Server-Fallen dabei: nach einer Neukompilierung liefert
+  `/login` einmal 404 (das Skript versucht dreimal), und eine Datei-Änderung
+  WÄHREND eines Laufs meldet 404-Ressourcen in genau dem offenen Kontext.
+  Die älteren Skripte `mess-df-landung.mjs`, `mess-df-rahmenlos.mjs` und
+  `mess-demo-analysen-ui.mjs` messen noch die ALTE Struktur (`.df-strang`,
+  `.df-kartei`) und laufen so nicht mehr durch.
+  **DIE SUCHE GEHT ÜBER ALLES — und lädt GENAU EINMAL je Sitzung**
+  (`lib/deepfight-analysen.ts`, Leons Entscheidung 08.09.): Gegner und Athleten
+  kosten nichts (Listen sind geladen, gefiltert wird lokal) und erscheinen
+  sofort; die Analysen liegen verstreut und kommen per Fächer (~38 Abfragen),
+  **einmal**, danach aus dem Speicher. Gemessen: **Tippen löst 0
+  Firestore-Anfragen aus.** „Meine Analysen" teilt sich denselben Lauf — sonst
+  wäre der Fächer je Landungsbesuch eine Verschlechterung gegenüber der alten
+  Werkbank gewesen. Gecacht wird das PROMISE (gleichzeitige Aufrufer teilen
+  sich den Lauf), Schlüssel ist `gymId:uid`, ein Fehlschlag räumt den Eintrag.
+  Schuld bleibt: Es skaliert mit der Mitgliederzahl — Teilschritt 6 legt beide
+  Stellen auf eine collectionGroup-Query zusammen.
+  **Der Zwischenstand wird auf der Landung NUR GELESEN**
+  (`lib/deepfight-zwischenstand.ts`): `VideoAnalysisSection` zu mounten hieße,
+  ihre Abfragen zu starten. Das Feld bietet deshalb nur „Weitermachen";
+  Verwerfen bleibt dort, wo der Stand zu Hause ist.
+  **DREI STELLEN, DIE GEMESSEN WERDEN MUSSTEN** (Falle 45, vier bzw. sechs
+  Zeitpunkte): Rahmenlos über der bewegten Schicht trägt nur `--text-1`.
+  `--accent-text` fiel im HELLEN Theme auf **2,28:1** („Analyse starten") →
+  `[data-area="deepfight"] .df-einstieg { color: var(--text-1) }`, und zwar
+  VOR der Hover-Regel, weil beide auf Spezifität (0,2,0) kommen und bei
+  Gleichstand der spätere gewinnt. Kleiner, gedämpfter Text trägt frei gar
+  nicht (3,55:1 / 3,69:1) — „Meine Analysen" und das Weitermachen-Feld stehen
+  deshalb auf Glas. Und `FightDnaHelix` malt auf einen DECKENDEN
+  `--bg-0`-Kasten mit 22 px Radius: im Bereich per `!important` überstimmt
+  (Inline-Stil schlägt jede Klasse), sonst löschte eine 620 px hohe Platte die
+  Schicht genau dort aus, wo sie am meisten zu sehen sein soll.
+  **„Start" MITTEN AUF DEM STRANG — die offene Kontrastfrage vom 11.09. ist
+  mit dem Metall-Entwurf anders beantwortet:** Das Wort steht seit 12.09. in
+  Silber mit dreifachem dunklem Schlagschatten (`drop-shadow` 2/5/8 px), nicht
+  mehr als dünner Regenbogen. Die Kante trägt es über die Partikel der Helix
+  in beiden Themes (Screenshots dunkel/hell, 1440/390 gesichtet); eine
+  Zahl nach WCAG gibt es für Schrift mit Schlagschatten nicht, der Knopf heißt
+  weiterhin „Analyse starten" und das Wort bleibt `aria-hidden`.
+  **LEONS DRITTE RUNDE (12.09.2026) — vier Korrekturen am Einstieg:**
+  (a) **Die zwei Platten sind jetzt BLAU („Athleten") und GRAU („Gegner")**
+  statt Silber/Türkis. Türkis ist app-weit die Akzentfarbe und stand hier
+  ausgerechnet für die fremde Seite; Silber trug in derselben Fläche schon
+  Überschrift und „Start". Beide bleiben WERKSTOFF (feste Farben, Ausnahme
+  von §1.1), dasselbe Relief, nur ein anderes Metall.
+  **UND ZWAR DIE ZWEI METALLE, DIE DER BEREICH SCHON FÜHRT** (Leons
+  Nachfrage: „warum ist das Blau des Athleten nicht im Tidal-Blau?"). Ein
+  erster Anlauf erfand ein Stahlblau bei Farbton 250 — daneben stand die
+  Entscheidung vom 06.09., die dieselbe Frage längst beantwortet:
+  „Tidal-Blau für unsere Leute, Silber für den Gegner" (`--df-ton-leute`
+  Farbton 197, `--df-ton-gegner` Farbton 235). Genau die stehen jetzt als
+  `--df-blau` / `--df-grau` im Token-Kopf des Einstiegs — als FESTE Werte
+  und nicht als `var()` auf die Tokens, weil die im hellen Theme ihre
+  Helligkeit drehen (0.74 → 0.62, und `-tief` wird HELLER als der Grundton);
+  eine Platte ist Werkstoff und sieht in beiden Themes gleich aus. Jede
+  Platte kennt nur EINE Farbe (`--platte`), Verlauf, Kante, Fuß und Schrift
+  leiten sich per `color-mix` daraus ab — die beiden können sich dadurch
+  nicht auseinanderentwickeln, und ein Wechsel ist eine Zeile.
+  (b) **Der Glanzpunkt gehört nach vorn:** Er lag mit `z-index: auto` in
+  derselben Ebene wie der Lichtlauf `::after`, der ihn in der
+  Baumreihenfolge überholt (`.df-metal` ist durch seinen `drop-shadow`
+  ohnehin ein eigener Stapelkontext, dort entscheidet allein die
+  Reihenfolge). Jetzt Lauf auf 1, Stern auf 2, dazu ein eigener Schein
+  `--df-glint-schein` — sonst verschwindet die weiße Spitze im weißen
+  Scheitel des Laufs.
+  (c) **Die Überschrift glänzt genau EINMAL** (Leon: „wird jedes Mal
+  ausgelöst, wenn ich mit der Maus drüberziehe"). Der Zeiger-Anstoß war ein
+  Behelf aus der Zeit, als der Lauf beim Laden verpuffte; seit der Zähler auf
+  `document.fonts.ready` plus zwei Bilder wartet, kommt der eine Lauf
+  verlässlich. Eine Überschrift ist kein Bedienelement — am DNA-Feld bleibt
+  der Anstoß, DORT ist er die Einladung.
+  (d) **Das Metall wechselt mit dem Licht** (Leon: „finde für die helle
+  Ansicht eine angepasste Version"). Im hellen Theme ist es GEBÜRSTETER
+  STAHL statt poliertem Silber — dieselbe Verlaufsform, an der
+  Helligkeitsachse gespiegelt, `--df-silver-dark` wird von der dunklen
+  Fußkante zur hellen Lippe, der Türkis geht zwei Stufen tiefer, der Stern
+  wird türkis. Alles über die Tokens in
+  `[data-theme="light"] .df-entry-heading, .df-entry`; keine Regel darunter
+  fasst eine Farbe direkt an. Die Trennlinie unter der Überschrift mischt
+  jetzt aus der Metallkante, statt auf festem Hellgrau zu stehen (im hellen
+  Theme war sie unsichtbar).
+  **ETAPPE 3b IST NACHGEZOGEN (13.09.2026, Leons Befund: „wenn ich auf neuen
+  Gegner anlegen gehe, kommt das Popup mit altem Fenster").** Der letzte große
+  Rest des alten Looks im Bereich lag in zwei Dateien —
+  `components/trainer/OpponentEditor.tsx` (377 Zeilen) und
+  `GegnerDnaAccordion.tsx` (222) —, die fünf übrigen Blöcke sind seit 3a
+  sauber. Aufgefallen ist es dort, wo diese zwei in einer fertigen Umgebung
+  stehen: im Popup „Neuer Gegner" der Wettkampf-Anlage, zwischen Feldern, die
+  seit Etappe 2b im Token-Look sind. Raus sind `--ink-2…5`, `--fg-1…4`,
+  `--ta-pink`, `font-mono-ta`, `font-display-ta`, die festen Pixelgrößen und
+  `rounded-2xl`; die Maße sind jetzt die der Formulare in „Neuer Wettkampf"
+  (`min-h-hit rounded-field px-3` auf `--surface-raised`/`--line`,
+  Beschriftungen als `.t-label`, Knöpfe wie am Fuß der Anlage).
+  **`--fg-1` gab es dabei nie** — dieselbe Beobachtung wie in Etappe 3a; die
+  Eingaben standen die ganze Zeit auf der geerbten Farbe.
+  **UND DIE KATEGORIE TRÄGT KEINE FARBE MEHR.** `category.accent` — vier
+  Farben, die sich über neun Kategorien im Kreis wiederholten und im Popup als
+  violette Ränder auffielen — ist aus dem Akkordeon raus, genau wie in
+  `DnaCategoryGrid` (3a): Die Farbe behauptete eine Ordnung, die es nicht
+  gibt, und beantwortete nicht die eine Frage an diese Liste — WAS IST SCHON
+  GESCOUTET? Jetzt trägt der ZUSTAND sie: leer = `--text-3`/`--line` und
+  gedämpft, gescoutet = Akzent in Symbol, Zähler und Kante.
+  (e) **Der türkise Balken unter der Überschrift ist weg** (Leon: „den
+  blauen Balken dann entfernen"). Der 64-px-Anstrich links vor der
+  Trennlinie kam aus der Vorschau mit, bedeutete nichts und war die einzige
+  Stelle des Einstiegs mit einem FESTEN Türkis statt der Gym-Farbe. Die
+  feine Linie selbst bleibt.
+  Dazu: **das Klemmbrett-Zeichen an „Analyse-Archiv" ist weg** — es sagte
+  nichts, was die Überschrift nicht schon sagt, und war rahmenlos das
+  Einzige, was die Zeile noch nach Kasten aussehen ließ.
+  **TEILSCHRITT 5 (der Ergebnis-Bericht) ist seit 14.09. gebaut — zugleich
+  Redesign-Etappe 3c.** `VideoAnalysisResult` steht im Token-Look;
+  **an der Merge-Logik keine Zeile** (`mergeDnaSplit`, `cleanActionStats`,
+  `computeVideoWeight`, `isConflict` gegen den frisch gelesenen Stand,
+  `markAnalysisApplied` liegen im Aufrufer und in lib/fight-stats.ts). Raus
+  sind 65 Alt-Token, 22 × `font-mono-ta`/`font-display-ta`, zwölf rohe
+  `rgba()` und `cat.accent`. Vier Dinge:
+  (1) **Keine eigene `.t-card`**, aus demselben Grund wie in Teilschritt 4 —
+  der Bericht sitzt in der Werkbank-Karte, und im Bereich ist jede `.t-card`
+  Glas. Gemessen: `.t-card` mit `.t-card`-Vorfahr = 0.
+  (2) **`--fg-4` wurde `--text-3`, nicht `--text-2`.** Im Bereich fällt die
+  dritte Stufe ohnehin auf die zweite; auf `/kampfprofil` — dem ZWEITEN
+  Aufrufer, ohne `data-area` — steht der Bericht dagegen auf einer DECKENDEN
+  Karte, und dort ist die dritte Stufe genau richtig. Ein festes `--text-2`
+  hätte die Abstufung dort eingeebnet.
+  (3) **Der Konflikt ist kein Fehler, sondern eine Entscheidung.** `--ta-pink`
+  stand für dreierlei und fällt deshalb NICHT pauschal auf `--negative`:
+  unsichere Identifikation, Wackler und Konflikt laufen auf `--warning`. Statt
+  der Miniaturzeile steht jetzt ein beschrifteter Vergleich „Bisher im Profil"
+  gegen den Befund; die Fläche trägt den Ton, der Text `--text-body`
+  (Falle 33), ein `warn`-Zeichen daneben. **Was die Anzeige nicht kann,
+  behauptet sie nicht:** aus welchem Video die bisherige Antwort stammt, ist
+  nirgends gespeichert (Backlog) — deshalb „Bisher im Profil", ohne Quelle.
+  Die Regel selbst bleibt: nie still überschreiben, nur einzeln „Ersetzen".
+  (4) **Der Weg hat ein sichtbares Ende** (UX-Punkt 6 „Das Ende ist die
+  Übernahme, nicht das Ergebnis"): Am Fuß steht ein Block mit drei Gesichtern
+  über EINEN `MorphSwap` — *fertig* nennt, was jetzt im Profil steht, und
+  führt hin (`/trainer/deepfight/gegner/<id>` bzw. `…/athleten/<uid>`, gebaut
+  aus `analysis.targetId`/`targetName`, kein neues Prop); *nur noch Konflikte*
+  nennt beides, das Erledigte und die offenen Entscheidungen; sonst nichts —
+  dann trägt der Knopf oben den Zustand. Der Block hängt an `canApply` und
+  erscheint auf `/kampfprofil` gar nicht: Der Athlet übernimmt nichts und
+  hätte für `/trainer/…` keinen Zugriff (gemessen: 0 solche Links im Bericht).
+  Gemessen mit `scripts/mess-t5-bericht.mjs` (eigenes Prüfkonto **und eigenes
+  Prüf-Gegnerprofil** — der Konflikt-Zustand braucht eine widersprechende
+  DNA-Antwort, und Leons „Paul the Fighter" wird dafür nicht angefasst):
+  dunkel + hell × beide Modi × 1440/390, drei Fuß-Zustände, Glas-in-Glas 0,
+  Überlauf 0, `main` transparent, 22 Kontraststellen je Lauf, 0 Konsolenfehler,
+  beide Aufrufer. Schwächster Kontrast 5,06:1.
+  **DIE SIGNALFARBEN REISSEN IM HELLEN THEME — derselbe Befund wie 08.09.,
+  eine Familie weiter.** Die Reihe von Teilschritt 4 rettete `--text-2`,
+  `--text-muted` und `--text-label` und übersah die Signalfamilien. Gemessen
+  am Bericht: `--warning` als Schrift 2,39–3,31 · `--positive` 3,59–3,83 ·
+  `--accent-text` 3,31–4,44 (AA 4,5; dieselben Stellen dunkel 5,2–13,8). Neu
+  im Block `[data-theme="light"] [data-area="deepfight"]`: `--warning`,
+  `--positive`, **`--negative` (neu, daran hängen `.t-danger`/-`strong`)** und
+  `--accent-text` auf **L 0,36**. Nicht 0,40 wie bei den Textstufen — das gab
+  4,46 ohne Reserve, weil diese Schrift auf einer 10–18 % GETÖNTEN Fläche
+  steht und die Tönung rund einen Punkt Kontrast frisst. Reihe: 0,60/0,55/0,46
+  → 2,39 · 0,40 → 4,46 · **0,36 → 5,35 gewählt**. Dunkel unangetastet. Die
+  Tönungen kippen dabei nicht: Die Tokens stehen nirgends deckend unter Text,
+  die Schrift dunkelt um den vollen Betrag, die Tönung nur um 12–18 % davon.
+  Damit ist `DnaCategory.accent` in `lib/gegner-dna.ts` **ohne jeden Leser** —
+  das Feld kann bei nächster Gelegenheit fallen.
+  **Auf `/kampfprofil` bleibt eine Lücke, die NICHT dieser Datei gehört:** Dort
+  steht der Bericht auf einer deckenden Karte mit den `:root`-Werten, und die
+  Signalfarben halten dort als Schrift kein AA (`--warning` 3,91 gegen
+  `--surface-card`, rein aus den Token-Definitionen). Das trifft die halbe App
+  und liegt als eigener Backlog-Punkt bereit.
+  **ZWEI FALLEN AUS DER MESSUNG** (beide haben je einen Lauf gekostet):
+  `page.screenshot({clip})` liegt in einem ANDEREN Koordinatenraum als
+  `boundingBox()` und schneidet aus dem SICHTFENSTER — ein Element weiter unten
+  liefert „Clipped area is either empty or outside" und sieht aus wie „Stelle
+  gibt es nicht"; `locator.screenshot()` nimmt einem beides ab. Und
+  **Playwright liefert PNG-Farbtyp 2 (RGB), nicht RGBA** — wer vier Bytes je
+  Pixel annimmt, verrechnet die Zeilenlänge, entfiltert Müll und bekommt
+  Schwarz zurück. Im DUNKLEN sah das mit 18,75:1 sogar gesund aus; erst das
+  helle Theme entlarvte es mit 1,19:1. **Eine Zahl, die in einem Theme
+  plausibel ist, belegt die Methode nicht.**
   Athleten haben KEINEN Zugriff auf das Werkzeug; sie sehen in ihrem
   **Kampfprofil** nur explizit Freigegebenes plus ihr gemergtes Profil
   (siehe nächster Punkt). Timer ist kein Top-Level-Punkt mehr: er hängt
@@ -135,6 +411,110 @@
   Teilschritt 3 (07.09.) ebenso, samt Ghost-Filter. Der DeepFight-Bereich ist
   damit vollständig gefiltert; die Sackgasse „anklicken → noch nicht
   freigegeben" gibt es dort nicht mehr.
+- **Wettkampfseite NEU (Leon 11.09.2026, `app/trainer/competitions/[uid]/
+  [campId]`):** Kopf = Name links, rechts `CampNotizen` (Notizen MEHRERER
+  Leute am Camp: `fightCamps.notizen[]` mit `authorUid`/`authorName`
+  denormalisiert, `createdAt` als ms-ZAHL, weil `arrayRemove` das gleiche
+  Objekt braucht; anlegen/löschen per `arrayUnion`/`arrayRemove` in
+  `lib/fight-camp.ts`, löschen nur die eigene — Touch: wischen links/rechts
+  via `SwipeAction`, Zeiger: Klick auf die Zeile zeigt den Mülleimer).
+  Darunter Zustand + Knopf „Trainingsplan" = ANKER auf die LAUFENDE Phase
+  (`phaseAnchorId()` aus `FightCampPlanView`, Rückfall `#trainingsplan`) +
+  „Geteiltes Profil"/„Archivieren" als Nebenwege. Dann das **Vs.**: zwei
+  Kacheln (Athlet / Gegner), die gewählte trägt den Akzent und entscheidet,
+  wessen DeepFight darunter steht (Start: Gegner). Der DeepFight-Bereich ist
+  RAHMENLOS: Name groß (`--type-display` OHNE Versalien — Inhalt), rechts
+  „+ Analyse" und das Funkeln allein mit der Analysen-Zahl (Leons Ausnahme
+  von DESIGN-BRIEF §1.6 für genau diese Stelle; die Wortmarke über dem
+  Namen ist weg). „+ Analyse" klappt die `VideoAnalysisSection` der Werkbank
+  HIER auf (gleiche Props, gleicher Speicher-Schlüssel wie `/analyse`), nach
+  einer Übernahme lädt die Seite still nach (Gegner: verknüpftes Profil →
+  `resolveCampOpponent`; Athlet: Kampfprofil). Kampfprofil/Analysen des
+  Athleten hängen am Bereich `deepfight` — ein `permission-denied` wird als
+  Satz gezeigt, nicht als Fehler. Die PageHead-Spur `detail` ist gefallen,
+  der Rumpf steht auf `standard`. **Zweite Runde am selben Abend (Leon):**
+  (1) **Gegner bearbeiten heißt IMMER für alle** — kein Snapshot-Editor mehr
+  auf der Seite, der Stift führt zum geteilten Profil, die Anzeige nimmt das
+  LEBENDE Profil (`opponentToSnapshot`), der Snapshot ist nur Rückfall;
+  `resolveCampOpponent` (Snapshot gewinnt) gilt nur noch für die Karten.
+  (2) „Geteiltes Profil" und „Archivieren" GESTRICHEN („Archiviert braucht
+  man nicht wirklich"); die Gruppe „Archiviert" in der Übersicht bleibt für
+  Altbestand. (3) Vs. ist `components/trainer/VersusBanner.tsx` — seit dem Abend
+  **Leons eigenes Paket** (D:\claude-projects\tidal-versus, „alles so
+  übernehmen"): silberne + türkise Platten mit Lichtkante, metallisches
+  VS-Emblem (`public/vs-emblem.svg`), **Match-Intro bei JEDEM Öffnen**
+  (Seite abgedunkelt, Platten gleiten in die Mitte, Impact, zurück; lokal
+  synthetisierter Sound via Web Audio in `components/trainer/versus-intro.js`
+  + `.d.ts`, Schlüssel = campId + Nonce je Einhängen, Escape/„Überspringen"
+  beendet, `prefers-reduced-motion` lässt es aus). Stile in globals.css
+  („DAS VS-BANNER DER WETTKAMPFSEITE"), Farben BEWUSST FEST (Material, wie das
+  Emblem — Ausnahme von §1.1). Ergänzt gegenüber dem Paket: die Platten sind
+  Knöpfe (`data-motion`, eigene :active-Transformation, weil die Grundhaptik
+  sonst das translateY der rechten Platte überschriebe), die GEWÄHLTE Platte trägt das
+  Türkis des Pakets und steht `scale(1.06)`, ihr Name zusätzlich
+  `scale(1.12)`; die andere ist Silber (Leon 12.09., zweite Fassung — vorher
+  war der Name blau, jetzt hängt die Farbe an der Wahl, nicht an der Seite:
+  beim eigenen Athleten wird der Gegnerblock grau). **Zwei Abweichungen vom Paket (Leon, gleicher Abend):** das Intro
+  wächst AN ORT UND STELLE auf dem Banner auf (dx/dy = 0), nicht in der
+  Bildschirmmitte; und das Zeitfenster für den Ton ist 1200 ms statt 180 ms —
+  nach einer Klick-Navigation war der Context „running", der Status trotzdem
+  „blocked", weil Klonen + Animieren auf der noch bauenden Seite länger als
+  180 ms dauerten (sichtbares Chromium, 11.09.). Danach „playing" per Klick
+  UND nach frischem Laden. Was bleibt: Ohne jede Nutzergeste im Tab sperrt
+  der Browser den Ton, dann läuft das Intro stumm. **Kein Aufblitzen (Leon
+  12.09.):** Eine Hülle hält das Banner ab dem Server-HTML unsichtbar, bis das
+  Skript `tidal-versus:intro-start` meldet; Rückfall nach 2 s, bei
+  reduzierter Bewegung sofort sichtbar. Gemessen alle 30 ms: Banner vor dem
+  Overlay an 0 Messpunkten sichtbar, per Klick und nach frischem Laden.
+  **Die Seite wartet mit (Leon 12.09.):** `onIntroAusklang` am Banner —
+  Kopf UND Rest stehen auf `visibility: hidden` + `opacity: 0` (nicht
+  ungerendert — ein Sprung der Seitenhöhe könnte ein Scroll-Ereignis
+  auslösen, und das bricht das Intro ab) und blenden in 900 ms ein, sobald das
+  Intro in den Ausklang geht (`tidal-versus:intro-settle` bei 62 % der Dauer,
+  spätestens `intro-end`); ohne Intro sofort, Rückfall 2 s. **Kein
+  „Überspringen"-Knopf mehr:** das Overlay trägt `pointer-events: auto`, ein
+  Klick oder Tipp irgendwohin beendet das Intro, ohne die Seite zu treffen;
+  Escape bleibt.
+  (4) „+ Analyse" ist `.df-start.df-plus`: nur ein großes Regenbogen-Plus,
+  unter dem Zeiger wächst „Analyse" heraus (max-width), auf Touch bleibt das
+  Plus allein (aria-label). **Seit Leons dritter Runde (12.09.) MEHR
+  Regenbogen:** `--df-start-mix` hängt am Thema — 70 % im dunklen, 26 % im
+  hellen. Die 26 % waren am hellen Theme gemessen, wo jeder Prozent mehr die
+  dunkle Schrift AUFHELLT und Kontrast frisst; im dunklen ist es umgekehrt
+  (`--text-1` L 0.96 gegen Regenbogen L 0.52–0.65, also dunkelt mehr Anteil
+  ab), 70 % landen bei L 0.71 und über 6:1. Dazu das Zeichen eine Stufe
+  kräftiger (600/48 px — mehr Fläche = mehr sichtbarer Verlauf) und ein
+  weicher farbiger Schein `--df-start-glow`, den `:hover` mit der Sättigung
+  zusammen trägt; im hellen Theme ist der Schein aus (dort wäre er ein
+  grauer Schmutzrand).
+  **Neben dem Plus steht seit 12.09. eine Pille „Bearbeiten"** statt des
+  nackten 16-px-Stifts (Leon: „schlecht zu sehen, zu klein, gefällt mir
+  nicht"). Kein anderes Symbol hätte das gelöst — die Frage war, ob ein
+  Zeichen allein reicht, und es reicht nicht: Der Weg führt auf eine andere
+  Seite und ändert das Profil FÜR ALLE. Jetzt Rahmen (`--line`), Wort in der
+  Sprache der Statuszeile darüber, Stift auf 18 px.
+  **Der Widerspruch „DNA 0 %" neben der Zahl „2"** (Leon 12.09.: „macht ja
+  keinen Sinn") ist keiner: Die Zahl zählt die ANALYSEN am Profil, die DNA
+  wächst erst mit der ÜBERNAHME der Befunde (`appliedFindingIds` /
+  `appliedStats`). Gesagt hatte es nur niemand — der Leertext nennt jetzt die
+  Zahl und was fehlt, der Titel am Funkeln ebenso.
+  (5) `CampNotizen` ist nur noch die dunkle Karte
+  mit Überschrift: Klick auf die Fläche setzt den Cursor in eine unsichtbare
+  Textfläche (OBEN unter der Überschrift), Blur oder Enter speichert, Escape
+  verwirft, Klick auf die eigene Notiz zeigt das nackte Mülleimer-Icon.
+  **ZWEI MASSE, DER FOKUS ENTSCHEIDET (Leon 12.09., dritte Runde — löst die
+  Fassung „wächst bis ans Banner" ab):** ruhig `--notiz-h-klein` 116 px, weit
+  `min(44vh, 350px)`; berührt man die Karte (`pointerdown`/Fokus), geht sie
+  auf, ein Zeiger daneben oder Escape klappt sie zu. Sie beginnt tiefer
+  (`lg:top-14` statt `top-7`) und hat KEIN `bottom` mehr. Zwei gemessene
+  Fallen: (a) `max-height` STRECKT nichts — bei leerer Liste blieb die Karte
+  auf 85 px; das große Maß braucht `min-height`. (b) Ein `z-index` an der
+  Karte ist wirkungslos, sie steht statisch — er gehört an den absolut
+  gesetzten Behälter (`lg:z-30`), sonst legt sich das Vs.-Banner darüber.
+  Die Fläche ist durchlässiger als eine normale `.t-card` (58 % ruhig, 82 %
+  weit, plus Weichzeichner). Innen Popup-Regel: genau EIN Scrollbereich
+  (`min-h-0 flex-1 overflow-y-auto`). Gemessen 11.09.: beide Themes, 1440
+  und 390 px; Plus-Hover, Blur-Speichern, Löschen, Anker per Playwright.
 - **Wettkampf-Gegner: Snapshot + verknüpftes Profil** (seit 2026-08-20):
   Der Snapshot in `fightCamps/{id}.opponent` bleibt gespeichert wie bisher,
   ist aber **nicht mehr das, was angezeigt wird**. Anzeige und Editor-Vorbelegung
@@ -467,7 +847,22 @@ heraustritt (Vorbild: /trainer/athleten). Kein natives `<input type="search">`
 mehr, auch nicht in Sheets und Pickern. Gesteuert über `value`/`onChange`,
 `placeholder`, `label`. Steht Text im Feld, bleibt es bei einem Klick daneben
 offen (sonst verlöre der Tipp auf einen Treffer die Suche); Escape leert und
-schließt.
+schließt. Zwei Maße (`breiteZu`/`breiteAuf`) und `nurSymbol` machen die
+größere Pille der DeepFight-Landung möglich, ohne die zehn anderen Stellen
+anzufassen.
+
+**DER GOO-FILTER LIEGT NUR WÄHREND DER BEWEGUNG AN** (Leon 12.09.2026: „die
+Suche soll nicht so hell leuchten bei den Buchstaben und Icons, es schimmert
+so komisch"). Das war kein Farbfehler, sondern der Filter selbst:
+`feComposite atop` legt zwar das scharfe Original obenauf, aber die
+weichgezeichnete und geschwellte Fassung bleibt sichtbar, wo das Original
+durchlässig ist — also rings um jeden Buchstaben. Aus heller Schrift auf
+dunkler Pille wird so ein heller Hof, und ein Hof um Schrift schließt
+DESIGN-BRIEF §1.4 aus. Der Filter hängt jetzt an `.goo-inner[data-goo]`,
+gesetzt für 1100 ms ab jedem Wechsel von `open` (der längste Ablauf ist der
+Tropfen: 0,1 s Verzögerung + 0,85 s). Das Verschmelzen bleibt sichtbar — es
+lag ohnehin nur in der Bewegung —, die Schrift steht im Ruhezustand scharf.
+Bei `reduced motion` läuft der Filter gar nicht.
 
 ### Bewegung & Haptik (Regelwerk: `docs/MOTION-BRIEF.md`, ab 2026-09-04)
 Wie sich die App ANFÜHLT, ist ein eigenes System — nicht Beiwerk einzelner
@@ -558,9 +953,156 @@ Regeln + Indizes: `firestore.rules`, `firestore.indexes.json`, `firebase.json`.
 ## KI-Video-Analyse (Konzept §6) — Architektur & Betriebswissen
 Spezifikation/Fragenkatalog: `docs/gegner-dna-video-analyse-fragenkatalog.md`.
 UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
-(Gegner-Tab „Videos" + Schüler-Detailseite). DNA-Übernahme per Trainer-Review
-(„Alle übernehmen" = konfliktfreie Befunde + Stats; Konflikte nur einzeln per
-„Ersetzen", nie still überschreiben). Datenmodell: `lib/video-analysis.ts`.
+(Werkbank auf /trainer/deepfight). Seit Etappe 1 der Automatik (16.09.2026)
+gibt es KEINE Übernahme mehr: Der Server speichert jede Analyse und rechnet
+das Profil aus allen Analysen neu. Datenmodell: `lib/video-analysis.ts`,
+Rechnung: `lib/profile-evidence.ts` (rein) + `lib/server/profile-recompute.ts`.
+
+### BESCHLOSSENER UMBAU: AUTOMATIK STATT REVIEW (Leon, 14./15.09.2026)
+Leon hat das Review-Modell abgeschafft: „Keiner wird jedes Mal den gesamten Text
+durchlesen. Der User möchte über die wichtigsten Punkte kurz informiert
+werden und darauf vertrauen, dass unsere App und die KI dahinter einen guten
+Job macht. Ich möchte nicht, dass der User das selber entscheiden muss."
+Vollständige Entscheidungsliste samt Zahlen und Beispielen:
+`PROMPT-analyse-umbau.md` im Projektstamm (D:\Tidal-Athletics\) und das
+Gedächtnis `analyse-automatik-entscheidung`. Kurzfassung:
+- **Analyse fertig = Profil aktualisiert.** Keine Übernehmen-Knöpfe mehr.
+  Zahlen addiert, Split gewichtet, Texte von Claude FORTGESCHRIEBEN (neue
+  Gesamtantwort je Frage). Das Profil wird bei jeder Änderung aus ALLEN
+  gespeicherten Analysen NEU GERECHNET (serverseitig) — Voraussetzung für
+  Löschen, Umklassifizieren, Doppel-Upload, Altern. Nutzer sieht 3–5 Punkte
+  (Bestätigt / Neu / Geändert), Befund-Texte, Zeitstempel, Rohzahlen hinter
+  „Details anzeigen".
+- **Kämpfer-Zuordnung NACH dem Upload per Standbild:** kurzer Gemini-Vorlauf
+  (erste 1–2 Min, niedrige Auflösung) → Kämpfer + Sekunde je Kämpfer; der
+  Browser zieht das Standbild aus der Datei; Trainer tippt je Karte
+  Athlet/Gegner aus der Datenbank oder „egal". Beide zugeordnet → ZWEI
+  Auswertungen aus einem Upload. Zeitraum und Art des Videos werden auf
+  demselben Schirm VOR der Analyse bestätigt, von der KI vorbelegt; die ART
+  legt die KI fest, nicht der Nutzer. YouTube: kein Standbild, Beschreibung
+  + Sprung ins Video. Beschreibungsfeld bleibt zugeklappter Rückfall.
+- **Gewichte** (Gegenprobe 10 Agenten): Zeitraum letzte 6 Monate 1,0 · 6–18
+  Monate 0,9 · 1–3 Jahre 0,6 · älter 0,4 · unbekannt 0,6 (heute 0,8 > 0,65
+  bestraft ehrliches Datieren). Art: ganzer Kampf 1,0 · Ausschnitt 0,7 ·
+  Sparring 0,6 · Highlight-Clip 0,3. Highlight liefert NUR Text (Waffen,
+  Entries, Auslage, Finish), nie Zahlen, nie Split, alle Clips je Antwort
+  ≤ 0,6; Sparring kein Split, beim Gegner keine Zahlen; Zahlen nur aus
+  ganzem Kampf/Ausschnitt ≤ 3 Jahre. w = Zeitraum × Art ohne Klemme.
+  Kämpfer-Sicherheit ist ein TOR (≥ 0,75 voll, darunter nichts, neu
+  zuordnen). Split = Fenster der 5 jüngsten Kämpfe. `deriveTendencies`
+  erst ab 5 Versuchen aus 2 Videos.
+- **Kipp-Regel für Texte:** jede Antwort = Tauziehen zwischen Seiten mit
+  Gewichtssumme; die jüngsten Videos entscheiden, sobald sie zusammen ≥ 1,0
+  wiegen; Ausschnitt/Sparring allein nie, zwei ja; Clips nie; ohne Datum
+  Mehrheit; „beides" im Text, sobald die zweite Seite ≥ halbes Gewicht hat.
+  Bestätigung zählt nur mit Timestamp-Beleg (Modelle bestätigen Vorgaben).
+- **„Trainer-Kommentar"** (ersetzt Tippen in einzelne Antworten UND das
+  frühere „Handnotiz schlägt immer"): EIN Freitextfeld im DeepFight-Profil,
+  KI zerlegt in Aussagen, Gewicht nach BELEG (regelmäßig gesehen 0,8 ·
+  einmal gesehen 0,6 · Meinung 0,5 · gehört 0,3), nie nach Wortwahl, max
+  0,8 = immer unter einem ganzen aktuellen Kampf, füllt die Kipp-Schwelle
+  NIE. Zwei Zeilen je Antwort: „Im Kampf" (Videos) / „Im Training laut
+  Trainer". Zahlen und Split: Trainer-Anteil 0. Zählfragen (häufigste Waffe)
+  folgen den Zahlen. Gameplan/Drills: KI schlägt vor, Trainer bearbeitet
+  oder verwirft. Rohtext nie in den Video-Prompt; Anweisungen („ignoriere")
+  = 0; Ablage `gyms/{gymId}/trainerNotes/…`, NICHT unter users/{uid}
+  (Owner-Wildcard!). Gegner-Notizen gym-privat.
+- **Verletzungs-Box:** Athlet schreibt selbst (Trainer gibt frei) oder
+  Trainer; verblasst statt abläuft (3 Monate voll, dann nach Schwere/Zeit,
+  nie null: „früher: …"); nur Trainer sehen es, nie Athleten-Fassung, nie
+  Snapshot; **beim Gegner vorerst GAR NICHT gespeichert** (Gesundheitsdaten
+  Dritter). Vor Rollout in Datenschutzerklärung + AVV.
+- **Abgelehnt:** „Kampf ohne Video" als Eingabe („die Benutzer sollen
+  lernen, dass sie Videos machen"); Zahlen nie aus Freitext.
+- **Athleten-Einreichung: JA** (Backlog-Idee wird gebaut). Teilschritt 6
+  (gymId am Analyse-Dokument, collectionGroup, Kosten je Gym) wird in den
+  Umbau GEFALTET, nicht getrennt gebaut. Bestand ist Demo — kein Backfill.
+- **Für ein Update gemerkt:** Kämpfer-Sicherheit je Runde prüfen und nur
+  unsichere Abschnitte neu laufen lassen; KI-Vermutungen zu alten
+  Verletzungen erst ab 3 ganzen Kämpfen, als Vermutung gekennzeichnet.
+- **Hicksches Gesetz gilt app-weit** (Leon 15.09.): je Schritt wenige
+  Wahlmöglichkeiten, ein Standard vorbelegt. Wo eine Entscheidung die Zahl
+  der Optionen betrifft, wird Leon gefragt, nicht entschieden.
+- **Gemessen (15.09.):** `scripts/check-analyse-freigabe.mjs` 15/15 —
+  `sharedWithAthlete` ist serverseitig und bewiesen, kein Client-Filter.
+- **Leons Antworten 16.09. (Hicksches Gesetz):** a) Trainer-Kommentar VIER
+  Chips · b) Zeitraum FÜNF Optionen · c) Stärke = FÜLLSTAND im
+  DeepFight-Symbol + Prozent · d) EIN „Details anzeigen" · e) Karte:
+  Rahmen-Feld „X Ignorieren" (grau, umkehrbar), Klick auf die Karte → Blur
+  + zwei Felder „Athlet / Gegner" → Popup mit Liste; Einreicher steht oben;
+  auf Karte 1 gewählte Person auf Karte 2 grau; mind. eine Zuordnung, Knopf
+  erst dann voll gefärbt, sonst „Wähle mind. eine Person zur Auswertung
+  aus" · f) Admin-SDK (liegt ohnehin in `lib/server/firebase-admin.ts`).
+
+### ETAPPE 1 GEBAUT — WÄHRUNG UND NEUBERECHNUNG (16.09.2026, nicht committet)
+- **Analyse-Dokument** trägt `gymId`, `targetIsStaff`, `videoType`
+  (full/excerpt/sparring/highlight), `recency`, `fightMonth`, `weight`
+  (aufgeschlüsselt, vom Server gerechnet), `fileFingerprint`, `wrongFighter`;
+  jeder Befund einen `sideKey` (Claude vergibt ihn; Altbestand bekommt ihn
+  beim Decodieren aus dem Text). `merge.confirms` ist jetzt
+  `{questionId, evidence[]}` — ohne Beleg zählt eine Bestätigung nichts.
+  `appliedFindingIds`/`appliedStats` sind WEG. `decodeVideoAnalysis` liest
+  Client- und Admin-Dokumente gleich und füllt Altbestand auf.
+- **Gewichte im Code:** `FIGHT_RECENCY_WEIGHT` 1/0,9/0,6/0,4/unbekannt 0,6,
+  `VIDEO_TYPE_WEIGHT` 1/0,7/0,6/0,3, `w = recency × type` OHNE Klemme;
+  Kämpfer-Sicherheit ist ein TOR (`identified`, ≥ 0,75). `coverageWeight`
+  ist gestrichen; bis Etappe 2 leitet `videoTypeFromObservation` die Art
+  aus `meta.coverage`/`ruleset` ab (unklar → „Teil eines Kampfs", 0,7).
+- **Rechnung `lib/profile-evidence.ts`** (rein, `computeProfile`): Tauziehen
+  je Frage über `sideKey`-Seiten, Kipp-Regel (jüngste Quellen ≥ 1,0 → Menge
+  entscheidet, sonst Mehrheit; Gleichstand Masse → jünger → Schlüssel),
+  „beides" ab halbem Gewicht, Highlight nur in `preferred-weapons` und
+  `entry-patterns` mit Deckel 0,6, Zahlen ungewichtet nur aus full/excerpt
+  (Athlet auch sparring) und nicht `ancient`, Split-Fenster 5, Seite
+  `manual` für Handtext ohne Analyse (bleibt, bis Evidenz gewinnt; belegte
+  Bestätigung gibt ihm Gewicht). Ergebnis-Felder am Profil: `dna`,
+  `dnaSplit`, `dnaSplitWeight`, `actionStats`, `evidence` (Seiten, Quellen,
+  Split-Fenster, `evidenceTotal`; `evidenceStrengthPct` = /3,0 für den
+  Füllstand). **39 Prüfungen** in `scripts/test-profil-rechnung.mjs`
+  (Aufruf: `node --import ./scripts/lib/ts-loader-register.mjs
+  scripts/test-profil-rechnung.mjs` — Node 24 streift Typen selbst, der
+  Loader kennt nur `@/` und Endungen).
+- **Server:** `POST /api/video-analysis/commit` (speichert, setzt gymId/
+  targetIsStaff/Art/Gewicht aus dem ZIEL, bucht Kosten in `aiUsage/summary`
+  UND `aiUsage/gym-{gymId}` mit `months.JJJJ-MM`, rechnet neu) und
+  `POST /api/video-analysis/flag` (Marke „falscher Kämpfer", Admin-Löschen;
+  rechnet neu). Beide prüfen das Tor SERVERSEITIG
+  (`lib/server/member-access.ts` = `canAccessMemberData` der Rules — das
+  Admin-SDK umgeht Regeln). Neuberechnung in einer Transaktion
+  (`lib/server/profile-recompute.ts`). Der Client speichert und löscht
+  Analysen NICHT mehr; `mergeDnaSplit` hat keinen Aufrufer mehr.
+- **Regeln (DEPLOYT 16.09. mit Leons Freigabe, samt Index):** videoAnalyses für Clients nur
+  lesen + `update hasOnly([sharedWithAthlete])` (Athleten-Modus); Gegner-
+  Analysen nur lesen; Admin-Wildcard schließt videoAnalyses aus;
+  fightProfile Trainer nur lesen (Admin schreibt für den Demo-Seeder);
+  opponents: create/update ohne Änderung an `dnaSplit`, `dnaSplitWeight`,
+  `actionStats`, `evidence` (`abgeleiteteFelderUnveraendert`, Falle 4 hilft:
+  unverändertes Durchreichen ist keine Änderung); collectionGroup-Regel
+  `{path=**}/videoAnalyses` mit `targetIsStaff == false` + `sameGym`
+  (direkter Feldzugriff); aiUsage read nur Admin, write false. Index
+  (gymId, targetIsStaff, createdAt desc, COLLECTION_GROUP) in
+  firestore.indexes.json. **Messung `scripts/check-analyse-automatik.mjs`
+  (39 Zeilen per REST): VOR dem Deploy 19 ✗ — genau die Löcher, die die
+  neuen Regeln schließen; NACH dem Deploy 39/39 ✓ (der cg-Index brauchte
+  rund drei Minuten zum Bauen, bis dahin 400 — ein 400 beweist nichts).
+  `check-analyse-freigabe.mjs` weiter 15/15. Eine eigene Falle im Skript:
+  `actionStats: []` auf ein leeres Array ist ein No-Op (Falle 4) und meldet
+  200 — die Zeile setzt deshalb einen echten Eintrag.** Screenshot
+  `scripts/mess-e1-automatik.mjs` 12/12 (eigenes Konto mess-e1@…).
+- **UI (Übergang bis Etappe 3):** Bericht ohne Übernehmen-Knöpfe und ohne
+  Konflikt-Vergleich (`existingDna={null}`, keine Rückrufe), Liste zeigt
+  „Im Profil" / „Zählt nicht", je Analyse eine Zeile „zählt zu X Prozent:
+  Art, Zeitraum" mit Knopf „Falscher Kämpfer" / „Zählt doch"; Löschen nur
+  Admin. Landung liest per `listGymVideoAnalyses` (EINE cg-Abfrage) plus
+  kleinem Fächer für Stab-Konten mit Freigabe (`lib/deepfight-analysen.ts`).
+  /admin zeigt unter „KI-Kosten" den Verbrauch je Gym (dieser Monat /
+  gesamt) aus `aiUsage/gym-*`.
+- **Drei Fallen aus dem Bau:** (1) Der Edit-Werkzeug-Cache legt eine per
+  Skript geänderte Datei wieder zurück — Skript-Ersetzungen NACH dem letzten
+  Edit an der Datei machen. (2) tsconfig hat kein ES6-Ziel: kein `u`-Flag
+  in Regex, keine `for…of` über Map/Set (Array.from). (3) Kombinierende
+  Unicode-Zeichen im Quelltext werden vom Werkzeug „normalisiert" — nach
+  `normalize("NFD")` stattdessen `[^\x00-\x7f]` streichen.
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)
@@ -574,7 +1116,13 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   mit 20-s-Countdown; retryfähig sind Fehlermeldungen mit **„überlastet"** oder
   **„kein Ergebnis"** (Timeout/Stream-Abriss) — diese Wortmarken nicht ändern!
 
-### Gewichtung & Merge (seit 2026-08-20 — WICHTIG)
+### Gewichtung & Merge (2026-08-20 bis 16.09.2026 — HISTORIE)
+**Dieser Abschnitt beschreibt das Klick-Modell VOR der Automatik.** Seit
+Etappe 1 (oben) gibt es kein `applyAll`, kein `mergeDnaSplit` im Aufrufer,
+keine Übernahme-Marken; Split, Zahlen und Texte rechnet
+`lib/profile-evidence.ts` aus allen Analysen. Was hier steht, erklärt
+Kommentare im Altbestand und warum die Regel `readTarget frisch lesen`
+entstand (heute: Transaktion im Server).
 - **Ein Video ≠ halbes Profil.** `dnaSplit` wird über einen echten gewichteten
   Mittelwert gemergt (`mergeDnaSplit` in `lib/fight-stats.ts`):
   `split_neu = (split_alt · W + split_video · w) / (W + w)`. Dafür trägt jedes
@@ -604,6 +1152,14 @@ UI: `components/trainer/VideoAnalysisSection.tsx` + `VideoAnalysisResult.tsx`
   Speichern/Merge; die Anzeige normalisiert ohnehin.
 - **`actionStats` werden weiterhin nur summiert**, nie gewichtet — es sind
   Zählungen; „3,7 Versuche" wäre nicht interpretierbar.
+- **Die Zahlen laufen je Analyse nur EINMAL ins Profil** (Leon 14.09.2026):
+  `applyAll` liest die Übernahme-Marken der Analyse frisch aus Firestore
+  (`getVideoAnalysis`) und überspringt Split und Stats, wenn `appliedStats`
+  schon gesetzt ist. Vorher wurde die Marke gesetzt, aber nie gelesen —
+  ein zweiter Klick (möglich, sobald sich ein Konflikt von außen auflöst)
+  addierte Versuche und Treffer erneut und mischte den Split ein zweites
+  Mal ins Gewicht. Die Befunde laufen unverändert weiter. Ein Klick in
+  derselben Sekunde aus zwei Tabs bliebe nur mit einer Transaktion dicht.
 - **DNA-Freitext bleibt manuell**: harter Ersatz pro Frage-ID, Konflikte nur
   per „Ersetzen". Das Gewicht erscheint dort nur als Anzeige (aufgeschlüsselt
   im Ergebniskopf).
@@ -989,7 +1545,9 @@ den Schlüssel.**
       ist die ganze Komponente weg (Leons Entscheidung, siehe Kosten-Tracking
       oben). Damit ist der LETZTE native Dialog der App verschwunden;
       `confirm()` gab es seit dem 04.09. keinen mehr.
-- [ ] **KI-KOSTEN JE GYM — Auswertung im Admin-Bereich** (Leons Wunsch
+- [ ] **KI-KOSTEN JE GYM — Auswertung im Admin-Bereich** (SEIT 15.09.2026
+      Teil des Analyse-Umbaus, siehe „BESCHLOSSENER UMBAU"; nicht mehr
+      getrennt bauen) (Leons Wunsch
       08.09.2026, beim Entfernen des Guthaben-Rings: „als Admin sehen, wie
       viel jede Analyse gekostet hat, egal welches Gym … monatliche Kosten,
       welches Gym am meisten Kosten verursacht hat, sofern das trackbar ist").
@@ -1154,9 +1712,9 @@ den Schlüssel.**
       Coach darf mit Nutzer-Bestätigung handeln („Trag mich Donnerstag
       ein" → recordParticipation; Verwaltung: Ankündigungs-Entwurf →
       vorbefüllter News-Post); erst nach stabilem v1.
-- [ ] **Athleten-Einreichung für DeepFight-Analysen** (Idee 2026-09-06, mit
-      Leon besprochen, NICHT beschlossen — steht im Ideen-Becken der
-      Roadmap): Athlet lädt sein Analyse-Video selbst hoch und füllt die
+- [ ] **Athleten-Einreichung für DeepFight-Analysen** (Idee 2026-09-06;
+      **BESCHLOSSEN 15.09.2026: JA**, Teil des Analyse-Umbaus — der Trainer
+      ordnet dann nur noch die Standbilder zu): Athlet lädt sein Analyse-Video selbst hoch und füllt die
       Felder vor, die heute der Trainer schreibt (Kämpferbeschreibung/
       Identifikation, recency, Disziplin); Trainer bekommt es als
       Warteschlange, prüft Video + Text, redigiert, bestätigt → ab da läuft
@@ -1229,7 +1787,38 @@ den Schlüssel.**
       Analysen des alten Gyms. Nötig: `gymId` am Analyse-Dokument (Backfill
       + beide Schreibstellen), Regel mit direktem Feldzugriff (kein
       `get(…, default)`), Composite-Index, `check-privacy-gate.mjs` erweitern.
-- [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert — die
+- [ ] Video-Analyse: Herkunft der DNA-Antworten wird nicht gespeichert (SEIT
+      15.09.2026 Teil des Analyse-Umbaus: Seiten mit Gewichtssumme je
+      Antwort, siehe „BESCHLOSSENER UMBAU") — die
       Konflikt-Anzeige kann daher nicht sagen, aus welchem (wie gewichteten)
-      Video die bisherige Antwort stammt
+      Video die bisherige Antwort stammt. Seit Teilschritt 5 sagt sie deshalb
+      ausdrücklich nur „Bisher im Profil" und behauptet keine Quelle; wer das
+      Feld nachrüstet, kann dort den Satz schärfen.
+- [ ] **Signalfarben als SCHRIFT halten im hellen Theme kein AA — app-weit**
+      (gemessen 14.09. auf `/kampfprofil`, wo der Analyse-Bericht auf einer
+      DECKENDEN Karte steht). Gegenprobe auf Token-Ebene, ohne jede
+      Komponente (zwei Fenster unabhängig, Zahlen auf zwei Stellen
+      deckungsgleich). AA verlangt 4,5:
+
+          auf --surface-card     --warning 3,91 FEHL · --positive 4,52 ok ·
+                                 --negative 5,24 ok · --accent-text 6,04 ok
+          auf --surface-raised   --warning 3,33 FEHL · --positive 3,85 FEHL ·
+                                 --negative 4,47 FEHL
+          dunkel                 6,24 bis 10,55 — alles ok
+
+      **`--surface-card` ist die HELLSTE Fläche der App** (252,254,254).
+      Sobald eine Signalfarbe auf `--surface-raised` steht — Listenzeilen,
+      Eingabefelder, Chips, die Gooey-Pille —, fallen ALLE DREI durch, auch
+      die beiden, die auf der Karte noch tragen.
+      Gerendert fielen im Bericht „Am gefährlichsten"
+      und die Konfidenz-Marke auf 3,33. **Das ist keine Eigenheit des
+      Berichts**, sondern der `:root`-Werte des hellen Themes (`--warning`
+      L 0,60, `--positive` L 0,55); betroffen ist jede Stelle, die eine
+      Signalfarbe als Text auf einer Karte zeigt — `AthleteProfileForm`,
+      `InviteStatusChip`, `FightCampPlanView`, `OpponentProfileView`,
+      `VideoAnalysisSection`. Im DeepFight-Bereich ist es seit Teilschritt 5
+      geheilt (Bereichsregel auf L 0,36); die app-weite Entscheidung steht aus,
+      weil ein dunkleres Amber/Grün überall sichtbar wird — das gehört Leon
+      vorgelegt, nicht nebenbei geändert. Messweg steht in
+      `scripts/mess-t5-bericht.mjs` („Gegenprobe auf Token-Ebene").
 - [ ] Optional: Google-Billing aktivieren → Detail-Analyse (Gemini Pro) nutzbar

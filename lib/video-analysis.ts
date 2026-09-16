@@ -6,13 +6,33 @@
  *   Stufe 2  Claude  → Bewertung/Analyse auf DNA-Kategorien gemappt (C + D + E)
  *
  * Ein Video = ein Analyse-Beitrag (VideoAnalysis), nie eine fertige DNA.
- * Befunde tragen confidence + evidence (Timestamps) + source und werden vom
- * Trainer per Review in die Gegner-DNA übernommen — nichts wird still
- * überschrieben (Konflikte werden geflaggt).
+ *
+ * ─── AUTOMATIK STATT REVIEW (Leon 14./15.09.2026, gebaut ab 16.09.) ─────────
+ *
+ * Bis Etappe 1 dieses Umbaus übernahm der Trainer Befunde per Klick in die
+ * DNA („Alle übernehmen", je Befund, „Ersetzen"). Das ist abgeschafft:
+ * **Analyse fertig = Profil aktualisiert.** Der Client speichert die Analyse
+ * nicht mehr selbst — er reicht sie an `POST /api/video-analysis/commit`,
+ * und der Server (Admin-SDK) schreibt das Dokument UND rechnet das Profil
+ * aus ALLEN gespeicherten Analysen neu (`lib/profile-evidence.ts`, rein;
+ * `lib/server/profile-recompute.ts`, Schreiber). Löschen gibt es für den
+ * Client nicht mehr — eine Analyse mit falsch erkanntem Kämpfer wird
+ * MARKIERT (`wrongFighter`) und fällt aus der Rechnung; auch das rechnet
+ * der Server neu. Damit sind Löschen, Umklassifizieren, Doppel-Upload und
+ * Altern jederzeit rückrechenbar.
+ *
+ * Die WÄHRUNG einer Analyse ist ihr Gewicht `w = Zeitraum × Art`, ohne
+ * Klemme (0,12–1,0). Die Kämpfer-Sicherheit ist KEIN Faktor, sondern ein
+ * TOR: unter 0,75 zählt die Analyse gar nicht, darüber voll. Die Zahlen
+ * stehen an `FIGHT_RECENCY_WEIGHT` und `VIDEO_TYPE_WEIGHT`; die
+ * Begründungen im Gedächtnis `analyse-automatik-entscheidung`.
  *
  * Firestore:
  *   opponents/{opponentId}/videoAnalyses/{analysisId}   (mode = "opponent")
  *   users/{uid}/videoAnalyses/{analysisId}              (mode = "athlete")
+ * Jedes Dokument trägt `gymId` und `targetIsStaff` — damit liest die
+ * Landung alle Analysen des Gyms mit EINER collectionGroup-Abfrage statt
+ * mit einem Fächer je Ziel (Regel mit direktem Feldzugriff, Falle 28).
  *
  * Die API-Keys (Gemini + Claude) leben ausschließlich serverseitig —
  * die Aufrufe laufen über /api/video-analysis/* (siehe lib/server/).
@@ -20,15 +40,12 @@
 
 import {
   collection,
-  deleteDoc,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
-  increment,
   orderBy,
   query,
-  serverTimestamp,
-  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -56,80 +73,138 @@ export const MAX_VIDEO_SECONDS = 15 * 60;
  */
 export type FightRecency = "recent" | "mid" | "old" | "ancient" | "unknown";
 
+/**
+ * Fünf Optionen — Leon 16.09.2026: „das lassen wir bei den genauen Angaben".
+ * Wortwahl einfach und sportneutral; die endgültige Formulierung stimmt das
+ * Design-Fenster mit Leon ab (Etappe 2).
+ */
 export const FIGHT_RECENCY_LABEL: Record<FightRecency, string> = {
-  recent: "Letzte 6 Monate",
-  mid: "6–18 Monate",
-  old: "1–3 Jahre",
-  ancient: "Älter als 3 Jahre",
-  unknown: "Unbekannt",
+  recent: "Kürzlich",
+  mid: "Letztes Jahr",
+  old: "Vor 1–3 Jahren",
+  ancient: "Länger her",
+  unknown: "Weiß ich nicht",
 };
 
 /**
- * Aktualitätsfaktor. „Unbekannt" liegt bewusst im oberen Mittelfeld: fehlendes
- * Wissen darf kein Strafabzug sein, sonst würde undatiertes Archivmaterial
- * systematisch benachteiligt.
+ * Aktualitätsfaktor (Gegenprobe 14.09.2026, 10 Agenten; Leon bestätigt).
+ * „Weiß ich nicht" zählt wie „1–3 Jahre": Der alte Wert 0,8 lag ÜBER dem
+ * ehrlichen „1–3 Jahre" (0,65) und bestrafte damit, wer datierte.
  */
 export const FIGHT_RECENCY_WEIGHT: Record<FightRecency, number> = {
   recent: 1,
-  mid: 0.85,
-  old: 0.65,
-  ancient: 0.45,
-  unknown: 0.8,
+  mid: 0.9,
+  old: 0.6,
+  ancient: 0.4,
+  unknown: 0.6,
 };
 
 /**
- * Abdeckungsfaktor aus dem Freitext von `meta.coverage` (Stufe 1). Ein
- * Highlight-Zusammenschnitt zeigt nur die besten Momente und zeichnet damit
- * ein geschöntes Bild — er darf das Profil deutlich weniger bewegen als ein
- * vollständiger Kampf.
+ * Reihenfolge „jünger zuerst" für die Kipp-Regel. „Weiß ich nicht" steht
+ * bei „1–3 Jahre" — dasselbe Gewicht, derselbe Platz.
  */
-export function coverageWeight(coverage: string | null): number {
-  const t = (coverage ?? "").toLowerCase();
-  if (!t) return 0.8;
-  if (t.includes("highlight") || t.includes("best of")) return 0.45;
+export const FIGHT_RECENCY_RANK: Record<FightRecency, number> = {
+  recent: 0,
+  mid: 1,
+  old: 2,
+  unknown: 2,
+  ancient: 3,
+};
+
+/**
+ * Art des Videos — legt die KI fest, nicht der Nutzer (Leon 14.09.: „zu
+ * umständlich, der Benutzer kann das vielleicht gar nicht entscheiden").
+ * Bis Etappe 2 (Vorlauf) leitet `videoTypeFromObservation` sie aus der
+ * Beobachtung ab; ab Etappe 2 kommt sie vorbelegt vom Vorlauf und der
+ * Trainer bestätigt sie auf dem Standbild-Schirm.
+ */
+export type VideoType = "full" | "excerpt" | "sparring" | "highlight";
+
+export const VIDEO_TYPE_LABEL: Record<VideoType, string> = {
+  full: "Kompletter Kampf",
+  excerpt: "Teil eines Kampfs",
+  sparring: "Training oder Sparring",
+  highlight: "Best-of-Zusammenschnitt",
+};
+
+/**
+ * Art-Faktor. Ein Highlight zeigt nur Treffer und darf deshalb NUR Text
+ * liefern (Waffen, Entries, Finish), nie Zahlen, nie Split — siehe
+ * `lib/profile-evidence.ts`. Sparring liefert keinen Split und beim Gegner
+ * keine Zahlen.
+ */
+export const VIDEO_TYPE_WEIGHT: Record<VideoType, number> = {
+  full: 1,
+  excerpt: 0.7,
+  sparring: 0.6,
+  highlight: 0.3,
+};
+
+/**
+ * Art aus der Beobachtung (Stufe 1) ableiten — Übergang bis zum Vorlauf.
+ * Unklare Angaben landen bei „Teil eines Kampfs" (0,7): Lieber zählt ein
+ * ganzer Kampf einmal zu 70 % als ein Clip zu 100 %.
+ */
+export function videoTypeFromObservation(
+  observation: Pick<VideoObservation, "meta">,
+): VideoType {
+  const t = `${observation.meta.coverage ?? ""} ${observation.meta.ruleset ?? ""}`
+    .toLowerCase();
+  if (t.includes("sparring") || t.includes("training")) return "sparring";
+  if (t.includes("highlight") || t.includes("best of") || t.includes("best-of"))
+    return "highlight";
   if (
     t.includes("vollkampf") || t.includes("voller") || t.includes("komplett") ||
-    t.includes("ganzer") || t.includes("full")
+    t.includes("ganzer") || t.includes("full") || t.includes("gesamter")
   )
-    return 1;
-  if (
-    t.includes("schnitt") || t.includes("clip") || t.includes("teil") ||
-    t.includes("auszug")
-  )
-    return 0.7;
-  return 0.8;
+    return "full";
+  return "excerpt";
 }
+
+/** Schwelle: darunter gilt die Kämpfer-Identifikation als unsicher. */
+export const ID_CONFIDENCE_WARN = 0.75;
 
 /** Aufgeschlüsseltes Gewicht eines Videos — die Faktoren bleiben sichtbar. */
 export interface VideoWeight {
-  /** Gesamtgewicht 0,2–1,0: so stark zählt dieses Video im Profil. */
+  /**
+   * Gesamtgewicht = recency × type, OHNE Klemme (0,12–1,0). 0, wenn das Tor
+   * der Kämpfer-Sicherheit zu ist — dann zählt die Analyse gar nicht.
+   */
   value: number;
   recency: number;
-  coverage: number;
+  type: number;
+  /** Kämpfer-Sicherheit aus Stufe 1 (nur Anzeige — im Wert steckt sie als Tor). */
   identification: number;
+  /** Tor offen: idConfidence ≥ ID_CONFIDENCE_WARN. */
+  identified: boolean;
 }
 
 /**
- * Gewicht eines Videos aus den drei Faktoren, die wir wirklich kennen:
- * Aktualität (Trainer-Eingabe), Abdeckung und Identifikationssicherheit.
- * Bewusst NICHT enthalten: `meta.estimatedAge` und `meta.opponentLevel` —
- * beides reine Bildschätzungen des Modells ohne belastbare Grundlage.
+ * Gewicht eines Videos. Bewusst NICHT enthalten: `meta.estimatedAge` und
+ * `meta.opponentLevel` — reine Bildschätzungen des Modells.
+ *
+ * Kämpfer-Sicherheit ist ein TOR, kein Faktor (Gegenprobe): Ein vertauschter
+ * Kämpfer vergiftet alle 60 Antworten, und das lässt sich nicht mit 0,6
+ * „ein bisschen" einrechnen. Unter der Schwelle zählt nichts; die Analyse
+ * bleibt gespeichert und wartet auf eine neue Zuordnung (Etappe 2).
  */
 export function computeVideoWeight(a: {
   recency?: FightRecency;
-  observation: VideoObservation;
+  videoType?: VideoType;
+  observation: Pick<VideoObservation, "identification" | "meta">;
 }): VideoWeight {
   const clamp01 = (n: number) => Math.max(0, Math.min(1, n || 0));
   const recency = FIGHT_RECENCY_WEIGHT[a.recency ?? "unknown"];
-  const coverage = coverageWeight(a.observation.meta.coverage);
+  const type = VIDEO_TYPE_WEIGHT[a.videoType ?? videoTypeFromObservation(a.observation)];
   const identification = clamp01(a.observation.identification.idConfidence);
-  // Untergrenze 0,2: auch ein schwaches Video verschwindet nicht ganz.
-  const value = Math.max(0.2, Math.min(1, recency * coverage * identification));
+  const identified = identification >= ID_CONFIDENCE_WARN;
+  const value = identified ? recency * type : 0;
   return {
     value: Math.round(value * 100) / 100,
     recency,
-    coverage,
+    type,
     identification,
+    identified,
   };
 }
 
@@ -280,6 +355,25 @@ export interface DnaFinding {
   confidence: number;
   /** Timestamps / Beobachtungen als Beleg. */
   evidence: string[];
+  /**
+   * SEITEN-SCHLÜSSEL (seit Etappe 1 der Automatik): ein kurzer Slug, der die
+   * AUSSAGE des Befunds benennt, nicht seinen Wortlaut — „cross", „low-kick",
+   * „clinch-suchen", „rueckwaerts". Zwei Videos, die dasselbe sagen, tragen
+   * denselben Schlüssel und ziehen im Tauziehen an derselben Seite
+   * (`lib/profile-evidence.ts`). Vergibt Claude in Stufe 2; ältere Analysen
+   * ohne Schlüssel bekommen beim Decodieren einen aus dem Antworttext.
+   */
+  sideKey: string;
+}
+
+/**
+ * Bestätigung einer BESTEHENDEN Antwort durch dieses Video (E1). Zählt nur
+ * mit Beleg: Modelle bestätigen Vorgaben bereitwillig, deshalb wiegt eine
+ * Bestätigung ohne Timestamp nichts.
+ */
+export interface ConfirmedAnswer {
+  questionId: string;
+  evidence: string[];
 }
 
 export interface TopListEntry {
@@ -334,13 +428,16 @@ export interface VideoEvaluation {
   actionStats: ActionStat[];
   /** Für die DNA aufbereiteter Split. */
   dnaSplit: DnaSplit | null;
-  /** E — Merge-Vorschlag gegen die bestehende DNA. */
+  /** E — Abgleich gegen die bestehende DNA. */
   merge: {
-    /** Frage-IDs, deren bestehende Antworten das Video bestätigt (E1). */
-    confirms: string[];
-    /** Widersprüche → Trainer-Review, kein stilles Überschreiben (E2). */
+    /** Bestehende Antworten, die das Video MIT BELEG bestätigt (E1). */
+    confirms: ConfirmedAnswer[];
+    /**
+     * Widersprüche (E2). Seit der Automatik nur noch Anzeige-Material: Was
+     * gilt, entscheidet das Tauziehen der Seiten, nicht ein Klick.
+     */
     contradicts: ContradictionFlag[];
-    /** Gewichtung dieses Videos 0–1 (E5: Aktualität × Niveau × Abdeckung). */
+    /** Selbsteinschätzung des Modells 0–1 — wird weder gerechnet noch angezeigt. */
     weight: number;
   };
 }
@@ -380,8 +477,12 @@ export function formatEur(n: number): string {
 
 /**
  * Laufende Summe über ALLE Analysen (Gegner + Athleten), als einzelnes
- * Firestore-Dokument — so braucht die Anzeige keine Collection-Group-Query.
- * Gelöschte Analysen reduzieren die Summe bewusst nicht: ausgegebenes
+ * Firestore-Dokument `aiUsage/summary`. Daneben liegt seit Etappe 1 der
+ * Automatik je Gym ein Dokument `aiUsage/gym-{gymId}` (gleiche Felder plus
+ * `months.{JJJJ-MM}`) — Leons Wunsch „welches Gym verursacht am meisten,
+ * und was kostet ein Monat" (Backlog „KI-Kosten je Gym"). Geschrieben wird
+ * beides NUR noch serverseitig in /api/video-analysis/commit; der Client
+ * liest. Gelöschte Analysen reduzieren die Summe bewusst nicht: ausgegebenes
  * Guthaben bleibt ausgegeben.
  */
 export interface AiUsageSummary {
@@ -390,6 +491,20 @@ export interface AiUsageSummary {
   inputTokens: number;
   outputTokens: number;
   analysisCount: number;
+}
+
+/** Verbrauch eines Gyms, mit Monatsverlauf. */
+export interface AiUsageByGym {
+  gymId: string;
+  spentEur: number;
+  analysisCount: number;
+  /** Schlüssel „JJJJ-MM" → Kosten und Zahl der Analysen in diesem Monat. */
+  months: Record<string, { spentEur: number; analysisCount: number }>;
+}
+
+/** Monatsschlüssel „JJJJ-MM" für die Kosten-Buchung. */
+export function monthKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function aiUsageDoc() {
@@ -408,28 +523,21 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   };
 }
 
-/** Addiert den Verbrauch einer abgeschlossenen Analyse auf die Gesamtsumme. */
-export async function recordAiUsage(usage: AnalysisUsage): Promise<void> {
-  await setDoc(
-    aiUsageDoc(),
-    {
-      spentEur: increment(usage.costEur),
-      inputTokens: increment(usage.inputTokens),
-      outputTokens: increment(usage.outputTokens),
-      analysisCount: increment(1),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-}
-
-/** Setzt das Budget neu (z. B. nach dem Aufladen von Guthaben). */
-export async function setAiBudget(budgetEur: number): Promise<void> {
-  await setDoc(
-    aiUsageDoc(),
-    { budgetEur: Math.max(0, budgetEur), updatedAt: serverTimestamp() },
-    { merge: true },
-  );
+/** Verbrauch je Gym (Plattform-Admin) — die Dokumente `aiUsage/gym-*`. */
+export async function listAiUsageByGym(): Promise<AiUsageByGym[]> {
+  const snap = await getDocs(collection(getFirestoreDb(), "aiUsage"));
+  const out: AiUsageByGym[] = [];
+  for (const d of snap.docs) {
+    if (!d.id.startsWith("gym-")) continue;
+    const data = d.data() as Partial<AiUsageByGym>;
+    out.push({
+      gymId: data.gymId ?? d.id.slice(4),
+      spentEur: data.spentEur ?? 0,
+      analysisCount: data.analysisCount ?? 0,
+      months: data.months ?? {},
+    });
+  }
+  return out.sort((a, b) => b.spentEur - a.spentEur);
 }
 
 // ─── Gespeicherte Analyse ───────────────────────────────────────────────────
@@ -440,25 +548,51 @@ export interface VideoAnalysis {
   /** opponentId (mode=opponent) bzw. Schüler-uid (mode=athlete). */
   targetId: string;
   targetName: string;
+  /**
+   * Gym des ZIELS (nicht des Aufrufers) — setzt der Server aus dem
+   * Gegnerprofil bzw. dem users-Dokument. Schlüssel der collectionGroup-
+   * Abfrage und der Kosten je Gym.
+   */
+  gymId: string;
+  /**
+   * Ist das Ziel ein Stab-Konto? Materialisiert wie `ownerIsStaff` an den
+   * Wettkämpfen: Die collectionGroup-Regel liefert nur Analysen zu Athleten
+   * und Gegnern (`targetIsStaff == false`); Analysen zu Kollegen laufen
+   * ausschließlich über den direkten Pfad und damit über die Freigabe.
+   */
+  targetIsStaff: boolean;
   /** Kurzlabel der Quelle für Listen (Dateiname bzw. YouTube-URL). */
   sourceLabel: string;
   sourceKind: "upload" | "youtube";
   youtubeUrl: string | null;
+  /**
+   * Fingerabdruck der Datei (Name, Größe, Dauer) — erkennt einen zweiten
+   * Upload desselben Videos (Etappe 3: „ersetzen oder zusätzlich?"). Bei
+   * YouTube die URL samt Ausschnitt.
+   */
+  fileFingerprint: string | null;
   fighter: FighterDescription;
   tier: GeminiTier;
-  /** Zeitliche Einordnung des Kampfes (Trainer-Angabe) — Basis der Gewichtung. */
-  recency?: FightRecency;
+  /** Zeitliche Einordnung des Kampfes (Trainer-Angabe) — Faktor der Gewichtung. */
+  recency: FightRecency;
+  /** Art des Videos (legt die KI fest) — zweiter Faktor der Gewichtung. */
+  videoType: VideoType;
+  /** Kampfmonat „JJJJ-MM", falls bekannt (Etappe 2: Datumseinblendung) — sortiert genauer als `recency`. */
+  fightMonth: string | null;
+  /** Gewicht zum Zeitpunkt des Speicherns, aufgeschlüsselt. Rechnet der Server. */
+  weight: VideoWeight;
   models: { gemini: string; claude: string };
   /** Token-Verbrauch + Kosten der Bewertungsstufe (null beim Gratis-Fallback). */
   usage: AnalysisUsage | null;
   observation: VideoObservation;
   evaluation: VideoEvaluation;
-  /** Frage-IDs, deren Befunde bereits in die DNA übernommen wurden. */
-  appliedFindingIds: string[];
-  /** True, wenn Split + Action-Stats übernommen wurden. */
-  appliedStats: boolean;
   /**
-   * Nur mode=athlete: Trainer hat das Ergebnis für den Schüler freigegeben —
+   * Trainer hat den Kämpfer als falsch erkannt markiert: Die Analyse bleibt
+   * gespeichert, zählt aber nicht mehr (ersetzt das Löschen). Umkehrbar.
+   */
+  wrongFighter: boolean;
+  /**
+   * Nur mode=athlete: Trainer hat das Ergebnis für den Athleten freigegeben —
    * der Athlet sieht die Auswertung dann unter „Mein DeepFight".
    */
   sharedWithAthlete?: boolean;
@@ -467,16 +601,131 @@ export interface VideoAnalysis {
   createdAt: Date;
 }
 
-export type VideoAnalysisInput = Omit<VideoAnalysis, "id" | "createdAt">;
+/**
+ * Was der Client an /api/video-analysis/commit reicht. Alles, was der
+ * Server selbst weiß oder rechnet (gymId, targetIsStaff, weight, videoType,
+ * createdAt, Marken), fehlt hier absichtlich — es wird nicht vertraut.
+ */
+export type VideoAnalysisInput = Omit<
+  VideoAnalysis,
+  | "id"
+  | "createdAt"
+  | "gymId"
+  | "targetIsStaff"
+  | "weight"
+  | "videoType"
+  | "wrongFighter"
+  | "sharedWithAthlete"
+  | "createdBy"
+  | "createdByName"
+> & { videoType?: VideoType };
 
-type VideoAnalysisDoc = Omit<VideoAnalysis, "id" | "createdAt"> & {
-  createdAt?: Timestamp;
+/** Rohform in Firestore — auch ältere Dokumente ohne die neuen Felder. */
+export type VideoAnalysisDoc = Partial<Omit<VideoAnalysis, "id" | "createdAt">> & {
+  createdAt?: Timestamp | { toDate(): Date };
+  /** Altbestand: Bestätigungen als nackte Frage-IDs. */
+  evaluation?: Omit<Partial<VideoEvaluation>, "merge"> & {
+    merge?: Partial<Omit<VideoEvaluation["merge"], "confirms">> & {
+      confirms?: (string | ConfirmedAnswer)[];
+    };
+  };
 };
 
-/** Schwelle: darunter gilt die Kämpfer-Identifikation als unsicher. */
-export const ID_CONFIDENCE_WARN = 0.75;
+// ─── Decodieren (Client UND Server) ─────────────────────────────────────────
 
-// ─── Firestore-CRUD (Client) ────────────────────────────────────────────────
+/**
+ * Seiten-Schlüssel für Befunde OHNE Schlüssel (Bestand vor Etappe 1): aus
+ * dem Antworttext, normiert und gekürzt. Zwei wortgleiche Antworten landen
+ * so auf einer Seite; zwei sinngleiche nicht — dafür gibt es ab jetzt den
+ * Schlüssel aus Stufe 2.
+ */
+export function sideKeyFromText(answer: string): string {
+  const slug = answer
+    .toLowerCase()
+    .normalize("NFD")
+    // Nach NFD sind Umlaute Grundbuchstabe + Akzentzeichen; alles außerhalb
+    // von ASCII fällt weg, der Grundbuchstabe bleibt („Käfig" → „kafig").
+    .replace(/[^\x00-\x7f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `text:${slug.slice(0, 40) || "leer"}`;
+}
+
+/**
+ * Macht aus einem Firestore-Dokument eine vollständige VideoAnalysis —
+ * gemeinsam für Client-SDK und Admin-SDK (beide Timestamps haben `toDate`).
+ * Fehlende Felder des Altbestands bekommen Vorgaben; das Gewicht wird dann
+ * aus den vorhandenen Angaben nachgerechnet.
+ */
+export function decodeVideoAnalysis(id: string, d: VideoAnalysisDoc): VideoAnalysis {
+  const observation = (d.observation ?? {}) as VideoObservation;
+  const rawEval = (d.evaluation ?? {}) as NonNullable<VideoAnalysisDoc["evaluation"]>;
+  const findings = (rawEval.findings ?? []).map((f) => ({
+    ...f,
+    sideKey: f.sideKey?.trim() || sideKeyFromText(f.answer ?? ""),
+  }));
+  const confirms: ConfirmedAnswer[] = (rawEval.merge?.confirms ?? []).map((c) =>
+    typeof c === "string" ? { questionId: c, evidence: [] } : c,
+  );
+  const evaluation = {
+    ...(rawEval as VideoEvaluation),
+    findings,
+    merge: {
+      confirms,
+      contradicts: rawEval.merge?.contradicts ?? [],
+      weight: rawEval.merge?.weight ?? 0,
+    },
+  } as VideoEvaluation;
+  const recency: FightRecency = d.recency ?? "unknown";
+  const videoType: VideoType =
+    d.videoType ??
+    (observation.meta ? videoTypeFromObservation(observation) : "excerpt");
+  const weight =
+    d.weight ??
+    (observation.identification
+      ? computeVideoWeight({ recency, videoType, observation })
+      : { value: 0, recency: 0, type: 0, identification: 0, identified: false });
+  return {
+    id,
+    mode: d.mode ?? "opponent",
+    targetId: d.targetId ?? "",
+    targetName: d.targetName ?? "",
+    gymId: d.gymId ?? "",
+    targetIsStaff: d.targetIsStaff === true,
+    sourceLabel: d.sourceLabel ?? "",
+    sourceKind: d.sourceKind ?? "upload",
+    youtubeUrl: d.youtubeUrl ?? null,
+    fileFingerprint: d.fileFingerprint ?? null,
+    fighter: d.fighter ?? {
+      name: d.targetName ?? "",
+      corner: "unknown",
+      clothing: "",
+      features: "",
+      startPosition: "",
+    },
+    tier: d.tier ?? "flash",
+    recency,
+    videoType,
+    fightMonth: d.fightMonth ?? null,
+    weight,
+    models: d.models ?? { gemini: "", claude: "" },
+    usage: d.usage ?? null,
+    observation,
+    evaluation,
+    wrongFighter: d.wrongFighter === true,
+    sharedWithAthlete: d.sharedWithAthlete ?? false,
+    createdBy: d.createdBy ?? "",
+    createdByName: d.createdByName ?? null,
+    createdAt: d.createdAt?.toDate() ?? new Date(),
+  };
+}
+
+/** Zählt diese Analyse im Profil? (Tor offen, nicht als falsch markiert.) */
+export function analysisCounts(a: Pick<VideoAnalysis, "weight" | "wrongFighter">): boolean {
+  return !a.wrongFighter && a.weight.identified && a.weight.value > 0;
+}
+
+// ─── Firestore-Lesen (Client) ───────────────────────────────────────────────
 
 function analysesCol(mode: AnalysisMode, targetId: string) {
   const db = getFirestoreDb();
@@ -485,28 +734,25 @@ function analysesCol(mode: AnalysisMode, targetId: string) {
     : collection(db, "users", targetId, "videoAnalyses");
 }
 
-function decode(id: string, d: VideoAnalysisDoc): VideoAnalysis {
-  return {
-    ...d,
-    id,
-    usage: d.usage ?? null,
-    recency: d.recency ?? "unknown",
-    appliedFindingIds: d.appliedFindingIds ?? [],
-    appliedStats: d.appliedStats ?? false,
-    sharedWithAthlete: d.sharedWithAthlete ?? false,
-    createdAt: d.createdAt?.toDate() ?? new Date(),
-  };
-}
+const decode = decodeVideoAnalysis;
 
-export async function saveVideoAnalysis(
-  input: VideoAnalysisInput,
-): Promise<VideoAnalysis> {
-  const ref = doc(analysesCol(input.mode, input.targetId));
-  // Firestore verträgt kein undefined — die Pipeline liefert bereits
-  // null-befüllte Objekte, JSON-Roundtrip entfernt Rest-undefined defensiv.
-  const body = JSON.parse(JSON.stringify(input)) as VideoAnalysisInput;
-  await setDoc(ref, { ...body, createdAt: serverTimestamp() });
-  return { ...body, id: ref.id, createdAt: new Date() };
+/**
+ * Alle Analysen eines Gyms mit EINER Abfrage — ersetzt den Fächer je Ziel
+ * in `lib/deepfight-analysen.ts`. Die Regel verlangt BEIDE Filter
+ * (`gymId` und `targetIsStaff == false`, direkter Feldzugriff); fehlt einer,
+ * weist Firestore die Abfrage komplett ab. Analysen zu Stab-Konten fehlen
+ * hier absichtlich — sie laufen über den direkten Pfad und die Freigabe.
+ */
+export async function listGymVideoAnalyses(gymId: string): Promise<VideoAnalysis[]> {
+  const snap = await getDocs(
+    query(
+      collectionGroup(getFirestoreDb(), "videoAnalyses"),
+      where("gymId", "==", gymId),
+      where("targetIsStaff", "==", false),
+      orderBy("createdAt", "desc"),
+    ),
+  );
+  return snap.docs.map((d) => decode(d.id, d.data() as VideoAnalysisDoc));
 }
 
 export async function listVideoAnalyses(
@@ -535,17 +781,28 @@ export async function listVideoAnalyses(
   return snap.docs.map((d) => decode(d.id, d.data() as VideoAnalysisDoc));
 }
 
-export async function deleteVideoAnalysis(
+/**
+ * Liest EINE Analyse frisch aus Firestore.
+ *
+ * Für Entscheidungen, die nicht am Anzeigestand hängen dürfen: Die
+ * Übernahme-Marken (`appliedFindingIds`, `appliedStats`) können in einem
+ * anderen Tab längst gesetzt sein, während der eigene sie noch als offen
+ * zeigt — dasselbe Standzeit-Fenster wie bei `readTarget`.
+ */
+export async function getVideoAnalysis(
   mode: AnalysisMode,
   targetId: string,
   analysisId: string,
-): Promise<void> {
-  await deleteDoc(doc(analysesCol(mode, targetId), analysisId));
+): Promise<VideoAnalysis | null> {
+  const snap = await getDoc(doc(analysesCol(mode, targetId), analysisId));
+  if (!snap.exists()) return null;
+  return decode(snap.id, snap.data() as VideoAnalysisDoc);
 }
 
 /**
- * Gibt eine Athleten-Auswertung für den Schüler frei (oder zieht die
- * Freigabe zurück) — sichtbar unter „Mein DeepFight".
+ * Gibt eine Athleten-Auswertung für den Athleten frei (oder zieht die
+ * Freigabe zurück) — sichtbar unter „Mein DeepFight". Das einzige Feld, das
+ * der Client an einer Analyse noch selbst schreibt (Regel: `hasOnly`).
  */
 export async function setAnalysisSharedWithAthlete(
   targetId: string,
@@ -557,22 +814,90 @@ export async function setAnalysisSharedWithAthlete(
   });
 }
 
-/** Merkt sich, welche Befunde/Stats bereits in die DNA übernommen wurden. */
-export async function markAnalysisApplied(
-  mode: AnalysisMode,
-  targetId: string,
-  analysisId: string,
-  patch: { appliedFindingIds?: string[]; appliedStats?: boolean },
-): Promise<void> {
-  await updateDoc(doc(analysesCol(mode, targetId), analysisId), patch);
-}
-
 // ─── Pipeline-Aufrufe (Client → API-Routen) ─────────────────────────────────
 
 async function idToken(): Promise<string> {
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error("Nicht angemeldet");
   return user.getIdToken();
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const token = await idToken();
+  return apiJson<T>(
+    await fetch(path, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** Rohform der Antwort: das Dokument, wie es der Server gespeichert hat. */
+type CommittedAnalysis = Omit<VideoAnalysisDoc, "createdAt"> & {
+  id: string;
+  createdAt: string;
+};
+
+function decodeCommitted(a: CommittedAnalysis): VideoAnalysis {
+  const { id, createdAt, ...rest } = a;
+  return decode(id, {
+    ...(rest as VideoAnalysisDoc),
+    createdAt: { toDate: () => new Date(createdAt) },
+  });
+}
+
+/**
+ * Speichert eine fertige Analyse — SERVERSEITIG. Der Server setzt gymId,
+ * targetIsStaff, Art und Gewicht, bucht die Kosten und rechnet das Profil
+ * aus allen Analysen neu. Zurück kommt das gespeicherte Dokument.
+ */
+export async function commitVideoAnalysis(
+  input: VideoAnalysisInput,
+): Promise<VideoAnalysis> {
+  const data = await postJson<{ analysis: CommittedAnalysis }>(
+    "/api/video-analysis/commit",
+    { analysis: input },
+  );
+  return decodeCommitted(data.analysis);
+}
+
+/**
+ * Markiert eine Analyse als „falscher Kämpfer" (oder nimmt die Marke
+ * zurück). Ersetzt das Löschen: Das Dokument bleibt, zählt aber nicht mehr;
+ * der Server rechnet das Profil neu.
+ */
+export async function flagVideoAnalysis(
+  mode: AnalysisMode,
+  targetId: string,
+  analysisId: string,
+  wrongFighter: boolean,
+): Promise<VideoAnalysis> {
+  const data = await postJson<{ analysis: CommittedAnalysis }>(
+    "/api/video-analysis/flag",
+    { mode, targetId, analysisId, action: "flag", wrongFighter },
+  );
+  return decodeCommitted(data.analysis);
+}
+
+/**
+ * Löscht eine Analyse endgültig — NUR Plattform-Admin (Demo-Bestand
+ * aufräumen). Trainer markieren stattdessen. Der Server rechnet neu.
+ */
+export async function deleteVideoAnalysisAsAdmin(
+  mode: AnalysisMode,
+  targetId: string,
+  analysisId: string,
+): Promise<void> {
+  await postJson<{ ok: true }>("/api/video-analysis/flag", {
+    mode,
+    targetId,
+    analysisId,
+    action: "delete",
+  });
 }
 
 /** Liest die Dauer einer Videodatei clientseitig aus (Metadaten). */

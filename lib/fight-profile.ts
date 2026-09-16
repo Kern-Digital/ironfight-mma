@@ -39,6 +39,7 @@ import {
   type ActionStat,
   type DnaSplit,
 } from "./fight-stats";
+import type { ProfileEvidence } from "./profile-evidence";
 
 export interface FightProfile {
   /** Qualitative DNA-Antworten (questionId → Freitext), gleiche IDs wie beim Gegner. */
@@ -53,6 +54,13 @@ export interface FightProfile {
   dnaSplitWeight: number;
   /** §2 Action-Stats — gezählte Techniken (Versuche/Treffer/Zone/Setup). */
   actionStats: ActionStat[];
+  /**
+   * Die Rechnung hinter den Antworten (seit Etappe 1 der Automatik, 16.09.):
+   * je Frage die Seiten mit Gewicht und Quellen, das Split-Fenster, die
+   * Stärke. Schreibt NUR der Server (`lib/server/profile-recompute.ts`);
+   * null bei Profilen, über die noch nie gerechnet wurde.
+   */
+  evidence: ProfileEvidence | null;
   updatedBy: string | null;
   updatedAt: Date | null;
 }
@@ -64,13 +72,15 @@ export type FightProfilePatch = Partial<
   >
 >;
 
-type FightProfileDoc = {
+/** Rohform in Firestore — Client-SDK und Admin-SDK lesen dieselbe. */
+export type FightProfileDoc = {
   dna?: GegnerDnaAnswers;
   dnaSplit?: DnaSplit | null;
   dnaSplitWeight?: number;
   actionStats?: ActionStat[];
+  evidence?: ProfileEvidence | null;
   updatedBy?: string | null;
-  updatedAt?: Timestamp;
+  updatedAt?: Timestamp | { toDate(): Date };
 };
 
 export function emptyFightProfile(): FightProfile {
@@ -79,6 +89,7 @@ export function emptyFightProfile(): FightProfile {
     dnaSplit: null,
     dnaSplitWeight: 0,
     actionStats: [],
+    evidence: null,
     updatedBy: null,
     updatedAt: null,
   };
@@ -93,17 +104,21 @@ export function isFightProfileEmpty(p: FightProfile | null | undefined): boolean
   );
 }
 
-function decode(data: FightProfileDoc | undefined | null): FightProfile {
+export function decodeFightProfile(
+  data: FightProfileDoc | undefined | null,
+): FightProfile {
   if (!data) return emptyFightProfile();
   return {
     dna: data.dna ?? {},
     dnaSplit: data.dnaSplit ?? null,
     dnaSplitWeight: data.dnaSplitWeight ?? 0,
     actionStats: data.actionStats ?? [],
+    evidence: data.evidence ?? null,
     updatedBy: data.updatedBy ?? null,
     updatedAt: data.updatedAt?.toDate() ?? null,
   };
 }
+const decode = decodeFightProfile;
 
 function userRef(uid: string) {
   return doc(getFirestoreDb(), "users", uid);
@@ -125,9 +140,12 @@ export async function getFightProfile(uid: string): Promise<FightProfile> {
 }
 
 /**
- * Patcht das Kampfprofil (Trainer/Admin). Nicht übergebene Felder bleiben
- * erhalten; übergebene werden bereinigt gespeichert (keine leeren Antworten,
- * undefined-frei — analog zu lib/opponents.ts).
+ * Patcht das Kampfprofil vom Client. SEIT ETAPPE 1 DER AUTOMATIK NUR NOCH
+ * FÜR DEN PLATTFORM-ADMIN (Demo-Seeder): Für Trainer sind Split, Gewicht,
+ * Zähler und Rechnung abgeleitete Felder, die der Server aus den Analysen
+ * schreibt — die Firestore-Regel weist einen Trainer-Schreibvorgang ab.
+ * Nicht übergebene Felder bleiben erhalten; `evidence` bleibt IMMER
+ * erhalten, damit der Seeder die Rechnung nicht löscht.
  */
 export async function updateFightProfile(
   uid: string,
@@ -145,6 +163,7 @@ export async function updateFightProfile(
       patch.dnaSplitWeight ?? current.dnaSplitWeight ?? 0,
     ),
     actionStats,
+    evidence: current.evidence ?? null,
     updatedBy: patch.updatedBy ?? current.updatedBy ?? null,
   };
   // Dokument komplett ersetzen (kein Merge) — sonst blieben gelöschte

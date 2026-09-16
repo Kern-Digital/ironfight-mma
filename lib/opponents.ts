@@ -46,6 +46,7 @@ import type {
   FightStyle,
   OpponentProfile,
 } from "./fight-camp";
+import type { ProfileEvidence } from "./profile-evidence";
 
 export interface Opponent {
   id: string;
@@ -71,6 +72,12 @@ export interface Opponent {
   dnaSplitWeight?: number;
   /** §2 Action-Stats — gezählte Techniken (Versuche/Treffer/Zone/Setup, optional). */
   actionStats?: ActionStat[];
+  /**
+   * Die Rechnung hinter den Antworten (Etappe 1 der Automatik): Seiten je
+   * Frage, Split-Fenster, Stärke. Schreibt NUR der Server; der Client darf
+   * dieses Feld — wie Split, Gewicht und Zähler — nicht anfassen (Regel).
+   */
+  evidence?: ProfileEvidence | null;
   /**
    * Schüler-uids, für die der Trainer dieses Profil freigegeben hat.
    * Freigegebene Schüler sehen das Profil read-only unter „Mein DeepFight"
@@ -113,7 +120,8 @@ export type OpponentPatch = Partial<
   >
 >;
 
-type OpponentDoc = {
+/** Rohform in Firestore — Client-SDK und Admin-SDK lesen dieselbe. */
+export type OpponentDoc = {
   gymId: string;
   name: string;
   style: FightStyle;
@@ -129,14 +137,28 @@ type OpponentDoc = {
   dnaSplit?: DnaSplit | null;
   dnaSplitWeight?: number;
   actionStats?: ActionStat[];
+  evidence?: ProfileEvidence | null;
   sharedWith?: string[];
   createdBy: string;
   createdByName: string | null;
   updatedBy?: string | null;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: Timestamp | { toDate(): Date };
+  updatedAt?: Timestamp | { toDate(): Date };
   isDemo?: boolean;
 };
+
+/**
+ * Felder, die NUR der Server schreibt (Profil-Rechnung). Die Firestore-Regel
+ * weist einen Client-Update ab, der eines davon ÄNDERT — ein unverändertes
+ * Durchreichen (OpponentEditor) ist kein Änderung und geht durch.
+ * Dieselbe Liste steht in firestore.rules (`abgeleiteteFelder`).
+ */
+export const DERIVED_PROFILE_FIELDS = [
+  "dnaSplit",
+  "dnaSplitWeight",
+  "actionStats",
+  "evidence",
+] as const;
 
 function opponentsCol() {
   return collection(getFirestoreDb(), "opponents");
@@ -156,7 +178,7 @@ function cleanDna(dna: GegnerDnaAnswers | undefined): GegnerDnaAnswers {
   return out;
 }
 
-function decode(id: string, d: OpponentDoc): Opponent {
+export function decodeOpponent(id: string, d: OpponentDoc): Opponent {
   return {
     id,
     gymId: d.gymId,
@@ -174,6 +196,7 @@ function decode(id: string, d: OpponentDoc): Opponent {
     dnaSplit: d.dnaSplit ?? null,
     dnaSplitWeight: d.dnaSplitWeight ?? 0,
     actionStats: d.actionStats ?? [],
+    evidence: d.evidence ?? null,
     sharedWith: d.sharedWith ?? [],
     createdBy: d.createdBy,
     createdByName: d.createdByName ?? null,
@@ -183,6 +206,7 @@ function decode(id: string, d: OpponentDoc): Opponent {
     isDemo: d.isDemo,
   };
 }
+const decode = decodeOpponent;
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -237,14 +261,12 @@ export async function updateOpponent(
     data.favoriteAttacks = patch.favoriteAttacks;
   if (patch.notes !== undefined) data.notes = patch.notes?.trim() || null;
   if (patch.dna !== undefined) data.dna = cleanDna(patch.dna);
-  if (patch.dnaSplit !== undefined) {
-    const split = cleanDnaSplit(patch.dnaSplit);
-    data.dnaSplit = isDnaSplitEmpty(split) ? null : split;
-  }
-  if (patch.dnaSplitWeight !== undefined)
-    data.dnaSplitWeight = Math.max(0, patch.dnaSplitWeight);
-  if (patch.actionStats !== undefined)
-    data.actionStats = cleanActionStats(patch.actionStats);
+  // Split, Gewicht und Zähler sind seit Etappe 1 der Automatik ABGELEITET
+  // und gehören dem Server (lib/server/profile-recompute.ts). Der Client
+  // reicht sie zwar noch durch (OpponentEditor, damit ältere Aufrufer
+  // kompilieren), geschrieben werden sie hier nicht mehr — die Regel würde
+  // einen Trainer ohnehin abweisen, sobald sich ein Wert ändert
+  // (`DERIVED_PROFILE_FIELDS`).
   if (patch.updatedBy !== undefined) data.updatedBy = patch.updatedBy ?? null;
   await updateDoc(opponentDoc(id), {
     ...data,

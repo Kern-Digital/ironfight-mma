@@ -12,10 +12,27 @@
  *      welcher Kämpfer ausgewertet werden soll + Modellstufe (Flash/Pro).
  *   2. Pipeline: Upload → Gemini-Beobachtung → Claude-Bewertung (Streaming-
  *      Fortschritt über /api/video-analysis/analyze).
- *   3. Ergebnis wird in Firestore gespeichert; Befunde können per
- *      Trainer-Review übernommen werden — im Gegner-Modus in die Gegner-DNA
- *      (opponents/{id}), im Athleten-Modus in das Kampfprofil des Nutzers
- *      (users/{uid}.fightProfile, siehe lib/fight-profile.ts).
+ *   3. Das Ergebnis geht an `POST /api/video-analysis/commit`: Der Server
+ *      speichert es und rechnet das Profil aus ALLEN Analysen neu
+ *      (Gegner-DNA in opponents/{id}, Kampfprofil in users/{uid}/fightProfile).
+ *
+ * ─── AUTOMATIK STATT REVIEW — ETAPPE 1 (16.09.2026) ───────────────────────
+ *
+ * Leon 14.09.: „Analyse fertig = Profil aktualisiert." Aus dieser Datei sind
+ * deshalb `readTarget`, `writeTarget`, `isConflict`, `applyFindings` und
+ * `applyAll` verschwunden — samt der Doppelzählungs-Sperre vom 14.09., die
+ * genau diesen Klick absicherte. Die Rechnung liegt jetzt serverseitig
+ * (`lib/profile-evidence.ts` + `lib/server/profile-recompute.ts`) und läuft
+ * bei jedem Speichern und jeder Marke. Der Bericht bekommt darum KEINE
+ * Übernehmen-Rückrufe mehr und keine `existingDna` — die Knöpfe und der
+ * Konflikt-Vergleich verschwinden von selbst (`canApply` false); der Umbau
+ * des Berichts auf Kurzinfo + „Details anzeigen" ist Etappe 3.
+ *
+ * LÖSCHEN GIBT ES NICHT MEHR — außer für den Plattform-Admin. Ein Trainer
+ * markiert eine Analyse als „falscher Kämpfer" (`wrongFighter`); sie bleibt
+ * gespeichert, zählt nicht mehr, und der Server rechnet neu. Die Zeile in
+ * der Liste sagt „Zählt nicht", wenn eine Analyse aus der Rechnung fällt
+ * (Marke ODER Kämpfer-Tor zu).
  *
  * ─── WAS TEILSCHRITT 4 GEÄNDERT HAT (08.09.2026) ──────────────────────────
  *
@@ -67,36 +84,26 @@ import Select from "@/components/ui/Select";
 import Skeleton from "@/components/ui/Skeleton";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import VideoAnalysisResult from "./VideoAnalysisResult";
-import { useAuth, useRights } from "@/lib/auth-context";
-import { getOpponent, updateOpponent, type Opponent } from "@/lib/opponents";
-import {
-  getFightProfile,
-  updateFightProfile,
-  type FightProfile,
-} from "@/lib/fight-profile";
-import {
-  cleanActionStats,
-  mergeDnaSplit,
-  type ActionStat,
-  type DnaSplit,
-} from "@/lib/fight-stats";
+import { useRights } from "@/lib/auth-context";
+import type { Opponent } from "@/lib/opponents";
+import type { FightProfile } from "@/lib/fight-profile";
 import { FIGHTER_STANCE_LABEL, FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 import {
   CORNER_LABEL,
   FIGHT_RECENCY_LABEL,
   ID_CONFIDENCE_WARN,
   MAX_VIDEO_SECONDS,
-  computeVideoWeight,
-  deleteVideoAnalysis,
+  VIDEO_TYPE_LABEL,
+  analysisCounts,
+  commitVideoAnalysis,
+  deleteVideoAnalysisAsAdmin,
+  flagVideoAnalysis,
   formatEur,
   listVideoAnalyses,
   isUploadStillActive,
-  markAnalysisApplied,
   readVideoDuration,
-  recordAiUsage,
   runVideoAnalysis,
   runVideoObservation,
-  saveVideoAnalysis,
   setAnalysisSharedWithAthlete,
   uploadVideoFile,
   type AnalysisMode,
@@ -417,8 +424,9 @@ export default function VideoAnalysisSection({
    */
   expandId?: string | null;
 }) {
-  const { user, profile } = useAuth();
-  // Was eine Analyse gekostet hat, ist Betreiber-Sache (Leon 08.09.2026).
+  // Was eine Analyse gekostet hat und wer endgültig löschen darf, ist
+  // Betreiber-Sache (Leon 08.09.2026). Wer gespeichert hat, trägt der Server
+  // ein — ein Konto braucht die Sektion hier nicht mehr.
   const rights = useRights();
 
   const [analyses, setAnalyses] = useState<VideoAnalysis[] | null>(null);
@@ -845,7 +853,15 @@ export default function VideoAnalysisSection({
 
       setStage("save");
       progress.enter("save");
-      const saved = await saveVideoAnalysis({
+      // Fingerabdruck der Quelle — erkennt denselben Upload beim zweiten
+      // Mal (Etappe 3: „ersetzen oder zusätzlich?").
+      const fileFingerprint =
+        source.kind === "upload"
+          ? `file:${source.fileName}|${file?.size ?? pendingUpload?.fileSize ?? 0}|${source.durationSeconds ?? ""}`
+          : `yt:${source.url}|${source.startSeconds ?? ""}|${source.endSeconds ?? ""}`;
+      // Der Server speichert, bucht die Kosten und rechnet das Profil aus
+      // allen Analysen neu — hier fällt kein Klick mehr an.
+      const saved = await commitVideoAnalysis({
         mode,
         targetId,
         targetName,
@@ -853,6 +869,7 @@ export default function VideoAnalysisSection({
         sourceLabel:
           source.kind === "upload" ? source.fileName : source.url,
         youtubeUrl: source.kind === "youtube" ? source.url : null,
+        fileFingerprint,
         fighter: {
           name: targetName,
           corner,
@@ -862,27 +879,13 @@ export default function VideoAnalysisSection({
         },
         tier,
         recency,
+        fightMonth: null,
         models: result.models,
         usage: result.usage,
         observation: result.observation,
         evaluation: result.evaluation,
-        appliedFindingIds: [],
-        appliedStats: false,
-        createdBy: user?.uid ?? "",
-        createdByName: profile?.displayName ?? user?.email ?? null,
       });
-
-      // Kosten weiter mitschreiben (nur wenn Claude lief). Der Guthaben-Ring
-      // ist seit 08.09.2026 weg, die Summe bleibt: Sie ist die Grundlage der
-      // Betreiber-Auswertung, die Leon im Admin-Bereich haben will
-      // (CLAUDE.md, Backlog „KI-Kosten je Gym").
-      if (result.usage) {
-        try {
-          await recordAiUsage(result.usage);
-        } catch {
-          /* Nebenbuchhaltung — darf die Analyse nie scheitern lassen */
-        }
-      }
+      notifyTargetUpdated();
 
       progress.complete();
       setAnalyses((prev) => [saved, ...(prev ?? [])]);
@@ -917,194 +920,42 @@ export default function VideoAnalysisSection({
     }
   }
 
-  // ─── Übernahme in Gegner-DNA bzw. Kampfprofil ────────────────────────────
-
-  /**
-   * `dna` optional: beim Übernehmen wird gegen den FRISCH gelesenen Stand
-   * geprüft, sonst gegen den Anzeigestand. Ohne das könnte eine Antwort, die
-   * ein anderer Trainer inzwischen gesetzt hat, als konfliktfrei durchgehen
-   * und still überschrieben werden.
-   */
-  function isConflict(
-    a: VideoAnalysis,
-    questionId: string,
-    dna: Record<string, string> = targetDna,
-  ): boolean {
-    if (a.appliedFindingIds.includes(questionId)) return false;
-    const finding = a.evaluation.findings.find((f) => f.questionId === questionId);
-    const existing = dna[questionId]?.trim();
-    return !!finding && !!existing && existing !== finding.answer.trim();
-  }
-
-  /**
-   * Liest das Merge-Ziel IMMER frisch aus Firestore — in beiden Modi.
-   *
-   * Der Gegner kam früher aus dem React-Prop. Das reichte, solange nur eine
-   * Person am Profil arbeitete: hat ein zweiter Trainer zwischenzeitlich etwas
-   * übernommen, überschrieb der veraltete Prop dessen Beitrag komplett
-   * (Split, Gewichtssumme und Zählungen). Das Zeitfenster war nicht ein
-   * Rennen um Millisekunden, sondern die gesamte Standzeit eines offenen Tabs.
-   */
-  async function readTarget(): Promise<{
-    dna: Record<string, string>;
-    dnaSplit: DnaSplit | null;
-    dnaSplitWeight: number;
-    actionStats: ActionStat[];
-  }> {
-    if (mode === "opponent") {
-      if (!opponent) throw new Error("Kein Gegnerprofil geladen");
-      // Fällt auf den Prop zurück, falls der Gegner nicht (mehr) lesbar ist.
-      const fresh = (await getOpponent(opponent.id)) ?? opponent;
-      return {
-        dna: fresh.dna ?? {},
-        dnaSplit: fresh.dnaSplit ?? null,
-        dnaSplitWeight: fresh.dnaSplitWeight ?? 0,
-        actionStats: fresh.actionStats ?? [],
-      };
-    }
-    const fresh = await getFightProfile(targetId);
-    return {
-      dna: fresh.dna,
-      dnaSplit: fresh.dnaSplit,
-      dnaSplitWeight: fresh.dnaSplitWeight,
-      actionStats: fresh.actionStats,
-    };
-  }
-
-  async function writeTarget(patch: {
-    dna: Record<string, string>;
-    dnaSplit?: DnaSplit | null;
-    dnaSplitWeight?: number;
-    actionStats?: ActionStat[];
-  }): Promise<void> {
-    if (mode === "opponent") {
-      if (!opponent) throw new Error("Kein Gegnerprofil geladen");
-      await updateOpponent(opponent.id, {
-        ...patch,
-        updatedBy: user?.uid ?? null,
-      });
-    } else {
-      await updateFightProfile(targetId, {
-        ...patch,
-        updatedBy: user?.uid ?? null,
-      });
-    }
-  }
+  // ─── Nach der Rechnung: Profil neu laden, Marken setzen ─────────────────
 
   function notifyTargetUpdated() {
     if (mode === "opponent") onOpponentUpdated?.();
     else onFightProfileUpdated?.();
   }
 
-  async function applyFindings(a: VideoAnalysis, ids: string[]) {
+  /**
+   * „Falscher Kämpfer": nimmt die Analyse aus der Rechnung (oder wieder
+   * hinein). Der Server rechnet das Profil neu und liefert das Dokument
+   * zurück; die Liste zeigt danach „Zählt nicht".
+   */
+  async function toggleWrongFighter(a: VideoAnalysis) {
     if (busy) return;
-    if (mode === "opponent" && !opponent) return;
     setBusy(true);
     setError(null);
     try {
-      const target = await readTarget();
-      const dna = { ...target.dna };
-      for (const id of ids) {
-        const finding = a.evaluation.findings.find((f) => f.questionId === id);
-        if (finding) dna[id] = finding.answer;
-      }
-      await writeTarget({ dna });
-      const appliedFindingIds = Array.from(
-        new Set([...a.appliedFindingIds, ...ids]),
-      );
-      await markAnalysisApplied(mode, targetId, a.id, { appliedFindingIds });
-      setAnalyses((prev) =>
-        (prev ?? []).map((x) => (x.id === a.id ? { ...x, appliedFindingIds } : x)),
-      );
+      const updated = await flagVideoAnalysis(mode, targetId, a.id, !a.wrongFighter);
+      setAnalyses((prev) => (prev ?? []).map((x) => (x.id === a.id ? updated : x)));
       notifyTargetUpdated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Übernahme fehlgeschlagen");
+      setError(err instanceof Error ? err.message : "Markieren fehlgeschlagen");
     } finally {
       setBusy(false);
     }
   }
 
-  /** Alle konfliktfreien Befunde + Zahlen (Split/Stats) auf einmal übernehmen. */
-  async function applyAll(a: VideoAnalysis) {
-    if (busy) return;
-    if (mode === "opponent" && !opponent) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const target = await readTarget();
-      const ids = a.evaluation.findings
-        .filter(
-          (f) =>
-            !a.appliedFindingIds.includes(f.questionId) &&
-            !isConflict(a, f.questionId, target.dna),
-        )
-        .map((f) => f.questionId);
-
-      const dna = { ...target.dna };
-      for (const id of ids) {
-        const finding = a.evaluation.findings.find((f) => f.questionId === id);
-        if (finding) dna[id] = finding.answer;
-      }
-
-      // Stats mergen: Versuche/Treffer aufsummieren, Zone/Setup behalten bzw. ergänzen.
-      const merged = new Map<string, ActionStat>(
-        cleanActionStats(target.actionStats).map((s) => [s.id, { ...s }]),
-      );
-      for (const stat of cleanActionStats(a.evaluation.actionStats)) {
-        const existing = merged.get(stat.id);
-        if (existing) {
-          existing.attempted += stat.attempted;
-          existing.landed += stat.landed;
-          if (!existing.zone && stat.zone) existing.zone = stat.zone;
-          if (!existing.setup && stat.setup) existing.setup = stat.setup;
-        } else {
-          merged.set(stat.id, { ...stat });
-        }
-      }
-
-      // Split: gewichteter laufender Mittelwert. Das Video bekommt nur seinen
-      // Anteil an der bisherigen Gewichtssumme — nicht pauschal die Hälfte.
-      const { split: dnaSplit, weight: dnaSplitWeight } = mergeDnaSplit(
-        target.dnaSplit,
-        target.dnaSplitWeight,
-        a.evaluation.dnaSplit,
-        computeVideoWeight(a).value,
-      );
-
-      await writeTarget({
-        dna,
-        actionStats: Array.from(merged.values()),
-        dnaSplit,
-        dnaSplitWeight,
-      });
-      const appliedFindingIds = Array.from(
-        new Set([...a.appliedFindingIds, ...ids]),
-      );
-      await markAnalysisApplied(mode, targetId, a.id, {
-        appliedFindingIds,
-        appliedStats: true,
-      });
-      setAnalyses((prev) =>
-        (prev ?? []).map((x) =>
-          x.id === a.id ? { ...x, appliedFindingIds, appliedStats: true } : x,
-        ),
-      );
-      notifyTargetUpdated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Übernahme fehlgeschlagen");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Die Rueckfrage steht im VideoAnalysisResult, direkt am Knopf — hier wird
-  // nur noch geloescht (Leon 04.09.2026: kein Browser-Popup mehr).
+  // Endgültig löschen darf nur der Plattform-Admin (Demo-Bestand). Die
+  // Rueckfrage steht im VideoAnalysisResult, direkt am Knopf.
   async function handleDelete(a: VideoAnalysis) {
     setBusy(true);
     try {
-      await deleteVideoAnalysis(mode, targetId, a.id);
+      await deleteVideoAnalysisAsAdmin(mode, targetId, a.id);
       setAnalyses((prev) => (prev ?? []).filter((x) => x.id !== a.id));
       if (expandedId === a.id) setExpandedId(null);
+      notifyTargetUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
     } finally {
@@ -1842,7 +1693,9 @@ export default function VideoAnalysisSection({
             const open = expandedId === a.id;
             const idWarn =
               a.observation.identification.idConfidence < ID_CONFIDENCE_WARN;
-            const uebernommen = a.appliedStats;
+            // Zählt diese Analyse im Profil? Nein bei zu enger Kämpfer-
+            // Sicherheit (Tor) oder gesetzter Marke „falscher Kämpfer".
+            const zaehlt = analysisCounts(a);
             return (
               <FlowItem key={a.id} index={i}>
                 <button
@@ -1882,7 +1735,7 @@ export default function VideoAnalysisSection({
                       style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                     >
                       {formatDate(a.createdAt)} ·{" "}
-                      {a.sourceKind === "youtube" ? "YouTube" : "Upload"} ·{" "}
+                      {VIDEO_TYPE_LABEL[a.videoType]} ·{" "}
                       {a.tier === "pro" ? "Detail" : "Standard"}
                       {/* Was eine Analyse gekostet hat, ist Betreiber-Sache
                           (Leon 08.09.2026) — im Gym steht keine Zahl mehr. */}
@@ -1895,19 +1748,18 @@ export default function VideoAnalysisSection({
                         " · für den Athleten freigegeben"}
                     </span>
                   </span>
-                  {uebernommen && (
-                    <span
-                      className="hidden shrink-0 rounded-badge px-2 py-0.5 sm:inline"
-                      style={{
-                        ...META_FONT,
-                        color: "var(--positive)",
-                        border:
-                          "1px solid color-mix(in oklab, var(--positive) 40%, transparent)",
-                      }}
-                    >
-                      Übernommen
-                    </span>
-                  )}
+                  {/* Der ZUSTAND färbt: drin oder draußen. Text steht
+                      daneben — Farbe ist nie das alleinige Signal. */}
+                  <span
+                    className="hidden shrink-0 rounded-badge px-2 py-0.5 sm:inline"
+                    style={{
+                      ...META_FONT,
+                      color: zaehlt ? "var(--positive)" : "var(--warning)",
+                      border: `1px solid color-mix(in oklab, ${zaehlt ? "var(--positive)" : "var(--warning)"} 40%, transparent)`,
+                    }}
+                  >
+                    {zaehlt ? "Im Profil" : "Zählt nicht"}
+                  </span>
                   {idWarn && (
                     <span
                       className="shrink-0"
@@ -1976,14 +1828,48 @@ export default function VideoAnalysisSection({
                         </button>
                       </div>
                     )}
+                    {/* Falscher Kämpfer: raus aus der Rechnung, umkehrbar. */}
+                    <div
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-field px-3 py-2.5"
+                      style={
+                        a.wrongFighter
+                          ? {
+                              background:
+                                "color-mix(in oklab, var(--warning) 12%, transparent)",
+                              border:
+                                "1px solid color-mix(in oklab, var(--warning) 40%, transparent)",
+                            }
+                          : FLAECHE
+                      }
+                    >
+                      <span
+                        style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                      >
+                        {a.wrongFighter
+                          ? "Du hast diese Analyse als falschen Kämpfer markiert — sie zählt nicht im Profil."
+                          : !a.weight.identified
+                            ? "Die KI war sich beim Kämpfer nicht sicher genug — diese Analyse zählt nicht im Profil."
+                            : `Diese Analyse zählt im Profil zu ${Math.round(a.weight.value * 100)} Prozent: ${VIDEO_TYPE_LABEL[a.videoType]}, ${FIGHT_RECENCY_LABEL[a.recency]}.`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleWrongFighter(a)}
+                        disabled={busy}
+                        className="t-interactive inline-flex min-h-hit items-center rounded-field px-4 disabled:opacity-60"
+                        style={{ ...BTN_FONT, color: "var(--text-2)", ...FLAECHE }}
+                      >
+                        {a.wrongFighter ? "Zählt doch" : "Falscher Kämpfer"}
+                      </button>
+                    </div>
+                    {/* Keine Übernehmen-Rückrufe, keine existingDna mehr:
+                        Das Profil ist schon gerechnet (Etappe 1). Löschen
+                        bleibt Betreiber-Sache. */}
                     <VideoAnalysisResult
                       analysis={a}
                       mode={mode}
-                      existingDna={targetDna}
+                      existingDna={null}
                       busy={busy}
-                      onApplyFindings={(ids) => applyFindings(a, ids)}
-                      onApplyAll={() => applyAll(a)}
-                      onDelete={() => handleDelete(a)}
+                      onDelete={rights.admin ? () => handleDelete(a) : undefined}
                     />
                   </div>
                 </Collapse>

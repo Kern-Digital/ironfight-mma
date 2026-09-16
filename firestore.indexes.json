@@ -75,6 +75,24 @@
       ]
     },
     {
+      "collectionGroup": "videoAnalyses",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "gymId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetIsStaff",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "participations",
       "queryScope": "COLLECTION_GROUP",
       "fields": [

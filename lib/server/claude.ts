@@ -15,10 +15,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GEMINI_MODELS, geminiGenerateJson, parseModelJson } from "./gemini";
 import { DNA_CATEGORIES } from "../gegner-dna";
 import { cleanActionStats, cleanDnaSplit, isDnaSplitEmpty } from "../fight-stats";
-import { FIGHT_RECENCY_LABEL } from "../video-analysis";
+import { FIGHT_RECENCY_LABEL, sideKeyFromText } from "../video-analysis";
 import type {
   AnalysisMode,
   AnalysisUsage,
+  ConfirmedAnswer,
   FighterDescription,
   FightRecency,
   VideoEvaluation,
@@ -97,6 +98,10 @@ const findingSchema = obj({
   answer: str,
   confidence: num,
   evidence: strArr,
+  // Seiten-Schlüssel fürs Tauziehen (lib/profile-evidence.ts): benennt die
+  // AUSSAGE, nicht den Wortlaut — zwei Videos, die dasselbe sagen, tragen
+  // denselben Schlüssel.
+  sideKey: str,
 });
 
 const topEntrySchema = obj({ title: str, reason: str, confidence: num });
@@ -141,7 +146,9 @@ const EVALUATION_SCHEMA = obj({
   ),
   dnaSplit: nullable(dnaSplitSchema),
   merge: obj({
-    confirms: strArr,
+    // Bestätigungen zählen nur MIT Beleg (Timestamps) — Modelle bestätigen
+    // Vorgaben bereitwillig; ohne Beleg wiegt eine Bestätigung nichts.
+    confirms: arr(obj({ questionId: str, evidence: strArr })),
     contradicts: arr(obj({ questionId: str, existing: str, observed: str })),
     weight: num,
   }),
@@ -164,6 +171,7 @@ Grundregeln:
 - Jeder Befund trägt eine Konfidenz 0-1 (wie belastbar ist er nach EINEM Video) und Evidenz (Timestamps oder konkrete Zahlen aus der Beobachtung).
 - Antworte auf Deutsch, in klarer Trainersprache. Konkret statt generisch: nenne Techniken, Situationen, Zonen und Runden beim Namen.
 - Befunde ordnest du den vorgegebenen Frage-IDs zu. Nutze nur existierende IDs aus dem Katalog.
+- Jeder Befund trägt einen sideKey: ein kurzer Slug in Kleinbuchstaben (a-z, 0-9, Bindestrich), der die KERNAUSSAGE benennt, nicht den Wortlaut. Geht es um eine Technik, ist der sideKey die Katalog-ID (z. B. "cross", "low-kick", "double-leg"); geht es um ein Verhalten, ein kurzer Begriff (z. B. "clinch-suchen", "rueckwaerts", "konter", "orthodox", "southpaw", "am-cage"). Zwei Videos mit derselben Kernaussage müssen denselben sideKey bekommen. Nennt eine Antwort ZWEI gleichrangige Aussagen, wähle die stärker belegte.
 - Scores 0-100 nur vergeben, wenn die Daten sie tragen, sonst null.
 - Die Beschreibung der Kämpfer-Identifikation stammt aus Stufe 1 — übernimm deren Unsicherheit in deine Konfidenzen (niedrige idConfidence senkt alle Konfidenzen).`;
 
@@ -223,8 +231,8 @@ VIDEO-BEOBACHTUNG (Stufe 1, ein einzelner Kampf):
 ${JSON.stringify(observation, null, 2)}
 
 ZUM MERGE-ABSCHNITT (nur relevant, wenn bestehende Antworten existieren):
-- confirms: Frage-IDs, deren bestehende Antwort dieses Video inhaltlich bestätigt.
-- contradicts: Frage-IDs, bei denen das Video der bestehenden Antwort widerspricht — mit "existing" (bisherige Antwort) und "observed" (was das Video zeigt). Nichts wird still überschrieben; das entscheidet der Trainer.
+- confirms: bestehende Antworten, die dieses Video inhaltlich bestätigt — je Eintrag questionId UND evidence (Timestamps "mm:ss" oder konkrete Zahlen aus der Beobachtung). Ohne Beleg keine Bestätigung eintragen: Eine Bestätigung ohne evidence zählt nicht.
+- contradicts: Frage-IDs, bei denen das Video der bestehenden Antwort widerspricht — mit "existing" (bisherige Antwort) und "observed" (was das Video zeigt). Was am Ende im Profil steht, entscheidet die gewichtete Rechnung über alle Videos, nicht dieses eine.
 - weight 0-1: Wie stark dieses Video die DNA gewichten darf (Aktualität × Niveau des damaligen Gegners × Abdeckung/Qualität × Regelwerk-Nähe, aus den meta-Feldern).
 
 ZU actionStats: Übernimm die gezählten Techniken aus der Beobachtung mit den Katalog-IDs (ohne "other"-Einträge), inkl. dominanter Zone und Setup, damit sie direkt in die bestehende Zähltabelle passen.
@@ -273,6 +281,7 @@ function normalizeEvaluation(e: Partial<VideoEvaluation>): VideoEvaluation {
         answer: f.answer.trim(),
         confidence: clamp01(f.confidence),
         evidence: f.evidence ?? [],
+        sideKey: normalizeSideKey(f.sideKey) || sideKeyFromText(f.answer),
       })),
     scores: {
       aggression: e.scores?.aggression ?? null,
@@ -298,11 +307,40 @@ function normalizeEvaluation(e: Partial<VideoEvaluation>): VideoEvaluation {
         ? cleanDnaSplit(e.dnaSplit as DnaSplit)
         : null,
     merge: {
-      confirms: e.merge?.confirms ?? [],
+      confirms: normalizeConfirms(e.merge?.confirms),
       contradicts: (e.merge?.contradicts ?? []).filter((c) => c.questionId),
       weight: clamp01(e.merge?.weight ?? 0.5),
     },
   };
+}
+
+/** Slug in Kleinbuchstaben; alles andere fällt auf den Text-Schlüssel zurück. */
+function normalizeSideKey(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const slug = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[^\x00-\x7f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug.slice(0, 40);
+}
+
+/** Bestätigungen: neue Form {questionId, evidence} — nackte IDs (altes Modell) ohne Beleg. */
+function normalizeConfirms(raw: unknown): ConfirmedAnswer[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ConfirmedAnswer[] = [];
+  for (const c of raw) {
+    if (typeof c === "string" && c.trim()) out.push({ questionId: c.trim(), evidence: [] });
+    else if (c && typeof c === "object" && typeof (c as ConfirmedAnswer).questionId === "string") {
+      const ev = (c as ConfirmedAnswer).evidence;
+      out.push({
+        questionId: (c as ConfirmedAnswer).questionId,
+        evidence: Array.isArray(ev) ? ev.filter((x) => typeof x === "string" && x.trim()) : [],
+      });
+    }
+  }
+  return out;
 }
 
 /**

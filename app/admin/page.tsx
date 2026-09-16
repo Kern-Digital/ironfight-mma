@@ -47,7 +47,11 @@ import { useAuth } from "@/lib/auth-context";
 import { greetingFor } from "@/lib/greeting";
 import { listGyms, type Gym } from "@/lib/gym";
 import {
+  formatEur,
   getAiUsageSummary,
+  listAiUsageByGym,
+  monthKey,
+  type AiUsageByGym,
   type AiUsageSummary,
 } from "@/lib/video-analysis";
 import Link from "next/link";
@@ -244,6 +248,12 @@ function PlattformDashboard() {
    * deshalb kein Grund, die ganze Seite als kaputt zu melden.
    */
   const [aiFailed, setAiFailed] = useState(false);
+  /**
+   * Verbrauch je Gym mit Monatsverlauf (`aiUsage/gym-*`, seit der Automatik
+   * serverseitig gebucht). Leer, bis die erste Analyse nach dem Umbau
+   * gelaufen ist — der Bestand ist Demo und wurde nicht nachgebucht.
+   */
+  const [gymUsage, setGymUsage] = useState<AiUsageByGym[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -254,14 +264,16 @@ function PlattformDashboard() {
     setAi(null);
     setAiFailed(false);
     try {
-      const [userList, gymList, usage] = await Promise.all([
+      const [userList, gymList, usage, byGym] = await Promise.all([
         listAllUsers(),
         listGyms(),
         getAiUsageSummary().catch(() => null),
+        listAiUsageByGym().catch(() => [] as AiUsageByGym[]),
       ]);
       setUsers(userList);
       setGyms(gymList);
       setAi(usage);
+      setGymUsage(byGym);
       setAiFailed(usage === null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -838,6 +850,59 @@ function PlattformDashboard() {
                   verbrauchten Token ({ai.inputTokens.toLocaleString("de-DE")}{" "}
                   hinein, {ai.outputTokens.toLocaleString("de-DE")} hinaus).
                 </p>
+
+                {/* ─── Je Gym (Leons Wunsch vom 08.09.: welches Gym
+                    verursacht am meisten, was kostet ein Monat). Gebucht
+                    seit der Automatik serverseitig je Analyse; der
+                    Demo-Bestand davor steht hier nicht. ─── */}
+                <div
+                  className="flex flex-col gap-2"
+                  style={{
+                    borderTop: "1px solid var(--line)",
+                    paddingTop: "var(--sp-3)",
+                  }}
+                >
+                  <span
+                    className={META_SIZE}
+                    style={{ ...META_BASE, color: "var(--text-label)" }}
+                  >
+                    Je Gym · dieser Monat / gesamt
+                  </span>
+                  {gymUsage.length === 0 ? (
+                    <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                      Sobald die erste Analyse nach dem Umbau gelaufen ist,
+                      steht hier, welches Gym wie viel verursacht.
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5">
+                      {gymUsage.map((g) => {
+                        const monat = g.months[monthKey(new Date())];
+                        const name =
+                          gyms?.find((x) => x.id === g.gymId)?.name ?? g.gymId;
+                        return (
+                          <li
+                            key={g.gymId}
+                            className="flex items-baseline justify-between gap-3"
+                            style={{ font: "var(--type-sub)" }}
+                          >
+                            <span className="min-w-0 truncate">{name}</span>
+                            <span
+                              className="shrink-0"
+                              style={{
+                                fontVariantNumeric: "tabular-nums",
+                                color: "var(--text-2)",
+                              }}
+                            >
+                              {formatEur(monat?.spentEur ?? 0)} /{" "}
+                              {formatEur(g.spentEur)} · {g.analysisCount}{" "}
+                              {g.analysisCount === 1 ? "Analyse" : "Analysen"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -889,10 +954,10 @@ function PlattformDashboard() {
                   füllen die Übersichten mit Kurs-Abos und Rückmeldungen,
                   damit sich Aussehen und Rechnung beurteilen lassen. Angelegt
                   und entfernt werden sie mit{" "}
-                  <span className="font-mono-ta">
+                  <span className="font-mono">
                     scripts/seed-demo-gym.mjs
                   </span>{" "}
-                  (der Schalter <span className="font-mono-ta">--clear</span>{" "}
+                  (der Schalter <span className="font-mono">--clear</span>{" "}
                   räumt alle wieder weg). Auf der Seite „Demo-Daten“ füllst du
                   dagegen ein einzelnes echtes Konto mit Trainingsverlauf.
                 </p>
