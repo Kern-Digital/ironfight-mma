@@ -117,26 +117,26 @@ async function main() {
     let text = (await main.innerText()).toLowerCase();
     sagt(text.includes("kämpfer zuordnen"), "Überschrift ‚Kämpfer zuordnen‘");
     sagt(text.includes("kämpfer 1") && text.includes("kämpfer 2"), "Zwei Karten");
-    sagt((text.match(/ignorieren/g) ?? []).length >= 2, "Je Karte ‚X Ignorieren‘");
-    sagt(text.includes("wann wurde das video aufgenommen"), "Feld ‚Wann wurde das Video aufgenommen?‘");
+    sagt((await main.locator('button[data-aktion="ignorieren"]').count()) >= 2, "Je Karte ein X (Ignorieren)");
+    sagt(text.includes("wann ist das video entstanden"), "Feld ‚Wann ist das Video entstanden?‘");
     sagt(text.includes("training / sparring") && text.includes("mma"), "Zeile Art · Kampfart vorbelegt");
-    sagt(text.includes("video liegt bei google"), "Zwischenstand sichtbar");
+    sagt(text.includes("video hochgeladen"), "Zwischenstand sichtbar");
 
     // Knopf noch nicht voll farbig: Klick sagt, was fehlt.
     await main.locator("button", { hasText: "Analysieren" }).first().click();
     await page.waitForTimeout(500);
     text = (await main.innerText()).toLowerCase();
-    sagt(text.includes("wähle mind. eine person zur auswertung aus"), "Hinweis ohne Zuordnung");
+    sagt(text.includes("wähl mindestens eine person zur auswertung aus"), "Hinweis ohne Zuordnung");
 
     // Ignorieren und zurück per Tipp auf die Karte.
-    await main.locator("button", { hasText: "Ignorieren" }).nth(1).click();
+    await main.locator('button[data-aktion="ignorieren"]').nth(1).click();
     await page.waitForTimeout(400);
     text = (await main.innerText()).toLowerCase();
-    sagt(text.includes("ignoriert · tipp zum auswerten"), "Karte 2 grau");
+    sagt(/aussen vor|außen vor/.test(text), "Karte 2 grau");
     await main.locator('[data-ignoriert] > button').first().click();
     await page.waitForTimeout(400);
     text = (await main.innerText()).toLowerCase();
-    sagt(!text.includes("ignoriert · tipp zum auswerten"), "Tipp auf die graue Karte holt sie zurück");
+    sagt(!/aussen vor|außen vor/.test(text), "Tipp auf die graue Karte holt sie zurück");
 
     // Karte 1 → Athlet → Sheet.
     await main.locator('button[aria-label="Kämpfer 1: zuordnen"]').click();

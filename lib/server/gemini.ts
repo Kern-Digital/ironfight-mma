@@ -13,6 +13,7 @@
 import { ACTION_CATALOG } from "../fight-stats";
 import type {
   CornerColor,
+  FighterBox,
   FighterDescription,
   GeminiTier,
   PreviewFighter,
@@ -22,7 +23,7 @@ import type {
   VideoSource,
   VideoType,
 } from "../video-analysis";
-import { CORNER_LABEL, isSport, sportFromText } from "../video-analysis";
+import { CORNER_LABEL, boxFromGemini, isSport, sportFromText } from "../video-analysis";
 
 const BASE = "https://generativelanguage.googleapis.com";
 
@@ -224,6 +225,7 @@ Reaktion auf Corner-Anweisungen, Besonderheiten.`;
 // ─── Beobachtung ausführen ──────────────────────────────────────────────────
 
 type GeminiPart = {
+  inlineData?: { mimeType: string; data: string };
   text?: string;
   fileData?: { fileUri: string; mimeType?: string };
   videoMetadata?: { startOffset?: string; endOffset?: string };
@@ -518,7 +520,7 @@ REGELN:
    clothing = Hose, Rashguard, Jacke, Handschuhe MIT Farben;
    features = Tattoos, Haare, Statur, Größe im Vergleich;
    description = EIN Satz, an dem ein Trainer ihn sofort wiedererkennt;
-   bestSecond = Sekunde ab Videostart (0–120), in der Gesicht und Oberkörper frei und nah zu sehen sind.
+   bestSecond = Sekunde ab Videostart (0–120), in der er frei und gut zu sehen ist. Gib sie IMMER an, sobald er irgendwo im Bild ist.
 3. videoType: "full" = ganzer Wettkampf mit Ringrichter oder Anzeige, "excerpt" = Teil eines Wettkampfs, "sparring" = Training oder Sparring ohne Wettkampfrahmen, "highlight" = Zusammenschnitt aus Treffern.
 4. sport nach Regeln und Ausrüstung: Käfig oder MMA-Handschuhe → "mma"; nur Fäuste mit Boxhandschuhen → "boxen"; Tritte oder Knie mit Handschuhen, kein Boden → "kickboxen"; Ringen ohne Jacke, keine Schläge → "ringen"; Jacke (Kurtka/Gi) mit Würfen und Standkampf → "sambo"; Bodenkampf und Aufgabegriffe ohne Schläge (mit oder ohne Gi) → "bjj"; unklar → null. sportSeen = was du siehst, in Worten.
 5. fightMonth "JJJJ-MM" NUR bei sichtbarer Datumseinblendung, sonst null.
@@ -570,6 +572,60 @@ function normalizePreview(
       ? p.fightMonth
       : null;
   return { fighters, videoType, sport, fightMonth, model };
+}
+
+// ─── Kämpfer auf dem Standbild eingrenzen ────────────────────────────────────
+
+const RAHMEN_TIMEOUT_MS = 30_000;
+
+function rahmenPrompt(fighters: { description: string; clothing: string; features: string }[]): string {
+  const liste = fighters
+    .map((f, i) => {
+      const teile = [f.description, f.clothing && `Kleidung: ${f.clothing}`, f.features && `Merkmale: ${f.features}`]
+        .filter(Boolean)
+        .join(" · ");
+      return `${i + 1}. ${teile || "keine Beschreibung"}`;
+    })
+    .join("\n");
+  return `Du siehst ein Standbild aus einem Kampfsport-Video. Finde die beschriebenen Personen:
+${liste}
+
+REGELN:
+1. Jede Nummer ist eine ANDERE Person. Vergib nie dieselbe Person zweimal.
+2. box_2d = Rahmen eng um den GANZEN Körper (Kopf bis Füße, ausgestreckte Arme und Beine eingeschlossen), als [ymin, xmin, ymax, xmax] auf 0–1000 normiert.
+3. Findest du eine Person nicht sicher, gib für sie null zurück. Nicht raten.
+
+Gib AUSSCHLIESSLICH dieses JSON zurück, in der Reihenfolge der Nummern:
+{ "boxes": [ [ymin, xmin, ymax, xmax] | null, ... ] }`;
+}
+
+/**
+ * Sucht die beschriebenen Kämpfer auf EINEM Standbild. Flash-Kette, niedrige
+ * Temperatur; ein Bild in voller Auflösung braucht Sekunden.
+ */
+export async function locateFighters(
+  imageBase64: string,
+  fighters: { description: string; clothing: string; features: string }[],
+): Promise<(FighterBox | null)[]> {
+  const { text } = await generateContentResilient(
+    FLASH_CHAIN,
+    {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+            { text: rahmenPrompt(fighters) },
+          ],
+        },
+      ],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1024, temperature: 0 },
+    },
+    RAHMEN_TIMEOUT_MS,
+  );
+  const roh = parseModelJson(text) as { boxes?: unknown[] };
+  const boxes = Array.isArray(roh?.boxes) ? roh.boxes : [];
+  return fighters.map((_, i) => boxFromGemini(boxes[i]));
 }
 
 /**

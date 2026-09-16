@@ -18,10 +18,15 @@ export function Collapse({
   open,
   children,
   className,
+  ueberstehen = false,
 }: {
   open: boolean;
   children: ReactNode;
   className?: string;
+  /** Nach dem Aufklappen darf Inhalt überstehen — Dropdown-Panels, Schein
+      unter Knöpfen (Leon 16.09.: Liste und „Analysieren" abgeschnitten).
+      Während der Bewegung bleibt es beim Beschnitt. */
+  ueberstehen?: boolean;
 }) {
   const { reduced } = useMotionCapability();
   if (reduced) return open ? <div className={className}>{children}</div> : null;
@@ -31,10 +36,14 @@ export function Collapse({
       {open && (
         <motion.div
           className={className}
-          style={{ overflow: "hidden" }}
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
+          initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+          animate={{
+            height: "auto",
+            opacity: 1,
+            overflow: "hidden",
+            transitionEnd: { overflow: ueberstehen ? "visible" : "hidden" },
+          }}
+          exit={{ height: 0, opacity: 0, overflow: "hidden" }}
           transition={springSoft}
         >
           {children}

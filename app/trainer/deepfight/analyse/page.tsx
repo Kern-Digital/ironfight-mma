@@ -200,7 +200,8 @@ function AnalyseSeiteInhalt() {
             Video, dann der Vorlauf, dann die Zuordnung auf den Karten. Ein
             `?upload=` holt einen gemerkten Zwischenstand zurück. */}
         {!zielId ? (
-          <section className="t-card p-4 sm:p-5">
+          // Ohne Glas-Karte (Leon 16.09.): Der Fluss steht frei auf der Seite.
+          <section className="pt-2 sm:pt-4">
             <VideoUploadFlow uploadId={uploadId} />
           </section>
         ) : gesperrt ? (

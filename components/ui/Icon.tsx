@@ -35,6 +35,7 @@ export type IconName =
   | "target"
   | "chart"
   | "calendar"
+  | "frame"
   | "users"
   | "share"
   | "shield"
@@ -261,6 +262,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M8 16v-5M12 16V8M16 16v-3" />
     </>
   ),
+  // Rahmen ziehen — vier Ecken, die etwas einfassen (Kämpfer-Karten, DeepFight).
+  frame: <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />,
   calendar: (
     <>
       <rect x="4" y="5.5" width="16" height="15" rx="2" />

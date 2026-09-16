@@ -3701,12 +3701,22 @@ h1, h2 { overflow-wrap: anywhere; }
   align-items: center;
   justify-content: center;
   border-radius: var(--r-pill);
-  transition: background-color var(--dur-fast) var(--ease-out);
+  /* KEIN Kreis mehr unter dem Zeiger (Leon 16.09.: „die X sollen nicht mit
+     einem Kreis drumherum sein") — das X bleibt stehen und macht eine
+     Vierteldrehung, dieselbe Kurve wie XKnopf. Kein Wort: in der Pille ist
+     dafür kein Platz. */
+  transition: transform 620ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 @media (hover: hover) {
   .mf-clear:hover .mf-clear-kreis {
-    background: color-mix(in oklab, var(--accent) 26%, transparent);
+    transform: rotate(90deg);
   }
+}
+.mf-clear:focus-visible .mf-clear-kreis {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mf-clear-kreis { transition: none; }
 }
 .mf-clear:focus-visible {
   outline: 2px solid var(--accent);
@@ -4067,4 +4077,160 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
   [data-press="quiet"]:active {
     transform: none;
   }
+}
+
+/* ─── DER REGENBOGEN-KNOPF (components/ui/RainbowButton.tsx) ─────────────────
+ * Leon 16.09.2026: „Analysieren" soll schimmern, unter dem Zeiger und beim
+ * Klick noch etwas Extremeres machen. Vorlage: Magic UI „Rainbow Button",
+ * angepasst an die App (data-theme statt `dark:`, kein shadcn).
+ *
+ * Die fünf Farben sind FEST (Material, Ausnahme von DESIGN-BRIEF §1.1 wie beim
+ * Plus der Wettkampfseite) und gelten in beiden Themes. Der Rand ist ein
+ * Verlauf, der mit `background-clip` nur im 2-px-Rand sichtbar bleibt;
+ * die dunkle Füllung liegt darüber, in beiden Themes gleich.
+ *
+ * Drei Stufen, nur transform/opacity/filter/background-position:
+ *   ruhig    Rand und Schein laufen in 6 s durch, Schein bei 35 %
+ *   Zeiger   3 s, Schein breiter und heller, Knopf hebt sich
+ *   Klick    1,2 s, dazu ein Regenbogen-Ring, der aus dem Knopf herausschießt
+ * Ohne `data-bereit` (Pflichtangaben fehlen) läuft der Schimmer entsättigt —
+ * „voll farbig erst, wenn alles steht" (Leon, Etappe 2) bleibt wahr. */
+:root {
+  --color-1: 0 100% 63%;
+  --color-2: 270 100% 63%;
+  --color-3: 210 100% 63%;
+  --color-4: 195 100% 63%;
+  --color-5: 90 100% 63%;
+  --rainbow: linear-gradient(90deg, hsl(var(--color-1)), hsl(var(--color-5)), hsl(var(--color-3)), hsl(var(--color-4)), hsl(var(--color-2)));
+}
+.rainbow-btn {
+  /* Dunkle Fläche in BEIDEN Themes (Leon 16.09.: die weiße Platte im
+     Dunkeln „nicht schön"), der Regenbogen läuft rundum im 2-px-Rand. */
+  --rb-fill: oklch(0.17 0.012 250);
+  color: #fff;
+  border-width: 2px;
+  background-image:
+    linear-gradient(var(--rb-fill), var(--rb-fill)),
+    var(--rainbow);
+  background-clip: padding-box, border-box;
+  background-origin: border-box;
+  background-size: 200%;
+  /* Lauf und Keyframes stehen HIER, nicht nur als Tailwind-Klasse
+     `animate-rainbow`: Ein laufender Dev-Server liest eine geänderte
+     tailwind.config.ts nicht neu ein, und der Regenbogen stand still
+     (gemessen 16.09.: Klasse fehlte im ausgelieferten CSS). */
+  animation: rainbow-lauf var(--speed, 6s) infinite linear;
+  /* Eigene Feder: `data-motion` am Knopf nimmt ihn aus der GRUNDHAPTIK
+     (Präzedenz VS-Banner) — sonst schlüge deren scale(.97) das hier. */
+  transition: transform var(--dur-fast) var(--ease-pop), filter var(--dur-med) var(--ease-out);
+}
+.rainbow-btn::before {
+  background-image: var(--rainbow);
+  /* Leon 16.09.: der Nebel war zu stark — ruhig nur ein Hauch. */
+  opacity: 0.35;
+  background-size: 200%;
+  animation: rainbow-lauf var(--speed, 6s) infinite linear;
+  transition: width var(--dur-med) var(--ease-out), height var(--dur-med) var(--ease-out),
+    opacity var(--dur-med) var(--ease-out), filter var(--dur-med) var(--ease-out);
+}
+.rainbow-btn:not([data-bereit]) {
+  filter: saturate(0.35);
+}
+@media (hover: hover) {
+  .rainbow-btn:hover {
+    --speed: 3s;
+    filter: saturate(1.25) brightness(1.05);
+    transform: translateY(-2px) scale(1.03);
+  }
+  .rainbow-btn:hover::before {
+    opacity: 0.55;
+    width: 85%;
+    height: 35%;
+    filter: blur(1.1rem) saturate(1.4);
+  }
+}
+.rainbow-btn:active {
+  --speed: 1.2s;
+  filter: saturate(1.5) brightness(1.1);
+  transform: scale(0.96);
+}
+.rainbow-btn:active::before {
+  opacity: 0.8;
+  width: 100%;
+  height: 50%;
+  filter: blur(1.4rem) saturate(1.6);
+}
+.rainbow-btn__burst {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: var(--rainbow);
+  background-size: 200%;
+  filter: blur(10px);
+  pointer-events: none;
+  animation: rainbow-burst 700ms var(--ease-out) forwards;
+}
+@keyframes rainbow-lauf {
+  0%   { background-position: 0%; }
+  100% { background-position: 200%; }
+}
+@keyframes rainbow-burst {
+  0%   { opacity: 0.95; transform: scale(1); }
+  100% { opacity: 0;    transform: scale(1.55, 2.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rainbow-btn,
+  .rainbow-btn::before { animation: none; }
+  .rainbow-btn__burst { display: none; }
+}
+
+/* ─── DAS X MIT HERAUSWACHSENDEM WORT (components/ui/XKnopf.tsx) ────────────
+ * APP-STANDARD seit 16.09.2026: jedes freistehende X ist dieser Knopf.
+ * Eine Kurve, eine Dauer für Drehung, Breite und Abstand — sonst läuft das
+ * Zeichen dem Wort voraus. `grid-template-columns` 0fr → 1fr endet genau an
+ * der Wortbreite (Leon 16.09.: „ruckelig", mit max-width lief es ins Leere).
+ * Das Einblenden des Worts startet leicht verzögert, das Ausblenden sofort. */
+.x-knopf {
+  --x-dauer: 620ms;
+  /* easeOutCubic: die steilere Expo-Kurve schoss 84 px in 60 ms heraus. */
+  --x-kurve: cubic-bezier(0.33, 1, 0.68, 1);
+}
+.x-knopf__zeichen {
+  transition: transform var(--x-dauer) var(--x-kurve);
+  will-change: transform;
+}
+.x-knopf__wort {
+  display: grid;
+  grid-template-columns: 0fr;
+  margin-left: 0;
+  opacity: 0;
+  transition:
+    grid-template-columns var(--x-dauer) var(--x-kurve),
+    margin-left var(--x-dauer) var(--x-kurve),
+    opacity 180ms ease-out;
+}
+.x-knopf__wort > span { min-width: 0; }
+@media (hover: hover) {
+  .x-knopf:hover .x-knopf__wort {
+    grid-template-columns: 1fr;
+    margin-left: 0.5rem;
+    opacity: 1;
+    transition:
+      grid-template-columns var(--x-dauer) var(--x-kurve),
+      margin-left var(--x-dauer) var(--x-kurve),
+      opacity 260ms ease-out 90ms;
+  }
+  .x-knopf[data-drehung="roll"]:hover .x-knopf__zeichen { transform: rotate(-180deg); }
+  .x-knopf[data-drehung="viertel"]:hover .x-knopf__zeichen { transform: rotate(90deg); }
+}
+.x-knopf:focus-visible .x-knopf__wort {
+  grid-template-columns: 1fr;
+  margin-left: 0.5rem;
+  opacity: 1;
+}
+.x-knopf[data-drehung="roll"]:focus-visible .x-knopf__zeichen { transform: rotate(-180deg); }
+.x-knopf[data-drehung="viertel"]:focus-visible .x-knopf__zeichen { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .x-knopf__zeichen, .x-knopf__wort { transition: none; }
 }

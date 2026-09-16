@@ -115,8 +115,15 @@ export default function Select({
         className="t-interactive flex min-h-hit w-full items-center justify-between gap-2 px-3.5 text-left"
         style={{
           font: "var(--type-body)",
-          background: "var(--surface-raised)",
-          border: "1px solid var(--line)",
+          // Aufgeklappt DECKEND: Im DeepFight-Bereich ist --surface-raised
+          // Glas (62 %) — das Panel ragt über die Karte hinaus, und der Text
+          // darunter schien durch (Leon 16.09.). Feld und Panel tragen dann
+          // dieselbe deckende Fläche, sonst wären sie keine Einheit.
+          background: open ? "var(--bg-2)" : "var(--surface-raised)",
+          // Aufgeklappt kein Hover-Zoom: Das Feld wuchs unter dem Zeiger um
+          // 1 %, das Panel nicht — der Rahmen stand seitlich versetzt.
+          transform: open ? "none" : undefined,
+          border: `1px solid ${open ? "var(--line-strong)" : "var(--line)"}`,
           // Aufgeklappt: Feld + Panel = ein Rahmen (unten offen)
           borderBottomColor: open ? "transparent" : "var(--line)",
           borderRadius: open ? "var(--r-md) var(--r-md) 0 0" : "var(--r-md)",
@@ -148,16 +155,18 @@ export default function Select({
         open={open}
         role="listbox"
         onKeyDown={onPanelKeyDown}
-        className="absolute inset-x-0 top-full z-40 overflow-y-auto p-1"
+        className="absolute inset-x-0 top-full z-40 overflow-hidden"
         style={{
-          maxHeight: "min(300px, 40vh)",
-          background: "var(--surface-raised)",
-          border: "1px solid var(--line)",
+          background: "var(--bg-2)",
+          border: "1px solid var(--line-strong)",
           borderTop: "none",
           borderRadius: "0 0 var(--r-md) var(--r-md)",
           boxShadow: "var(--glass-shadow)",
         }}
       >
+        {/* Gescrollt wird innen: Scrollt der gerundete Kasten selbst, schneidet
+            der Balken die Rundung unten rechts an und der Rahmen reißt. */}
+        <div className="overflow-y-auto p-1" style={{ maxHeight: "min(300px, 40vh)" }}>
           {listOptions.map((o, i) => {
             const isSelected = o.value === value;
             return (
@@ -198,6 +207,7 @@ export default function Select({
               </button>
             );
           })}
+        </div>
       </Pop>
     </div>
   );

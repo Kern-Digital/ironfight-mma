@@ -1315,6 +1315,33 @@ export interface PreviewFighter {
 }
 
 /**
+ * Ein Rahmen um einen Kämpfer im Standbild, normiert auf 0–1 (Anteil an
+ * Bildbreite bzw. -höhe). Leon 16.09.: „die Karten sollen den Kämpfer
+ * genauer zeigen". Die KI sucht ihn auf dem STANDBILD selbst
+ * (`locateFightersInStill`), der Trainer kann ihn auf der Karte neu ziehen.
+ *
+ * NICHT aus dem Vorlauf: Der sieht das Video in niedriger Auflösung und je
+ * Sekunde nur ein Bild — gemessen 16.09. am Testvideo lag ein Rahmen halb,
+ * der andere ganz neben dem Kämpfer. Auf dem Standbild in voller Auflösung
+ * trifft dieselbe Kette.
+ */
+export interface FighterBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Gemini-Form `[ymin, xmin, ymax, xmax]` auf 0–1000 → FighterBox; Unsinn → null. */
+export function boxFromGemini(roh: unknown): FighterBox | null {
+  if (!Array.isArray(roh) || roh.length !== 4) return null;
+  const [ymin, xmin, ymax, xmax] = roh.map((v) => Number(v));
+  if (![ymin, xmin, ymax, xmax].every((v) => Number.isFinite(v) && v >= 0 && v <= 1000)) return null;
+  if (ymax - ymin < 20 || xmax - xmin < 10) return null;
+  return { x: xmin / 1000, y: ymin / 1000, w: (xmax - xmin) / 1000, h: (ymax - ymin) / 1000 };
+}
+
+/**
  * Was der Vorlauf liefert. Der Nutzer sieht davon NICHTS direkt (Leon
  * 16.09.): Die Kämpfer werden zu Karten, Art und Kampfart zu einer
  * vorbelegten Zeile unter den Karten.
@@ -1338,6 +1365,23 @@ export async function runVideoPreview(source: VideoSource): Promise<VideoPreview
     { source },
   );
   return data.preview;
+}
+
+/**
+ * Sucht die beschriebenen Kämpfer auf einem Standbild (JPEG als Data-URL)
+ * und liefert je Beschreibung einen Rahmen oder null — in derselben
+ * Reihenfolge. Alle Beschreibungen gehen mit, auch wenn nur einer gesucht
+ * ist: Zwei Beschreibungen sind zwei verschiedene Personen.
+ */
+export async function locateFightersInStill(
+  image: string,
+  fighters: { description: string; clothing: string; features: string }[],
+): Promise<(FighterBox | null)[]> {
+  const data = await postJson<{ boxes: (FighterBox | null)[] }>("/api/video-analysis/rahmen", {
+    image,
+    fighters,
+  });
+  return fighters.map((_, i) => data.boxes?.[i] ?? null);
 }
 
 export interface AnalyzeResult {
