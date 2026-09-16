@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 // AUSNAHME (MOTION-BRIEF §3.1): Die Helix — dort IST die Bewegung der Inhalt.
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
 import type { DnaSplit } from "@/lib/fight-stats";
 import { buildHelixModel } from "@/lib/fight-dna-helix";
@@ -709,27 +709,13 @@ export default function FightDnaHelix({
                 <p style={{ margin: 0, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, color: "var(--text-3)", font: "var(--type-label)", letterSpacing: "var(--ls-label)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
                   <span>{completenessLabel}</span><span style={{ color: focusColor, fontFamily: "var(--font-mono), monospace", fontWeight: 700 }}>{model.completeness} %</span>
                 </p>
-                <button
-                  type="button"
+                <XKnopf
                   onClick={() => onFocusChange?.(null)}
-                  aria-label="Segmentfokus schließen"
-                  style={{
-                    position: "absolute",
-                    right: 4,
-                    top: 4,
-                    inlineSize: 44,
-                    blockSize: 44,
-                    display: "grid",
-                    placeItems: "center",
-                    color: "var(--text-2)",
-                    background: "transparent",
-                    border: 0,
-                    borderRadius: "var(--r-md)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon name="x" size={18} />
-                </button>
+                  ariaLabel="Segmentfokus schließen"
+                  wort="Schließen"
+                  drehung="roll"
+                  style={{ position: "absolute", right: 4, top: 4, color: "var(--text-2)" }}
+                />
               </div>
             </motion.aside>
           </>

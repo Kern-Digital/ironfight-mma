@@ -59,6 +59,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import XKnopf from "@/components/ui/XKnopf";
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -1499,19 +1500,20 @@ export default function PlanView({
                           </span>
                           {edit && (
                             // Desktop-Weg; auf Touch übernimmt die Wisch-Geste
-                            <button
-                              type="button"
-                              aria-label={`${ex.name} entfernen`}
+                            <XKnopf
+                              ariaLabel={`${ex.name} entfernen`}
                               onClick={(e) => {
                                 // nicht zusätzlich das Detail-Sheet öffnen
                                 e.stopPropagation();
                                 handleRemoveRow(idx, i);
                               }}
-                              className="t-interactive hidden h-9 w-9 items-center justify-center rounded-field sm:flex"
+                              wort="Entfernen"
+                              drehung="roll"
+                              size={30}
+                              strokeWidth={3.8}
+                              className="hidden sm:inline-flex"
                               style={{ color: "var(--gesture-delete)" }}
-                            >
-                              <Icon name="x" size={15} strokeWidth={2.2} />
-                            </button>
+                            />
                           )}
                         </div>
                         {/* „+1" — Dupliziere-Feedback, groß und leuchtend */}

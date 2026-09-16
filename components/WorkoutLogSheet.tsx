@@ -20,6 +20,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell, useLetzterWert } from "@/components/motion";
 import { getExerciseById } from "@/lib/exercises";
 import { workoutSessionToPlan } from "@/lib/workout-plans";
@@ -228,15 +229,13 @@ function WorkoutLogInhalt({
               style={saved ? { fill: "currentColor" } : undefined}
             />
           </button>
-          <button
-            type="button"
+          <XKnopf
             onClick={onClose}
-            aria-label="Schließen"
-            className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={16} strokeWidth={2.2} />
-          </button>
+            ariaLabel="Schließen"
+            wort="Schließen"
+            drehung="roll"
+            style={{ color: "var(--text-2)" }}
+          />
         </div>
       </div>
       <div

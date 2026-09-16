@@ -24,6 +24,7 @@ import {
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { DNA_CATEGORIES, answeredCount, dnaCompleteness } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
+import XKnopf from "@/components/ui/XKnopf";
 
 /**
  * DER TAB „VIDEOS" IST WEG (Teilschritt 4 des DeepFight-Neuaufbaus,
@@ -195,14 +196,13 @@ function SharePanel({
             Bereich „Mein DeepFight“ — z. B. zur Vorbereitung auf den Kampf.
           </p>
         </div>
-        <button
+        <XKnopf
           onClick={onClose}
-          aria-label="Freigabe schließen"
-          className="rounded-lg p-1.5"
-          style={{ color: "var(--fg-4)" }}
-        >
-          <Icon name="x" size={14} />
-        </button>
+          ariaLabel="Freigabe schließen"
+          wort="Schließen"
+          drehung="roll"
+          style={{ color: "var(--text-2)" }}
+        />
       </div>
 
       {error && (

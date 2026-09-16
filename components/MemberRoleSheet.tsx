@@ -18,6 +18,7 @@
  */
 
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import { MorphSwap, SheetShell, useLetzterWert } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import type { StudentEntry } from "@/lib/admin";
@@ -220,15 +221,13 @@ function MemberRoleInhalt({
               {member.email ? ` · ${member.email}` : ""}
             </span>
           </div>
-          <button
-            type="button"
+          <XKnopf
             onClick={onClose}
-            aria-label="Schließen"
-            className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={16} strokeWidth={2.2} />
-          </button>
+            ariaLabel="Schließen"
+            wort="Schließen"
+            drehung="roll"
+            style={{ color: "var(--text-2)" }}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">

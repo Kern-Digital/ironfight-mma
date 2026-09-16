@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 // Choreografie vor (Schritt-Karten, die sich zeigen und zurückziehen) und
 // steht außerhalb der Sheet-Hülle, weil ihn das Betriebssystem auslöst.
 import { AnimatePresence, motion } from "framer-motion";
-import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 
 // Der Prompt legt sich als Modal (Backdrop + Bottom-Sheet) über ALLES.
 // Deshalb nur auf den Einstiegsseiten zeigen — mitten in einem Flow hat
@@ -208,14 +208,14 @@ export default function PwaInstallPrompt() {
               />
 
               {/* Close */}
-              <button
+              <XKnopf
                 onClick={dismiss}
-                className="absolute right-4 top-4 rounded-badge p-1.5 transition-colors"
-                style={{ color: "var(--text-3)" }}
-                aria-label="Schließen"
-              >
-                <Icon name="x" size={16} strokeWidth={2.5} />
-              </button>
+                ariaLabel="Schließen"
+                wort="Schließen"
+                drehung="roll"
+                className="absolute right-3 top-3"
+                style={{ color: "var(--text-2)" }}
+              />
 
               {/* App icon + title */}
               <div className="mb-4 flex items-center gap-3 pr-8">

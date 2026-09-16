@@ -16,6 +16,7 @@
 
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import Select from "@/components/ui/Select";
 import SwipeAction from "@/components/SwipeAction";
 import { EXERCISES } from "@/lib/exercises";
@@ -202,15 +203,13 @@ export default function ExercisePicker({
               {blockCount === 1 ? "Übung" : "Übungen"}
             </span>
           </div>
-          <button
-            type="button"
+          <XKnopf
             onClick={onClose}
-            aria-label="Fertig"
-            className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={16} strokeWidth={2.2} />
-          </button>
+            ariaLabel="Fertig"
+            wort="Fertig"
+            drehung="roll"
+            style={{ color: "var(--text-2)" }}
+          />
         </div>
 
         {/* Filter — beide optional, „Alle" = kein Filter */}

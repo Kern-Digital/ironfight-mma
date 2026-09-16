@@ -16,6 +16,7 @@
 
 import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell, useLetzterWert } from "@/components/motion";
 import InviteStatusChip from "@/components/InviteStatusChip";
 import { useAuth } from "@/lib/auth-context";
@@ -185,15 +186,13 @@ function InviteDetailInhalt({
               {INVITE_ROLE_LABEL[invite.role]}
             </span>
           </div>
-          <button
-            type="button"
+          <XKnopf
             onClick={onClose}
-            aria-label="Schließen"
-            className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-            style={{ color: "var(--text-3)" }}
-          >
-            <Icon name="x" size={16} strokeWidth={2.2} />
-          </button>
+            ariaLabel="Schließen"
+            wort="Schließen"
+            drehung="roll"
+            style={{ color: "var(--text-2)" }}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">

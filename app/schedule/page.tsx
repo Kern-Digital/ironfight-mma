@@ -17,6 +17,7 @@ import { resolveGymId } from "@/lib/gym";
 import { useTheme } from "@/lib/theme-context";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import {
   WEEKDAY_LABELS,
   getBlocksForDay,
@@ -1428,15 +1429,13 @@ function ModalHeader({ block, onClose }: { block: TrainingBlock; onClose: () => 
           <span style={{ color: "var(--text-3)" }}> · Diese Woche</span>
         </p>
       </div>
-      <button
-        type="button"
+      <XKnopf
         onClick={onClose}
-        className="t-interactive flex h-11 w-11 shrink-0 items-center justify-center rounded-field"
-        style={{ background: "var(--surface-raised)", color: "var(--text-2)" }}
-        aria-label="Schließen"
-      >
-        <Icon name="x" size={18} />
-      </button>
+        ariaLabel="Schließen"
+        wort="Schließen"
+        drehung="roll"
+        style={{ color: "var(--text-2)" }}
+      />
     </div>
   );
 }

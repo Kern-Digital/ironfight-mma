@@ -47,6 +47,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import XKnopf from "@/components/ui/XKnopf";
 
 const CATEGORIES: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
 const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
@@ -708,15 +709,13 @@ export default function WorkoutHubPage() {
                 />
                 <span className="t-label">Auto-Generator</span>
               </div>
-              <button
-                type="button"
+              <XKnopf
                 onClick={() => setGenOpen(false)}
-                aria-label="Schließen"
-                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-                style={{ color: "var(--text-3)" }}
-              >
-                <Icon name="x" size={16} strokeWidth={2.2} />
-              </button>
+                ariaLabel="Schließen"
+                wort="Schließen"
+                drehung="roll"
+                style={{ color: "var(--text-2)" }}
+              />
             </div>
             <div
               className="flex flex-col gap-6 overflow-y-auto px-5 pt-2"
@@ -901,15 +900,13 @@ export default function WorkoutHubPage() {
                 />
                 <span className="t-label">{sharedPlansTitle}</span>
               </div>
-              <button
-                type="button"
+              <XKnopf
                 onClick={() => setTrainerPlansOpen(false)}
-                aria-label="Schließen"
-                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-                style={{ color: "var(--text-3)" }}
-              >
-                <Icon name="x" size={16} strokeWidth={2.2} />
-              </button>
+                ariaLabel="Schließen"
+                wort="Schließen"
+                drehung="roll"
+                style={{ color: "var(--text-2)" }}
+              />
             </div>
             <div
               className="flex flex-col gap-3 overflow-y-auto px-4 pt-3"
@@ -1002,15 +999,13 @@ export default function WorkoutHubPage() {
                 />
                 <span className="t-label">Meine Workouts</span>
               </div>
-              <button
-                type="button"
+              <XKnopf
                 onClick={() => setPlansOpen(false)}
-                aria-label="Schließen"
-                className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-                style={{ color: "var(--text-3)" }}
-              >
-                <Icon name="x" size={16} strokeWidth={2.2} />
-              </button>
+                ariaLabel="Schließen"
+                wort="Schließen"
+                drehung="roll"
+                style={{ color: "var(--text-2)" }}
+              />
             </div>
             <div
               className="overflow-y-auto px-3 pt-2"
@@ -1086,20 +1081,21 @@ export default function WorkoutHubPage() {
                               min · {exercises} Übungen
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            aria-label={`„${plan.name}" aus den Favoriten entfernen`}
+                          <XKnopf
+                            ariaLabel={`„${plan.name}" aus den Favoriten entfernen`}
                             onClick={(e) => {
                               // nicht zusätzlich zur Plan-Seite navigieren
                               e.preventDefault();
                               e.stopPropagation();
                               handleRemovePlan(plan.id);
                             }}
-                            className="t-interactive hidden h-9 w-9 shrink-0 items-center justify-center rounded-field sm:flex"
+                            wort="Entfernen"
+                            drehung="roll"
+                            size={30}
+                            strokeWidth={3.8}
+                            className="hidden sm:inline-flex"
                             style={{ color: "var(--gesture-delete)" }}
-                          >
-                            <Icon name="x" size={15} strokeWidth={2.2} />
-                          </button>
+                          />
                           <span
                             aria-hidden
                             className="shrink-0"

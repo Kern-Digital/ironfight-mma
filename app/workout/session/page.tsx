@@ -34,6 +34,7 @@ import DoneAnimation from "@/components/DoneAnimation";
 import ExerciseAnimation from "@/components/ExerciseAnimation";
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { unlockAudio, isAudioUnlocked } from "@/lib/audio";
@@ -955,15 +956,13 @@ function SessionRunner() {
               />
               <span className="t-label">Alle Übungen</span>
             </div>
-            <button
-              type="button"
+            <XKnopf
               onClick={() => setSheetOpen(false)}
-              aria-label="Schließen"
-              className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-              style={{ color: "var(--text-3)" }}
-            >
-              <Icon name="x" size={16} strokeWidth={2.2} />
-            </button>
+              ariaLabel="Schließen"
+              wort="Schließen"
+              drehung="roll"
+              style={{ color: "var(--text-2)" }}
+            />
           </div>
           <div
             className="overflow-y-auto px-3 pt-1"

@@ -25,6 +25,7 @@ import { EQUIPMENT } from "@/lib/equipment";
 import { CATEGORY_LABEL, getTechniqueById } from "@/lib/techniques";
 import { DIFFICULTY_LABEL, type Exercise, type Technique } from "@/lib/types";
 import { useEffect, useState } from "react";
+import XKnopf from "@/components/ui/XKnopf";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -142,15 +143,13 @@ function DetailRahmen({
           />
           <span className="t-label">{label}</span>
         </div>
-        <button
-          type="button"
+        <XKnopf
           onClick={onClose}
-          aria-label="Schließen"
-          className="t-interactive inline-flex h-10 w-10 items-center justify-center rounded-field"
-          style={{ color: "var(--text-3)" }}
-        >
-          <Icon name="x" size={16} strokeWidth={2.2} />
-        </button>
+          ariaLabel="Schließen"
+          wort="Schließen"
+          drehung="roll"
+          style={{ color: "var(--text-2)" }}
+        />
       </div>
       <div
         className="overflow-y-auto px-5 pt-2"

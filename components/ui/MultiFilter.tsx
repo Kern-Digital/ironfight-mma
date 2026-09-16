@@ -302,7 +302,7 @@ export default function MultiFilter({
           title={`${kurzname}-Filter zurücksetzen`}
         >
           <span aria-hidden className="mf-clear-kreis">
-            <Icon name="x" size={13} strokeWidth={2.6} />
+            <Icon name="x" size={18} strokeWidth={3.4} />
           </span>
         </button>
       )}

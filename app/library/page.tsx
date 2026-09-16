@@ -21,6 +21,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import SwipeAction from "@/components/SwipeAction";
 import { SheetShell } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
+import XKnopf from "@/components/ui/XKnopf";
 import Select from "@/components/ui/Select";
 import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
@@ -437,15 +438,13 @@ function LibraryContent() {
                     {savedIds.size === 1 ? "Technik" : "Techniken"} gespeichert
                   </span>
                 </div>
-                <button
-                  type="button"
+                <XKnopf
                   onClick={() => setShowBrowse(false)}
-                  aria-label="Fertig"
-                  className="t-interactive inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-                  style={{ color: "var(--text-3)" }}
-                >
-                  <Icon name="x" size={16} strokeWidth={2.2} />
-                </button>
+                  ariaLabel="Fertig"
+                  wort="Fertig"
+                  drehung="roll"
+                  style={{ color: "var(--text-2)" }}
+                />
               </div>
 
               {/* Filter + Suche */}
@@ -650,20 +649,21 @@ function LibraryRow({
           {dateStr}
         </span>
       </div>
-      <button
-        type="button"
-        aria-label={`„${t?.name ?? entry.exerciseId}" entfernen`}
+      <XKnopf
+        ariaLabel={`„${t?.name ?? entry.exerciseId}" entfernen`}
         onClick={(e) => {
           // nicht zusätzlich zur Technik-Seite navigieren
           e.preventDefault();
           e.stopPropagation();
           onRemove();
         }}
-        className="t-interactive hidden h-9 w-9 shrink-0 items-center justify-center rounded-field sm:flex"
+        wort="Entfernen"
+        drehung="roll"
+        size={30}
+        strokeWidth={3.8}
+        className="hidden sm:inline-flex"
         style={{ color: "var(--gesture-delete)" }}
-      >
-        <Icon name="x" size={15} strokeWidth={2.2} />
-      </button>
+      />
       {t && (
         <span
           aria-hidden
