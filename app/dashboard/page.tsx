@@ -790,16 +790,19 @@ function TrainerDashboardContent() {
     month: "long",
   });
 
-  const badges: { label: string; accent: "pink" | "amber"; icon?: "users" | "shield" }[] = [
-    { label: "Trainer", accent: "pink", icon: "users" },
+  /* Die Plaketten sagen die Rolle in WORTEN und mit einem Symbol. Ihre
+     Farben („pink" für Trainer, „amber" für Admin) sind ersatzlos entfallen —
+     sie waren Farbe als alleiniges Signal, und sie wiederholten nur, was
+     danebensteht. */
+  const badges: { label: string; icon?: "users" | "shield" }[] = [
+    { label: "Trainer", icon: "users" },
   ];
-  if (isAdmin) badges.push({ label: "Admin", accent: "amber", icon: "shield" });
+  if (isAdmin) badges.push({ label: "Admin", icon: "shield" });
 
   return (
     <main className="min-h-screen">
       <DashboardHero
         badges={badges}
-        accent="pink"
         title={greeting}
         subtitle={`Trainer-Dashboard · ${todayLabel}`}
       />
@@ -830,7 +833,6 @@ function TrainerDashboardContent() {
             <StatCard
               label="Einheiten diese Woche"
               icon="calendar"
-              accent="var(--ta-pink)"
               value={sessionCount !== null ? String(sessionCount) : null}
             />
             <StatCard
@@ -841,7 +843,7 @@ function TrainerDashboardContent() {
             <StatCard
               label="Heute"
               icon="timer"
-              accent={todayBlocks.length > 0 ? "var(--ta-cyan)" : "var(--fg-4)"}
+              tone={todayBlocks.length > 0 ? "accent" : "quiet"}
               value={todayBlocks.length > 0 ? `${todayBlocks.length} Kurs${todayBlocks.length !== 1 ? "e" : ""}` : "Frei"}
             />
             <StatCard
@@ -861,7 +863,6 @@ function TrainerDashboardContent() {
               title="Meistangesehene Techniken"
               eyebrow="Aggregiert · Anonym"
               icon="chart"
-              accent="var(--ta-cyan)"
               moreHref="/techniques"
               className="h-full"
             >
@@ -886,38 +887,61 @@ function TrainerDashboardContent() {
                   {topTechniques.map((entry, idx) => {
                     const technique = getTechniqueById(entry.id);
                     const isTop3 = idx < 3;
-                    const rankColor =
-                      idx === 0 ? "var(--ta-cyan)" : idx === 1 ? "var(--ta-pink)" : idx === 2 ? "var(--fg-2)" : "var(--fg-4)";
+                    /* Vier Farben für vier Plätze („Cyan, Rosa, hellgrau,
+                       dunkelgrau") lasen sich wie ein Medaillen-Spiegel, ohne
+                       einer zu sein — Platz 2 war rosa, Platz 3 grau, und ab
+                       Platz 4 wiederholte sich nichts mehr. Die Frage an diese
+                       Liste ist einfacher: WAS STEHT OBEN? Die ersten drei
+                       tragen den Akzent, der Rest steht ruhig; die Karte um
+                       die Top 3 sagt dasselbe ein zweites Mal, damit die Farbe
+                       nicht allein trägt. */
+                    const rankColor = isTop3 ? "var(--accent-text)" : "var(--text-3)";
                     return (
                       <Link
                         key={entry.id}
                         href={`/techniques/${entry.id}`}
-                        className={`rise-${Math.min(idx + 1, 6)} flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[.03]`}
+                        data-press="quiet"
+                        className={`rise-${Math.min(idx + 1, 6)} t-interactive flex items-center gap-3 rounded-field px-3 py-2.5`}
                         style={{
-                          background: isTop3 ? "rgba(255,255,255,.03)" : "transparent",
-                          border: isTop3 ? "1px solid var(--ink-4)" : "1px solid transparent",
+                          /* Wie im Navigations-Aufklapper: die Fläche darf nur
+                             im hervorgehobenen Fall inline stehen. Ein
+                             `background: "transparent"` schlüge als Inline-Stil
+                             die Hover-Tönung von `.t-interactive` aus. */
+                          ...(isTop3 ? { background: "var(--surface-raised)" } : {}),
+                          border: isTop3
+                            ? "1px solid var(--line)"
+                            : "1px solid transparent",
                           textDecoration: "none",
                         }}
                       >
                         {/* Rang */}
                         <span
-                          className="font-display-ta w-6 shrink-0 text-center font-black leading-none"
-                          style={{ fontSize: "18px", color: rankColor }}
+                          className="w-6 shrink-0 text-center leading-none"
+                          style={{
+                            font: "var(--type-h3)",
+                            fontVariantNumeric: "tabular-nums",
+                            color: rankColor,
+                          }}
                         >
                           {idx + 1}
                         </span>
                         {/* Name */}
                         <div className="flex-1 min-w-0">
                           <div
-                            className="font-bold truncate text-sm"
-                            style={{ color: "var(--fg)" }}
+                            className="truncate"
+                            style={{ font: "var(--type-body-strong)", color: "var(--text-1)" }}
                           >
                             {technique?.name ?? entry.id}
                           </div>
                           {technique && (
                             <div
-                              className="font-mono-ta text-[9px] uppercase mt-0.5"
-                              style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
+                              className="mt-0.5"
+                              style={{
+                                font: "var(--type-meta)",
+                                letterSpacing: "var(--ls-label)",
+                                textTransform: "uppercase",
+                                color: "var(--text-3)",
+                              }}
                             >
                               {technique.category}
                             </div>
@@ -926,14 +950,21 @@ function TrainerDashboardContent() {
                         {/* View-Count */}
                         <div className="shrink-0 text-right">
                           <span
-                            className="font-mono-ta font-bold"
-                            style={{ fontSize: "15px", color: isTop3 ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                            style={{
+                              font: "var(--type-num)",
+                              fontVariantNumeric: "tabular-nums",
+                              color: isTop3 ? "var(--accent-text)" : "var(--text-2)",
+                            }}
                           >
                             {entry.viewCount}
                           </span>
                           <div
-                            className="font-mono-ta text-[8px] uppercase"
-                            style={{ letterSpacing: "0.15em", color: "var(--fg-4)" }}
+                            style={{
+                              font: "var(--type-meta)",
+                              letterSpacing: "var(--ls-label)",
+                              textTransform: "uppercase",
+                              color: "var(--text-3)",
+                            }}
                           >
                             Aufrufe
                           </div>
@@ -951,7 +982,6 @@ function TrainerDashboardContent() {
             <SectionCard
               title="Verwalten"
               icon="clipboard"
-              accent="var(--ta-pink)"
               className="h-full"
             >
               <div className="flex flex-col gap-2">
@@ -960,28 +990,24 @@ function TrainerDashboardContent() {
                   icon="calendar"
                   title="Kursplan"
                   sub="Deine Woche & Übungen"
-                  accent="var(--ta-pink)"
                 />
                 <QuickAction
                   href="/trainer"
                   icon="trophy"
                   title="Wettkampf"
                   sub="Athleten · DeepFight"
-                  accent="var(--ta-cyan)"
                 />
                 <QuickAction
                   href="/techniques"
                   icon="book"
                   title="Techniken"
                   sub="Bibliothek"
-                  accent="var(--ta-cyan)"
                 />
                 <QuickAction
                   href="/workout/generator"
                   icon="spark"
                   title="Generator"
                   sub="Workout erstellen"
-                  accent="var(--ta-pink)"
                 />
               </div>
             </SectionCard>
@@ -994,7 +1020,6 @@ function TrainerDashboardContent() {
             title="Heute im Gym"
             eyebrow={WEEKDAY_LABELS[todayWeekday]}
             icon="calendar"
-            accent="var(--ta-cyan)"
             moreHref="/schedule"
             moreLabel="Ganze Woche"
             className="mt-4"
@@ -1007,29 +1032,39 @@ function TrainerDashboardContent() {
                   <Link
                     key={block.id}
                     href="/schedule"
-                    className={`rise-${Math.min(idx + 1, 6)} card-interactive rounded-xl px-4 py-3`}
-                    style={{
-                      background: "rgba(255,255,255,.02)",
-                      border: "1px solid var(--ink-4)",
-                      textDecoration: "none",
-                    }}
+                    data-press="surface"
+                    className={`rise-${Math.min(idx + 1, 6)} t-card t-interactive rounded-field px-4 py-3`}
+                    style={{ textDecoration: "none" }}
                   >
                     <div
-                      className="font-mono-ta text-[10px]"
-                      style={{ color: "var(--ta-cyan)", letterSpacing: "0.08em" }}
+                      style={{
+                        font: "var(--type-num)",
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--accent-text)",
+                      }}
                     >
                       {block.startTime}–{block.endTime}
                     </div>
                     <div
-                      className="font-display-ta mt-0.5 font-bold uppercase"
-                      style={{ fontSize: "14px", letterSpacing: "0.04em", color: "var(--fg)" }}
+                      className="mt-0.5"
+                      style={{
+                        font: "var(--type-label)",
+                        letterSpacing: "var(--ls-label)",
+                        textTransform: "uppercase",
+                        color: "var(--text-1)",
+                      }}
                     >
                       {block.title}
                     </div>
                     {block.level && (
                       <div
-                        className="font-mono-ta mt-1 text-[9px] uppercase"
-                        style={{ letterSpacing: "0.1em", color: "var(--fg-4)" }}
+                        className="mt-1"
+                        style={{
+                          font: "var(--type-meta)",
+                          letterSpacing: "var(--ls-label)",
+                          textTransform: "uppercase",
+                          color: "var(--text-3)",
+                        }}
                       >
                         {block.level}
                       </div>

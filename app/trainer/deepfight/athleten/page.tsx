@@ -29,18 +29,30 @@
  *    Bleibt eine Gruppe dadurch leer, sagt die Seite WARUM: Der Kollege
  *    entscheidet selbst.
  * 3. **Zwei Wege je Zeile**: die Karte führt aufs Kampfprofil, der Knopf
- *    daneben direkt in die Werkbank
- *    (`/trainer/deepfight?modus=leute&ziel=<uid>`). Technisch dasselbe Muster
- *    wie in der Gegner-Bibliothek — Klickziel als unsichtbares Geschwister
+ *    daneben zur neuen Analyse. Technisch dasselbe Muster wie in der
+ *    Gegner-Bibliothek — Klickziel als unsichtbares Geschwister
  *    (`.t-row-card`/`.t-row-target`), Aktion darüber; ein Knopf IM Link wäre
- *    ungültiges HTML. Der Werkbank-Knopf trägt hier nur sein Zeichen: Bei
- *    ~32 Namen zählt die Scanbarkeit der Liste mehr als ein zweites Wort pro
+ *    ungültiges HTML. Der zweite Weg trägt hier nur sein Zeichen: Bei ~32
+ *    Namen zählt die Scanbarkeit der Liste mehr als ein zweites Wort pro
  *    Zeile (Muster: die Zeilen-Aktion in /verwaltung/einladungen).
- * 4. **Der Knopf „Gegner-Scouting" ist weg** — dafür sind die Segmente da.
+ * 4. **Der Knopf „Gegner-Scouting" ist weg** — dafür ist die Landung da.
  *
- * Gruppiert wie die Werkbank und wie „Neuer Wettkampf": Ich selbst · Trainer
- * & Coaches · Athleten. Trainer sind auch Athleten (CLAUDE.md), deshalb liest
- * die Seite `listAllMembers` und nicht `listAllStudents`.
+ * ─── DIESE SEITE IST JETZT AUCH DIE ZIELAUSWAHL (Leon 08.09.2026) ───────────
+ *
+ * Mit der neuen Landung fallen die Segmente aus der Glas-Leiste, und der Weg
+ * „Analyse starten → Eigene Athleten" führt HIERHER. Leon hatte selbst
+ * gefragt, ob Bibliothek und Auswahl „im Endeffekt das gleiche" machen — ja,
+ * also ist es jetzt eine Seite statt zweier.
+ *
+ * Sie merkt sich das an `?fuer=analyse`: Wer so ankommt, sucht ein ZIEL und
+ * keine Lektüre. Dann TAUSCHEN die beiden Wege je Zeile (die ganze Karte führt
+ * in die Konfiguration, der Knopf aufs Profil), und der Hinweis oben sagt
+ * etwas anderes. Ohne den Parameter bleibt alles wie beschrieben — ein
+ * Lesezeichen auf die Bibliothek verhält sich weiter wie eine Bibliothek.
+ *
+ * Gruppiert wie „Neuer Wettkampf": Ich selbst · Trainer & Coaches · Athleten.
+ * Trainer sind auch Athleten (CLAUDE.md), deshalb liest die Seite
+ * `listAllMembers` und nicht `listAllStudents`.
  */
 
 import { FlowItem, StaggerFlow } from "@/components/motion";
@@ -59,7 +71,8 @@ import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import { darfSehen } from "@/lib/profile-sharing";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -78,16 +91,39 @@ function initialsOf(name: string): string {
 
 // ─── Eine Zeile ──────────────────────────────────────────────────────────────
 
-function PersonRow({ entry, self }: { entry: StudentEntry; self: boolean }) {
+function PersonRow({
+  entry,
+  self,
+  fuerAnalyse,
+}: {
+  entry: StudentEntry;
+  self: boolean;
+  /**
+   * Kommt der Besucher über „Analyse starten", TAUSCHEN die beiden Wege:
+   * Die ganze Karte führt dann in die Konfiguration, der kleine Knopf aufs
+   * Profil. Sonst führte der große Klick mitten im Analyse-Fluss woanders
+   * hin als angekündigt — und der Fluss wäre nach zwei Seiten wieder eine
+   * Kreuzung.
+   */
+  fuerAnalyse: boolean;
+}) {
   const name = labelOf(entry);
+  const profilHref = `/trainer/deepfight/athleten/${entry.uid}`;
+  const analyseHref = `/trainer/deepfight/analyse?modus=leute&ziel=${entry.uid}`;
   return (
     <div className="t-card t-row-card relative flex items-center gap-3 p-3.5">
-      {/* Klickziel über der GANZEN Karte — der Alltagsweg führt aufs Profil. */}
+      {/* Klickziel über der GANZEN Karte. */}
       <Link
-        href={`/trainer/deepfight/athleten/${entry.uid}`}
+        href={fuerAnalyse ? analyseHref : profilHref}
         className="t-row-target absolute inset-0 rounded-[var(--r-lg)]"
         aria-label={
-          self ? "Mein Kampfprofil öffnen" : `Kampfprofil von ${name} öffnen`
+          fuerAnalyse
+            ? self
+              ? "Mich analysieren"
+              : `${name} analysieren`
+            : self
+              ? "Mein Kampfprofil öffnen"
+              : `Kampfprofil von ${name} öffnen`
         }
       />
 
@@ -112,19 +148,27 @@ function PersonRow({ entry, self }: { entry: StudentEntry; self: boolean }) {
         {name}
       </span>
 
-      {/* Der zweite Weg: direkt an die Werkbank, mit dieser Person als Ziel. */}
+      {/* Der zweite Weg — was die Karte NICHT tut, tut dieser Knopf. */}
       <Link
-        href={`/trainer/deepfight?modus=leute&ziel=${entry.uid}`}
+        href={fuerAnalyse ? profilHref : analyseHref}
         data-press
         className="t-interactive relative flex h-hit w-hit shrink-0 items-center justify-center rounded-field"
         style={{
           color: "var(--accent-text)",
           border: "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
         }}
-        aria-label={self ? "Mich analysieren" : `${name} analysieren`}
-        title="Analysieren"
+        aria-label={
+          fuerAnalyse
+            ? self
+              ? "Mein Kampfprofil öffnen"
+              : `Kampfprofil von ${name} öffnen`
+            : self
+              ? "Mich analysieren"
+              : `${name} analysieren`
+        }
+        title={fuerAnalyse ? "Kampfprofil" : "Analysieren"}
       >
-        <Icon name="spark" size={16} strokeWidth={2.2} />
+        <Icon name={fuerAnalyse ? "user" : "spark"} size={16} strokeWidth={2.2} />
       </Link>
 
       <span
@@ -159,10 +203,18 @@ function Gruppe({
 
 // ─── Seite ───────────────────────────────────────────────────────────────────
 
-export default function DeepFightAthletesPage() {
+function AthletenAuswahlInhalt() {
   const { user, profile } = useAuth();
   const gymId = resolveGymId(profile);
   const eigeneUid = user?.uid ?? "";
+  const searchParams = useSearchParams();
+  /**
+   * `?fuer=analyse` heißt: Der Besucher kommt über „Analyse starten" und sucht
+   * ein ZIEL, keine Lektüre. Dann führt die ganze Karte in die Konfiguration
+   * (siehe PersonRow) und der Hinweis oben sagt etwas anderes — ein Text pro
+   * Zustand (Hausregel „Hilfstexte folgen der Auswahl").
+   */
+  const fuerAnalyse = searchParams.get("fuer") === "analyse";
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -221,13 +273,22 @@ export default function DeepFightAthletesPage() {
       <h1 className="sr-only">DeepFight — Athleten</h1>
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-4 sm:px-6">
-        <TrainerHint id="deepfight-athletes" title="Eigene Leute auswerten">
-          Tipp auf einen Namen und du siehst sein Kampfprofil; der Knopf
-          daneben bringt dich mit ihm als Ziel direkt an die Werkbank. Deine
-          Kollegen entscheiden selbst, wer ihr Kampfprofil sieht — sobald dich
-          jemand freischaltet, steht er hier. Dich selbst wertest du jederzeit
-          aus.
-        </TrainerHint>
+        {fuerAnalyse ? (
+          <TrainerHint id="deepfight-athletes-auswahl" title="Wen analysierst du?">
+            Tipp auf einen Namen und du landest direkt bei der neuen Analyse;
+            der Knopf daneben zeigt dir stattdessen sein Kampfprofil. Was du
+            am Ende übernimmst, landet im Kampfprofil dieser Person — deine
+            Kollegen entscheiden deshalb selbst, wer sie hier sieht. Dich
+            selbst wertest du jederzeit aus.
+          </TrainerHint>
+        ) : (
+          <TrainerHint id="deepfight-athletes" title="Eigene Leute auswerten">
+            Tipp auf einen Namen und du siehst sein Kampfprofil; der Knopf
+            daneben startet mit ihm als Ziel eine neue Analyse. Deine Kollegen
+            entscheiden selbst, wer ihr Kampfprofil sieht — sobald dich jemand
+            freischaltet, steht er hier. Dich selbst wertest du jederzeit aus.
+          </TrainerHint>
+        )}
 
         {error && (
           <ErrorState
@@ -289,7 +350,7 @@ export default function DeepFightAthletesPage() {
             {gruppen.self && (
               <Gruppe title="Ich selbst">
                 <FlowItem key={gruppen.self.uid}>
-                  <PersonRow entry={gruppen.self} self />
+                  <PersonRow entry={gruppen.self} self fuerAnalyse={fuerAnalyse} />
                 </FlowItem>
               </Gruppe>
             )}
@@ -298,7 +359,7 @@ export default function DeepFightAthletesPage() {
               <Gruppe title="Trainer & Coaches">
                 {gruppen.staff.map((s, i) => (
                   <FlowItem key={s.uid} index={i}>
-                    <PersonRow entry={s} self={false} />
+                    <PersonRow entry={s} self={false} fuerAnalyse={fuerAnalyse} />
                   </FlowItem>
                 ))}
               </Gruppe>
@@ -333,7 +394,7 @@ export default function DeepFightAthletesPage() {
               <Gruppe title="Athleten">
                 {gruppen.students.map((s, i) => (
                   <FlowItem key={s.uid} index={i}>
-                    <PersonRow entry={s} self={false} />
+                    <PersonRow entry={s} self={false} fuerAnalyse={fuerAnalyse} />
                   </FlowItem>
                 ))}
               </Gruppe>
@@ -342,5 +403,19 @@ export default function DeepFightAthletesPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function DeepFightAthletesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+          <Skeleton className="h-16 w-full rounded-pill" />
+        </div>
+      }
+    >
+      <AthletenAuswahlInhalt />
+    </Suspense>
   );
 }

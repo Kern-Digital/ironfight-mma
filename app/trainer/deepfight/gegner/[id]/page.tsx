@@ -632,7 +632,7 @@ function OpponentDetailContent({ id }: { id: string }) {
             {/* Der Weg in die Werkbank — sie ist seit Teilschritt 4 die eine
                 Stelle, an der analysiert wird (siehe Kopf dieser Datei). */}
             <Link
-              href={`/trainer/deepfight?modus=gegner&ziel=${opponent.id}`}
+              href={`/trainer/deepfight/analyse?modus=gegner&ziel=${opponent.id}`}
               data-press
               className="t-interactive inline-flex min-h-hit w-fit items-center gap-2 rounded-field px-5"
               style={{

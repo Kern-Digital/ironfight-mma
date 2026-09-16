@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 // Choreografie vor (Schritt-Karten, die sich zeigen und zurückziehen) und
 // steht außerhalb der Sheet-Hülle, weil ihn das Betriebssystem auslöst.
 import { AnimatePresence, motion } from "framer-motion";
+import Icon from "@/components/ui/Icon";
 
 // Der Prompt legt sich als Modal (Backdrop + Bottom-Sheet) über ALLES.
 // Deshalb nur auf den Einstiegsseiten zeigen — mitten in einem Flow hat
@@ -68,15 +69,6 @@ function IconDownload() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
-
-function IconX() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
@@ -181,7 +173,7 @@ export default function PwaInstallPrompt() {
           {/* Backdrop */}
           <motion.div
             className="fixed inset-0 z-[80]"
-            style={{ background: "var(--modal-backdrop)", backdropFilter: "blur(3px)" }}
+            style={{ background: "var(--overlay)", backdropFilter: "blur(3px)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -198,11 +190,11 @@ export default function PwaInstallPrompt() {
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
           >
             <div
-              className="relative overflow-hidden rounded-2xl p-5"
+              className="relative overflow-hidden rounded-modal p-5"
               style={{
-                background: "linear-gradient(160deg, var(--ink-4) 0%, var(--ink-3) 100%)",
-                border: "1px solid var(--ink-6)",
-                boxShadow: "var(--pwa-shadow)",
+                background: "var(--surface-card)",
+                border: "1px solid var(--line)",
+                boxShadow: "var(--glass-shadow)",
               }}
             >
               {/* Top glow line */}
@@ -210,7 +202,7 @@ export default function PwaInstallPrompt() {
                 className="pointer-events-none absolute left-0 right-0 top-0 h-px"
                 style={{
                   background:
-                    "linear-gradient(90deg, transparent 0%, var(--ta-cyan) 50%, transparent 100%)",
+                    "linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%)",
                   opacity: 0.6,
                 }}
               />
@@ -218,11 +210,11 @@ export default function PwaInstallPrompt() {
               {/* Close */}
               <button
                 onClick={dismiss}
-                className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors"
-                style={{ color: "var(--fg-4)" }}
+                className="absolute right-4 top-4 rounded-badge p-1.5 transition-colors"
+                style={{ color: "var(--text-3)" }}
                 aria-label="Schließen"
               >
-                <IconX />
+                <Icon name="x" size={16} strokeWidth={2.5} />
               </button>
 
               {/* App icon + title */}
@@ -237,14 +229,18 @@ export default function PwaInstallPrompt() {
                 />
                 <div>
                   <div
-                    className="text-[10px] font-black uppercase tracking-widest"
-                    style={{ color: "var(--ta-cyan)" }}
+                    className="t-label"
                   >
                     App installieren
                   </div>
                   <div
-                    className="heading-display text-xl font-black leading-tight"
-                    style={{ color: "var(--fg)" }}
+                    className="text-xl uppercase leading-tight"
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 800,
+                      letterSpacing: "var(--ls-display)",
+                      color: "var(--text-1)",
+                    }}
                   >
                     Tidal Athletics
                   </div>
@@ -252,7 +248,7 @@ export default function PwaInstallPrompt() {
               </div>
 
               {/* Tagline */}
-              <p className="mb-5 text-sm leading-relaxed" style={{ color: "var(--fg-3)" }}>
+              <p className="mb-5 leading-relaxed" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
                 Füge die App zum Homescreen hinzu — schneller Zugriff, Offline-Nutzung
                 und ein vollständiges App-Erlebnis ohne Browser.
               </p>
@@ -273,15 +269,14 @@ export default function PwaInstallPrompt() {
               {platform === "ios" && (
                 <div className="space-y-3">
                   <div
-                    className="rounded-xl p-4"
+                    className="rounded-card p-4"
                     style={{
-                      background: "var(--ink-2)",
-                      border: "1px solid var(--ink-5)",
+                      background: "var(--surface-raised)",
+                      border: "1px solid var(--line)",
                     }}
                   >
                     <p
-                      className="mb-4 text-[10px] font-black uppercase tracking-widest"
-                      style={{ color: "var(--fg-4)" }}
+                      className="t-label mb-4"
                     >
                       In 2 Schritten installieren:
                     </p>
@@ -289,26 +284,28 @@ export default function PwaInstallPrompt() {
                     <ol className="space-y-4">
                       <li className="flex items-start gap-3">
                         <span
-                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill"
                           style={{
-                            background: "rgba(35,196,206,0.12)",
-                            color: "var(--ta-cyan)",
-                            border: "1px solid rgba(35,196,206,0.3)",
+                            background: "var(--accent-subtle)",
+                            color: "var(--accent-text)",
+                            border:
+                              "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
+                            font: "var(--type-meta)",
                           }}
                         >
                           1
                         </span>
                         <div>
                           <div
-                            className="flex items-center gap-1.5 text-sm font-bold"
-                            style={{ color: "var(--fg)" }}
+                            className="flex items-center gap-1.5"
+                            style={{ font: "var(--type-body-strong)", color: "var(--text-1)" }}
                           >
                             <IconShareUpArrow />
                             Teilen-Symbol tippen
                           </div>
                           <div
-                            className="mt-0.5 text-xs leading-snug"
-                            style={{ color: "var(--fg-4)" }}
+                            className="mt-0.5 leading-snug"
+                            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                           >
                             Das Quadrat mit dem Pfeil nach oben — unten in der Safari-Leiste
                           </div>
@@ -317,28 +314,30 @@ export default function PwaInstallPrompt() {
 
                       <li className="flex items-start gap-3">
                         <span
-                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill"
                           style={{
-                            background: "rgba(35,196,206,0.12)",
-                            color: "var(--ta-cyan)",
-                            border: "1px solid rgba(35,196,206,0.3)",
+                            background: "var(--accent-subtle)",
+                            color: "var(--accent-text)",
+                            border:
+                              "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
+                            font: "var(--type-meta)",
                           }}
                         >
                           2
                         </span>
                         <div>
                           <div
-                            className="flex items-center gap-1.5 text-sm font-bold"
-                            style={{ color: "var(--fg)" }}
+                            className="flex items-center gap-1.5"
+                            style={{ font: "var(--type-body-strong)", color: "var(--text-1)" }}
                           >
                             <IconPlusSquare />
-                            „Zum Home-Bildschirm" wählen
+                            „Zum Home-Bildschirm“ wählen
                           </div>
                           <div
-                            className="mt-0.5 text-xs leading-snug"
-                            style={{ color: "var(--fg-4)" }}
+                            className="mt-0.5 leading-snug"
+                            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                           >
-                            Im Menü nach unten scrollen und antippen — dann „Hinzufügen"
+                            Im Menü nach unten scrollen und antippen — dann „Hinzufügen“
                           </div>
                         </div>
                       </li>

@@ -21,7 +21,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -44,17 +43,55 @@ function modusAusPfad(pathname: string): DeepFightModus {
   return pathname.startsWith("/trainer/deepfight/gegner") ? "gegner" : "leute";
 }
 
+/**
+ * DER GESETZTE WERT TRÄGT SEINEN PFAD MIT SICH — und genau deshalb gibt es
+ * hier KEINEN Aufräum-Effekt mehr (gefunden beim Messen von Teilschritt 5,
+ * 14.09.2026).
+ *
+ * DER FEHLER: Der Vorgänger löschte den ausdrücklich gesetzten Wert in einem
+ * `useEffect` auf `pathname`. Beim ERSTEN Mounten laufen Kind-Effekte vor
+ * Eltern-Effekten — die Analyse-Seite setzte „gegner", der Provider löschte
+ * es unmittelbar danach, und der Rückfall aus dem Pfad sagte „leute". Wer
+ * `/trainer/deepfight/analyse?modus=gegner&ziel=…` DIREKT aufrief (Lesezeichen,
+ * weitergeschickter Link, F5), sah den Gegner in Tidal-Blau statt in Silber —
+ * die ganze Farbidentität des Modus fiel weg. Über die Umleitung von der
+ * Landung stimmte es, weil beim Pfadwechsel im laufenden Client die
+ * Reihenfolge anders greift; im normalen Klickweg fiel es deshalb nie auf.
+ *
+ * WARUM NICHT „nur beim echten Pfadwechsel löschen": Das heilt den ersten
+ * Aufruf, aber nicht den Wechsel von der Bibliothek auf `/analyse` — dort
+ * setzt das Kind erst „gegner" und der Eltern-Effekt löscht es danach. Jede
+ * Lösung, die auf der Reihenfolge zweier Effekte beruht, ist an dieser Stelle
+ * eine Wette.
+ *
+ * WARUM NICHT `useSearchParams` im Rückfall: Das wäre die zweite naheliegende
+ * Antwort (`?modus=` mitlesen), zieht aber den ganzen Bereich in die
+ * CSR-Ausnahme von Next, weil der Provider im Layout ÜBER jeder
+ * Suspense-Grenze sitzt.
+ *
+ * DIE LÖSUNG braucht gar keinen Effekt: Der gesetzte Wert merkt sich, für
+ * WELCHEN Pfad er gilt. Stimmt der Pfad nicht mehr, wird er ignoriert und
+ * der Rückfall greift — die Gegner-Bibliothek steht also weiterhin nicht im
+ * Blau der zuletzt gewählten Athletin. Kein Aufräumen, keine Reihenfolge,
+ * kein Rennen.
+ */
 export function DeepFightModusProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  // Ausdrücklich gesetzter Wert. Er gilt nur für die Seite, die ihn gesetzt
-  // hat — ein Seitenwechsel löscht ihn, sonst stünde die Gegner-Bibliothek
-  // im Blau der zuletzt gewählten Athletin.
-  const [gesetzt, setGesetzt] = useState<DeepFightModus | null>(null);
-  useEffect(() => setGesetzt(null), [pathname]);
+  const [gesetzt, setGesetzt] = useState<{
+    pfad: string;
+    modus: DeepFightModus;
+  } | null>(null);
 
-  const setModus = useCallback((m: DeepFightModus) => setGesetzt(m), []);
+  const setModus = useCallback(
+    (m: DeepFightModus) => setGesetzt({ pfad: pathname, modus: m }),
+    [pathname],
+  );
   const value = useMemo(
-    () => ({ modus: gesetzt ?? modusAusPfad(pathname), setModus }),
+    () => ({
+      modus:
+        gesetzt?.pfad === pathname ? gesetzt.modus : modusAusPfad(pathname),
+      setModus,
+    }),
     [gesetzt, pathname, setModus],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -34,6 +34,25 @@
  * • TypeScript. Die Vorlage hatte implizite `any`-Props (`{ isUnsupported }`,
  *   `{ index }`) und wäre an `strict` gescheitert.
  *
+ * DER FILTER LÄUFT NUR, SOLANGE SICH ETWAS BEWEGT (Leon 12.09.2026: „die
+ * Suche soll nicht so hell leuchten bei den Buchstaben und Icons, es
+ * schimmert so komisch").
+ *
+ * Das war kein Farbfehler, sondern der Filter selbst. `feComposite atop`
+ * legt zwar das scharfe Original obenauf, ABER die weichgezeichnete und
+ * geschwellte Fassung darunter bleibt sichtbar, wo das Original durchlässig
+ * ist — also rings um jeden Buchstaben und jedes Symbol. Aus heller Schrift
+ * auf dunkler Pille wird so ein heller Hof, der bei jeder Bewegung
+ * mitschwimmt. Ein Hof um Schrift ist genau das, was DESIGN-BRIEF §1.4
+ * ausschließt.
+ *
+ * Die Lösung steht schon im Kommentar zum Tropfen: „Der Goo-Moment liegt in
+ * der BEWEGUNG, nicht im Endzustand." Also hängt der Filter jetzt am
+ * Übergang — er wird beim Öffnen und Schließen eingeschaltet und fällt ab,
+ * sobald Pille und Tropfen stehen. Das Verschmelzen sieht man weiter, die
+ * Schrift steht im Ruhezustand scharf und ohne Hof. Kein Maß, keine Farbe
+ * und kein Ablauf ändern sich dadurch.
+ *
  * SAFARI UND CHROME AUF iOS bekommen den Goo-Filter NICHT (`.no-goo`): Dort
  * rechnet der Filter auf animierten Elementen sichtbar nach und flackert. Die
  * Erkennung stammt aus der Vorlage und bleibt — sie fällt auf eine saubere
@@ -112,6 +131,9 @@ export default function GooeySearch({
   loading = false,
   placeholder = "Name oder E-Mail…",
   label = "Suchen",
+  breiteZu = 116,
+  breiteAuf = 240,
+  nurSymbol = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -119,8 +141,38 @@ export default function GooeySearch({
   placeholder?: string;
   /** Beschriftung der eingeklappten Pille. */
   label?: string;
+  /**
+   * Die zwei Maße der Pille in Pixeln — zugeklappt und geöffnet.
+   *
+   * SIE SIND PROPS, SEIT DIE DEEPFIGHT-LANDUNG EINEN GRÖSSEREN BALKEN BRAUCHT
+   * (Leon 08.09.2026: „oben rechts ein größerer Suchbalken"). Dort sucht das
+   * Feld über Gegner, Athleten UND Analysen und ist die Hauptsache der
+   * Kopfzeile — nicht wie sonst ein Filter neben einem Knopf.
+   *
+   * ZWEI ZAHLEN STATT EINES „size"-SCHALTERS: Ein `size="gross"` bündelte zwei
+   * Fragen in einer (Falle 35) und legte für jede neue Stelle eine dritte
+   * Stufe an. Die Vorgabewerte SIND die alten Literale — die zehn
+   * bestehenden Suchfelder ändern sich um kein Pixel.
+   *
+   * Die Höhe bleibt `--hit-min` (globals.css): Ein Touch-Ziel wächst nicht mit
+   * der Wichtigkeit, und die Pille steht neben Feldern desselben Maßes.
+   */
+  breiteZu?: number;
+  breiteAuf?: number;
+  /**
+   * Zugeklappt nur die Lupe statt der Beschriftung (Leon 10.09.2026).
+   *
+   * Für Stellen, an denen die Suche allein steht und niemand sie mit etwas
+   * anderem verwechseln kann — auf der DeepFight-Landung sitzt sie ganz
+   * rechts in der Kopfzeile. Die Beschriftung bleibt als `aria-label` am
+   * Element: Für Screenreader ändert sich nichts, nur das Auge sieht weniger.
+   * Sinnvoll nur mit einer kreisrunden Breite (`breiteZu` = Höhe).
+   */
+  nurSymbol?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  /** Läuft der Übergang gerade? Nur dann liegt der Goo-Filter an. */
+  const [verschmilzt, setVerschmilzt] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const unsupported = useMemo(isUnsupportedBrowser, []);
@@ -166,6 +218,17 @@ export default function GooeySearch({
     };
   }, [open]);
 
+  /* Der Filter an und wieder aus. Die Zeit deckt den längsten der drei
+     Abläufe ab: Der Tropfen startet mit 0,1 s Verzögerung und braucht 0,85 s
+     — zusammen 0,95 s, plus etwas Luft für das Nachschwingen der Feder.
+     Ohne Bewegung (reduced motion) verschmilzt gar nichts. */
+  useEffect(() => {
+    if (reduced) return;
+    setVerschmilzt(true);
+    const t = window.setTimeout(() => setVerschmilzt(false), 1100);
+    return () => window.clearTimeout(t);
+  }, [open, reduced]);
+
   return (
     <div
       ref={rootRef}
@@ -176,8 +239,9 @@ export default function GooeySearch({
 
       <motion.div
         className="goo-inner"
+        data-goo={verschmilzt || undefined}
         initial={false}
-        animate={{ width: open ? 240 : 116 }}
+        animate={{ width: open ? breiteAuf : breiteZu }}
         transition={
           reduced
             ? { duration: 0 }
@@ -216,6 +280,10 @@ export default function GooeySearch({
               value={value}
               onChange={(e) => onChange(e.target.value)}
             />
+          ) : nurSymbol ? (
+            <span className="goo-symbol">
+              <Icon name="search" size={18} strokeWidth={2.2} />
+            </span>
           ) : (
             <span className="goo-label">{label}</span>
           )}

@@ -280,8 +280,22 @@ export default function MultiFilter({
       </button>
 
       {zeigeX && (
+        /* `data-motion` AUCH HIER, und aus einem handfesten Grund (Leons
+           Befund 12.09.2026: „das x verschiebt sich beim Drübergehen"):
+           Dieses Kreuz haengt an `top: 50%` und wird von seinem EIGENEN
+           `transform: translateY(-50%)` wieder in die Mitte gezogen. Die
+           Grundhaptik aller Knoepfe setzt unter der Maus `transform:
+           scale(1.02)` — und das ERSETZT die Verschiebung, statt sie zu
+           ergaenzen. Das Kreuz fiel dadurch um seine halbe Hoehe nach unten,
+           an den unteren Rand des Feldes.
+
+           Eine zweite Feder ist das nicht, aber dieselbe Regel greift: Wer
+           `transform` selbst besetzt, nimmt die Grundhaptik heraus. Das
+           Kreuz hat ohnehin seine eigene Rueckmeldung — der Kreis darunter
+           faerbt sich (`.mf-clear:hover .mf-clear-kreis`). */
         <button
           type="button"
+          data-motion
           onClick={() => onChange([])}
           className="mf-clear"
           aria-label={`${kurzname}-Filter zurücksetzen`}

@@ -9,10 +9,24 @@
  * Kampfsport-Bänder (JoinBackdrop), davor steht EINE dunkle Karte mit
  * Tunnel-Animation und Verlauf (.join-panel in globals.css).
  *
- * Die Karte ist in beiden Themes dunkel und bringt ihre eigenen Text-Farben
- * mit (--panel-fg/-2/-3). Alles davon leitet sich aus --accent-h/--accent-c
- * ab — ein Gym-Branding färbt Tunnel, Verlauf und Felder automatisch mit
- * (DESIGN-BRIEF §1: eine Variable ändern, die App folgt).
+ * DIE KARTE BRINGT IHRE EIGENEN TEXTFARBEN MIT (--panel-fg/-2/-3), und das
+ * ist die eine Sache, die man hier wissen muss: INNERHALB der Karte gelten
+ * NICHT die App-Tokens --text-* / --surface-*. Ihr Grund ist ein Verlauf über
+ * einer Fotowand, kein Flächenton — Schrift und Felder müssen sich gegen
+ * diesen Verlauf behaupten.
+ *
+ * BERICHTIGT AM 13.09.2026: Hier stand jahrelang „Die Karte ist in beiden
+ * Themes dunkel". Das stimmt nicht, und die Aussage ist in mehrere Prompts
+ * weitergewandert. Gemessen in globals.css: im dunklen Theme steht die Karte
+ * auf L 0,10 mit heller Schrift, im hellen auf L 0,99 mit DUNKLER Schrift
+ * (--panel-fg L 0,30) — sie dreht sich mit dem Theme wie jede andere Fläche.
+ * Die REGEL darüber bleibt trotzdem gültig, sie wird sogar wichtiger: Wer
+ * hier --text-1 benutzt, reißt den Kontrast in genau einem der beiden Themes,
+ * und zwar in dem, das er gerade nicht offen hat.
+ *
+ * Alles leitet sich aus --accent-h/--accent-c ab — ein Gym-Branding färbt
+ * Tunnel, Verlauf und Felder automatisch mit (DESIGN-BRIEF §1: eine Variable
+ * ändern, die App folgt).
  */
 
 import Icon from "@/components/ui/Icon";
@@ -184,12 +198,19 @@ export function JoinPrimary({
   onClick,
   disabled,
   icon,
+  type = "button",
   children,
 }: {
   href?: string;
   onClick?: () => void;
   disabled?: boolean;
   icon?: React.ComponentProps<typeof Icon>["name"];
+  /**
+   * `submit` für Knöpfe IN einem <form> (Login, Register). Ohne das wäre die
+   * Eingabetaste im Passwortfeld wirkungslos — ein Anmeldeformular, das auf
+   * Enter nicht reagiert, fühlt sich kaputt an.
+   */
+  type?: "button" | "submit";
   children: React.ReactNode;
 }) {
   const style: React.CSSProperties = {
@@ -216,7 +237,7 @@ export function JoinPrimary({
   }
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={className}

@@ -54,6 +54,8 @@
  */
 
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   collectionGroup,
   deleteDoc,
@@ -170,6 +172,29 @@ export interface OpponentProfile {
   opponentId?: string | null;
 }
 
+/**
+ * Eine Notiz am Wettkampf (Leon 11.09.2026: „könnten ja verschiedene Leute
+ * etwas eintragen"). Jede Notiz trägt deshalb ihren Autor mit — und zwar
+ * DENORMALISIERT als Name, nicht nur als uid: Die Liste soll ohne eine
+ * Abfrage je Autor lesbar sein, und der Name zum Zeitpunkt der Notiz ist
+ * genau das, was man später sehen will.
+ *
+ * `createdAt` ALS ZAHL, NICHT ALS TIMESTAMP: Gelöscht wird über
+ * `arrayRemove`, und das findet nur das GLEICHE Objekt wieder. Eine
+ * Millisekunden-Zahl kommt nach dem Roundtrip durch Firestore exakt so
+ * zurück; ein Timestamp nur, wenn man seine Nanosekunden mitschleppt.
+ * Löschen darf nur, wer die Notiz geschrieben hat — das prüft die
+ * Oberfläche (die Regel lässt jeden mit Wettkampf-Zugriff schreiben).
+ */
+export interface CampNotiz {
+  id: string;
+  text: string;
+  authorUid: string;
+  authorName: string;
+  /** Millisekunden seit Epoche. */
+  createdAt: number;
+}
+
 export interface FightCampPhaseBlock {
   phase: FightCampPhase;
   startsAt: Date;
@@ -224,6 +249,8 @@ export interface FightCamp {
   status: "active" | "completed" | "archived";
   /** Gesamt-Notizen vom Trainer */
   trainerNotes?: string;
+  /** Notizen mehrerer Leute am Wettkampf — siehe `CampNotiz`. */
+  notizen: CampNotiz[];
   isDemo?: boolean;
 }
 
@@ -277,6 +304,7 @@ type FightCampDoc = {
   phases: PhaseDoc[];
   status: "active" | "completed" | "archived";
   trainerNotes?: string;
+  notizen?: CampNotiz[];
   isDemo?: boolean;
 };
 
@@ -313,6 +341,7 @@ function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
     })),
     status: d.status,
     trainerNotes: d.trainerNotes,
+    notizen: Array.isArray(d.notizen) ? d.notizen : [],
     isDemo: d.isDemo,
   };
 }
@@ -386,6 +415,7 @@ function encode(camp: Omit<FightCamp, "id" | "createdAt">): FightCampDoc {
   if (camp.opponentId) out.opponentId = camp.opponentId;
   if (camp.trainerNotes && camp.trainerNotes.trim())
     out.trainerNotes = camp.trainerNotes.trim();
+  if (camp.notizen.length > 0) out.notizen = camp.notizen;
   if (camp.isDemo) out.isDemo = camp.isDemo;
   return out;
 }
@@ -430,6 +460,7 @@ export async function updateFightCamp(
   }
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.trainerNotes !== undefined) data.trainerNotes = patch.trainerNotes;
+  if (patch.notizen !== undefined) data.notizen = patch.notizen;
   if (patch.isDemo !== undefined) data.isDemo = patch.isDemo;
   // updateDoc statt setDoc(merge): ersetzt das `opponent`-Feld komplett, damit
   // gelöschte Gegner-DNA-Antworten nicht durch Deep-Merge erhalten bleiben.
@@ -466,6 +497,45 @@ export async function deleteFightCamp(
   campId: string,
 ): Promise<void> {
   await deleteDoc(fightCampDoc(uid, campId));
+}
+
+// ─── Notizen ───────────────────────────────────────────────────────────────
+
+/**
+ * Was jede Notiz-Änderung zusätzlich mitschreibt: `ownerIsStaff`, wenn der
+ * Aufrufer es kennt. Die Update-Regel vergleicht das Feld bei JEDEM
+ * Schreibvorgang gegen das Konto des Besitzers — bei einem Camp aus der Zeit
+ * vor dem Backfill fehlte es sonst und der Vergleich schlüge fehl.
+ */
+type NotizExtra = { ownerIsStaff?: boolean };
+
+/**
+ * Hängt eine Notiz an — per `arrayUnion`, nicht per Lesen-Ändern-Schreiben:
+ * Zwei Leute, die gleichzeitig eintragen, überschreiben sich so nicht.
+ */
+export async function addCampNotiz(
+  uid: string,
+  campId: string,
+  notiz: CampNotiz,
+  extra: NotizExtra = {},
+): Promise<void> {
+  await updateDoc(fightCampDoc(uid, campId), {
+    notizen: arrayUnion(notiz),
+    ...extra,
+  });
+}
+
+/** Entfernt genau diese Notiz — das Objekt muss dem gespeicherten gleichen. */
+export async function removeCampNotiz(
+  uid: string,
+  campId: string,
+  notiz: CampNotiz,
+  extra: NotizExtra = {},
+): Promise<void> {
+  await updateDoc(fightCampDoc(uid, campId), {
+    notizen: arrayRemove(notiz),
+    ...extra,
+  });
 }
 
 /** Decodiert ein collectionGroup-Dokument und sichert studentUid aus dem Pfad. */

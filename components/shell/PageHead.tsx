@@ -40,17 +40,14 @@ import Link from "next/link";
  * gehört zu Formularen — ein Eingabefeld über die volle Breite liest sich
  * schlecht, egal wie viel Platz da ist.
  *
- * `detail` ist ein ERBSTÜCK und soll wieder verschwinden: Nur die
- * Wettkampf-Detailseite steht auf `max-w-4xl`. Der Kopf nimmt die Breite
- * vorerst an, damit er nicht breiter steht als der Inhalt darunter — beim
- * Rollout dieser Seite (Etappe 2) zieht ihr Rumpf auf `standard` nach, und
- * dieser Eintrag fällt weg.
+ * Bis zum 11.09.2026 gab es hier ein viertes, `detail` auf `max-w-4xl` —
+ * ein Erbstück allein für die Wettkampf-Detailseite. Mit ihrem Umbau steht
+ * ihr Rumpf auf `standard`, und der Eintrag ist weg.
  */
 const LANES = {
   standard: "max-w-2xl lg:max-w-5xl",
   wide: "max-w-7xl",
   narrow: "max-w-3xl",
-  detail: "max-w-4xl",
 } as const;
 
 export type PageHeadLane = keyof typeof LANES;

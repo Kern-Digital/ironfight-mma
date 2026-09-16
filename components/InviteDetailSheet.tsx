@@ -200,8 +200,12 @@ function InviteDetailInhalt({
           <div className="flex flex-col gap-4 pb-2">
             <div className="flex flex-col items-center gap-3">
               <span
-                className="font-mono-ta text-center text-2xl sm:text-3xl"
-                style={{ fontWeight: 700, color: "var(--text-body)" }}
+                className="font-mono text-center text-2xl sm:text-3xl"
+                style={{
+                  fontWeight: 700,
+                  letterSpacing: "var(--ls-label)",
+                  color: "var(--text-body)",
+                }}
               >
                 {formatInviteCode(invite.code)}
               </span>

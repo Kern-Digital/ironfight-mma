@@ -1,6 +1,34 @@
 "use client";
 
+/**
+ * Gegner-DNA als ausklappbare Hauptkategorien.
+ *
+ * mode="view"  → nur beantwortete Fragen, leere Kategorien werden ausgeblendet.
+ *                Wirkt wie ein fertiger Gegnerbericht.
+ * mode="edit"  → alle Kategorien + alle Fragen als Eingabefelder. `onChange`
+ *                liefert die aktualisierten Antworten (Speichern macht der Parent).
+ *
+ * ─── ETAPPE 3b (Leons Befund 13.09.2026: „wenn ich auf neuen Gegner anlegen
+ * gehe, kommt das Popup mit altem Fenster") ─────────────────────────────────
+ *
+ * Diese Datei war der letzte große Rest des alten Looks im DeepFight-Bereich
+ * — und sie fiel genau dort auf, wo der Rest schon neu ist: im Popup „Neuer
+ * Gegner" der Wettkampf-Anlage. Raus sind `--ink-2…5`, `--fg-2…4`,
+ * `font-mono-ta`, `font-display-ta`, die festen Pixelgrößen und `rounded-2xl`.
+ * **`--fg-1` gab es dabei nie** — der Fragetext stand also die ganze Zeit auf
+ * der geerbten Farbe (derselbe Befund wie in Etappe 3a).
+ *
+ * DIE KATEGORIE TRÄGT KEINE FARBE MEHR, DER ZUSTAND TRÄGT SIE. `category.accent`
+ * — vier Farben, die sich über neun Kategorien im Kreis wiederholten — ist
+ * hier weg, wie schon in `DnaCategoryGrid` (Etappe 3a): Die Farbe behauptete
+ * eine Ordnung, die es nicht gibt, und beantwortete nicht die eine Frage, die
+ * man an diese Liste hat — WAS IST SCHON GESCOUTET? Also: leer = gedämpft und
+ * neutral (`--text-3`, `--line`), gescoutet = Akzent in Symbol, Zähler und
+ * Kante. Dasselbe Muster, dieselben drei Mittel.
+ */
+
 import { Collapse } from "@/components/motion";
+import Icon from "@/components/ui/Icon";
 import { useState } from "react";
 import {
   DNA_CATEGORIES,
@@ -11,33 +39,23 @@ import {
 } from "@/lib/gegner-dna";
 import DnaCategoryIcon from "./DnaCategoryIcon";
 
-function IconChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "none" }}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
 
-/**
- * Gegner-DNA als ausklappbare Hauptkategorien.
- *
- * mode="view"  → nur beantwortete Fragen, leere Kategorien werden ausgeblendet.
- *                Wirkt wie ein fertiger Gegnerbericht.
- * mode="edit"  → alle Kategorien + alle Fragen als Eingabefelder. `onChange`
- *                liefert die aktualisierten Antworten (Speichern macht der Parent).
- */
+/** Die Eingabefläche der Fragen — dasselbe Maß wie in „Neuer Wettkampf". */
+const FELD_STYLE: React.CSSProperties = {
+  background: "var(--surface-raised)",
+  border: "1px solid var(--line)",
+  color: "var(--text-body)",
+  font: "var(--type-body)",
+  outline: "none",
+  resize: "vertical",
+  minHeight: "var(--hit-min)",
+};
+
 export default function GegnerDnaAccordion({
   answers,
   mode,
@@ -71,13 +89,19 @@ export default function GegnerDnaAccordion({
   if (mode === "view" && visibleCategories.length === 0) {
     return (
       <div
-        className="rounded-2xl p-6 text-center"
-        style={{ background: "var(--ink-2)", border: "1px dashed var(--ink-5)" }}
+        className="rounded-card p-6 text-center"
+        style={{
+          background: "var(--surface-raised)",
+          border: "1px dashed var(--line)",
+        }}
       >
-        <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
+        <p style={{ font: "var(--type-body-strong)" }}>
           Noch keine DeepFight-Daten erfasst.
         </p>
-        <p className="mt-1 text-xs" style={{ color: "var(--fg-4)" }}>
+        <p
+          className="mt-1"
+          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+        >
           Über &bdquo;Bearbeiten&ldquo; lassen sich Scouting-Infos zum Gegner
           ergänzen — nur was du wirklich weißt.
         </p>
@@ -92,14 +116,20 @@ export default function GegnerDnaAccordion({
         const count = answeredCount(category, answers);
         const total = category.questions.length;
         const answered = answeredQuestions(category, answers);
+        const isEmpty = count === 0;
+        const akzent = isEmpty ? "var(--text-3)" : "var(--accent-text)";
 
         return (
           <div
             key={category.id}
-            className="overflow-hidden rounded-2xl"
+            className="overflow-hidden rounded-card"
             style={{
-              background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-              border: `1px solid ${count > 0 ? "var(--ink-5)" : "var(--ink-4)"}`,
+              background: "var(--surface-card)",
+              border: `1px solid ${
+                isEmpty
+                  ? "var(--line)"
+                  : "color-mix(in oklab, var(--accent) 30%, var(--line))"
+              }`,
             }}
           >
             {/* Kategorie-Kopf (klickbar) */}
@@ -107,15 +137,19 @@ export default function GegnerDnaAccordion({
               type="button"
               onClick={() => toggle(category.id)}
               data-press="quiet"
-              className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+              className="t-interactive flex w-full items-center gap-3 px-4 py-3.5 text-left"
               aria-expanded={open}
             >
               <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field"
                 style={{
-                  background: "var(--ink-4)",
-                  border: `1px solid ${category.accent}`,
-                  color: category.accent,
+                  background: "var(--surface-raised)",
+                  border: `1px solid ${
+                    isEmpty
+                      ? "var(--line)"
+                      : "color-mix(in oklab, var(--accent) 35%, transparent)"
+                  }`,
+                  color: akzent,
                 }}
                 aria-hidden
               >
@@ -123,36 +157,50 @@ export default function GegnerDnaAccordion({
               </span>
               <span className="min-w-0 flex-1">
                 <span
-                  className="font-display-ta block truncate font-bold uppercase"
+                  className="block truncate"
                   style={{
-                    fontSize: "15.5px",
-                    letterSpacing: "0.08em",
-                    color: count > 0 ? "var(--fg-2)" : "var(--fg-3)",
+                    font: "var(--type-body-strong)",
+                    color: isEmpty ? "var(--text-3)" : "var(--text-1)",
                   }}
                 >
                   {category.label}
                 </span>
                 <span
-                  className="font-mono-ta mt-0.5 block truncate text-[10px]"
-                  style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
+                  className="mt-0.5 block truncate"
+                  style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                 >
                   {category.hint}
                 </span>
               </span>
-              {/* Status-Badge */}
+              {/* Der Zähler: im Bearbeiten-Modus „3/7", in der Ansicht die
+                  Zahl allein — dort gibt es keine offenen Fragen. */}
               <span
-                className="font-mono-ta shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase"
+                className="shrink-0 rounded-badge px-2 py-1"
                 style={{
-                  letterSpacing: "0.1em",
-                  background: count > 0 ? "var(--ink-4)" : "transparent",
-                  border: `1px solid ${count > 0 ? category.accent : "var(--ink-5)"}`,
-                  color: count > 0 ? category.accent : "var(--fg-4)",
+                  ...META_FONT,
+                  fontVariantNumeric: "tabular-nums",
+                  background: isEmpty ? "transparent" : "var(--accent-subtle)",
+                  border: `1px solid ${
+                    isEmpty
+                      ? "var(--line)"
+                      : "color-mix(in oklab, var(--accent) 40%, transparent)"
+                  }`,
+                  color: akzent,
                 }}
               >
                 {mode === "edit" ? `${count}/${total}` : `${count}`}
               </span>
-              <span className="shrink-0" style={{ color: "var(--fg-4)" }}>
-                <IconChevron open={open} />
+              <span
+                className="shrink-0"
+                style={{
+                  color: "var(--text-3)",
+                  lineHeight: 0,
+                  transition: "transform var(--dur-fast) var(--ease-out)",
+                  transform: open ? "rotate(180deg)" : "none",
+                }}
+                aria-hidden
+              >
+                <Icon name="chevron-down" size={16} strokeWidth={2.2} />
               </span>
             </button>
 
@@ -160,21 +208,19 @@ export default function GegnerDnaAccordion({
             <Collapse open={open}>
               <div
                 className="border-t px-4 py-4"
-                style={{ borderColor: "var(--ink-4)" }}
+                style={{ borderColor: "var(--line)" }}
               >
                 {mode === "view" ? (
                   <div className="flex flex-col gap-4">
                     {answered.map(({ question, value }) => (
                       <div key={question.id}>
-                        <div
-                          className="font-mono-ta text-[13px] font-bold uppercase leading-snug"
-                          style={{ color: category.accent }}
-                        >
-                          {question.label}
-                        </div>
+                        <div className="t-label">{question.label}</div>
                         <p
-                          className="mt-1 whitespace-pre-wrap text-sm leading-relaxed"
-                          style={{ color: "var(--fg-1)" }}
+                          className="mt-1 whitespace-pre-wrap"
+                          style={{
+                            font: "var(--type-body)",
+                            color: "var(--text-body)",
+                          }}
                         >
                           {value}
                         </p>
@@ -184,10 +230,12 @@ export default function GegnerDnaAccordion({
                 ) : (
                   <div className="flex flex-col gap-3">
                     {category.questions.map((question) => (
-                      <label key={question.id} className="flex flex-col gap-1">
+                      <label key={question.id} className="flex flex-col gap-1.5">
                         <span
-                          className="text-[11px]"
-                          style={{ color: "var(--fg-3)" }}
+                          style={{
+                            font: "var(--type-sub)",
+                            color: "var(--text-2)",
+                          }}
                         >
                           {question.label}
                         </span>
@@ -196,17 +244,12 @@ export default function GegnerDnaAccordion({
                           onChange={(e) =>
                             setAnswer(question.id, e.target.value)
                           }
-                          placeholder={question.placeholder ?? "Nur ausfüllen, wenn bekannt…"}
+                          placeholder={
+                            question.placeholder ?? "Nur ausfüllen, wenn bekannt…"
+                          }
                           rows={2}
-                          className="rounded-lg px-3 py-2 text-sm"
-                          style={{
-                            background: "var(--ink-3)",
-                            border: "1px solid var(--ink-5)",
-                            color: "var(--fg-1)",
-                            outline: "none",
-                            resize: "vertical",
-                            minHeight: "44px",
-                          }}
+                          className="rounded-field px-3 py-2"
+                          style={FELD_STYLE}
                         />
                       </label>
                     ))}

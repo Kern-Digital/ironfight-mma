@@ -20,7 +20,7 @@ export default function MyAnalysisPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(`/trainer/deepfight?modus=leute&ziel=${user.uid}`);
+      router.replace(`/trainer/deepfight/analyse?modus=leute&ziel=${user.uid}`);
     }
   }, [loading, user, router]);
 

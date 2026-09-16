@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth, useRights } from "@/lib/auth-context";
+import Icon from "@/components/ui/Icon";
 
 /**
  * Erst-Login-Onboarding speziell für Trainer.
@@ -107,24 +108,22 @@ export default function TrainerOnboardingModal() {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm"
-      style={{ background: "var(--modal-backdrop)" }}
+      style={{ background: "var(--overlay)" }}
     >
+      {/* Der Grund war ein VERLAUF (`--ink-3` nach `--ink-2`) — als
+          Flächenfüllung schließt DESIGN-BRIEF §3 das aus. Jetzt der
+          Karten-Flächenton, der in beiden Themes stimmt. */}
       <div
-        className="w-full max-w-md animate-fade-in space-y-5 rounded-2xl p-6"
+        className="w-full max-w-md animate-fade-in space-y-5 rounded-modal p-6"
         style={{
-          background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-          border: "1px solid var(--ink-5)",
-          boxShadow: "var(--modal-shadow)",
+          background: "var(--surface-card)",
+          border: "1px solid var(--line)",
+          boxShadow: "var(--glass-shadow)",
         }}
       >
         {/* Eyebrow + Step-Indicator */}
         <div className="flex items-center justify-between">
-          <div
-            className="font-mono-ta text-xs font-bold uppercase"
-            style={{ letterSpacing: "0.2em", color: "var(--ta-cyan)" }}
-          >
-            {current.eyebrow}
-          </div>
+          <div className="t-label">{current.eyebrow}</div>
           <div className="flex gap-1.5">
             {STEPS.map((_, i) => (
               <span
@@ -133,10 +132,10 @@ export default function TrainerOnboardingModal() {
                 style={{
                   background:
                     i === step
-                      ? "var(--ta-cyan)"
+                      ? "var(--accent)"
                       : i < step
-                        ? "rgba(35,196,206,0.4)"
-                        : "var(--ink-5)",
+                        ? "color-mix(in oklab, var(--accent) 45%, transparent)"
+                        : "var(--line)",
                 }}
               />
             ))}
@@ -144,13 +143,18 @@ export default function TrainerOnboardingModal() {
         </div>
 
         <h2
-          className="font-display-ta text-2xl font-black uppercase leading-tight sm:text-3xl"
-          style={{ color: "var(--fg)", letterSpacing: "0.04em" }}
+          className="text-2xl uppercase leading-tight sm:text-3xl"
+          style={{
+            fontFamily: "var(--font-body)",
+            fontWeight: 800,
+            letterSpacing: "var(--ls-display)",
+            color: "var(--text-1)",
+          }}
         >
           {current.title}
         </h2>
 
-        <div className="text-sm leading-relaxed" style={{ color: "var(--fg-2)" }}>
+        <div className="leading-relaxed" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
           {current.body}
         </div>
 
@@ -185,20 +189,32 @@ export default function TrainerOnboardingModal() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--ink-5)" }}>
+        <div className="flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--line)" }}>
           <Link
             href="/help"
             onClick={handleFinish}
-            className="text-xs uppercase tracking-widest"
-            style={{ color: "var(--fg-3)" }}
+            data-press
+            className="inline-flex items-center gap-1.5"
+            style={{
+              font: "var(--type-meta)",
+              letterSpacing: "var(--ls-label)",
+              textTransform: "uppercase",
+              color: "var(--text-2)",
+            }}
           >
-            Hilfe-Bereich öffnen →
+            Hilfe-Bereich öffnen
+            <Icon name="arrow-right" size={12} strokeWidth={2.2} />
           </Link>
           <button
             onClick={handleFinish}
             disabled={busy}
-            className="text-xs uppercase tracking-widest disabled:opacity-50"
-            style={{ color: "var(--fg-4)" }}
+            className="disabled:opacity-50"
+            style={{
+              font: "var(--type-meta)",
+              letterSpacing: "var(--ls-label)",
+              textTransform: "uppercase",
+              color: "var(--text-3)",
+            }}
           >
             Überspringen
           </button>

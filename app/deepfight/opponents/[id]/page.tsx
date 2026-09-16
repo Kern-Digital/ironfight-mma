@@ -36,39 +36,35 @@ function SharedOpponentContent({ id }: { id: string }) {
   }, [load]);
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--ink-0)" }}>
+    <main className="min-h-screen" style={{ background: "var(--surface-page)" }}>
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <Link
           href="/deepfight"
+          data-press
           className="inline-flex items-center gap-2"
-          style={{ color: "var(--fg-3)", textDecoration: "none" }}
+          style={{ color: "var(--text-2)", textDecoration: "none" }}
         >
           <Icon name="arrow-left" size={18} />
-          <span
-            className="font-mono-ta text-[10px] font-bold uppercase"
-            style={{ letterSpacing: "0.18em" }}
-          >
-            <DeepFightWordmark />
-          </span>
+          <DeepFightWordmark />
         </Link>
 
         <div className="mt-5">
           {error ? (
             <div
-              className="rounded-2xl p-10 text-center"
+              className="rounded-card p-10 text-center"
               style={{
-                background: "var(--ink-2)",
-                border: "1px dashed var(--ink-5)",
+                background: "var(--surface-card)",
+                border: "1px dashed var(--line)",
               }}
             >
-              <p className="text-sm font-bold" style={{ color: "var(--fg-3)" }}>
+              <p style={{ font: "var(--type-body-strong)", color: "var(--text-2)" }}>
                 {error}
               </p>
               <Link
                 href="/deepfight"
                 className="btn-secondary mt-4 inline-flex px-4 py-2 text-xs"
               >
-                Zurück zu „Mein DeepFight"
+                Zurück zum Kampfprofil
               </Link>
             </div>
           ) : opponent === null ? (

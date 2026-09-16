@@ -8,103 +8,20 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth, useFighterName, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
+import Icon from "@/components/ui/Icon";
 
-// ── Icons ──────────────────────────────────────────────────────
-function IconDumbbell() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 4v16M18 4v16M6 8h12M6 16h12M3 4h3M18 4h3M3 20h3M18 20h3" />
-    </svg>
-  );
-}
-
-function IconBook() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function IconUser() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M6 20v-2a6 6 0 0 1 12 0v2" />
-    </svg>
-  );
-}
-
-function IconChevron({ size = 12 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-function IconAdmin() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
-}
-
-function IconMembers() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="9" cy="8" r="3.2" />
-      <path d="M3 20v-1.5A5 5 0 0 1 8 13.5h2A5 5 0 0 1 15 18.5V20" />
-      <path d="M16.5 5.6a3.2 3.2 0 0 1 0 6.2M18 13.8a5 5 0 0 1 3 4.7V20" />
-    </svg>
-  );
-}
-
-function IconClipboard() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="8" y="2" width="8" height="4" rx="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-      <path d="M9 12h6M9 16h4" />
-    </svg>
-  );
-}
-
-function IconHelp() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.7" />
-      <path d="M12 17h.01" />
-    </svg>
-  );
-}
-
-function IconSun() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" />
-      <line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-
-function IconMoon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
+/* ─── Symbole ────────────────────────────────────────────────────────────────
+ * Hier standen zehn von Hand gemalte SVG-Pfade (rund 95 Zeilen). Sie sind
+ * gegen `components/ui/Icon.tsx` getauscht — dieselbe 24er-Box, dieselbe
+ * Strichführung wie im Rest der App, und ein späterer Satzwechsel ist EINE
+ * Datei statt elf (DESIGN-BRIEF §1.4/§5: Symbole nur aus der Registry).
+ *
+ * EINE Zuordnung ist keine 1:1-Übersetzung: „Hilfe" trug ein Fragezeichen im
+ * Kreis, die Registry führt nur `info` (das „i" im Kreis). Statt einen elften
+ * Pfad in die Navigation zu malen — genau das, was die Regel verhindern soll —
+ * steht dort jetzt das Info-Zeichen. Wer das Fragezeichen zurückwill, ergänzt
+ * die REGISTRY; dann bekommen es alle Stellen gleichzeitig.
+ */
 
 // ── Types ──────────────────────────────────────────────────────
 interface NavChild {
@@ -132,7 +49,7 @@ interface NavGroup {
 const trainingNavGroup: NavGroup = {
   id: "training",
   label: "Training",
-  icon: <IconDumbbell />,
+  icon: <Icon name="dumbbell" size={14} strokeWidth={2} />,
   children: [
     { href: "/workout/generator", label: "Workouts", activePattern: /^\/workout/ },
     { href: "/schedule", label: "Kursplan" },
@@ -143,7 +60,7 @@ const trainingNavGroup: NavGroup = {
 const lernenNavGroup: NavGroup = {
   id: "lernen",
   label: "Lernen",
-  icon: <IconBook />,
+  icon: <Icon name="book" size={14} strokeWidth={2} />,
   children: [
     { href: "/techniques", label: "Techniken" },
     { href: "/regeln", label: "Regeln" },
@@ -154,7 +71,7 @@ const lernenNavGroup: NavGroup = {
 const profilNavGroup: NavGroup = {
   id: "profil",
   label: "Profil",
-  icon: <IconUser />,
+  icon: <Icon name="user" size={14} strokeWidth={2} />,
   children: [
     // Kampfprofil: DeepFight-Daten, freigegebene Auswertungen & Gegner,
     // Athleten-Daten. /deepfight leitet dorthin um (alte "Mein DeepFight"-Seite).
@@ -172,14 +89,14 @@ const profilNavGroup: NavGroup = {
 const helpNavGroup: NavGroup = {
   id: "help",
   label: "Hilfe",
-  icon: <IconHelp />,
+  icon: <Icon name="info" size={14} strokeWidth={2} />,
   href: "/help",
 };
 
 const trainerNavGroup: NavGroup = {
   id: "trainer",
   label: "Trainer",
-  icon: <IconClipboard />,
+  icon: <Icon name="clipboard" size={14} strokeWidth={2} />,
   children: [
     { href: "/trainer", label: "Dashboard", activePattern: /^\/trainer$/ },
     { href: "/trainer/athleten", label: "Athleten", activePattern: /^\/trainer\/students/ },
@@ -256,7 +173,7 @@ const deepFightNavGroup: NavGroup = {
 const adminNavGroup: NavGroup = {
   id: "admin",
   label: "Admin",
-  icon: <IconAdmin />,
+  icon: <Icon name="shield" size={14} strokeWidth={2} />,
   children: [
     { href: "/admin/users", label: "Nutzer" },
     { href: "/admin/seed", label: "Demo-Daten" },
@@ -297,7 +214,7 @@ export default function Navbar() {
       ? {
           id: "verwaltung",
           label: "Verwaltung",
-          icon: <IconMembers />,
+          icon: <Icon name="users" size={14} strokeWidth={2} />,
           // Ohne Trainer-Punkte darüber braucht es keine Zwischenüberschrift.
           // `section` wird nur benannt, damit `rest` es NICHT mehr enthält.
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -360,9 +277,31 @@ export default function Navbar() {
     setOpenMobileGroup((prev) => (prev === id ? null : id));
   }
 
-  const monoStyle = {
-    fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
-    letterSpacing: "0.12em",
+  /* Beschriftungen des Balkens. Die GRÖSSE bleibt bewusst an den
+     Tailwind-Klassen (`text-xs lg:text-sm`) und steht nicht im Token-Shorthand:
+     Der Balken braucht zwei Stufen, und `font: var(--type-meta)` kann nur eine.
+     Alles andere — Familie, Gewicht, Laufweite — kommt aus den Tokens.
+
+     NEBENBEI LÖST DER SCHRIFTWECHSEL EIN GEMESSENES PROBLEM: Der Balken läuft
+     ab 1024 px über (1305 px Inhalt bei 1232 px Platz, Backlog-Punkt
+     „Navigationsbalken läuft über"). Die alte Beschriftung lief in JetBrains
+     MONO mit 0,12em Laufweite — eine dickengleiche Schrift ist die breiteste
+     Wahl, die es gibt. Archivo mit 0,08em (`--ls-label`) braucht für dieselben
+     Wörter spürbar weniger Platz. Der Überlauf ist damit NICHT behoben (das
+     bleibt die Umbruch-Strategie aus dem Backlog), aber er beginnt später. */
+  const NAV_FONT: React.CSSProperties = {
+    fontFamily: "var(--font-body)",
+    fontWeight: 600,
+    letterSpacing: "var(--ls-label)",
+    textTransform: "uppercase",
+  };
+  /* Zwischenüberschrift IM Aufklapper („Verwaltung"). Gleiche Größe wie die
+     Einträge, aber gedämpft — sie ist eine Trennung, kein Ziel. */
+  const NAV_SECTION: React.CSSProperties = {
+    font: "var(--type-meta)",
+    letterSpacing: "var(--ls-label)",
+    textTransform: "uppercase",
+    color: "var(--text-3)",
   };
 
   return (
@@ -370,8 +309,11 @@ export default function Navbar() {
       <header
         className="sticky top-0 z-50 backdrop-blur"
         style={{
-          background: "var(--nav-surface)",
-          borderBottom: "1px solid var(--ink-4)",
+          /* `--nav-surface` war ein VERLAUF als Flächenfüllung — das schließt
+             DESIGN-BRIEF §3 aus. Jetzt ein Flächenton, halbdeckend, damit der
+             Weichzeichner darunter noch etwas zu tun hat. */
+          background: "color-mix(in oklab, var(--surface-page) 88%, transparent)",
+          borderBottom: "1px solid var(--line)",
         }}
       >
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -382,19 +324,38 @@ export default function Navbar() {
               alt="Tidal Athletics"
               width={36}
               height={36}
-              className="rounded-xl"
+              className="rounded-field"
             />
             <div>
+              {/* DIE MARKE FOLGT JETZT DEM GYM-AKZENT. Vorher stand „Tidal" in
+                  festem --ta-pink und „Athletics" in festem --ta-cyan — zwei
+                  hart gesetzte Markenfarben, und damit genau das, was
+                  DESIGN-BRIEF §1.1 verbietet („Abnahme-Test: EINE Variable
+                  ändern → die gesamte App folgt"). Ausgerechnet der Schriftzug
+                  wäre beim ersten Gym-Branding stehen geblieben.
+
+                  Die Zweifarbigkeit BLEIBT, sie trägt jetzt nur eine andere
+                  Aussage: Der erste Teil ist Text, der zweite der Akzent. Ein
+                  Gym mit eigener Farbe färbt damit die zweite Hälfte mit. */}
               <div
-                className="font-display-ta text-lg font-black uppercase leading-none"
-                style={{ letterSpacing: "0.12em" }}
+                className="text-lg uppercase leading-none"
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontWeight: 800,
+                  letterSpacing: "var(--ls-display)",
+                }}
               >
-                <span style={{ color: "var(--ta-pink)" }}>Tidal</span>
-                <span style={{ color: "var(--ta-cyan)" }}>Athletics</span>
+                <span style={{ color: "var(--text-1)" }}>Tidal</span>
+                <span style={{ color: "var(--accent-text)" }}>Athletics</span>
               </div>
               <div
-                className="font-mono-ta text-[9px] uppercase"
-                style={{ letterSpacing: "0.25em", color: "var(--fg-3)", marginTop: "2px" }}
+                style={{
+                  font: "var(--type-meta)",
+                  letterSpacing: "var(--ls-label)",
+                  textTransform: "uppercase",
+                  color: "var(--text-3)",
+                  marginTop: "2px",
+                }}
               >
                 MMA Training
               </div>
@@ -419,14 +380,14 @@ export default function Navbar() {
                     <Link
                       href={group.href}
                       className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                      style={{ ...monoStyle, color: active ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                      style={{ ...NAV_FONT, color: active ? "var(--accent-text)" : "var(--text-2)" }}
                     >
                       {group.icon && <span style={{ opacity: 0.75 }}>{group.icon}</span>}
                       {group.label}
                       {active && (
                         <span
                           className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                          style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                          style={{ background: "var(--accent)", boxShadow: "var(--accent-glow)" }}
                         />
                       )}
                     </Link>
@@ -434,7 +395,7 @@ export default function Navbar() {
                     // Dropdown trigger
                     <button
                       className="relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase transition-colors lg:px-4 lg:text-sm"
-                      style={{ ...monoStyle, color: active || isOpen ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                      style={{ ...NAV_FONT, color: active || isOpen ? "var(--accent-text)" : "var(--text-2)" }}
                       aria-haspopup="true"
                       aria-expanded={isOpen}
                     >
@@ -447,12 +408,12 @@ export default function Navbar() {
                           opacity: 0.5,
                         }}
                       >
-                        <IconChevron />
+                        <Icon name="chevron-down" size={12} strokeWidth={2.5} />
                       </span>
                       {active && !isOpen && (
                         <span
                           className="absolute inset-x-2 -bottom-px h-0.5 rounded-b"
-                          style={{ background: "var(--ta-cyan)", boxShadow: "0 0 8px var(--ta-cyan)" }}
+                          style={{ background: "var(--accent)", boxShadow: "var(--accent-glow)" }}
                         />
                       )}
                     </button>
@@ -461,11 +422,11 @@ export default function Navbar() {
                   {/* Dropdown Panel */}
                   {group.children && isOpen && (
                     <div
-                      className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-xl py-1"
+                      className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-card py-1"
                       style={{
-                        background: "var(--dropdown-surface)",
-                        border: "1px solid var(--ink-5)",
-                        boxShadow: "var(--dropdown-shadow)",
+                        background: "var(--surface-card)",
+                        border: "1px solid var(--line)",
+                        boxShadow: "var(--glass-shadow)",
                       }}
                     >
                       {group.children.map((child) => {
@@ -474,39 +435,43 @@ export default function Navbar() {
                           <div key={child.href}>
                           {child.section && (
                             <div
-                              className="mt-1 border-t px-4 pb-1 pt-2 text-[9px] font-bold uppercase"
-                              style={{
-                                ...monoStyle,
-                                borderColor: "var(--ink-5)",
-                                color: "var(--fg-4)",
-                              }}
+                              className="mt-1 border-t px-4 pb-1 pt-2"
+                              style={{ ...NAV_SECTION, borderColor: "var(--line)" }}
                             >
                               {child.section}
                             </div>
                           )}
+                          {/* HOVER MACHT JETZT CSS. Vorher schrieben zwei
+                              JavaScript-Handler `style.background` direkt auf das
+                              Element — auf Touch bleibt so eine Tönung nach dem
+                              Tipp hängen (MOTION-BRIEF §3.2), und sie umging die
+                              `@media (hover: hover)`-Sperre der App. `.t-interactive`
+                              tönt die Fläche, `data-press="quiet"` gibt der Zeile die
+                              Haptik dichter Listen: sinkt ein, hebt sich NIE.
+
+                              DIE FLÄCHE DARF DESHALB NUR IM AKTIVEN FALL INLINE
+                              STEHEN — ein Inline-Stil schlägt jede Klassenregel, und
+                              ein `background: "transparent"` an dieser Stelle hätte
+                              die Hover-Tönung von `.t-interactive` still ausgehebelt.
+                              Deshalb wird der Schlüssel weggelassen statt auf
+                              „durchsichtig" gesetzt. */}
                           <Link
                             href={child.href}
                             onClick={() => setOpenDesktopGroup(null)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase transition-colors"
+                            data-press="quiet"
+                            className="t-interactive flex items-center gap-2 px-4 py-2.5 text-xs"
                             style={{
-                              ...monoStyle,
-                              color: childActive ? "var(--ta-cyan)" : "var(--fg-3)",
-                              background: childActive ? "var(--active-overlay-cyan)" : "transparent",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!childActive)
-                                e.currentTarget.style.background = "var(--hover-overlay)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = childActive
-                                ? "var(--active-overlay-cyan)"
-                                : "transparent";
+                              ...NAV_FONT,
+                              color: childActive ? "var(--accent-text)" : "var(--text-2)",
+                              ...(childActive
+                                ? { background: "var(--accent-subtle)" }
+                                : {}),
                             }}
                           >
                             {childActive && (
                               <span
                                 className="h-3 w-0.5 rounded-full"
-                                style={{ background: "var(--ta-cyan)", flexShrink: 0 }}
+                                style={{ background: "var(--accent)", flexShrink: 0 }}
                               />
                             )}
                             {child.label}
@@ -526,38 +491,39 @@ export default function Navbar() {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="rounded-xl p-2 transition-colors"
+              className="rounded-field p-2 transition-colors"
               style={{
-                background: "var(--ink-3)",
-                border: "1px solid var(--ink-5)",
-                color: "var(--fg-3)",
+                background: "var(--surface-raised)",
+                border: "1px solid var(--line)",
+                color: "var(--text-2)",
               }}
               aria-label={theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"}
             >
-              {theme === "dark" ? <IconSun /> : <IconMoon />}
+              {theme === "dark" ? <Icon name="sun" size={15} strokeWidth={2} /> : <Icon name="moon" size={15} strokeWidth={2} />}
             </button>
             {loading ? (
               <div
-                className="h-8 w-24 animate-pulse rounded-xl"
-                style={{ background: "var(--ink-4)" }}
+                className="h-8 w-24 animate-pulse rounded-field"
+                style={{ background: "var(--surface-raised)" }}
               />
             ) : user ? (
               <>
                 <Link
                   href="/profile"
-                  className="flex items-center gap-2 text-sm font-bold uppercase transition-colors"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.1em",
-                    color: "var(--fg-2)",
-                  }}
+                  className="flex items-center gap-2 text-sm transition-colors"
+                  style={{ ...NAV_FONT, color: "var(--text-2)" }}
                 >
+                  {/* Die Plakette trug zwei feste rgba-Cyans. Beide leiten sich
+                      jetzt aus dem Akzent ab — `color-mix` statt Alpha-Anhang,
+                      wie im Token-Kopf vorgeschrieben. */}
                   <span
-                    className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black"
+                    className="flex h-8 w-8 items-center justify-center rounded-field"
                     style={{
-                      border: "1px solid rgba(35,196,206,.4)",
-                      background: "rgba(35,196,206,.08)",
-                      color: "var(--ta-cyan)",
+                      border:
+                        "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
+                      background: "var(--accent-subtle)",
+                      color: "var(--accent-text)",
+                      font: "var(--type-meta)",
                     }}
                   >
                     {initialsOf(fighterName)}
@@ -566,14 +532,13 @@ export default function Navbar() {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="text-sm font-bold uppercase transition-colors"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.1em",
-                    color: "var(--fg-4)",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ta-pink)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-4)")}
+                  /* Der Farbwechsel lief über zwei JS-Handler auf ein festes
+                     Rosa. Jetzt eine Tailwind-Sperre, die `hoverOnlyWhenSupported`
+                     mitnimmt: Auf Touch gibt es sie gar nicht erst. Und der Griff
+                     ist ein AUFHELLEN statt eines Farbwechsels — Abmelden ist
+                     nicht zerstörerisch, es braucht keine Warnfarbe. */
+                  className="text-sm transition-colors text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  style={NAV_FONT}
                 >
                   Logout
                 </button>
@@ -582,12 +547,8 @@ export default function Navbar() {
               <>
                 <Link
                   href="/login"
-                  className="text-sm font-bold uppercase transition-colors"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.1em",
-                    color: "var(--fg-3)",
-                  }}
+                  className="text-sm transition-colors text-[var(--text-2)] hover:text-[var(--text-1)]"
+                  style={NAV_FONT}
                 >
                   Login
                 </Link>
@@ -606,11 +567,11 @@ export default function Navbar() {
                 return !v;
               })
             }
-            className="rounded-xl p-2 md:hidden"
+            className="rounded-field p-2 md:hidden"
             style={{
-              background: "var(--ink-3)",
-              border: "1px solid var(--ink-5)",
-              color: "var(--fg-2)",
+              background: "var(--surface-raised)",
+              border: "1px solid var(--line)",
+              color: "var(--text-1)",
             }}
             aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
             aria-expanded={mobileOpen}
@@ -641,7 +602,7 @@ export default function Navbar() {
       {mobileOpen && (
         <div
           className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto border-t md:hidden"
-          style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+          style={{ borderColor: "var(--line)", background: "var(--surface-page)" }}
         >
           <div className="flex min-h-full flex-col p-4">
             {visibleGroups.map((group) => {
@@ -656,7 +617,7 @@ export default function Navbar() {
                       href={group.href}
                       onClick={() => setMobileOpen(false)}
                       className="flex items-center gap-2.5 px-2 py-3 text-sm font-bold uppercase transition-colors"
-                      style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                      style={{ ...NAV_FONT, color: groupActive ? "var(--accent-text)" : "var(--text-2)" }}
                     >
                       {group.icon && <span style={{ opacity: 0.7 }}>{group.icon}</span>}
                       {group.label}
@@ -666,8 +627,9 @@ export default function Navbar() {
                       {/* Accordion header */}
                       <button
                         onClick={() => toggleMobileGroup(group.id)}
-                        className="flex w-full items-center justify-between px-2 py-3 text-sm font-bold uppercase transition-colors"
-                        style={{ ...monoStyle, color: groupActive ? "var(--ta-cyan)" : "var(--fg-3)" }}
+                        data-press="quiet"
+                        className="flex w-full items-center justify-between px-2 py-3 text-sm transition-colors"
+                        style={{ ...NAV_FONT, color: groupActive ? "var(--accent-text)" : "var(--text-2)" }}
                       >
                         <span className="flex items-center gap-2.5">
                           {group.icon && <span style={{ opacity: 0.7 }}>{group.icon}</span>}
@@ -679,7 +641,7 @@ export default function Navbar() {
                             transform: groupMobileOpen ? "rotate(180deg)" : "none",
                           }}
                         >
-                          <IconChevron size={14} />
+                          <Icon name="chevron-down" size={14} strokeWidth={2.5} />
                         </span>
                       </button>
 
@@ -688,28 +650,27 @@ export default function Navbar() {
                       <Collapse open={groupMobileOpen}>
                         <div
                           className="mb-2 ml-6 flex flex-col border-l"
-                          style={{ borderColor: "var(--ink-5)" }}
+                          style={{ borderColor: "var(--line)" }}
                         >
                           {group.children?.map((child) => {
                             const childActive = isChildActive(child);
                             return (
                               <div key={child.href}>
                               {child.section && (
-                                <div
-                                  className="px-4 pb-1 pt-3 text-[9px] font-bold uppercase"
-                                  style={{ ...monoStyle, color: "var(--fg-4)" }}
-                                >
+                                <div className="px-4 pb-1 pt-3" style={NAV_SECTION}>
                                   {child.section}
                                 </div>
                               )}
                               <Link
                                 href={child.href}
                                 onClick={() => setMobileOpen(false)}
-                                className="px-4 py-2.5 font-bold uppercase transition-colors"
+                                data-press="quiet"
+                                className="px-4 py-2.5 text-xs transition-colors"
                                 style={{
-                                  ...monoStyle,
-                                  fontSize: "0.75rem",
-                                  color: childActive ? "var(--ta-cyan)" : "var(--fg-4)",
+                                  ...NAV_FONT,
+                                  color: childActive
+                                    ? "var(--accent-text)"
+                                    : "var(--text-2)",
                                 }}
                               >
                                 {child.label}
@@ -728,16 +689,17 @@ export default function Navbar() {
             {/* Auth section */}
             <div
               className="mt-auto flex flex-col gap-2 border-t pt-4"
-              style={{ borderColor: "var(--ink-4)" }}
+              style={{ borderColor: "var(--line)" }}
             >
               {/* Theme toggle row */}
               <button
                 onClick={toggleTheme}
-                className="flex w-full items-center gap-2.5 px-2 py-2 text-sm font-bold uppercase transition-colors"
-                style={{ ...monoStyle, color: "var(--fg-3)" }}
+                data-press="quiet"
+                className="flex w-full items-center gap-2.5 px-2 py-2 text-sm transition-colors"
+                style={{ ...NAV_FONT, color: "var(--text-2)" }}
               >
                 <span style={{ opacity: 0.7 }}>
-                  {theme === "dark" ? <IconSun /> : <IconMoon />}
+                  {theme === "dark" ? <Icon name="sun" size={15} strokeWidth={2} /> : <Icon name="moon" size={15} strokeWidth={2} />}
                 </span>
                 {theme === "dark" ? "Helles Design" : "Dunkles Design"}
               </button>

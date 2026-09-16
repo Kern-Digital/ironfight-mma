@@ -15,9 +15,10 @@
  *     fixiert hinter allem — wie `.shell-ambient`, nur für diesen Bereich.
  *     Drei Seiten mit je eigener Schicht hätten bei jedem Wechsel neu
  *     aufgebaut und geflackert.
- *  3. Die Glas-Leiste mit den drei Segmenten, auf den drei Hauptrouten. Die
- *     Detailseiten (ein Gegner, ein Athlet) tragen stattdessen ihren
- *     Zurück-Weg im Seitenkopf.
+ *  3. Die Glas-Leiste, auf den vier Seiten des Flusses. Die Detailseiten (ein
+ *     Gegner, ein Athlet) tragen stattdessen ihren Zurück-Weg im Seitenkopf.
+ *     Sie trägt seit Leons Neugestaltung (08.09.2026) keine Segmente mehr,
+ *     sondern Wortmarke und Ortsangabe — Begründung in DeepFightLeiste.
  *
  * WARUM EIN CLIENT-LAYOUT, anders als app/admin/layout.tsx: Der Modus ist
  * Zustand, und der lebt in React. Die Falle aus CLAUDE.md („redirect() unter
@@ -38,10 +39,23 @@ import {
 import Synthesis from "@/components/ui/Synthesis";
 import { usePathname } from "next/navigation";
 
+/**
+ * Wo die Glas-Leiste steht: auf den Seiten des Flusses unterhalb der Landung.
+ *
+ * DIE LANDUNG FEHLT SEIT DEM 10.09.2026. Leon: „oben links: DeepFight größer
+ * ohne Rahmen, nur Text" — und rechts daneben, auf derselben Höhe, die Suche.
+ * Beides gehört in EINE Kopfzeile, und die kann nur die Seite selbst bauen:
+ * Die Leiste steht im Layout, also über dem `<main>` der Seite, und könnte
+ * nie neben einem Element aus der Seite sitzen. Die Landung bringt ihre
+ * Wortmarke deshalb selbst mit.
+ *
+ * Die Detailseiten fehlen weiterhin — sie tragen ihren Zurück-Weg selbst und
+ * stünden sonst unter zwei Köpfen.
+ */
 const HAUPTROUTEN = new Set([
-  "/trainer/deepfight",
   "/trainer/deepfight/gegner",
   "/trainer/deepfight/athleten",
+  "/trainer/deepfight/analyse",
 ]);
 
 function Bereich({ children }: { children: React.ReactNode }) {

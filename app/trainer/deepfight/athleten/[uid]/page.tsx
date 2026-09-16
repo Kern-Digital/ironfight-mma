@@ -234,7 +234,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                 nachsah, fand nichts. Analysiert wird ab jetzt an EINER Stelle;
                 diese Seite zeigt, was dabei herausgekommen ist. */}
             <Link
-              href={`/trainer/deepfight?modus=leute&ziel=${uid}`}
+              href={`/trainer/deepfight/analyse?modus=leute&ziel=${uid}`}
               data-press
               className="t-card t-interactive inline-flex min-h-hit w-fit items-center gap-2 rounded-field px-5"
               style={{

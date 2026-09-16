@@ -80,10 +80,15 @@ export function SheetShell({
     <AnimatePresence>
       {open && (
         <div
+          /* `ta-sheet` ist ein reiner GRIFF, kein Stil: Die Huelle der App
+             traegt ihr Schubfach dauerhaft als role="dialog" im Baum
+             (`aria-label="Menü"`, nur per `lg:hidden` versteckt). Ein Test,
+             der auf die Rolle allein zeigt, faendet also IMMER ein Dialog —
+             gemessen 12.09.2026, es sah wie ein Sheet aus, das nicht zugeht. */
           className={
             placement === "bottom"
-              ? "fixed inset-0 flex flex-col justify-end"
-              : "fixed inset-0 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
+              ? "ta-sheet fixed inset-0 flex flex-col justify-end"
+              : "ta-sheet fixed inset-0 flex flex-col justify-end sm:items-center sm:justify-center sm:p-6"
           }
           style={{ zIndex }}
           role="dialog"

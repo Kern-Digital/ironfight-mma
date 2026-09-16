@@ -178,8 +178,12 @@ function InviteCreateInhalt({
                   Code
                 </span>
                 <span
-                  className="font-mono-ta text-center text-2xl sm:text-3xl"
-                  style={{ fontWeight: 700, color: "var(--text-body)" }}
+                  className="font-mono text-center text-2xl sm:text-3xl"
+                  style={{
+                    fontWeight: 700,
+                    letterSpacing: "var(--ls-label)",
+                    color: "var(--text-body)",
+                  }}
                 >
                   {formatInviteCode(result.code)}
                 </span>

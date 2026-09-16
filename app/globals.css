@@ -48,15 +48,15 @@
   --blood-dark: var(--ta-cyan-deep);
   --blood-glow: rgba(35, 196, 206, 0.4);
 
-  /* Surface helpers — overridden per theme */
-  --nav-surface:          linear-gradient(180deg, rgba(7,9,12,.95), rgba(3,4,6,.92));
-  --dropdown-surface:     rgba(7,9,12,0.98);
-  --dropdown-shadow:      0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(35,196,206,0.06);
-  --hover-overlay:        rgba(255,255,255,0.04);
-  --active-overlay-cyan:  rgba(35,196,206,0.07);
-  --modal-backdrop:       rgba(3,4,6,0.85);
-  --modal-shadow:         0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(35,196,206,0.06);
-  --pwa-shadow:           0 -4px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(35,196,206,0.10);
+  /* DIE ACHT „SURFACE HELPERS" SIND AM 13.09.2026 ENTFALLEN
+     (--nav-surface, --dropdown-surface, --dropdown-shadow, --hover-overlay,
+     --active-overlay-cyan, --modal-backdrop, --modal-shadow, --pwa-shadow).
+     Sie hatten zuletzt GENAU DREI Verbraucher — Navbar, PwaInstallPrompt und
+     TrainerOnboardingModal —, und mit deren Umbau auf die Tokens waren alle
+     acht unbenutzt. Ihre Nachfolger im neuen System: --surface-page /
+     --surface-card / --surface-raised für Flächen, --overlay für die
+     Abdunkelung hinter Sheets, --glass-shadow für den Schlagschatten und die
+     Hover-Tönung von .t-interactive für „eine Ebene heller". */
 }
 
 /* ─── Light Theme ─────────────────────────────────────────────────────────── */
@@ -89,15 +89,6 @@
   --ink-5: rgba(0,0,0,0.15);
   --ink-6: rgba(0,0,0,0.26);
 
-  /* Surface helpers */
-  --nav-surface:          linear-gradient(180deg, rgba(248,250,253,.97), rgba(238,242,248,.96));
-  --dropdown-surface:     rgba(255,255,255,0.99);
-  --dropdown-shadow:      0 4px 24px rgba(0,0,0,0.11), 0 0 0 1px rgba(19,147,156,0.12);
-  --hover-overlay:        rgba(0,0,0,0.04);
-  --active-overlay-cyan:  rgba(19,147,156,0.09);
-  --modal-backdrop:       rgba(0,0,0,0.35);
-  --modal-shadow:         0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(19,147,156,0.15);
-  --pwa-shadow:           0 -4px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(19,147,156,0.15);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -357,6 +348,36 @@
      gilt auch für Schedule/Kampfprofil, die vorher eigene clamp()-Größen
      trugen und jetzt dieses Token nutzen. */
   --type-display: 800 36px/1.1 var(--font-body);       /* +ls .04em, caps */
+  /* Eine Stufe ÜBER Display — für die eine Überschrift, die einen Bereich
+     eröffnet (Leon 10.09.2026: „Entschlüssle die Fight-DNA auch größer und
+     nicht auf zwei Zeilen beim Desktop").
+     WARUM `clamp` UND KEINE FESTE ZAHL: Einzeilig ist keine Schriftgröße,
+     sondern ein Verhältnis von Textlänge zu SPALTENBREITE. 26 Zeichen in
+     Versalien brauchen rund das 17-fache der Schriftgröße an Breite.
+     WARUM `cqw` UND NICHT `vw` — gemessen 10.09.2026: Mit `5.2vw` und
+     Deckel 64 px brach die Zeile auf 1440 px trotzdem („…FIGHT-" / „DNA").
+     Der Grund ist die Stab-Hülle: Die Sidebar nimmt 320 px weg, die Spalte
+     ist also rund 1090 px breit, nicht 1440. `vw` misst das Fenster und
+     rechnet damit Platz mit, den es nicht gibt. `cqw` misst den Container —
+     die Zeile passt sich der Spalte an, egal ob eine Sidebar davorsteht.
+     Voraussetzung ist ein `container-type` am Elternteil (`.df-kopfspalte`).
+     DER FAKTOR IST GERECHNET, NICHT GERATEN: Gemessen liegt die Zeilenbreite
+     beim 19,2-fachen der Schriftgröße. Damit sie in die Spalte passt, darf
+     die Schrift höchstens 100/19,2 = 5,2 % der Spaltenbreite messen — mit
+     Reserve also 4,8 %. Ein erster Anlauf mit 5,5 % hielt nur, solange der
+     Deckel griff (ab rund 1018 px Spalte); bei 1280 px Fenster wäre die
+     Spalte 912 px breit gewesen und die Zeile erneut umgebrochen. Der Boden
+     (30 px) greift auf schmalen Schirmen; dort DARF sie umbrechen, Leon
+     wollte die eine Zeile ausdrücklich „beim Desktop". */
+  --type-display-xl: 800 clamp(30px, 4.8cqw, 56px)/1.04 var(--font-body);
+  /* Die Stufe ZWISCHEN h2 (20 px) und Display (36 px). Sie fehlte, und der
+     Sprung ist zu groß für das, was Leon am 10.09. wollte: Wortmarke und
+     „Start" auf der DeepFight-Landung „nicht in Big und etwas kleiner".
+     Von 36 auf 20 wäre nicht „etwas", sondern halb. 700 statt 800: Neben
+     einer 56-px-Überschrift muss darunter nichts mehr um Aufmerksamkeit
+     kämpfen. Versalien trägt dieses Token bewusst NICHT — beide Stellen sind
+     Namen, keine Rubriken. */
+  --type-marke: 700 26px/1.2 var(--font-body);
   --type-h2: 700 20px/1.2 var(--font-body);            /* +ls .04em, caps */
   --type-h3: 700 17px/1.3 var(--font-body);
   --type-body: 400 16px/1.5 var(--font-body);
@@ -767,6 +788,67 @@
     oklch(0.40 var(--accent-c) var(--accent-h)) 40%,
     var(--text-2)
   );
+
+  /* DIE SIGNALFARBEN REISSEN IM HELLEN THEME GENAUSO — nachgemessen
+     14.09.2026 (Teilschritt 5, der Ergebnis-Bericht der Video-Analyse).
+     Die Reihe darüber hat 08.09. die neutralen Textstufen gerettet und die
+     SIGNALFAMILIEN übersehen. Sie standen seither auf ihren :root-Werten,
+     und die sind für diese Fläche zu hell:
+
+        --warning     als Schrift   2,39 · 2,49 · 2,56 · 3,25 · 3,31
+        --positive    als Schrift   3,59 · 3,69 · 3,76 · 3,83
+        --accent-text als Schrift   3,31 · 4,44
+        (AA verlangt 4,5 — dieselben Stellen dunkel: 5,2 bis 13,8)
+
+     Verfahren wie gehabt (Falle 45/16): Vordergrund aus der über einen
+     Canvas AUFGELÖSTEN CSS-Farbe — `getComputedStyle` gibt `oklch()`
+     unaufgelöst zurück —, Hintergrund aus einem echten Bildpixel AN DER
+     STELLE DES TEXTES, Text im ganzen Teilbaum transparent, vier
+     Zeitpunkte, der schlechteste zählt.
+
+     ES GEHT NICHT UM DEN FARBWERT AN SICH. Auf einer normalen, DECKENDEN
+     Karte trägt `--positive` bei L 0,55 mühelos; hier steht dieselbe Schrift
+     auf halbdurchsichtigem Glas, und dahinter LÄUFT die Schicht. Deshalb
+     gilt die Korrektur nur im Bereich und nur im Hellen — im Dunkeln hält
+     alles ≥ 5,2:1, dort wäre der Eingriff grundlos.
+
+     DIE REIHE, hier neu gemessen — L 0,40 von den Textstufen zu übernehmen
+     hätte NICHT gereicht:
+
+        L 0,60/0,55/0,46 (vorher)   2,39   durchgefallen
+        L 0,40                      4,46   durchgefallen (keine Reserve)
+        L 0,36                      5,35   trägt            ← gewählt
+
+     Der Unterschied zu den Textstufen ist die TÖNUNG: Diese Schrift steht
+     nicht auf dem blanken Glas, sondern auf einer 10–18 % getönten Fläche
+     darauf — der Löschen-Knopf, die Konfidenz-Marke, der Kopf der
+     Identifikation. Die Tönung nimmt dem Grund rund einen Punkt Kontrast ab,
+     und den muss die Schrift mitbringen. Bei L 0,40 stand die schwächste
+     Stelle auf 4,46 und schwankte zwischen 4,46 und 5,79 — dieselbe Stelle,
+     dieselbe Farbe, nur eine andere Position der Schicht. Genau diese
+     Streuung (±0,3 bis ±1,5) ist der Grund, warum eine Zahl knapp über 4,5
+     nicht reicht.
+
+     Die Stufe bleibt damit dunkler als `--text-2` (L 0,40). Das dreht die
+     Hierarchie nicht um: Diese vier Tokens sind BUNT und arbeiten als
+     Signal, nicht als Textstufe — sie stehen neben der Hierarchie, nicht
+     in ihr.
+
+     Die Tönungen kippen dabei NICHT: Diese Tokens stehen nirgends als
+     deckende Fläche unter Text, sondern überall im selben Muster — Token als
+     Schrift, `color-mix(…, 12–18 %, transparent)` als Tönung, 40–55 % als
+     Kante. Dunkelt die Schrift um den vollen Betrag und die Tönung nur um
+     12–18 % davon, wächst der Abstand.
+
+     `--negative` kommt hier NEU dazu (die anderen drei überschreiben einen
+     :root-Wert): daran hängen `.t-danger` und `.t-danger-strong`, also der
+     Löschen-Knopf des Berichts.
+
+     Wer `--df-deckkraft` ändert, misst auch diese vier neu. */
+  --warning: oklch(0.36 0.12 90);
+  --positive: oklch(0.36 0.13 150);
+  --negative: oklch(0.36 0.18 25);
+  --accent-text: oklch(0.36 var(--accent-c) var(--accent-h));
 }
 [data-area="deepfight"] .t-card {
   background: var(--glass-bg);
@@ -863,6 +945,748 @@
   .df-rueckfall > span:last-child {
     animation: none;
   }
+}
+
+/* ─── DER DNA-STRANG DER LANDUNG: KEIN RAHMEN, SONDERN EIN AUSLAUFEN ────────
+ * (Leons Neugestaltung 08.09.2026: „Sein Hintergrund sitzt NICHT in einem
+ * sauberen Rahmen, sondern läuft verschwimmend aus.")
+ *
+ * ZWEI DINGE, UND DAS ERSTE WÄRE AUCH OHNE LEONS WUNSCH FÄLLIG GEWESEN:
+ *
+ * 1. `FightDnaHelix` malt auf einen DECKENDEN, abgerundeten Kasten
+ *    (`background: var(--bg-0)`, `border-radius: var(--r-xl)` in der
+ *    Komponente). Auf jeder normalen Seite ist das richtig. Im
+ *    DeepFight-Bereich läge damit eine 620 px hohe undurchsichtige Platte auf
+ *    der bewegten Schicht und löschte sie an genau der Stelle aus, an der sie
+ *    am meisten zu sehen sein soll. Hier ist der Grund deshalb durchsichtig —
+ *    die Helix bringt ihre eigene Farbe mit.
+ *
+ * 2. Ihre Hintergrund-Schichten (Ambient, vier Lava-Flecken, Vignette) enden
+ *    sonst an der Kante des Kastens. Die Maske lässt sie zum Rand hin auf null
+ *    fallen: Der Hintergrund geht in den Grund über, statt abzubrechen.
+ *
+ * DIE MASKE MUSS AUF DAS GANZE ELEMENT — gemessen und im Screenshot gesehen,
+ * 08.09.2026. Ein erster Anlauf legte sie nur auf Ambient, Lava und Vignette,
+ * um die Kennzahl der Helix zu schonen (die sitzt oben LINKS, also in der
+ * Ecke, wo eine radiale Maske am wenigsten deckt). Alle Zahlen bestanden —
+ * und der Screenshot zeigte trotzdem einen Kasten mit HARTEN Kanten, im
+ * hellen Theme besonders deutlich. Der Grund: Der WebGL-Canvas malt seinen
+ * eigenen, rechteckigen Grund und lag außerhalb der Maske. **Eine Kante, die
+ * keine Kontrastmessung meldet, sieht man nur, wenn man hinsieht.**
+ *
+ * Die Kennzahl ist dafür auf der Landung abgeschaltet (`kennzahlZeigen`):
+ * Der Strang zeigt dort ein Demo-Profil, also einen Menschen, den es nicht
+ * gibt — eine Prozentzahl darüber wirft nur die Frage auf, wessen sie ist.
+ * Zwei Gründe, eine Entscheidung.
+ *
+ * WARUM MASKE UND NICHT EIN AUFGELEGTER VERLAUF: Ein Verlauf müsste die Farbe
+ * DAHINTER kennen. Die gibt es hier nicht — dahinter läuft Synthesis (oder,
+ * ohne WebGL, der CSS-Rückfall), und beide bewegen sich. Eine Maske blendet
+ * das Element selbst aus und ist gegen jeden Grund richtig.
+ *
+ * KEIN BLUR: Das „Verschwimmen" macht der weiche Maskenrand. `filter: blur()`
+ * wäre in WKWebView ein Repaint je Bild (MOTION-BRIEF §3.5) — auf einer
+ * Fläche, hinter der schon eine bewegte Schicht rechnet, die zweite. */
+/* `!important` IST HIER PFLICHT, NICHT BEQUEMLICHKEIT — gemessen 08.09.2026:
+   Ohne die beiden Ausrufezeichen stand der Grund weiter auf
+   `oklch(0.15 0.0084 197)` und der Radius auf 22 px. `FightDnaHelix` setzt
+   beides als INLINE-Stil am `<section>`, und ein Inline-Stil schlägt jede
+   Klassenregel. Dieselbe Falle wie am DeepFight-Einstieg, wo die Ruhefarbe
+   deshalb aus dem Inline-Stil nach globals.css ziehen musste — nur umgekehrt:
+   Dort war Inline der Fehler, hier ist es das, was überstimmt werden muss. */
+/* Die Inhaltsspalte der DeepFight-Landung meldet ihre Breite an ihre Kinder.
+   NUR DAFÜR steht sie hier: `--type-display-xl` rechnet in `cqw`, und ohne
+   einen `container-type` in der Kette fiele die Einheit auf den nächsten
+   Container zurück — im Zweifel den Bildschirm, also genau den Fehler, den
+   sie vermeiden soll. `inline-size` statt `size`: Nur die Breite wird
+   eingefangen, die Höhe bleibt vom Inhalt bestimmt. */
+.df-kopfspalte {
+  container-type: inline-size;
+}
+
+/* ─── „START" — der Regenbogen SITZT IM TEXT, nicht dahinter ────────────────
+ * (Leon 10.09.2026: „das Textfeld soll indirekt in Rainbow schimmern und wenn
+ * man mit der Maus drauf ist, markanter wirken. Der Rainbow-Rahmen drum herum
+ * soll entfernt werden.")
+ *
+ * Der Einstieg auf `/trainer/athleten/[uid]` (`.df-einstieg`) behält seine
+ * Regenbogen-FLÄCHE — die ist dort von Leon abgenommen. Diese Klasse ist die
+ * zweite Fassung für die Landung, nicht deren Ersatz.
+ *
+ * ─── WARUM `mix-blend-mode: color` UND NICHT EINFACH BUNTE SCHRIFT ──────────
+ *
+ * Bunte Schrift über der bewegten Schicht ist ein Kontrast-Problem: Die
+ * `--ai-*`-Stopps liegen in BEIDEN Themes zwischen L 0,58 und L 0,80 — im
+ * hellen Theme wäre das helle Schrift auf hellem Grund. `color` als
+ * Blend-Modus nimmt vom Regenbogen nur FARBTON und SÄTTIGUNG und behält die
+ * HELLIGKEIT der Schrift darunter. Der Text bleibt also `--text-1` hell bzw.
+ * dunkel wie gehabt und schimmert trotzdem — genau Leons „indirekt".
+ *
+ * `isolation: isolate` ist Pflicht: Ohne eigenen Stapelkontext blendete der
+ * Schimmer gegen die ganze Seite statt gegen die Schrift.
+ *
+ * Die Uhr ist dieselbe wie beim DNA-Badge (`t-ai-flow`, hier 6 s wie am
+ * Einstieg) — wer den Regenbogen ändert, ändert ihn an EINER Stelle. */
+.df-start {
+  /* Jede Stufe des Verlaufs ist eine MISCHUNG AUS DEM REGENBOGEN UND
+     `--text-1`. Damit liegt die Helligkeit der Schrift per Konstruktion nahe
+     an der, die sie ohne Schimmer hätte — der Farbton wandert, die Lesbarkeit
+     bleibt. `--df-start-mix` ist die einzige Stellschraube; Hover dreht sie
+     hoch, sonst ändert sich nichts.
+
+     EIN ERSTER ANLAUF NAHM `mix-blend-mode: color` (Farbton vom Regenbogen,
+     Helligkeit vom Text darunter). Auf dem Papier ideal — gemessen fiel die
+     gemalte Schrift im HELLEN Theme auf **1,55:1**. Die Helligkeit kam eben
+     nicht vom Text: Die Schimmer-Schicht deckte ihn, und geblendet wurde
+     gegen die Seite. Eine Mischung im Farbraum hat dieses Problem nicht,
+     weil gar nichts geblendet wird.
+
+     DER MISCHANTEIL HÄNGT AM THEMA (Leon 12.09.2026: „das sieht man leider
+     zu schwach, soll mehr Regenbogen sein"). Die 26 % waren am hellen Theme
+     gemessen — dort HELLT jeder zusätzliche Prozent die dunkle Schrift auf
+     und frisst genau den Kontrast, den die Mischung retten soll (mit 34 %
+     fiel die schlechteste Stufe auf 4,22:1). Im dunklen Theme ist es
+     umgekehrt: `--text-1` liegt bei L 0.96, die Regenbogenfarben bei L 0.52
+     bis 0.65, ein höherer Anteil DUNKELT die Schrift also ab — und sie hat
+     gegen `--bg-0` (L 0.15) reichlich Luft. 70 % landen bei rund L 0.71 mit
+     einer Buntheit von 0.10 — gegen L 0.15 immer noch über 6:1, und das
+     Zeichen ist endlich bunt statt blass. (54 % waren am selben Tag ein
+     erster, zu vorsichtiger Anlauf.) Das helle Theme bleibt unangetastet. */
+  --df-start-mix: 70%;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--ai-1) var(--df-start-mix), var(--text-1)),
+    color-mix(in oklab, var(--ai-2) var(--df-start-mix), var(--text-1)),
+    color-mix(in oklab, var(--ai-3) var(--df-start-mix), var(--text-1)),
+    color-mix(in oklab, var(--ai-4) var(--df-start-mix), var(--text-1)),
+    color-mix(in oklab, var(--ai-5) var(--df-start-mix), var(--text-1)),
+    color-mix(in oklab, var(--ai-1) var(--df-start-mix), var(--text-1))
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* Ohne das bliebe die Schrift deckend und der Verlauf unsichtbar. */
+  color: transparent;
+  animation: t-ai-flow 6s linear infinite;
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    filter var(--dur-med) var(--ease-out);
+}
+@media (hover: hover) {
+  /* MARKANTER HEISST HIER SÄTTIGUNG, NICHT HELLIGKEIT (Leon: „markanter
+     wirken"). Ein stärkerer Mischanteil würde die Schrift im hellen Theme
+     aufhellen und damit genau den Kontrast kosten, den die Mischung oben
+     rettet. `saturate` dreht die Buntheit auf und lässt die Helligkeit fast
+     unangetastet; die kleine Skalierung macht den Rest. */
+  /* DER MISCHANTEIL BLEIBT UNTER DEM ZEIGER GLEICH — gemessen 10.09.2026:
+     Mit 34 % statt 26 % fiel die schlechteste Verlaufsstufe im hellen Theme
+     auf 4,22:1. Mehr Regenbogen heisst dort mehr HELLIGKEIT, und genau die
+     fehlt einer dunklen Schrift auf hellem Grund. Die Sättigung allein
+     trägt das „markanter". */
+  .df-start:hover {
+    filter: saturate(1.6) var(--df-start-glow, none);
+    transform: scale(1.03);
+  }
+}
+/* Der gemessene Wert des hellen Themes bleibt unangetastet (siehe oben). */
+[data-theme="light"] .df-start { --df-start-mix: 26%; }
+.df-start:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-start {
+    animation: none;
+    transition: none;
+  }
+  .df-start:hover {
+    transform: none;
+  }
+}
+
+/* ─── „+ Analyse" auf der Wettkampfseite (Leon 11.09.2026) ──────────────────
+ *
+ * „Es soll erst nur + zu sehen sein, größer und in Rainbow leuchtend. Hover
+ * ich darauf, kommt + Analyse — alles ohne Rahmen."
+ *
+ * Der Regenbogen ist `.df-start` (Mischung aus Regenbogen und `--text-1`,
+ * gemessen 10.09.: hält in beiden Themes). Diese Klasse regelt nur, dass das
+ * Wort unter dem Zeiger aus dem Zeichen herauswächst. Auf Touch gibt es
+ * keinen Hover — dort bleibt das Plus allein, und es reicht: Der Knopf trägt
+ * sein `aria-label`, ein Tipp öffnet die Ablage (MOTION-BRIEF §3.3).
+ * `max-width` statt `width: auto`, weil CSS `auto` nicht animieren kann. */
+.df-plus {
+  display: inline-flex;
+  align-items: center;
+  /* Das Zeichen: groß, und seit dem 12.09. eine Stufe kräftiger (600 statt
+     500). Ein dünner Strich zeigt vom Verlauf kaum etwas — je mehr Fläche
+     das Zeichen hat, desto mehr Regenbogen ist zu sehen. Bei 800 verschmilzt
+     er wieder zu einem Klecks, das bleibt die Obergrenze. */
+  font: 600 48px/1 var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* „In Rainbow LEUCHTEND" (Leons ursprüngliche Ansage) — ein weicher
+     farbiger Schein unter dem Zeichen, nur im dunklen Theme: Auf hellem
+     Grund wäre er ein grauer Schmutzrand statt eines Leuchtens. Der Schein
+     liegt auf `--df-start-glow`, damit `:hover` oben ihn mitnehmen kann,
+     ohne die Sättigung zu verlieren. */
+  --df-start-glow: drop-shadow(0 0 10px oklch(0.60 0.15 150 / 0.35))
+    drop-shadow(0 0 22px oklch(0.52 0.17 305 / 0.28));
+  filter: var(--df-start-glow);
+}
+[data-theme="light"] .df-plus { --df-start-glow: none; filter: none; }
+.df-plus-label {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: baseline;
+  font: 600 13px/1 var(--font-body);
+  letter-spacing: 0.08em;
+  transition:
+    max-width var(--dur-med) var(--ease-out),
+    opacity var(--dur-med) var(--ease-out),
+    margin-left var(--dur-med) var(--ease-out);
+}
+@media (hover: hover) {
+  .df-plus:hover .df-plus-label,
+  .df-plus:focus-visible .df-plus-label {
+    /* 10em statt 8: „Neuer Gegner" in der Gegner-Auswahl ist das laengste
+       Wort, das hier herauswaechst, und wurde bei 8em angeschnitten. Es ist
+       eine OBERGRENZE — kuerzere Beschriftungen wie „Analyse" bleiben so
+       breit, wie ihr Text ist. */
+    max-width: 10em;
+    opacity: 1;
+    margin-left: 0.5em;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-plus-label { transition: none; }
+}
+
+/* ─── DIE NOTIZEN AM WETTKAMPF (components/trainer/CampNotizen.tsx) ─────────
+ *
+ * ZWEI MASSE, DER FOKUS ENTSCHEIDET (Leon 12.09.2026): ruhig eine flache
+ * Karte, die weit über dem Vs.-Banner endet; berührt man sie, wächst sie auf
+ * ein Maß, in dem man lesen und schreiben kann, und legt sich dabei ÜBER die
+ * Seite, statt sie zu verschieben. Ein Zeiger daneben oder Escape klappt sie
+ * zurück (die Logik steht in der Komponente).
+ *
+ * DURCHLÄSSIGER ALS EINE NORMALE KARTE (Leon: „der Hintergrund soll etwas
+ * mehr durchsichtig werden"): Die Fläche mischt `--surface-card` mit
+ * Nichts und stellt einen Weichzeichner dahinter — auf der Wettkampfseite
+ * liegt darunter der Seitenverlauf, den man dadurch durchschimmern sieht.
+ * Der Rand bleibt `--card-border`, sonst verlöre die Karte ihre Kante.
+ *
+ * Die Höhe ist eine `max-height` und keine `height`: Bei zwei Notizen soll
+ * die Karte auch klein bleiben dürfen. Animiert wird nur `max-height` —
+ * die Karte steht absolut im Kopf, treibt also kein Layout an. */
+.camp-notizen {
+  --notiz-h-klein: 116px;
+  --notiz-h-weit: min(44vh, 350px);
+  /* Im kleinen Maß ist `max-height` die Grenze und der Inhalt bestimmt die
+     Höhe — zwei Notizen dürfen auch flacher bleiben. Im großen Maß zieht
+     `min-height` die Karte auf: Eine reine `max-height` STRECKT nichts, sie
+     deckelt nur, und bei leerer Liste blieben die 85 px stehen (gemessen
+     12.09.). Beide Maße animieren, weil beide feste Längen sind. */
+  min-height: 0;
+  max-height: var(--notiz-h-klein);
+  background: color-mix(in oklab, var(--surface-card) 58%, transparent);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition:
+    min-height var(--dur-med) var(--ease-out),
+    max-height var(--dur-med) var(--ease-out),
+    background-color var(--dur-med) var(--ease-out);
+}
+.camp-notizen[data-weit] {
+  min-height: var(--notiz-h-weit);
+  max-height: var(--notiz-h-weit);
+  background: color-mix(in oklab, var(--surface-card) 82%, transparent);
+}
+/* ÜBER DEM BANNER LIEGT DER BEHÄLTER, NICHT DIE KARTE (gemessen 12.09.): Die
+   Karte steht statisch, ein `z-index` an ihr bleibt wirkungslos. Den trägt
+   der absolut gesetzte Behälter im Seitenkopf — `lg:z-30` in
+   app/trainer/competitions/[uid]/[campId]/page.tsx. `.tidal-vs` macht mit
+   `isolation: isolate` zwar einen eigenen Stapel auf, steht darin aber auf
+   `z-index: auto`; eine positive Lage im Wurzelstapel schlägt ihn. */
+/* Am Handy steht die Karte im Fluss und schiebt die Seite — dort ist das
+   richtig, weil nichts daneben liegt, das verdeckt werden dürfte. */
+@media (max-width: 1023px) {
+  .camp-notizen { --notiz-h-weit: min(46vh, 340px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camp-notizen { transition: none; }
+}
+
+/* ─── DAS VS-BANNER DER WETTKAMPFSEITE (Leons Paket, 11.09.2026) ────────────
+ *
+ * Übernommen aus D:\claude-projects\tidal-versus (versus.css), so wie Leon es
+ * bestellt hat: „alles so übernommen werden". Silberne und türkise Platten
+ * mit Lichtkante, das metallische VS-Emblem (public/vs-emblem.svg), das
+ * Match-Intro als Overlay über der ganzen Seite.
+ *
+ * DIE FARBEN SIND MIT ABSICHT FEST (Ausnahme von DESIGN-BRIEF §1.1, wie das
+ * Emblem-SVG selbst und die Helix-Tokens): Die Platten sind MATERIAL — Silber
+ * und Türkis als Werkstoff, kein Gym-Akzent. Deshalb gleich in BEIDEN Themes.
+ * Was hier NICHT aus dem Paket stammt, ist die Auswahl (Leon 12.09., zweite
+ * Fassung): Die Platten sind Knöpfe. Die GEWÄHLTE Platte trägt das Türkis des
+ * Pakets und steht etwas größer, samt Namen; die andere ist Silber. Im Paket
+ * war die Farbe fest an die Seite gebunden (rechts = Gegner = Türkis) — jetzt
+ * ist sie an die Wahl gebunden: Wählt Leon seinen Athleten, wird der
+ * Gegnerblock grau. `--opponent` trägt nur noch die Geometrie (Versatz,
+ * Innenabstand), `--selected` die Farbe und die Größe.
+ *
+ * `data-motion` an den Platten: Die Grundhaptik oben setzt bei :active ein
+ * `transform`, das die Versetzung der rechten Platte (translateY) überschriebe.
+ * Die Platten tragen ihr Drücken deshalb selbst.
+ * Die Schrift kommt aus `--font-display` (Barlow Condensed) und
+ * `--font-sans` (Inter) — das Paket nannte sie `--font-inter`. */
+.tidal-vs {
+  --vs-accent: #00c7ce;
+  --vs-selected: #1449c9; /* nur noch der Fokusring */
+  --vs-radius: 20px;
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+  color: #eaf5f4;
+  font-family: var(--font-sans, Arial), sans-serif;
+}
+.tidal-vs *, .tidal-vs *::before, .tidal-vs *::after { box-sizing: border-box; }
+.tidal-vs__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  position: relative;
+  padding-block: 62px;
+}
+.tidal-vs__stage::before {
+  content: "";
+  position: absolute;
+  inset: 12% 13%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, #00c7ce14, transparent 68%);
+}
+.tidal-vs__plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 92px;
+  padding: 22px 72px 22px 30px;
+  border: 1px solid #bacdca55;
+  border-radius: var(--vs-radius);
+  background: linear-gradient(112deg, #d0dfde 0%, #f2f9f6 25%, #cfddda 56%, #8ba9a9 100%);
+  box-shadow: inset 0 1px 0 #ffffffcf, inset 0 -2px 0 #344e5466, 0 4px 0 #344b4e, 0 5px 0 #a8c5c32e, 0 12px 25px #0005;
+  color: #102b30;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  text-align: center;
+  transition: transform var(--dur-fast) var(--ease-pop), filter var(--dur-fast) var(--ease-out);
+}
+.tidal-vs__plate:active { transform: translateY(2px); }
+.tidal-vs__plate:focus-visible { outline: 2px solid var(--vs-selected); outline-offset: 4px; }
+@media (hover: hover) {
+  .tidal-vs__plate:hover { filter: brightness(1.04); }
+}
+.tidal-vs__plate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(172deg, #fff7 0%, #fff0 43%, #fff2 44%, #fff0 47%), repeating-linear-gradient(0deg, #fff0 0px, #fff0 3px, #ffffff07 3.5px, #fff0 4px);
+}
+.tidal-vs__plate::after {
+  content: "";
+  position: absolute;
+  left: 25px;
+  right: 25px;
+  top: 1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  opacity: .7;
+  pointer-events: none;
+}
+.tidal-vs__plate--opponent {
+  transform: translateY(14px);
+  padding: 22px 30px 22px 72px;
+}
+.tidal-vs__plate--opponent:active { transform: translateY(16px); }
+/* Die Wahl: Türkis und etwas größer — die Platte wächst um ihre Mitte,
+   der Name darin noch einmal. Die andere Platte bleibt Silber. */
+.tidal-vs__plate--selected {
+  color: #002f34;
+  border-color: #49eded80;
+  background: linear-gradient(112deg, #006872 0%, #00b8bd 24%, #24ddd7 60%, #02b1ba 100%);
+  box-shadow: inset 0 1px 0 #b5ffefb3, inset 0 -2px 0 #00495699, 0 4px 0 #00444d, 0 5px 0 #4cd6d93b, 0 12px 25px #0005;
+  transform: scale(1.06);
+  z-index: 1;
+}
+.tidal-vs__plate--selected:active { transform: translateY(2px) scale(1.06); }
+.tidal-vs__plate--opponent.tidal-vs__plate--selected { transform: translateY(14px) scale(1.06); }
+.tidal-vs__plate--opponent.tidal-vs__plate--selected:active { transform: translateY(16px) scale(1.06); }
+/* ─── „DU BIST DRAN" — der Puls an der offenen Platte (Leon 12.09.2026) ───
+ *
+ * NUR IN DER AUSWAHL, und immer nur an EINER Platte: erst Athlet, nach der
+ * Wahl der Gegner, danach gar keine mehr. Ein Ring, der aus der Kante
+ * herauswaechst und dabei verblasst — ein Ping, kein Blinken.
+ *
+ * ES IST EIN `outline`, KEIN `box-shadow` UND KEIN `transform`: Der Schatten
+ * der Platte IST ihr Material (fuenf gestapelte Lagen, innen wie aussen) —
+ * eine Keyframe darauf muesste den ganzen Stapel mitschleppen und braeche
+ * beim naechsten Griff ins Material. Und `transform` traegt hier schon drei
+ * Zustaende (Versatz der rechten Platte, Wahl, Druck), die sich gegenseitig
+ * ueberschreiben wuerden. `outline` liegt daneben, kostet kein Layout und
+ * fasst nichts davon an.
+ *
+ * Der Ring hoert auf, sobald die Platte den Fokus hat: Dort steht sonst
+ * derselbe `outline` als Fokusring, und der darf nicht wegpulsieren. */
+@keyframes tidal-vs-puls {
+  0%   { outline-color: #49eded00; outline-offset: 1px; }
+  40%  { outline-color: #49eded8c; outline-offset: 4px; }
+  100% { outline-color: #49eded00; outline-offset: 9px; }
+}
+.tidal-vs__plate--pulst {
+  outline: 2px solid transparent;
+  animation: tidal-vs-puls 2.4s var(--ease-out) infinite;
+}
+.tidal-vs__plate--pulst:focus-visible { animation: none; }
+.tidal-vs__name {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display, Impact), "Arial Narrow", sans-serif;
+  font-size: clamp(21px, 4cqi, 36px);
+  line-height: 1.13;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: .015em;
+  text-align: center;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  text-shadow: 0 1px 0 #ffffff35;
+  transition: transform var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out);
+}
+.tidal-vs__name--long { font-size: clamp(18px, 3.2cqi, 28px); }
+/* Der Name der gewählten Platte wächst zusätzlich zur Platte. `transform`
+   statt `font-size`, damit die Platten ihre Höhe behalten. */
+.tidal-vs__plate--selected .tidal-vs__name {
+  transform: scale(1.12);
+}
+.tidal-vs__emblem {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  left: 50%;
+  top: calc(50% + 2px);
+  transform: translate(-50%, -50%);
+  width: clamp(140px, 26cqi, 238px);
+  height: auto;
+  max-width: none;
+  filter: none;
+}
+@container (max-width: 540px) {
+  .tidal-vs__stage { gap: 7px; padding-block: 48px; }
+  .tidal-vs__plate { min-height: 86px; padding: 20px 36px 20px 14px; border-radius: min(var(--vs-radius), 15px); }
+  .tidal-vs__plate--opponent { padding: 20px 14px 20px 36px; transform: translateY(10px); }
+  .tidal-vs__plate--opponent:active { transform: translateY(12px); }
+  .tidal-vs__plate--selected { transform: scale(1.05); }
+  .tidal-vs__plate--selected:active { transform: translateY(2px) scale(1.05); }
+  .tidal-vs__plate--opponent.tidal-vs__plate--selected { transform: translateY(10px) scale(1.05); }
+  .tidal-vs__plate--opponent.tidal-vs__plate--selected:active { transform: translateY(12px) scale(1.05); }
+  .tidal-vs__name { font-size: clamp(18px, 5.2cqi, 27px); }
+  .tidal-vs__name--long { font-size: clamp(16px, 4.7cqi, 24px); }
+}
+@media (forced-colors: active) {
+  .tidal-vs__plate { border: 1px solid CanvasText; }
+  .tidal-vs__name { color: CanvasText; }
+}
+/* Das Intro: Overlay am body, damit weder Clip noch Stapelkontext der Hülle
+   es beschneiden. pointer-events: auto (Leon 12.09.): Ein Klick oder Tipp
+   irgendwohin überspringt — und trifft dabei nicht die Seite darunter. */
+.tidal-vs-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: default;
+  isolation: isolate;
+}
+.tidal-vs-intro__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 46%, #001819e8 0%, #000607f5 65%);
+  backdrop-filter: blur(5px);
+}
+.tidal-vs-intro__hero { transform-origin: center; will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) {
+  .tidal-vs-intro { display: none; }
+  .tidal-vs__name, .tidal-vs__plate { transition: none; }
+  /* Der Puls faellt weg — die Aufforderung steht als WORT auf der Platte
+     („Athlet waehlen"), sie haengt nicht an der Bewegung. */
+  .tidal-vs__plate--pulst { animation: none; outline-color: transparent; }
+}
+
+/* ─── DER METALL-EINSTIEG DER DEEPFIGHT-LANDUNG (Leon 12.09.2026) ───────────
+ *
+ * Leons Entwurf aus D:\Tidal-Athletics\GPT\deepfight-entry („nimm diese"):
+ * Überschrift, DNA-Feld und „Start" in SILBER mit Lichtlauf und Glanzpunkt,
+ * die Auswahl als zwei Platten — Silber „Athleten", Türkis „Gegner". Die
+ * Komponente ist components/deepfight/FightDnaEntry.tsx.
+ *
+ * DIE FARBEN SIND FEST, wie beim VS-Banner der Wettkampfseite (Ausnahme von
+ * DESIGN-BRIEF §1.1): Metall ist Werkstoff, keine Rolle.
+ *
+ * ABER DAS METALL WECHSELT MIT DEM LICHT (Leon 12.09.2026: „finde für die
+ * helle Ansicht eine angepasste Version"). Der erste Anlauf ließ Silber in
+ * beiden Themes stehen und verließ sich auf die dunklen Schlagschatten —
+ * das trug, war aber kein Entwurf, sondern eine Notlösung: Eine fast weiße
+ * Schrift auf fast weißem Grund lebt nur von ihrem Schatten. Im hellen
+ * Theme ist das Metall deshalb GEBÜRSTETER STAHL statt poliertem Silber —
+ * dieselbe Verlaufsform, dieselben Kanten, nur an der Helligkeitsachse
+ * gespiegelt. Der Lichtlauf bleibt hell (auf dunklem Metall ist er ein
+ * Glanz, kein Fremdkörper), der Stern wird türkis, weil ein weißer Stern
+ * auf hellem Grund nichts wäre. Alles läuft über die Tokens gleich unten —
+ * die Regeln darunter fassen keine Farbe direkt an.
+ *
+ * Nur Bewegungen, die der Compositor rechnet (opacity, transform,
+ * background-position im geclippten Text); kein framer-motion, keine Feder
+ * — der Ein- und Austritt der Platten ist ein CSS-Keyframe (MOTION-BRIEF
+ * §1.8 lässt das zu, weil nichts davon Layout treibt). */
+.df-entry-heading, .df-entry {
+  --df-silver-top: #f5fffd; --df-silver-mid: #c8dcda; --df-silver-edge: #779295;
+  --df-silver-dark: #365458; --df-cyan: #00c7ce; --df-cyan-light: #a4fff8;
+  --df-ink: #062a30; --df-white: #ffffff; --df-copy: #eaf5f4;
+  --df-shadow: #001012;
+  --df-glint: #ffffff; --df-glint-schein: #a8fff6cc;
+  /* DIE ZWEI PLATTEN TRAGEN DIE IDENTITÄT DES BEREICHS, KEINE NEUE FARBE
+     (Leon 12.09.2026: „warum ist das Blau des Athleten nicht im Tidal-Blau?").
+     Ein erster Anlauf erfand ein Stahlblau bei Farbton 250 — daneben stand
+     seit dem 06.09. die längst getroffene Entscheidung, die dieselbe Frage
+     schon beantwortet: „Tidal-Blau für unsere Leute, Silber für den Gegner"
+     (`--df-ton-leute` / `--df-ton-gegner`, Farbton 197 bzw. 235, siehe den
+     Block zur bewegten Hintergrund-Schicht). Genau die stehen hier.
+     Als FESTE Werte, nicht als `var()` auf die Tokens: Die drehen im hellen
+     Theme ihre Helligkeit (0.74 → 0.62, und `-tief` wird HELLER als der
+     Grundton, weil es dort der tiefe Grund ist). Eine Platte ist Werkstoff
+     und sieht in beiden Themes gleich aus — sie nimmt deshalb den dunklen
+     Stand, der der kanonische ist („Tidal-Blauton, fest"). */
+  --df-blau: oklch(0.74 0.13 197); --df-grau: oklch(0.80 0.012 235);
+  --df-metal-fill: linear-gradient(176deg, var(--df-white) 0%, var(--df-silver-top) 24%, var(--df-silver-mid) 43%, var(--df-silver-edge) 49%, var(--df-silver-top) 51%, var(--df-silver-mid) 70%, var(--df-silver-edge) 100%);
+  --df-display: var(--font-display, Impact), 'Arial Narrow', sans-serif;
+  --df-ease: cubic-bezier(.2,.8,.2,1); --df-choice-radius: 10px;
+  color: var(--df-copy);
+}
+/* GEBÜRSTETER STAHL FÜRS HELLE THEME — dieselbe Verlaufsform, an der
+   Helligkeitsachse gespiegelt: Wo im Dunkeln Weiß steht, steht hier der
+   hellste Stahl, und die tiefste Stufe wird fast Tinte. `--df-silver-dark`
+   ist nicht mehr der dunkle Fuß unter der Schrift, sondern eine helle
+   Lippe darüber — sonst säße unter dunklen Buchstaben ein zweiter dunkler
+   Rand. Der Türkis geht zwei Stufen tiefer, damit er sich gegen die helle
+   Seite behauptet. */
+[data-theme="light"] .df-entry-heading, [data-theme="light"] .df-entry {
+  --df-white: #93a9b1; --df-silver-top: #5b7883; --df-silver-mid: #2b4650;
+  --df-silver-edge: #0f2a31; --df-silver-dark: #ffffffc4;
+  --df-cyan: #007e88; --df-cyan-light: #00a6ad;
+  --df-ink: #062a30; --df-copy: #143137;
+  --df-shadow: #4b6d7433;
+  --df-glint: #00b3bb; --df-glint-schein: #00b3bb80;
+}
+.df-entry-heading *, .df-entry *, .df-entry *::before, .df-entry *::after { box-sizing: border-box; }
+
+/* Die Überschrift: EINZEILIG auf dem Schreibtisch, gerechnet in `cqi` gegen
+   die Inhaltsspalte (`.df-kopfspalte` liefert den Container). */
+.df-entry-heading { container-type: inline-size; padding-top: 14px; }
+.df-entry-heading h2 { margin: 0; font-family: var(--df-display); font-style: italic; font-weight: 900; font-size: clamp(30px, 5.6cqi, 72px); letter-spacing: .012em; line-height: 1.12; text-transform: uppercase; white-space: nowrap; }
+
+/* Silber IN der Schrift. `::after` ist derselbe Text noch einmal, als
+   Lichtlauf über den Buchstaben; der Glanzpunkt ist ein Stern rechts oben. */
+.df-metal { position: relative; display: inline-block; padding: 0 .12em .08em .02em; background: var(--df-metal-fill); background-clip: text; -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 var(--df-silver-dark)) drop-shadow(0 5px 0 var(--df-shadow)) drop-shadow(0 8px 8px var(--df-shadow)); }
+.df-metal::after { content: attr(data-text); position: absolute; z-index: 1; inset: 0; padding: inherit; color: transparent; background: linear-gradient(112deg, transparent 37%, #c9fffa60 44%, #fff 49%, #fff 51%, #c9fffa60 56%, transparent 63%); background-size: 330% 100%; background-position: 100% 0; background-clip: text; -webkit-background-clip: text; opacity: 0; pointer-events: none; }
+/* DER REFLEX HÄNGT AN `data-shone`, NICHT AM STYLE-APPLY (Leon 12.09.: „der
+   Lichtreflex fehlt"): Mit dem Server-HTML lief die Uhr, bevor Schrift und
+   WebGL-Schicht standen. Jetzt setzt die Komponente das Attribut nach
+   `fonts.ready` + zwei Bildern und hängt den Schriftzug bei jedem
+   Zeiger-Eintritt neu ein (`key`), damit die Animation wieder läuft. */
+.df-entry-heading[data-shone] .df-metal::after { animation: df-metal-sweep 1.15s .3s var(--df-ease) 1 both; }
+/* DER STERN GEHÖRT NACH VORN (Leon 12.09.2026: „der Stern beim Lichtlauf ist
+   im Hintergrund"). Er lag mit `z-index: auto` in derselben Ebene wie der
+   Lichtlauf `::after`, der ihn in der Baumreihenfolge überholt — und weil
+   `.df-metal` durch seinen `drop-shadow` ohnehin ein eigener Stapelkontext
+   ist, entschied dort allein die Reihenfolge. Jetzt ist die Lage gesagt:
+   Lauf auf 1, Stern auf 2. Er trägt zusätzlich einen eigenen Schein, sonst
+   verschwindet die weiße Spitze im weißen Scheitel des Lichtlaufs. */
+.df-metal__glint { position: absolute; z-index: 2; width: .24em; aspect-ratio: 1; right: 12%; top: 25%; background: var(--df-glint); filter: drop-shadow(0 0 6px var(--df-glint-schein)); clip-path: polygon(50% 0,58% 41%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%); opacity: 0; transform: scale(.2) rotate(12deg); }
+.df-entry-heading[data-shone] .df-metal__glint { animation: df-metal-glint .55s .78s ease-out 1 both; }
+/* Die Linie unter der Überschrift lief auf festem Hellgrau und war im hellen
+   Theme nicht da. Sie mischt jetzt aus der Metallkante — im Dunkeln ein
+   heller Strich, im Hellen ein dunkler, beide gleich zurückhaltend. */
+.df-entry-heading__rule { margin-top: 20px; height: 1px; background: linear-gradient(90deg, color-mix(in oklab, var(--df-silver-mid) 45%, transparent), color-mix(in oklab, var(--df-silver-edge) 18%, transparent), transparent); }
+
+/* Das DNA-Feld. Der Strang ist `inert`; das Klickziel liegt als Geschwister
+   darüber (Muster `.t-row-target`), die Mitte darüber nimmt keine Zeiger an. */
+.df-entry { position: relative; isolation: isolate; container-type: inline-size; min-width: 0; }
+.df-entry__dna { transition: filter .35s var(--df-ease), transform .55s var(--df-ease); pointer-events: none; }
+/* KEIN RAHMEN, SONDERN EIN AUSLAUFEN — die Regel aus dem Block „DER
+   DNA-STRANG DER LANDUNG" weiter oben (Maske mit 50 %-Radien, `!important`
+   gegen den Inline-Stil der Helix). Die HÖHE ist Leons Wahl aus der
+   Vorschau je Fensterbreite; `size="lg"` bleibt der Rechenmaßstab. */
+.df-entry__dna section { height: 550px !important; background: transparent !important; border-radius: 0 !important; -webkit-mask-image: radial-gradient(50% 50% at 50% 50%, black 52%, transparent 100%); mask-image: radial-gradient(50% 50% at 50% 50%, black 52%, transparent 100%); }
+.df-entry__target { position: absolute; inset: 0; z-index: 3; width: 100%; background: transparent; border: 0; border-radius: 20px; cursor: pointer; }
+.df-entry__target:focus-visible { outline: 2px solid var(--df-cyan); outline-offset: -8px; }
+.df-entry__invitation { position: absolute; z-index: 4; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transform: translateY(8px) scale(.94); transition: opacity .25s ease, transform .4s var(--df-ease); }
+.df-entry__start { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font: 900 italic clamp(66px, 17cqi, 106px)/1 var(--df-display); text-transform: uppercase; letter-spacing: .025em; }
+.df-entry__arrows { width: .35em; height: .43em; fill: none; stroke: var(--df-cyan-light); stroke-width: 3; filter: drop-shadow(0 0 8px #00c7ce80); }
+.df-entry[data-shone] .df-entry__start .df-metal::after { animation: df-metal-sweep .95s .14s var(--df-ease) 1 both; }
+.df-entry[data-shone] .df-entry__start .df-metal__glint { animation: df-metal-glint .5s .5s ease-out 1 both; }
+
+/* Die zwei Platten, am selben Ort wie „Start". */
+.df-entry__choices { position: absolute; z-index: 5; left: 50%; top: 50%; width: min(84%, 320px); transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 12px; animation: df-choice-enter .28s var(--df-ease) both; }
+.df-entry__choices[hidden] { display: none; }
+/* DIE ZWEI PLATTEN: ATHLETEN BLAU, GEGNER GRAU (Leon 12.09.2026 — vorher
+   Silber und Türkis). Türkis ist app-weit die Akzentfarbe und stand hier für
+   „Gegner", also ausgerechnet für die fremde Seite; Silber trug in derselben
+   Fläche schon die Überschrift und das „Start". Blau/Grau trennt die beiden
+   Wege deutlicher und lässt Türkis dort, wo es hingehört. Beide bleiben
+   WERKSTOFF (feste Farben, Ausnahme von DESIGN-BRIEF §1.1) — dieselbe
+   Platte, dasselbe Relief, nur ein anderes Metall.
+   Und zwar GENAU die zwei Metalle, die der Bereich ohnehin führt:
+   `--df-blau` ist der Tidal-Blauton, `--df-grau` das Silber des Gegners
+   (siehe den Token-Kopf oben). */
+/* EINE FARBE JE PLATTE, DER REST IST RELIEF: Verlauf, Kante, Fuß und Schrift
+   leiten sich alle aus `--platte` ab. Ein Wechsel der Identität ist dadurch
+   eine Zeile, und die zwei Platten können sich nicht auseinanderentwickeln. */
+.df-entry__choice { --platte: var(--df-grau); --platte-hell: color-mix(in oklab, var(--platte) 30%, #fff); --platte-tief: color-mix(in oklab, var(--platte) 58%, #000); --platte-fuss: color-mix(in oklab, var(--platte) 34%, #000); position: relative; width: 100%; min-height: 56px; padding: 10px 20px; border: 1px solid color-mix(in oklab, var(--platte-hell) 55%, transparent); border-radius: var(--df-choice-radius); text-align: center; background: linear-gradient(112deg, var(--platte-tief), var(--platte-hell) 25%, var(--platte) 56%, var(--platte-tief)); color: color-mix(in oklab, var(--platte) 22%, #000); box-shadow: inset 0 1px 0 color-mix(in oklab, #fff 78%, transparent), inset 0 -2px 0 color-mix(in oklab, var(--platte-fuss) 55%, transparent), 0 4px 0 var(--platte-fuss), 0 14px 25px #0005; cursor: pointer; transition: transform .2s var(--df-ease); }
+.df-entry__choice::after { content: ''; pointer-events: none; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(172deg, #fff6, transparent 43%, #fff2 44%, transparent 48%); }
+.df-entry__choice strong { display: block; font: 900 italic clamp(23px, 6cqi, 30px)/1.15 var(--df-display); text-transform: uppercase; }
+.df-entry__choice--athlete { --platte: var(--df-blau); }
+.df-entry__choice:focus-visible { outline: 2px solid var(--df-white); outline-offset: 5px; }
+.df-entry:has(.df-entry__target:focus-visible) .df-entry__invitation { opacity: 1; transform: none; }
+@media (hover: hover) {
+  .df-entry:hover .df-entry__invitation { opacity: 1; transform: none; }
+  .df-entry:hover .df-entry__dna, .df-entry[data-open] .df-entry__dna { filter: saturate(1.35); transform: scale(1.035); }
+  .df-entry__choice:hover { transform: translateY(-3px); }
+}
+/* Auf Touch steht „Start" immer da (MOTION-BRIEF §3.3: Hover trägt nie). */
+@media (hover: none) {
+  .df-entry__invitation { opacity: 1; transform: none; }
+}
+@keyframes df-metal-sweep { 0% { background-position: 100% 0; opacity: 0 } 15% { opacity: 1 } 80% { opacity: 1 } 100% { background-position: 0% 0; opacity: 0 } }
+@keyframes df-metal-glint { 0%, 100% { opacity: 0; transform: scale(.2) rotate(12deg) } 40% { opacity: 1; transform: scale(1.4) rotate(12deg) } }
+@keyframes df-choice-enter { from { opacity: 0; translate: 0 8px } to { opacity: 1; translate: 0 0 } }
+@media (min-width: 1550px) { .df-entry__dna section { height: 610px !important; } }
+@media (max-width: 1150px) { .df-entry__dna section { height: 530px !important; } }
+@media (max-width: 860px) { .df-entry__dna section { height: 510px !important; } }
+@media (max-width: 680px) {
+  .df-entry__invitation { opacity: 1; transform: none; }
+  .df-entry-heading h2 { white-space: normal; font-size: clamp(32px, 10cqi, 54px); }
+  .df-entry-heading__rule { margin-top: 16px; }
+  .df-entry__dna section { height: 410px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-entry *, .df-entry *::after, .df-entry-heading *, .df-entry-heading *::after { animation: none !important; transition: none !important; }
+  .df-entry:hover .df-entry__dna, .df-entry[data-open] .df-entry__dna { transform: none; }
+}
+@media (forced-colors: active) {
+  .df-metal { color: CanvasText; filter: none; background: none; }
+  .df-entry__choice { border: 2px solid ButtonText; }
+}
+
+/* ─── DIE ZWEI FELDER RECHTS: „ANALYSEN IN ARBEIT" UND „ANALYSE-ARCHIV" ─────
+ * (components/deepfight/AnalysenFelder.tsx)
+ *
+ * AN DIE APP ANGEPASST, wie Leon es wollte („die Rundung der Ecken etc."):
+ * Beide Felder sind `.t-card` — im Bereich Glas mit `--r-lg` —, die Zeilen
+ * tragen `--r-md`, alle Farben kommen aus den Tokens und halten so im hellen
+ * Theme (dort ist `--text-2` im Bereich auf L 0,40 gemessen). Nur die
+ * Überschriften sprechen die Display-Schrift des Einstiegs, damit rechts zu
+ * links gehört. Der ZUSTAND trägt die Farbe (Punkt: Akzent = bereit,
+ * `--warning` = unterbrochen), der Text bleibt auf `--text-2`. */
+.df-felder { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.df-feld { position: relative; min-width: 0; padding: 20px 20px 8px; }
+/* Das Archiv steht ohne Karte (Leon 12.09.) — kein Innenabstand, nur Luft
+   nach oben; rahmenlos über der Schicht trägt `--text-2` im Bereich (L 0,40). */
+.df-feld--archiv { padding: 4px 0 0; }
+/* Der türkise Strich an der Oberkante — das Signal, dass hier etwas läuft. */
+.df-feld--arbeit::before { content: ''; position: absolute; top: -1px; left: 20px; right: 50%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+.df-feld__kopf { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.df-feld h2 {
+  margin: 0;
+  font: 800 italic clamp(22px, 2.2vw, 28px)/1.1 var(--font-display, Impact), sans-serif;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+  /* Die Kursive ragt rechts über den Kasten — ohne Luft schnitte
+     `background-clip: text` den letzten Buchstaben an (gesehen 12.09.). */
+  padding-right: .14em;
+  color: var(--text-1);
+  background: linear-gradient(178deg, var(--text-1) 15%, color-mix(in oklab, var(--text-1) 72%, var(--text-2)) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.df-feld__signal { flex: none; width: 7px; height: 7px; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 12px color-mix(in oklab, var(--accent) 45%, transparent); }
+.df-feld__liste { display: flex; flex-direction: column; margin-top: 10px; }
+.df-feld__zeile {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: 60px; padding: 10px 8px;
+  border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--text-body);
+  text-align: left; text-decoration: none; cursor: pointer;
+  transition: background-color var(--dur-med) var(--ease-out);
+}
+/* GERADE TRENNSTRICHE, KEINE HALBEN RAHMEN (Leon 12.09.): Ein `border-top`
+   folgt der Rundung der Zeile und sah aus wie ein halber Rahmen. Der Strich
+   ist deshalb ein eigenes Element ohne Radius. */
+.df-feld__zeile { position: relative; }
+.df-feld__zeile + .df-feld__zeile::before { content: ''; position: absolute; top: 0; left: 8px; right: 8px; height: 1px; background: var(--line); }
+.df-feld__zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* IMMER DIE PERSON — die Rolle trägt die Farbe, nicht die Form (Leon 12.09.):
+   eigene Athleten in der Gym-Farbe, Gegner grau. */
+.df-feld__rolle { flex: none; display: grid; place-items: center; width: 30px; height: 34px; color: var(--accent-text); }
+.df-feld__rolle[data-modus="gegner"] { color: var(--text-2); }
+.df-feld__rumpf { flex: 1; min-width: 0; }
+.df-feld__rumpf strong { display: block; font: var(--type-body-strong); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-feld__meta { display: block; margin-top: 2px; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.df-feld__zeile--alle strong { color: var(--text-2); }
+.df-feld__mehr, .df-feld__leer { margin: 0; padding: 12px 8px 10px; color: var(--text-2); }
+.df-feld__mehr { font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; }
+.df-feld__leer { font: var(--type-sub); }
+/* Die Filter Alle / Athleten / Gegner — im SHEET, nicht auf der Seite. */
+.df-filter { display: flex; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
+.df-filter button { position: relative; min-height: 44px; padding: 0 0 10px; border: 0; background: none; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-2); cursor: pointer; transition: color var(--dur-med) var(--ease-out); }
+.df-filter button[aria-pressed="true"] { color: var(--text-1); }
+.df-filter button[aria-pressed="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.df-filter button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.df-filter__summe { margin-left: auto; padding-bottom: 10px; font: var(--type-meta); letter-spacing: var(--ls-label); color: var(--text-2); font-variant-numeric: tabular-nums; }
+@media (hover: hover) {
+  .df-feld__zeile:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+  .df-feld__zeile--alle:hover strong { color: var(--text-1); }
+  .df-filter button:hover { color: var(--text-1); }
+}
+@media (max-width: 680px) {
+  .df-feld { padding: 16px 14px 6px; }
+  .df-feld--archiv { padding: 0; }
+  .df-feld h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df-feld__zeile, .df-filter button { transition: none; }
+}
+@media (forced-colors: active) {
+  .df-feld h2 { -webkit-text-fill-color: CanvasText; background: none; }
+  .df-feld--arbeit { border: 1px solid CanvasText; }
 }
 
 /* Konto-Panel der Sidebar (Vorlage: fade-in zoom-in-95, 100 ms). Der
@@ -1212,9 +2036,18 @@
   /* Klickbares OHNE eigene Rundung: die Hover-Fläche bekommt trotzdem
      runde Ecken (Leon 30.08.) — Elemente mit rounded-*-Klasse oder Karten
      behalten ihre eigene Rundung (Attribut-Check greift nur, wenn keine
-     rounded-Klasse am Element hängt). */
+     rounded-Klasse am Element hängt).
+
+     HIER STAND `var(--r-field)`, UND DAS TOKEN GIBT ES NICHT (gemessen
+     13.09.2026 — derselbe Fall wie `--fg-1` in den Etappen 3a und 3b). Es
+     existiert nur als TAILWIND-Name (`rounded-field` → `--r-md` in
+     tailwind.config.ts), nicht als CSS-Variable. Eine `var()` ohne Rückfall
+     auf eine undefinierte Variable macht die ganze Deklaration ungültig:
+     Die Regel stand da, kostete eine Zeile und hat nie etwas gerundet.
+     Jetzt direkt `--r-md` — derselbe Wert (12 px), den `rounded-field`
+     meint. */
   .t-interactive:not([class*="rounded"]):not(.t-card) {
-    border-radius: var(--r-field);
+    border-radius: var(--r-md);
   }
   /* Ganze Rubrik greifbar (Trainer-Editor, Leon 30.08.): Hover über der
      freien Blockfläche (NICHT über einer Übungszeile o. ä. — :has prüft
@@ -1420,6 +2253,41 @@
   opacity: 0;
   transition: opacity var(--dur-med) var(--ease-out);
 }
+/* ─── DER EINSTIEG IM DEEPFIGHT-BEREICH SELBST — nachgemessen 08.09.2026 ────
+ *
+ * Auf `/trainer/athleten/[uid]` steht der Einstieg auf einer normalen Seite:
+ * deckender Grund, `--accent-text` hält dort 10,32:1 dunkel / 5,34:1 hell.
+ *
+ * Auf der DeepFight-LANDUNG steht derselbe Einstieg (Leons „Analyse starten",
+ * ausdrücklich ohne Rahmen) direkt über der bewegten Schicht. Gemessen mit
+ * der vollen Methode (Falle 45, vier Zeitpunkte, schlechtester Wert):
+ *
+ *     hell, --accent-text (L 0,46)   2,28:1   fällt klar durch
+ *     dunkel, --accent-text                   hielt
+ *
+ * 2,28:1 ist kein Grenzfall und keine Streuung der wandernden Schicht: Der
+ * Akzent liegt im Hellen bei L 0,46, und die Schicht malt daneben ihren
+ * hellen Tidal-Ton — ein Akzent auf seiner eigenen Farbfamilie.
+ *
+ * Der Bereich stellt die Ruhefarbe deshalb auf `--text-1`. Verloren geht
+ * nichts: Dass hier DeepFight beginnt, sagt das Funkeln vor dem Wort (es
+ * bringt seinen Regenbogen selbst mit), und unter der Maus übernimmt ohnehin
+ * der Verlauf mit seiner eigenen, dunklen Schriftfarbe.
+ *
+ * SIE STEHT VOR DER HOVER-REGEL, UND DAS IST DER PUNKT: Beide Selektoren
+ * kommen auf dieselbe Spezifität (0,2,0) — `[data-area] .df-einstieg` so gut
+ * wie `.df-einstieg:hover`. Bei Gleichstand gewinnt der SPÄTERE. Stünde
+ * dieser Block hinter der Hover-Regel, läge `--text-1` auf dem Regenbogen und
+ * der gemessene Hover-Ton wäre wirkungslos. (Dieselbe Lehre wie beim
+ * reduced-motion-Riegel des CSS-Rückfalls: Eine Regel, die etwas überstimmen
+ * soll, muss ihre Nachbarn kennen.)
+ *
+ * NUR IN DIESEM BEREICH. Der Einstieg auf der Athletenseite bleibt im Akzent
+ * — dort ist er gemessen und dort ist er richtig. */
+[data-area="deepfight"] .df-einstieg {
+  color: var(--text-1);
+}
+
 @media (hover: hover) {
   .df-einstieg:hover::before {
     opacity: 1;
@@ -1434,6 +2302,7 @@
     color: oklch(0.17 0.03 285);
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .df-funke::after,
   .df-einstieg::before {
@@ -1535,71 +2404,87 @@ h1, h2 { overflow-wrap: anywhere; }
 /* ─── Components ─────────────────────────────────────────────────────────── */
 @layer components {
 
-  /* Primary CTA — cyan glow button */
+  /* ─── DIE ZWEI KNÖPFE DER APP — auf die Tokens umgestellt (13.09.2026) ────
+   * Sie standen als EINZIGE Knopf-Definition noch im alten System: fester
+   * Cyan-Verlauf, `#03201D` als Schriftfarbe, vier rgba-Schatten. Umgebaut
+   * wurden sie HIER und nicht in den zwanzig aufrufenden Dateien — das ist
+   * der Arbeitsmodus aus DESIGN-BRIEF §4.3 („Rollout als Token-Änderung,
+   * nicht als Seite-für-Seite-Neustyling"). Eine Zeile hier bringt Login,
+   * Register, Landung, PWA-Hinweis, Onboarding und die Navigation
+   * gleichzeitig mit; die Maße (px-6 py-3, Radius, Versalien) bleiben exakt
+   * wie vorher, damit sich kein Layout verschiebt.
+   *
+   * DREI DINGE, DIE MAN DABEI WISSEN MUSS:
+   *
+   * (1) `transform` MUSS in der eigenen `transition` stehen. Die GRUNDHAPTIK
+   *     setzt ihre Bewegung über `:where(button, …)` mit Spezifität NULL —
+   *     jede Klassen-Regel mit eigenem `transition` ersetzt sie vollständig,
+   *     und der Knopf säße dann hart auf .97 statt zu federn. Das alte
+   *     `transition-all duration-200` hatte denselben Effekt, nur unbemerkt.
+   *
+   * (2) KEIN eigenes `transform` mehr. Vorher hob `:hover` um translateY(-1px)
+   *     und `:active` sprang auf scale(.97) — beides schlug die Grundhaptik
+   *     per Spezifität aus dem Feld (MOTION-BRIEF §3.8, „nie zwei Federn auf
+   *     einem Element"). Jetzt hebt und senkt die Schicht, die alle 240
+   *     Knöpfe der App bedient, auch diese beiden.
+   *
+   * (3) Der Fokus liegt auf `outline` statt auf einem `box-shadow`-Ring —
+   *     dieselbe Marke wie `.t-interactive:focus-visible`, damit
+   *     Tastaturbedienung app-weit gleich aussieht.
+   */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-display font-extrabold uppercase transition-all duration-200;
-    letter-spacing: 0.12em;
-    @apply px-6 py-3 text-sm;
-    background: linear-gradient(180deg, var(--ta-cyan-bright), var(--ta-cyan));
-    color: #03201D;
-    box-shadow:
-      0 1px 2px rgba(0,0,0,.3),
-      0 4px 18px rgba(35,196,206,.28),
-      inset 0 1px 0 rgba(255,255,255,.35);
+    @apply inline-flex items-center justify-center gap-2 rounded-field uppercase;
+    @apply px-6 py-3;
+    font: var(--type-label);
+    letter-spacing: var(--ls-label);
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: var(--accent-glow);
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-pop);
   }
   @media (hover: hover) {
-    .btn-primary:hover {
-      background: var(--ta-cyan-bright);
-      box-shadow:
-        0 2px 4px rgba(0,0,0,.3),
-        0 6px 26px rgba(35,196,206,.42),
-        inset 0 1px 0 rgba(255,255,255,.45);
-      transform: translateY(-1px);
-    }
+    .btn-primary:hover { background: var(--accent-hover); }
   }
-  .btn-primary:active { transform: scale(.97); }
   .btn-primary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(35,196,206,.5);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
-  /* Secondary — transparent border button */
+  /* Sekundär — die ruhige Schwester: Rand statt Fläche. Unter der Maus
+     färbt sich die KANTE im Akzent und die Fläche hebt sich eine Ebene;
+     die SCHRIFT bleibt --text-body. Vorher wurde sie selbst akzentfarben,
+     und genau das ist die Stelle, an der in beiden Themes der Kontrast
+     kippt (dieselbe Messung wie in Etappe 3a/3b). */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-display font-extrabold uppercase transition-all duration-200;
-    letter-spacing: 0.12em;
-    @apply px-6 py-3 text-sm;
+    @apply inline-flex items-center justify-center gap-2 rounded-field uppercase;
+    @apply px-6 py-3;
+    font: var(--type-label);
+    letter-spacing: var(--ls-label);
     background: transparent;
-    border: 1px solid var(--ink-5);
-    color: var(--fg);
+    border: 1px solid var(--line);
+    color: var(--text-body);
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-pop);
   }
   @media (hover: hover) {
     .btn-secondary:hover {
-      border-color: var(--ta-cyan);
-      color: var(--ta-cyan);
-      box-shadow: 0 0 24px rgba(35,196,206,.2);
+      border-color: var(--accent);
+      background: var(--surface-raised);
     }
   }
-  .btn-secondary:active { transform: scale(.97); }
   .btn-secondary:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(35,196,206,.3);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
-  /* Ghost pink — cancel/danger */
-  .btn-ghost-pink {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-display font-extrabold uppercase transition-all duration-200;
-    letter-spacing: 0.12em;
-    @apply px-6 py-3 text-sm;
-    background: transparent;
-    border: 1px solid rgba(255,79,168,.4);
-    color: var(--ta-pink);
-  }
-  @media (hover: hover) {
-    .btn-ghost-pink:hover {
-      background: rgba(255,79,168,.08);
-      box-shadow: 0 0 24px rgba(255,79,168,.25);
-    }
-  }
+  /* `.btn-ghost-pink` ist ersatzlos entfallen (13.09.2026): null Aufrufer in
+     app/ und components/, und ihr Rosa war der letzte feste --ta-pink-Knopf.
+     Zerstörerische Handlungen tragen `.t-danger`/`.t-danger-strong`. */
 
   /* Display-Headline — relaxed weight + breathing letter-spacing */
   .heading-display {
@@ -1680,19 +2565,10 @@ h1, h2 { overflow-wrap: anywhere; }
     }
   }
 
-  /* Input field */
-  .input-field {
-    background: var(--ink-2);
-    border: 1px solid var(--ink-5);
-    @apply w-full rounded-xl px-4 py-3 text-sm transition-all;
-    color: var(--fg);
-  }
-  .input-field:focus {
-    border-color: var(--ta-cyan);
-    box-shadow: 0 0 0 3px rgba(35,196,206,.18), 0 0 24px rgba(35,196,206,.15);
-    outline: none;
-  }
-  .input-field::placeholder { color: var(--fg-4); }
+  /* `.input-field` ist am 13.09.2026 ersatzlos entfallen. Ihre einzigen zwei
+     Aufrufer waren /login und /register; beide stehen jetzt in der
+     Beitritts-Karte und nehmen `.join-feld` (siehe „Beitritts-Kulisse"), weil
+     dort die Panel-Farben gelten und nicht die der App. */
 
   /* Badge variants */
   .badge-cyan {
@@ -1933,29 +2809,27 @@ h1, h2 { overflow-wrap: anywhere; }
   }
 }
 
-@media (hover: hover) {
-  [data-theme="light"] .btn-secondary:hover {
-    border-color: var(--ta-cyan-deep);
-    color: var(--ta-cyan-deep);
-    box-shadow: 0 0 16px rgba(19,147,156,.12);
-  }
-}
+/* HIER STANDEN ZWEI HELL-THEME-REGELN FÜR DIE KNÖPFE — beide am 13.09.2026
+   ersatzlos entfallen.
 
-@media (hover: hover) {
-  [data-theme="light"] .btn-ghost-pink:hover {
-    background: rgba(255,79,168,.06);
-    box-shadow: 0 0 16px rgba(255,79,168,.15);
-  }
-}
+   `[data-theme="light"] .btn-secondary:hover` setzte `color` und
+   `border-color` weiter auf das feste `--ta-cyan-deep`. Sie hätte den Umbau
+   der Klasse im hellen Theme KOMPLETT aufgehoben, und zwar aus zwei Gründen
+   gleichzeitig: höhere Spezifität (0,3,0 gegen 0,2,0) UND — der eigentliche
+   Punkt — sie stand AUSSERHALB von `@layer components`. Ungeschichtete Regeln
+   schlagen geschichtete unabhängig von jeder Spezifität; sie hätte also auch
+   dann gewonnen, wenn die Selektoren gleich stark gewesen wären.
 
-[data-theme="light"] .input-field {
-  background: #FFFFFF;
-  border-color: var(--ink-5);
-}
-[data-theme="light"] .input-field:focus {
-  border-color: var(--ta-cyan-deep);
-  box-shadow: 0 0 0 3px rgba(19,147,156,.14), 0 0 16px rgba(19,147,156,.1);
-}
+   Ausgerechnet ihr Ergebnis war das, was die neue Basisregel verhindern soll:
+   akzentfarbene SCHRIFT im Hover. Die neue `.btn-secondary:hover` trägt beide
+   Themes allein, weil `--accent` und `--surface-raised` selbst theme-gescoped
+   sind — eine Hell-Fassung braucht es nicht.
+
+   Die zweite Regel gehörte zu `.btn-ghost-pink`, die oben gelöscht ist.
+
+   MERKE FÜR DEN REST DES ROLLOUTS: Wer eine Klasse in `@layer components`
+   umbaut, sucht danach nach ungeschichteten `[data-theme="light"]`-Resten
+   derselben Klasse. Sie sind unsichtbar, solange man im dunklen Theme prüft. */
 
 [data-theme="light"] .badge-grey {
   background: var(--ink-3);
@@ -2152,6 +3026,15 @@ h1, h2 { overflow-wrap: anywhere; }
   );
 }
 @media (min-width: 640px) { .join-tile { width: 232px; } }
+/* GRÖSSERE SCHIRME BEKOMMEN GRÖSSERE KACHELN (Leon 14.09.2026).
+   Zwei Fliegen mit einer Klappe: Auf 3440 px standen bei 232 px rund
+   ZWANZIG schmale Spalten nebeneinander — eine Bildkante alle 16 cm, das
+   liest sich als Raster, nicht als Wand aus Fotos. Und weil die Deckung einer
+   Reihe `Kachelzahl × Vorschub` ist, wächst mit der Kachel auch die Strecke,
+   die eine Reihe füllt. Breiter ist hier also nicht Geschmack, sondern
+   zugleich die Antwort auf die schwarze Fläche rechts. */
+@media (min-width: 1600px) { .join-tile { width: 280px; } }
+@media (min-width: 2200px) { .join-tile { width: 320px; } }
 .join-tile img {
   position: absolute;
   inset: 0;
@@ -2295,6 +3178,80 @@ h1, h2 { overflow-wrap: anywhere; }
 .join-slot:focus {
   background: var(--panel-field-active);
   border-color: oklch(0.88 var(--accent-c) var(--accent-h) / 0.75);
+}
+
+/* ─── Ein gewöhnliches Eingabefeld IN der Karte (Login/Register, 13.09.2026) ──
+ *
+ * Die Code-Kästchen oben sind acht Felder für je EIN Zeichen. Login und
+ * Register brauchen daneben das normale Feld — E-Mail, Passwort, Name.
+ *
+ * WARUM ES NICHT DIE APP-FELDER NIMMT: Innerhalb von `.join-panel` gelten die
+ * Panel-Farben (`--panel-fg`, `--panel-field`, …) und NICHT `--text-*` /
+ * `--surface-*`. Der Grund ist die Karte selbst: Ihr Grund ist ein Verlauf
+ * über einer Fotowand, und sie DREHT SICH MIT DEM THEME — im Dunkeln steht
+ * sie auf L 0,10, im Hellen auf L 0,99. Ein Feld auf `--surface-raised` mit
+ * `--text-body` träfe diesen Grund in keinem der beiden Fälle sauber.
+ * (Die Kopfnotiz an JoinLayout behauptete lange, die Karte sei „in beiden
+ * Themes dunkel" — das stimmt nicht und ist dort jetzt berichtigt.)
+ *
+ * Die MASSE dagegen sind die der App: `--hit-min` als Mindesthöhe
+ * (DESIGN-BRIEF §1.8, Touch-Ziel), `--r-md` als Radius, `--type-body` als
+ * Schrift. Der Fokus trägt exakt die Kante der Code-Kästchen darüber — beide
+ * Feldarten stehen in derselben Karte und dürfen nicht auseinanderlaufen. */
+.join-feld {
+  width: 100%;
+  min-height: var(--hit-min);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--panel-field);
+  border: 1px solid var(--panel-field-line);
+  color: var(--panel-fg);
+  font: var(--type-body);
+  outline: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.join-feld:focus {
+  background: var(--panel-field-active);
+  border-color: oklch(0.88 var(--accent-c) var(--accent-h) / 0.75);
+}
+.join-feld::placeholder { color: var(--panel-fg-3); }
+[data-theme="light"] .join-feld:focus {
+  border-color: oklch(0.55 var(--accent-c) var(--accent-h) / 0.85);
+}
+
+/* Der Zweitweg „Mit Google anmelden": eine ruhige Fläche in der Karte, kein
+   zweiter Vollton-Knopf neben `JoinPrimary`. */
+.join-fremdknopf {
+  width: 100%;
+  min-height: var(--hit-min);
+  border-radius: var(--r-md);
+  background: var(--panel-field);
+  border: 1px solid var(--panel-field-line);
+  color: var(--panel-fg);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-pop);
+}
+@media (hover: hover) {
+  .join-fremdknopf:hover { background: var(--panel-field-active); }
+}
+
+/* „oder" zwischen den beiden Wegen — eine Linie, ein Wort, eine Linie. */
+.join-trenner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--panel-fg-3);
+}
+.join-trenner::before,
+.join-trenner::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--panel-field-line);
 }
 
 
@@ -2502,12 +3459,19 @@ h1, h2 { overflow-wrap: anywhere; }
   display: flex;
   align-items: center;
   height: var(--hit-min);
-  filter: url(#ta-goo);
   /* Ohne das clippt der Filterbereich die Tropfen. */
   overflow: visible;
 }
+/* NUR WÄHREND DER BEWEGUNG (Leon 12.09.2026, Begründung im Kopf von
+   GooeySearch.tsx): Im Ruhezustand legte der geschwellte Weichzeichner einen
+   hellen Hof um jeden Buchstaben — den sieht man als „komisches Schimmern".
+   Das Verschmelzen von Pille und Tropfen passiert ohnehin nur im Übergang. */
+.goo-inner[data-goo] {
+  filter: url(#ta-goo);
+}
 /* Safari / Chrome auf iOS: Filter aus, alles andere bleibt. */
-.no-goo .goo-inner {
+.no-goo .goo-inner,
+.no-goo .goo-inner[data-goo] {
   filter: none;
 }
 
@@ -2533,6 +3497,26 @@ h1, h2 { overflow-wrap: anywhere; }
 }
 [data-open] .goo-pill {
   cursor: text;
+}
+
+/* NUR DIE LUPE, KEIN WORT (Leon 10.09.2026, DeepFight-Landung): Dort sitzt
+   die Suche als einziges Element ganz rechts in der Kopfzeile, auf Höhe der
+   Wortmarke. Ein Wort daneben wäre eine Beschriftung ohne Gegenstück — das
+   Symbol sagt dasselbe. Die Pille wird dadurch zum Kreis.
+
+   DIE POLSTERUNG MUSS WEG, sonst bleibt vom 44-px-Kreis nach `0 18px`
+   Innenabstand ein 8 px breiter Kasten für ein 18-px-Symbol übrig, und das
+   Symbol läuft aus seiner eigenen Pille heraus. Die Beschriftung lebt
+   weiter im `aria-label` — für Screenreader ändert sich nichts. */
+.goo-pill:has(.goo-symbol) {
+  padding: 0;
+}
+.goo-symbol {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
 }
 
 .goo-label {
@@ -3092,8 +4076,12 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
   :where([data-press]:not(button):not([role="button"]):not(a):not(summary)) {
     transition: none;
   }
-  button:active, [role="button"]:active, [role="button"]:hover,
-  button:hover, a[data-press]:hover, a[data-press]:active,
+  /* [data-motion] bleibt auch hier aussen vor (wie in allen Regeln oben):
+     Wer sein Transform selbst traegt — die Vs.-Platten mit Versatz und
+     Auswahl-Groesse —, verloere es sonst unter dem Finger. */
+  button:active:not([data-motion]), [role="button"]:active:not([data-motion]),
+  [role="button"]:hover:not([data-motion]), button:hover:not([data-motion]),
+  a[data-press]:hover, a[data-press]:active,
   [data-press="surface"]:hover, [data-press="surface"]:active,
   [data-press="quiet"]:active {
     transform: none;

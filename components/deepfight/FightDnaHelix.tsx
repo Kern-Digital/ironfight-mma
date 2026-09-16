@@ -32,6 +32,21 @@ export interface FightDnaHelixProps {
   forceRenderer?: "auto" | "svg" | "webgl";
   tilt?: number;
   completenessLabel?: string;
+  /**
+   * Die Kennzahl oben links („92 PROZENT PROFILSTÄRKE"). Standard: sichtbar.
+   *
+   * `false` setzt seit dem 08.09.2026 die DeepFight-Landung. Dort ist der
+   * Strang ein BILD, keine Auskunft: Er zeigt ein Demo-Profil
+   * (`lib/demo-fight-profile.ts`), also einen Menschen, den es nicht gibt —
+   * eine Prozentzahl darüber wirft nur die Frage auf, wessen sie ist. Dazu
+   * kommt ein technischer Grund: Auf der Landung läuft der Strang zum Rand
+   * hin per Maske aus (kein Rahmen, Leons Ansage), und die Kennzahl sitzt
+   * ausgerechnet in der Ecke, wo eine radiale Maske am wenigsten deckt.
+   *
+   * EIN SCHALTER, EINE FRAGE (Falle 35): Er blendet die Kennzahl aus, sonst
+   * nichts — kein zweiter Look, keine gebündelte Entscheidung.
+   */
+  kennzahlZeigen?: boolean;
   nearParticleCount?: number;
   farParticleCount?: number;
   glowIntensity?: number;
@@ -128,6 +143,7 @@ export default function FightDnaHelix({
   forceRenderer = "auto",
   tilt = 5,
   completenessLabel = "Profilstärke",
+  kennzahlZeigen = true,
   nearParticleCount = 288,
   farParticleCount = 80,
   glowIntensity = 1.3,
@@ -570,6 +586,7 @@ export default function FightDnaHelix({
         </div>
       )}
 
+      {kennzahlZeigen && (
       <div
         aria-hidden
         style={{
@@ -596,6 +613,7 @@ export default function FightDnaHelix({
           Prozent {completenessLabel}
         </span>
       </div>
+      )}
 
       <AnimatePresence>
         {focusedSegment && size !== "sm" && bounds.width > 0 && (

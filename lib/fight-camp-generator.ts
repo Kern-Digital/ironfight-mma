@@ -348,5 +348,6 @@ export function generateFightCamp(input: {
     opponent: input.opponent,
     phases,
     status: "active",
+    notizen: [],
   };
 }

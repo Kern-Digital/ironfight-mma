@@ -33,7 +33,11 @@ const jetbrainsMono = JetBrains_Mono({
 // Barlow/Inter bleiben bis zum Rollout-Ende für Altseiten.
 const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  // 300 seit dem 11.09.2026: das dünne „Start" in der Mitte des DNA-Strangs
+  // (Leon: „den Text in dünn, nicht dick"). Ohne geladenen Schnitt fiele
+  // `font-weight: 300` still auf 400 zurück — dünner als geladen kann ein
+  // Browser eine Schrift nicht vortäuschen, nur fetter.
+  weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-archivo",
   display: "swap",
 });

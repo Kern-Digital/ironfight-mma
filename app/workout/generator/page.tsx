@@ -11,6 +11,7 @@
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
+import PeekStack from "@/components/ui/PeekStack";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { ALL_EQUIPMENT, EQUIPMENT } from "@/lib/equipment";
@@ -103,71 +104,6 @@ function HubFieldHead({ icon, title }: { icon: IconName; title: string }) {
       >
         {title}
       </h2>
-    </div>
-  );
-}
-
-/**
- * Angedeutete Kartei: die ersten drei Einträge als kompakte Kacheln, nach
- * unten in den Seitengrund ausgeblendet (Maske) — man sieht den Anfang,
- * der Rest „läuft aus". Die vollen Listen liegen hinter dem Feld.
- */
-function PeekStack({
-  items,
-  empty,
-  emptyText,
-}: {
-  items: { key: string; title: string; meta: string }[];
-  empty: boolean;
-  emptyText: string;
-}) {
-  if (empty) {
-    return (
-      <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-        {emptyText}
-      </p>
-    );
-  }
-  return (
-    <div
-      aria-hidden
-      className="relative overflow-hidden"
-      style={{
-        // Zeigt gut zwei Kacheln, die dritte läuft in der Maske aus
-        height: 96,
-        maskImage: "linear-gradient(to bottom, black 40%, transparent 96%)",
-        WebkitMaskImage:
-          "linear-gradient(to bottom, black 40%, transparent 96%)",
-      }}
-    >
-      <div className="flex flex-col gap-1.5">
-        {items.map((it) => (
-          <div
-            key={it.key}
-            className="flex flex-col rounded-field px-2.5 py-1.5"
-            style={{
-              background: "var(--surface-raised)",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <span
-              className="truncate"
-              style={{
-                font: "600 14px/1.3 var(--font-archivo), system-ui, sans-serif",
-                color: "var(--text-body)",
-              }}
-            >
-              {it.title}
-            </span>
-            <span
-              className="truncate"
-              style={{ ...META_FONT, color: "var(--text-3)" }}
-            >
-              {it.meta}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

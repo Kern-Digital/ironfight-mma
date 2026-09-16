@@ -61,16 +61,39 @@ function parseTags(s: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * ETAPPE 3b (Leons Befund 13.09.2026: „wenn ich auf neuen Gegner anlegen gehe,
+ * kommt das Popup mit altem Fenster").
+ *
+ * Der Kommentar weiter unten kündigte es an — „Der Rest dieser Datei zieht in
+ * Etappe 3b nach" —, und aufgefallen ist es genau dort, wo diese Datei in
+ * einer fertigen Umgebung steht: im Popup „Neuer Gegner" der Wettkampf-Anlage,
+ * zwischen Feldern, die seit Etappe 2b im Token-Look sind. Raus sind
+ * `--ink-3/5`, `--fg-1/3/4`, `--ta-pink`, `font-mono-ta`, `font-display-ta`
+ * und die festen Pixelgrößen. **`--fg-1` gab es nie** (derselbe Befund wie in
+ * Etappe 3a) — die Eingaben standen also auf der geerbten Farbe.
+ *
+ * Die Maße sind die der Formulare in „Neuer Wettkampf": `min-h-hit
+ * rounded-field px-3` auf `--surface-raised`/`--line`, Beschriftungen als
+ * `.t-label`. Ein Formular in einem Popup soll aussehen wie ein Formular auf
+ * einer Seite — es ist dasselbe Formular.
+ */
 const fieldStyle: React.CSSProperties = {
-  background: "var(--ink-3)",
-  border: "1px solid var(--ink-5)",
-  color: "var(--fg-1)",
+  background: "var(--surface-raised)",
+  border: "1px solid var(--line)",
+  color: "var(--text-body)",
+  font: "var(--type-body)",
   outline: "none",
 };
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  letterSpacing: "0.15em",
-  color: "var(--fg-3)",
+const META_FONT: React.CSSProperties = {
+  font: "var(--type-meta)",
+  letterSpacing: "var(--ls-label)",
+  textTransform: "uppercase",
+};
+const BTN_FONT: React.CSSProperties = {
+  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
 };
 
 /**
@@ -155,16 +178,11 @@ export default function OpponentEditor({
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {/* ── Gegnerprofil (Grunddaten) ── */}
       <div>
-        <div
-          className="font-mono-ta mb-3 text-[10px] font-bold uppercase"
-          style={{ letterSpacing: "0.2em", color: "var(--ta-pink)" }}
-        >
-          Gegnerprofil
-        </div>
+        <div className="t-label mb-3">Gegnerprofil</div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase" style={labelStyle}>
+          <label className="flex flex-col gap-1.5">
+            <span className="t-label">
               Name / Bezeichnung
             </span>
             <input
@@ -172,12 +190,12 @@ export default function OpponentEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="z.B. Marco K."
-              className="rounded-lg px-3 py-2 text-sm"
+              className="min-h-hit rounded-field px-3"
               style={fieldStyle}
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase" style={labelStyle}>
+          <label className="flex flex-col gap-1.5">
+            <span className="t-label">
               Stil
             </span>
             <Select
@@ -189,8 +207,8 @@ export default function OpponentEditor({
               }))}
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase" style={labelStyle}>
+          <label className="flex flex-col gap-1.5">
+            <span className="t-label">
               Auslage
             </span>
             <Select
@@ -203,47 +221,47 @@ export default function OpponentEditor({
             />
           </label>
           <div className="grid grid-cols-3 gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase" style={labelStyle}>
+            <label className="flex flex-col gap-1.5">
+              <span className="t-label">
                 Größe cm
               </span>
               <input
                 type="number"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
-                className="rounded-lg px-2 py-2 text-sm"
+                className="min-h-hit rounded-field px-2"
                 style={fieldStyle}
               />
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase" style={labelStyle}>
+            <label className="flex flex-col gap-1.5">
+              <span className="t-label">
                 Gewicht kg
               </span>
               <input
                 type="number"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                className="rounded-lg px-2 py-2 text-sm"
+                className="min-h-hit rounded-field px-2"
                 style={fieldStyle}
               />
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase" style={labelStyle}>
+            <label className="flex flex-col gap-1.5">
+              <span className="t-label">
                 Reach cm
               </span>
               <input
                 type="number"
                 value={reach}
                 onChange={(e) => setReach(e.target.value)}
-                className="rounded-lg px-2 py-2 text-sm"
+                className="min-h-hit rounded-field px-2"
                 style={fieldStyle}
               />
             </label>
           </div>
         </div>
 
-        <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[10px] uppercase" style={labelStyle}>
+        <label className="mt-3 flex flex-col gap-1.5">
+          <span className="t-label">
             Stärken (kommagetrennt)
           </span>
           <input
@@ -251,12 +269,12 @@ export default function OpponentEditor({
             value={strengths}
             onChange={(e) => setStrengths(e.target.value)}
             placeholder="z.B. harter Cross, gutes Footwork, Konter"
-            className="rounded-lg px-3 py-2 text-sm"
+            className="min-h-hit rounded-field px-3"
             style={fieldStyle}
           />
         </label>
-        <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[10px] uppercase" style={labelStyle}>
+        <label className="mt-3 flex flex-col gap-1.5">
+          <span className="t-label">
             Schwächen (kommagetrennt)
           </span>
           <input
@@ -264,12 +282,12 @@ export default function OpponentEditor({
             value={weaknesses}
             onChange={(e) => setWeaknesses(e.target.value)}
             placeholder="z.B. Bodenlage schwach, lässt Kicks zu"
-            className="rounded-lg px-3 py-2 text-sm"
+            className="min-h-hit rounded-field px-3"
             style={fieldStyle}
           />
         </label>
-        <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[10px] uppercase" style={labelStyle}>
+        <label className="mt-3 flex flex-col gap-1.5">
+          <span className="t-label">
             Bevorzugte Angriffe
           </span>
           <input
@@ -277,20 +295,20 @@ export default function OpponentEditor({
             value={favorites}
             onChange={(e) => setFavorites(e.target.value)}
             placeholder="z.B. Jab-Cross, Double-Leg, Roundhouse"
-            className="rounded-lg px-3 py-2 text-sm"
+            className="min-h-hit rounded-field px-3"
             style={fieldStyle}
           />
         </label>
-        <label className="mt-3 flex flex-col gap-1">
-          <span className="text-[10px] uppercase" style={labelStyle}>
+        <label className="mt-3 flex flex-col gap-1.5">
+          <span className="t-label">
             Notizen
           </span>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Frei-Text, Video-Notes, weitere Beobachtungen…"
-            className="rounded-lg px-3 py-2 text-sm"
-            style={{ ...fieldStyle, minHeight: "70px", resize: "vertical" }}
+            className="rounded-field px-3 py-2.5"
+            style={{ ...fieldStyle, minHeight: "84px", resize: "vertical" }}
           />
         </label>
       </div>
@@ -300,11 +318,14 @@ export default function OpponentEditor({
           sie bis dahin selbst mit, solange sie ohne `frameless` gerendert
           wurden. Das Prop ist weg, die Blöcke sind reine Anzeige — wer sie
           platziert, benennt sie (Begründung im Kopf von FightDnaSplit.tsx).
-          Der Rest dieser Datei zieht in Etappe 3b nach. */}
+          Etappe 3b hat den Rest dieser Datei nachgezogen (13.09.). */}
       <div>
         <div className="t-label mb-3">Fight-DNA</div>
         <FightDnaSplit split={dnaSplit} />
-        <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
+        <p
+          className="mt-2"
+          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+        >
           Der Fight-DNA-Split kommt aus der KI-Video-Analyse — ein gewichteter
           Mittelwert, der mit jedem Video schärfer wird.
         </p>
@@ -314,7 +335,10 @@ export default function OpponentEditor({
       <div>
         <div className="t-label mb-3">Technik-Statistik</div>
         <FightStatsBlock stats={actionStats} />
-        <p className="mt-2 text-[11px]" style={{ color: "var(--fg-4)" }}>
+        <p
+          className="mt-2"
+          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+        >
           Versuche, Treffer, Zone und Setup zählt die KI-Video-Analyse mit —
           jedes weitere Video macht das Bild vollständiger.
         </p>
@@ -334,17 +358,13 @@ export default function OpponentEditor({
 
       {/* ── DeepFight-Analyse (ausklappbare Kategorien) ── */}
       <div>
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <h3
-            className="font-display-ta font-black uppercase"
-            style={{ fontSize: "15px", letterSpacing: "0.06em" }}
-          >
+        {/* Die Wortmarke bringt ihre Schrift selbst mit — eine zweite
+            Größenangabe daneben hätte sie nur gestaucht. */}
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h3 className="t-label">
             <DeepFightWordmark />
           </h3>
-          <span
-            className="font-mono-ta text-[10px]"
-            style={{ letterSpacing: "0.12em", color: "var(--fg-4)" }}
-          >
+          <span style={{ ...META_FONT, color: "var(--text-2)" }}>
             Optional · nur ausfüllen was bekannt ist
           </span>
         </div>
@@ -352,12 +372,20 @@ export default function OpponentEditor({
       </div>
 
       {/* ── Aktionen ── */}
+      {/* Dieselben zwei Knöpfe wie am Fuß von „Neuer Wettkampf": der eine
+          trägt den Akzent, der andere nur eine Kante. */}
       <div className="flex flex-wrap gap-2">
         <button
           type="submit"
           disabled={busy}
-          className="btn-primary px-5 py-2 text-sm"
-          style={{ opacity: busy ? 0.6 : 1, cursor: busy ? "not-allowed" : "pointer" }}
+          data-press
+          className="t-interactive min-h-hit rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            ...BTN_FONT,
+            background: "var(--accent)",
+            color: "var(--on-accent)",
+            boxShadow: "var(--accent-glow)",
+          }}
         >
           {busy ? "Speichere…" : submitLabel}
         </button>
@@ -366,7 +394,13 @@ export default function OpponentEditor({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="btn-secondary px-5 py-2 text-sm"
+            data-press
+            className="t-interactive min-h-hit rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              ...BTN_FONT,
+              border: "1px solid var(--line)",
+              color: "var(--text-body)",
+            }}
           >
             Abbrechen
           </button>

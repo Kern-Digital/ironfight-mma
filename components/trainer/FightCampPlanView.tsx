@@ -78,6 +78,17 @@ const META_FONT: React.CSSProperties = {
   textTransform: "uppercase",
 };
 
+/**
+ * Anker einer Phase im Dokument — der Knopf „Trainingsplan" im Kopf der
+ * Wettkampfseite (Leon 11.09.2026) springt damit auf die LAUFENDE Phase,
+ * nicht bloß auf die Überschrift des Plans. Eine Funktion statt eines
+ * Strings an zwei Orten: Der Knopf und dieser Block müssen denselben Namen
+ * bilden, sonst läuft der Sprung ins Leere.
+ */
+export function phaseAnchorId(phase: FightCampPhase): string {
+  return `plan-phase-${phase}`;
+}
+
 export default function FightCampPlanView({
   camp,
   showOpponent = true,
@@ -236,7 +247,10 @@ export default function FightCampPlanView({
         return (
           <div
             key={`${phase.phase}-${idx}`}
-            className={isCurrent ? "t-card p-5" : undefined}
+            id={phaseAnchorId(phase.phase)}
+            // scroll-mt: Der Anker landet nicht unter der Kopfleiste der
+            // Hülle, sondern mit Luft darunter.
+            className={isCurrent ? "t-card scroll-mt-24 p-5" : "scroll-mt-24"}
             style={
               isCurrent
                 ? {

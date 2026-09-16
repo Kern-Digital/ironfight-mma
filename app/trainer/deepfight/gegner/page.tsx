@@ -19,10 +19,21 @@
  * 2. **Die Aktionsleiste ist eine Glas-Pille** statt zweier freistehender
  *    Knöpfe — damit steht das erste sichtbare Element der Seite auf Glas.
  * 3. **Jede Karte hat jetzt ZWEI Wege**: die Karte selbst führt aufs Profil,
- *    der Knopf rechts führt in die Werkbank
- *    (`/trainer/deepfight?modus=gegner&ziel=<id>`). Vorher war das Scouten
- *    eines bekannten Gegners ein Umweg über die Detailseite und ihren
- *    Videos-Tab.
+ *    der Knopf am Fuß zur neuen Analyse. Vorher war das Scouten eines
+ *    bekannten Gegners ein Umweg über die Detailseite und ihren Videos-Tab.
+ *
+ * ─── DIESE SEITE IST JETZT AUCH DIE ZIELAUSWAHL (Leon 08.09.2026) ───────────
+ *
+ * Mit der neuen Landung fallen die Segmente aus der Glas-Leiste, und der Weg
+ * „Analyse starten → Gegner" führt HIERHER. Leon hatte selbst gefragt, ob
+ * Bibliothek und Auswahl „im Endeffekt das gleiche" machen — ja, also ist es
+ * jetzt eine Seite statt zweier.
+ *
+ * Sie merkt sich das an `?fuer=analyse`: Wer so ankommt, sucht ein ZIEL und
+ * keine Lektüre. Dann TAUSCHEN die beiden Wege je Karte (die ganze Karte führt
+ * in die Konfiguration, der Knopf aufs Profil), und der Hinweis oben sagt
+ * etwas anderes. „Neues DeepFight-Profil" bleibt in beiden Zuständen stehen —
+ * beim Gegner ist „den gibt es noch nicht" der Normalfall.
  *
  * Zwei Knöpfe in EINER Karte, ohne verschachteltes HTML: Das Klickziel liegt
  * als unsichtbares Geschwister über der Karte (`.t-row-card`/`.t-row-target`
@@ -81,18 +92,36 @@ function formatDate(d: Date): string {
 
 // ─── Bibliothekskarte ────────────────────────────────────────────────────────
 
-function OpponentCard({ opponent }: { opponent: Opponent }) {
+function OpponentCard({
+  opponent,
+  fuerAnalyse,
+}: {
+  opponent: Opponent;
+  /**
+   * Kommt der Besucher über „Analyse starten", TAUSCHEN die beiden Wege:
+   * Die ganze Karte führt dann in die Konfiguration, der Knopf am Fuß aufs
+   * Profil. Sonst führte der große Klick mitten im Analyse-Fluss woanders hin
+   * als angekündigt.
+   */
+  fuerAnalyse: boolean;
+}) {
   const covered = DNA_CATEGORIES.filter(
     (c) => answeredCount(c, opponent.dna) > 0,
   ).length;
+  const profilHref = `/trainer/deepfight/gegner/${opponent.id}`;
+  const analyseHref = `/trainer/deepfight/analyse?modus=gegner&ziel=${opponent.id}`;
 
   return (
     <div className="t-card t-row-card relative flex h-full flex-col gap-2.5 p-4">
-      {/* Klickziel über der GANZEN Karte — der Alltagsweg führt aufs Profil. */}
+      {/* Klickziel über der GANZEN Karte. */}
       <Link
-        href={`/trainer/deepfight/gegner/${opponent.id}`}
+        href={fuerAnalyse ? analyseHref : profilHref}
         className="t-row-target absolute inset-0 rounded-[var(--r-lg)]"
-        aria-label={`DeepFight-Profil von ${opponent.name} öffnen`}
+        aria-label={
+          fuerAnalyse
+            ? `${opponent.name} analysieren`
+            : `DeepFight-Profil von ${opponent.name} öffnen`
+        }
       />
 
       <div className="pointer-events-none relative flex items-start gap-3">
@@ -145,12 +174,12 @@ function OpponentCard({ opponent }: { opponent: Opponent }) {
         </div>
       )}
 
-      {/* Der zweite Weg: direkt an die Werkbank, mit diesem Gegner als Ziel.
+      {/* Der zweite Weg — was die Karte NICHT tut, tut dieser Knopf.
           `mt-auto` hält ihn am Fuß, damit er in jeder Karte des Rosters auf
           derselben Höhe steht — auch wenn eine Karte keine Stärken trägt. */}
       <div className="relative mt-auto flex justify-end pt-0.5">
         <Link
-          href={`/trainer/deepfight?modus=gegner&ziel=${opponent.id}`}
+          href={fuerAnalyse ? profilHref : analyseHref}
           data-press
           className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-3"
           style={{
@@ -159,10 +188,14 @@ function OpponentCard({ opponent }: { opponent: Opponent }) {
             border: "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
             textDecoration: "none",
           }}
-          aria-label={`${opponent.name} analysieren`}
+          aria-label={
+            fuerAnalyse
+              ? `DeepFight-Profil von ${opponent.name} öffnen`
+              : `${opponent.name} analysieren`
+          }
         >
-          <Icon name="spark" size={13} strokeWidth={2.4} />
-          Analysieren
+          <Icon name={fuerAnalyse ? "target" : "spark"} size={13} strokeWidth={2.4} />
+          {fuerAnalyse ? "Profil" : "Analysieren"}
         </Link>
       </div>
     </div>
@@ -184,6 +217,18 @@ function OpponentsLibraryContent() {
   const [showNewOpponent, setShowNewOpponent] = useState(
     searchParams.get("new") === "1",
   );
+  /**
+   * `?fuer=analyse` heißt: Der Besucher kommt über „Analyse starten" und sucht
+   * ein ZIEL, keine Lektüre. Dann führt die ganze Karte in die Konfiguration
+   * (siehe OpponentCard) und der Hinweis oben sagt etwas anderes — ein Text
+   * pro Zustand (Hausregel „Hilfstexte folgen der Auswahl").
+   *
+   * „Neues DeepFight-Profil" bleibt in BEIDEN Zuständen stehen: Beim Gegner
+   * ist „den gibt es noch nicht" der Normalfall — man scoutet jemanden, den
+   * man gerade erst gesehen hat. (Bei eigenen Athleten gibt es das Gegenstück
+   * bewusst nicht; die entstehen über Einladungen.)
+   */
+  const fuerAnalyse = searchParams.get("fuer") === "analyse";
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -234,13 +279,23 @@ function OpponentsLibraryContent() {
       <h1 className="sr-only">DeepFight — Gegner</h1>
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-4 sm:px-6">
-        <TrainerHint id="opponents-library" title="DeepFight-Bibliothek">
-          Jedes Profil ist die lebende Analyse eines Gegners: Muster, Waffen,
-          Schwächen, Gameplan. Alle Trainer deines Gyms arbeiten an denselben
-          Profilen. Der Ring zeigt, wie viele der {DNA_CATEGORIES.length}{" "}
-          Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen den
-          damaligen Stand ein.
-        </TrainerHint>
+        {fuerAnalyse ? (
+          <TrainerHint id="opponents-auswahl" title="Wen analysierst du?">
+            Tipp auf ein Profil und du landest direkt bei der neuen Analyse;
+            der Knopf in der Karte zeigt dir stattdessen das volle Profil. Was
+            du am Ende übernimmst, landet im gemeinsamen Gegnerprofil — dein
+            ganzes Trainerteam arbeitet damit. Steht der Gegner noch nicht in
+            der Bibliothek, leg ihn hier an.
+          </TrainerHint>
+        ) : (
+          <TrainerHint id="opponents-library" title="DeepFight-Bibliothek">
+            Jedes Profil ist die lebende Analyse eines Gegners: Muster, Waffen,
+            Schwächen, Gameplan. Alle Trainer deines Gyms arbeiten an denselben
+            Profilen. Der Ring zeigt, wie viele der {DNA_CATEGORIES.length}{" "}
+            Kategorien schon gescoutet sind. Wettkämpfe frieren beim Anlegen
+            den damaligen Stand ein.
+          </TrainerHint>
+        )}
 
         {error && (
           <ErrorState
@@ -348,7 +403,7 @@ function OpponentsLibraryContent() {
           <StaggerFlow className="grid items-stretch gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((o, i) => (
               <FlowItem key={o.id} index={i} className="h-full">
-                <OpponentCard opponent={o} />
+                <OpponentCard opponent={o} fuerAnalyse={fuerAnalyse} />
               </FlowItem>
             ))}
           </StaggerFlow>

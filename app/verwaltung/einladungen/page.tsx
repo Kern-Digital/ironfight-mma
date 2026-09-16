@@ -220,9 +220,10 @@ export default function TrainerInvitesPage() {
                       <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                           <span
-                            className="font-mono-ta text-base sm:text-lg"
+                            className="font-mono text-base sm:text-lg"
                             style={{
                               fontWeight: 700,
+                              letterSpacing: "var(--ls-label)",
                               color: "var(--text-body)",
                             }}
                           >

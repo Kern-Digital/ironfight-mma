@@ -155,6 +155,18 @@ function deny(req: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(url);
 }
 
+/**
+ * Zur Anmeldung — OHNE `next`-Parameter. `deny()` haengt sonst `?next=/` an,
+ * und der Weg nach dem Anmelden fuehrte ueber die Wurzel ein zweites Mal
+ * durch diese Weiche. Ein Umweg, den niemand braucht.
+ */
+function toLogin(req: NextRequest): NextResponse {
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  return NextResponse.redirect(url);
+}
+
 function toDashboard(req: NextRequest): NextResponse {
   const url = req.nextUrl.clone();
   url.pathname = "/dashboard";
@@ -171,8 +183,27 @@ export async function middleware(req: NextRequest) {
   // next.config.mjs (redirects()) — genau deshalb, damit das Trainer-Gate
   // unten eine reine Verwaltung nicht abfaengt, bevor sie ihr neues Ziel
   // erreicht.
+  /**
+   * DIE WURZEL IST EINE WEICHE, KEINE SEITE (Leons Entscheidung 14.09.2026).
+   *
+   * Die Werbeseite ist ein eigenes Projekt (`Tidal-Athletics-Landing`) und
+   * bekommt eine eigene Adresse; die Anwendung laeuft auf einer Subdomain.
+   * `/` fuehrt deshalb nur noch weiter: angemeldet ins Dashboard, sonst zur
+   * Anmeldung.
+   *
+   * WARUM HIER UND NICHT NUR IN DER SEITE: Eine Client-Weiterleitung braucht
+   * erst React, den Auth-Context und einen Durchlauf — solange rendert die
+   * Huelle, und ein Ausgeloggter saehe die Navigationsleiste mit
+   * „Training/Lernen/Profil" aufblitzen, bevor es zur Anmeldung springt.
+   * Hier faellt die Entscheidung, bevor ein Byte gerendert wird.
+   *
+   * `app/page.tsx` bleibt als Rueckfall bestehen: bei gesetztem Not-Aus
+   * (`MIDDLEWARE_AUTH=off`) kommt diese Funktion gar nicht erst dran.
+   */
+  const istWurzel = pathname === "/";
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return deny(req, pathname);
+  if (!token) return istWurzel ? toLogin(req) : deny(req, pathname);
 
   const result = await verifySession(token);
   let claims: SessionClaims | null;
@@ -183,7 +214,11 @@ export async function middleware(req: NextRequest) {
   } else {
     claims = null; // ungueltige Signatur/Issuer/Audience → wie ausgeloggt
   }
-  if (!claims) return deny(req, pathname);
+  if (!claims) return istWurzel ? toLogin(req) : deny(req, pathname);
+
+  // Gueltige Sitzung an der Wurzel: hinein. Vor den Rechte-Pruefungen, weil
+  // „/" zu keinem der gegateten Bereiche gehoert.
+  if (istWurzel) return toDashboard(req);
 
   // Rechte-Gating (Rollen-Set aus dem verifizierten Token). Der
   // Plattform-Rang ist in `claims` bereits eingerechnet — ein Admin faellt
@@ -202,6 +237,13 @@ export async function middleware(req: NextRequest) {
 }
 
 /**
+ * NICHT AUFNEHMEN: `/dev/*` (Prüfseiten). Fünf Seiten bilden Bausteine ohne
+ * Daten nach — `kursfenster`, `motion-sheet`, `auswahl-chips`,
+ * `deepfight-farbe`, `helix`. CLAUDE.md und der MOTION-BRIEF verweisen
+ * ausdrücklich auf „Sichtprüfung OHNE Login"; die Messskripte rufen sie
+ * unangemeldet auf. Ein Gate davor hieße, jedes dieser Skripte um eine
+ * Anmeldung zu erweitern — für Seiten, die gar keine Daten zeigen.
+ *
  * NICHT AUFNEHMEN: `/beitreten/*` (Einladungen einlösen, Checkpoint 1C).
  * Die Seite ist für AUSGELOGGTE gedacht — ein Eingeladener öffnet den Link,
  * bevor er ein Konto hat. Stünde sie im matcher, würfe die Middleware ihn auf
@@ -211,6 +253,8 @@ export async function middleware(req: NextRequest) {
  */
 export const config = {
   matcher: [
+    // Die Wurzel ist die Weiche (siehe oben) — exakt „/", keine Unterpfade.
+    "/",
     "/admin/:path*",
     "/dashboard/:path*",
     "/deepfight/:path*",
@@ -219,5 +263,29 @@ export const config = {
     "/profile/:path*",
     "/trainer/:path*",
     "/verwaltung/:path*",
+    /*
+     * SEIT DEM 14.09.2026 BRAUCHT AUCH DER INHALT EIN KONTO (Leons
+     * Entscheidung). Bis dahin waren Technik-Bibliothek, Regeln, Quiz, Hilfe,
+     * Timer, Kursplan und Workouts ohne Anmeldung erreichbar — ein Rest aus
+     * der Zeit, als `/` eine Werbeseite war und diese Seiten ihr Schaufenster.
+     *
+     * Das Schaufenster hat jetzt ein eigenes Zuhause: die Website
+     * (`Tidal-Athletics-Landing`) auf eigener Adresse. Damit besteht die
+     * oeffentliche Flaeche der ANWENDUNG nur noch aus dem Anmelde-Stapel.
+     *
+     * ZWEI ADRESSEN MEHR, ALS LEON GENANNT HAT: `/schedule` und `/workout`.
+     * Er nannte die fuenf darueber; diese beiden standen ebenso offen und
+     * gehoeren in dieselbe Reihe — `/schedule` zeigt den KURSPLAN DES GYMS,
+     * also fremde Betriebsdaten, und `/workout` die Trainingsplaene. Sie
+     * offen zu lassen haette die Entscheidung an ihrer wichtigsten Stelle
+     * verfehlt.
+     */
+    "/techniques/:path*",
+    "/regeln/:path*",
+    "/quiz/:path*",
+    "/help/:path*",
+    "/timer/:path*",
+    "/schedule/:path*",
+    "/workout/:path*",
   ],
 };
