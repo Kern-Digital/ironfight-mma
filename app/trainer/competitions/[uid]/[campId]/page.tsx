@@ -617,10 +617,11 @@ function CompetitionDetailContent({
               </div>
             </div>
 
-            {/* Die Ablage der Werkbank, hier aufgeklappt. Pro Ziel neu
-              gemountet (key) — der Zwischenstand liegt im localStorage der
-              Sektion, nicht im React-Zustand. Sie sitzt in einer Karte, weil
-              sie keine eigene mitbringt. */}
+            {/* Die Auswertungen des Ziels, hier aufgeklappt. Pro Ziel neu
+              gemountet (key). Seit Etappe 2 (16.09.2026) ohne Ablage — ein
+              neues Video läuft über den Upload-Fluss, der Knopf in der
+              Sektion führt hin. Sie sitzt in einer Karte, weil sie keine
+              eigene mitbringt. */}
             <Collapse open={analyseOffen && kannAnalysieren}>
               <div className="t-card mt-5 p-4 sm:p-5">
                 {seite === "athlet" ? (
@@ -630,7 +631,6 @@ function CompetitionDetailContent({
                       mode="athlete"
                       targetId={uid}
                       targetName={studentName}
-                      fightProfile={fightProfile}
                       onFightProfileUpdated={() => void reloadFightProfile()}
                       onAnalysesLoaded={(n) =>
                         setAnzahl((prev) => ({ ...prev, athlet: n }))
@@ -645,7 +645,6 @@ function CompetitionDetailContent({
                     mode="opponent"
                     targetId={opponent.id}
                     targetName={opponent.name}
-                    opponent={opponent}
                     onOpponentUpdated={() => void reloadOpponent()}
                     onAnalysesLoaded={(n) =>
                       setAnzahl((prev) => ({ ...prev, gegner: n }))

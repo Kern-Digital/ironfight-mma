@@ -7,19 +7,23 @@
  * `opponents/{id}/videoAnalyses` für Gegner. Bis zum 16.09.2026 gab es keinen
  * Leser über alle — ein FÄCHER fragte je Ziel einzeln, rund 38 Abfragen.
  *
- * ─── SEIT ETAPPE 1 DER AUTOMATIK: EINE ABFRAGE + EIN KLEINER REST ──────────
+ * ─── SEIT ETAPPE 1 DER AUTOMATIK: EINE ABFRAGE + EIN FÄCHER ────────────────
  *
- * Jedes Analyse-Dokument trägt jetzt `gymId` und `targetIsStaff`. Damit
- * liest `listGymVideoAnalyses` alle Analysen zu Athleten UND Gegnern des
- * Gyms mit EINER collectionGroup-Abfrage (Regel mit direktem Feldzugriff,
- * Falle 28; Composite-Index in firestore.indexes.json).
+ * Jedes Analyse-Dokument trägt `gymId`, `targetIsStaff` und `mode`. Damit
+ * liest `listGymVideoAnalyses` alle GEGNER-Analysen des Gyms mit EINER
+ * collectionGroup-Abfrage (Regel mit direktem Feldzugriff, Falle 28;
+ * Composite-Index gymId/mode/createdAt in firestore.indexes.json).
  *
- * Was die Abfrage NICHT liefert — absichtlich: Analysen zu STAB-KONTEN. Ein
- * Trainer sieht das Persönliche eines Kollegen nur mit dessen Freigabe, und
+ * ─── SEIT ETAPPE 2 (16.09.2026): DEEPFIGHT-FREIGABE FÜR ALLE ───────────────
+ *
+ * Jeder Athlet entscheidet selbst, welche Trainer seine Analysen sehen — und
  * eine Query kann diese Freigabe nicht prüfen (kein get() aufs Eltern-
- * Dokument). Für Kollegen mit Freigabe und für mich selbst bleibt deshalb
- * ein kleiner Fächer über den direkten Pfad — typisch zwei bis fünf
- * Abfragen statt 38, und er wächst mit den Freigaben, nicht mit dem Gym.
+ * Dokument). Athleten-Analysen kommen deshalb über einen Fächer je
+ * SICHTBARER Person (direkter Pfad, `sichtbareMitglieder`): ich selbst, dazu
+ * jeder, der mich namentlich oder über „alle Trainer des Gyms" freigegeben
+ * hat. Der Fächer wächst mit den Freigaben, nicht mit dem Gym; bei „alle
+ * Trainer" für jeden Athleten ist er so groß wie die Mitgliederliste — einmal
+ * je Sitzung, das ist der Preis dafür, dass die Regel serverseitig hält.
  *
  * ─── DIE ENTSCHEIDUNG (Leon 08.09.2026) — gilt weiter ───────────────────────
  *
@@ -44,11 +48,7 @@
  * sonst wäre ein einmaliger Netzfehler für die ganze Sitzung eingefroren.
  */
 
-import {
-  isGhostAccount,
-  isStaffEntry,
-  type StudentEntry,
-} from "./admin";
+import { isGhostAccount, type StudentEntry } from "./admin";
 import type { Opponent } from "./opponents";
 import { darfSehen } from "./profile-sharing";
 import {
@@ -69,11 +69,12 @@ export interface AnalyseEintrag {
 const cache = new Map<string, Promise<AnalyseEintrag[]>>();
 
 /**
- * Wer in den Fächer kommt: ich selbst, Athleten, Kollegen NUR mit Freigabe im
- * Bereich `deepfight` — und keine Ghost-Konten.
+ * Wer in den Fächer kommt: ich selbst und jeder — Athlet wie Kollege — mit
+ * Freigabe im Bereich `deepfight` (namentlich oder über mein Gym); keine
+ * Ghost-Konten.
  *
  * DIESE ZEILE IST NICHT KOSMETIK, SIE IST DIE RECHTE-PRÜFUNG: Eine Abfrage
- * auf einen gesperrten Kollegen liefe in `permission-denied` (firestore.rules,
+ * auf jemanden ohne Freigabe liefe in `permission-denied` (firestore.rules,
  * `canAccessMemberData`). Sie würde zwar aufgefangen, kostete aber jedes Mal
  * einen abgewiesenen Aufruf — und die Liste soll gar nicht erst fragen, wo sie
  * nicht fragen darf. Wortgleich zur Ziel-Auswahl und zur Athleten-Bibliothek.
@@ -81,22 +82,22 @@ const cache = new Map<string, Promise<AnalyseEintrag[]>>();
 export function sichtbareMitglieder(
   members: StudentEntry[],
   eigeneUid: string,
+  gymId: string,
 ): StudentEntry[] {
   return members.filter(
     (s) =>
       s.uid === eigeneUid ||
-      (!isGhostAccount(s) &&
-        (!isStaffEntry(s) || darfSehen(s.profileShares, "deepfight", eigeneUid))),
+      (!isGhostAccount(s) && darfSehen(s.profileShares, "deepfight", eigeneUid, gymId)),
   );
 }
 
 /**
  * Lädt alles Sichtbare — oder gibt den laufenden bzw. fertigen Lauf zurück.
  *
- * EINE collectionGroup-Abfrage für Athleten und Gegner des Gyms, dazu der
- * kleine Fächer für Stab-Konten mit Freigabe (siehe Kopf). Eine einzelne
- * fehlgeschlagene Abfrage nimmt die Liste NICHT mit: Ein Ziel, das gerade
- * nicht lesbar ist, darf nicht die Analysen aller anderen verschlucken.
+ * EINE collectionGroup-Abfrage für die Gegner des Gyms, dazu der Fächer über
+ * jede sichtbare Person (siehe Kopf). Eine einzelne fehlgeschlagene Abfrage
+ * nimmt die Liste NICHT mit: Ein Ziel, das gerade nicht lesbar ist, darf
+ * nicht die Analysen aller anderen verschlucken.
  */
 export function ladeAlleAnalysen(
   gymId: string,
@@ -126,27 +127,17 @@ export function ladeAlleAnalysen(
             zielName: leuteName.get(analyse.targetId) ?? analyse.targetName,
           };
 
-    // Ghost-Konten bleiben draußen, auch wenn ihre Analyse im Gym liegt.
-    const ghosts = new Set(
-      members.filter((s) => isGhostAccount(s) && s.uid !== eigeneUid).map((s) => s.uid),
-    );
-
     const abfragen: Promise<AnalyseEintrag[]>[] = [
+      // Gegner: eine Abfrage fürs Gym.
       listGymVideoAnalyses(gymId)
-        .then((liste) =>
-          liste
-            .filter((a) => !(a.mode === "athlete" && ghosts.has(a.targetId)))
-            .map(eintrag),
-        )
+        .then((liste) => liste.map(eintrag))
         .catch(() => [] as AnalyseEintrag[]),
-      // Stab-Konten: ich selbst und Kollegen mit Freigabe — direkter Pfad.
-      ...sichtbareMitglieder(members, eigeneUid)
-        .filter((s) => isStaffEntry(s) || s.uid === eigeneUid)
-        .map((s) =>
-          listVideoAnalyses("athlete", s.uid)
-            .then((liste) => liste.map(eintrag))
-            .catch(() => [] as AnalyseEintrag[]),
-        ),
+      // Athleten und Kollegen: nur die, die mich freigegeben haben — direkter Pfad.
+      ...sichtbareMitglieder(members, eigeneUid, gymId).map((s) =>
+        listVideoAnalyses("athlete", s.uid)
+          .then((liste) => liste.map(eintrag))
+          .catch(() => [] as AnalyseEintrag[]),
+      ),
     ];
     const alle = (await Promise.all(abfragen)).flat();
     // Ein Stab-Konto mit `targetIsStaff` falsch (Bestand) käme doppelt —

@@ -143,7 +143,14 @@ export async function POST(req: Request) {
         // Hochgeladenes Video nach erfolgreicher Analyse sofort bei Google
         // löschen (bei Fehlern bleibt es für einen Retry — Google räumt nach
         // 48 h ohnehin automatisch auf). YouTube-Quellen: nichts zu löschen.
-        if (body.source.kind === "upload") {
+        //
+        // SEIT ETAPPE 2 NUR AUF WUNSCH (`keepFile` fehlt oder false): Aus
+        // EINEM Upload werden bis zu zwei Auswertungen. Löschte die Route nach
+        // der ersten, fände die Beobachtung der zweiten Person die Datei nicht
+        // mehr — gemessen 16.09.: „Gemini HTTP 403: You do not have permission
+        // to access the File". Der Upload-Fluss setzt `keepFile: true` und
+        // löscht nach der LETZTEN Person über /api/video-analysis/delete-upload.
+        if (body.source.kind === "upload" && !body.keepFile) {
           const match = /files\/[A-Za-z0-9._-]+$/.exec(body.source.fileUri);
           if (match) await deleteFile(match[0]);
         }

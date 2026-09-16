@@ -97,7 +97,6 @@ import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
 import {
   ladeAlleAnalysen,
-  nameVon,
   nurMeine,
   sichtbareMitglieder,
   type AnalyseEintrag,
@@ -211,8 +210,8 @@ function LandungInhalt() {
 
   /** Wer überhaupt sichtbar ist — Freigabe im Bereich `deepfight`, kein Ghost. */
   const sichtbar = useMemo(
-    () => (members ? sichtbareMitglieder(members, eigeneUid) : null),
-    [members, eigeneUid],
+    () => (members ? sichtbareMitglieder(members, eigeneUid, gymId) : null),
+    [members, eigeneUid, gymId],
   );
 
   // ── Der Fächer: einmal je Sitzung, geteilt mit der Suche ──────────────────
@@ -236,45 +235,33 @@ function LandungInhalt() {
     [analysen, eigeneUid],
   );
 
-  /** Der Name zum wartenden Zwischenstand — aus den ohnehin geladenen Listen. */
-  const standName = useCallback(
-    (stand: Zwischenstand): string | null => {
-      if (stand.modus === "gegner") {
-        return opponents?.find((o) => o.id === stand.zielId)?.name ?? null;
-      }
-      const m = members?.find((s) => s.uid === stand.zielId);
-      return m ? nameVon(m) : null;
-    },
-    [members, opponents],
-  );
-
   // ── Die zwei Felder rechts ────────────────────────────────────────────────
   /**
-   * „In Arbeit" = die Zwischenstände (ein abgebrochener Lauf verfällt nach
-   * 48 Stunden). Sie bieten nur EINEN Weg (weitermachen); Verwerfen bleibt in
-   * `VideoAnalysisSection`, wo der Stand zu Hause ist. „Bereit fürs Profil"
-   * gibt es seit Leons zweiter Runde (12.09.) nicht mehr — was übernommen ist
-   * und was nicht, sagt das Abzeichen im Sheet.
+   * „In Arbeit" = die Zwischenstände des Upload-Flusses (ein abgebrochener
+   * Lauf verfällt nach 48 Stunden). Seit Etappe 2 tragen sie kein Ziel mehr,
+   * sondern die Datei — wer zugeordnet ist, steht IM Stand. Sie bieten nur
+   * EINEN Weg (weitermachen); Verwerfen bleibt im Fluss, wo der Stand zu
+   * Hause ist.
    */
   const arbeit = useMemo<ArbeitEintrag[]>(
     () =>
       staende.map((stand) => ({
-        key: `stand:${stand.modus}:${stand.zielId}`,
-        href: `/trainer/deepfight/analyse?modus=${stand.modus}&ziel=${stand.zielId}`,
-        name: standName(stand) ?? stand.dateiname ?? "Ein Zwischenstand",
+        key: `stand:${stand.uploadId}`,
+        href: `/trainer/deepfight/analyse?upload=${stand.uploadId}`,
+        name: stand.quelle ?? "Ein Video",
         meta: [
           stand.ausgewertet
-            ? "Video ist ausgewertet"
-            : stand.videoLiegt
-              ? "Video liegt bei Google"
-              : null,
+            ? "Beobachtung liegt vor"
+            : stand.zugeordnet
+              ? "Zugeordnet, bereit zum Analysieren"
+              : "Wartet auf Zuordnung",
           restzeitText(stand.gespeichertAm),
         ]
           .filter((t): t is string => !!t)
           .join(" · "),
-        modus: stand.modus,
+        modus: "leute",
       })),
-    [staende, standName],
+    [staende],
   );
 
   /** Das Archiv = alle eigenen Analysen, neueste zuerst (der Fächer sortiert). */
@@ -298,14 +285,14 @@ function LandungInhalt() {
     setAlleOffen(true);
   }
 
-  /** Der Tipp auf eine Platte FÄRBT, bevor er navigiert: `data-modus` sofort, der Seitenwechsel folgt. */
-  function los(modus: "leute" | "gegner") {
-    setModus(modus);
-    router.push(
-      modus === "gegner"
-        ? "/trainer/deepfight/gegner?fuer=analyse"
-        : "/trainer/deepfight/athleten?fuer=analyse",
-    );
+  /**
+   * „Start" führt DIREKT zur Ablage (Etappe 2, Leon 16.09.): Wen es
+   * betrifft, wird nach dem Upload auf den Karten beantwortet. Der Bereich
+   * färbt sich vorab „unsere Leute" — der Fluss kennt noch kein Ziel.
+   */
+  function los() {
+    setModus("leute");
+    router.push("/trainer/deepfight/analyse");
   }
 
   const listeFuerSheet = useLetzterWert(alleOffen ? meine : null) ?? [];
@@ -366,11 +353,12 @@ function LandungInhalt() {
               (Regel `.df-entry__dna section` in globals.css). Die Helix
               bleibt `inert` und `aria-hidden`: Beispieldaten, vorgelesen
               wären es Zahlen über einen Menschen, den es nicht gibt. Der
-              Knopf darüber trägt die Beschriftung „Analyse starten".
+              Knopf darüber trägt die Beschriftung „Analyse starten" und
+              führt seit Etappe 2 direkt zur Ablage — keine Platten mehr.
               `size="lg"` immer — die Höhe je Fensterbreite regelt das CSS
               (Leons Maße aus der Vorschau). */}
           <section aria-label="Neue Analyse" className="min-w-0">
-            <FightDnaEntry onSelect={los}>
+            <FightDnaEntry onStart={los}>
               <FightDnaHelix
                 profile={DEMO_FIGHT_PROFILE}
                 variant="athlete"

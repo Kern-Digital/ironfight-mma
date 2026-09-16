@@ -107,10 +107,11 @@ try {
     (await fetch(`${BASE}/${sammlung}`, { method: "POST", headers: hdr(k, true), body: JSON.stringify({ fields: felder }) })).status;
   const loesche = async (k, pfad) => (await fetch(`${BASE}/${pfad}`, { method: "DELETE", headers: hdr(k) })).status;
   /** collectionGroup-Query wie listGymVideoAnalyses — Filter wählbar. */
-  async function cgQuery(k, { gym = true, staff = "false" } = {}) {
+  async function cgQuery(k, { gym = true, staff = null, mode = "opponent" } = {}) {
     const filters = [];
     if (gym) filters.push({ fieldFilter: { field: { fieldPath: "gymId" }, op: "EQUAL", value: { stringValue: GYM } } });
     if (staff !== null) filters.push({ fieldFilter: { field: { fieldPath: "targetIsStaff" }, op: "EQUAL", value: { booleanValue: staff === "true" } } });
+    if (mode !== null) filters.push({ fieldFilter: { field: { fieldPath: "mode" }, op: "EQUAL", value: { stringValue: mode } } });
     const structuredQuery = {
       from: [{ collectionId: "videoAnalyses", allDescendants: true }],
       orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }],
@@ -131,7 +132,10 @@ try {
   const gPfad = `opponents/${gegnerId}/videoAnalyses/${ids.G}`;
 
   console.log("\nANALYSEN — Trainer A gegen Athlet C und Gegner:");
-  erwarte("A liest C-Analyse", await lese("A", cPfad), 200);
+  // DeepFight-Tor fuer ALLE (16.09.): ohne Freigabe kein Zugriff, auch nicht auf Athleten.
+  erwarte("A liest C-Analyse OHNE Freigabe", await lese("A", cPfad), 403);
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: { uids: [], gyms: [GYM] } } }, { merge: true });
+  erwarte("A liest C-Analyse (C gibt das Gym frei)", await lese("A", cPfad), 200);
   erwarte("A legt Analyse über C an (Client-Create)", await lege("A", `users/${uids.C}/videoAnalyses`, { mode: s.string("athlete"), gymId: s.string(GYM), targetIsStaff: s.boolean(false) }), 403);
   erwarte("A setzt sharedWithAthlete (einziges Client-Feld)", await patche("A", cPfad, { sharedWithAthlete: s.boolean(true) }), 200);
   erwarte("A setzt wrongFighter selbst", await patche("A", cPfad, { wrongFighter: s.boolean(true) }), 403);
@@ -143,8 +147,11 @@ try {
   erwarte("A markiert Gegner-Analyse selbst", await patche("A", gPfad, { wrongFighter: s.boolean(true) }), 403);
   erwarte("A löscht Gegner-Analyse", await loesche("A", gPfad), 403);
 
-  console.log("\nKAMPFPROFIL — Trainer liest, schreibt nie:");
+  console.log("\nKAMPFPROFIL — Trainer liest (mit Freigabe), schreibt nie:");
   erwarte("A liest fightProfile von C", await lese("A", `users/${uids.C}/fightProfile/main`), 200);
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: { uids: [], gyms: [] } } }, { merge: true });
+  erwarte("… ohne Freigabe nicht", await lese("A", `users/${uids.C}/fightProfile/main`), 403);
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: { uids: [], gyms: [GYM] } } }, { merge: true });
   erwarte("A schreibt fightProfile von C", await patche("A", `users/${uids.C}/fightProfile/main`, { dnaSplitWeight: s.int(9) }), 403);
   erwarte("C liest eigenes fightProfile", await lese("C", `users/${uids.C}/fightProfile/main`), 200);
   erwarte("C schreibt eigenes fightProfile", await patche("C", `users/${uids.C}/fightProfile/main`, { dnaSplitWeight: s.int(9) }), 403);
@@ -164,19 +171,20 @@ try {
     await db.doc(j.name.replace(/^projects\/[^/]+\/databases\/\(default\)\/documents\//, "")).delete();
   }
 
-  console.log("\nCOLLECTIONGROUP — eine Abfrage fürs Gym:");
-  const beide = await cgQuery("A");
-  erwarte("cg mit beiden Filtern (gymId + targetIsStaff==false)", beide.status, 200);
-  if (beide.status !== 200) console.log(`    Hinweis: ${beide.hinweis}`);
-  erwarte("… enthält C-Analyse (Athlet)", beide.ids.includes(ids.C), true);
-  erwarte("… enthält Gegner-Analyse", beide.ids.includes(ids.G), true);
-  erwarte("… enthält NICHT B-Analyse (Kollege)", beide.ids.includes(ids.B), false);
-  erwarte("cg nur mit gymId", (await cgQuery("A", { staff: null })).status, 403);
-  erwarte("cg mit targetIsStaff==true", (await cgQuery("A", { staff: "true" })).status, 403);
+  console.log("\nCOLLECTIONGROUP — eine Abfrage fuer die GEGNER des Gyms (seit 16.09.):");
+  const gegnerCg = await cgQuery("A");
+  erwarte("cg mit gymId + mode==opponent", gegnerCg.status, 200);
+  if (gegnerCg.status !== 200) console.log(`    Hinweis: ${gegnerCg.hinweis}`);
+  erwarte("… enthält Gegner-Analyse", gegnerCg.ids.includes(ids.G), true);
+  erwarte("… enthält NICHT C-Analyse (Athlet, Freigabe-Sache)", gegnerCg.ids.includes(ids.C), false);
+  erwarte("… enthält NICHT B-Analyse (Kollege)", gegnerCg.ids.includes(ids.B), false);
+  erwarte("cg alte Form (gymId + targetIsStaff==false, ohne mode)", (await cgQuery("A", { staff: "false", mode: null })).status, 403);
+  erwarte("cg nur mit gymId", (await cgQuery("A", { mode: null })).status, 403);
+  erwarte("cg mode==athlete", (await cgQuery("A", { mode: "athlete" })).status, 403);
   erwarte("cg ohne gymId", (await cgQuery("A", { gym: false })).status, 403);
   erwarte("Athlet C: cg-Abfrage", (await cgQuery("C")).status, 403);
   erwarte("A liest B-Analyse direkt (Kollege, ohne Freigabe)", await lese("A", `users/${uids.B}/videoAnalyses/${ids.B}`), 403);
-  await db.collection("users").doc(uids.B).set({ profileShares: { athlet: [], deepfight: [uids.A], wettkampf: [] } }, { merge: true });
+  await db.collection("users").doc(uids.B).set({ profileShares: { athlet: { uids: [], gyms: [] }, deepfight: { uids: [uids.A], gyms: [] }, wettkampf: { uids: [], gyms: [] } } }, { merge: true });
   erwarte("… mit deepfight-Freigabe", await lese("A", `users/${uids.B}/videoAnalyses/${ids.B}`), 200);
   erwarte("… cg liefert B trotz Freigabe NICHT (direkter Pfad)", (await cgQuery("A")).ids.includes(ids.B), false);
 

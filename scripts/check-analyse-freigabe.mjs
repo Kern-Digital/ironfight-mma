@@ -143,12 +143,27 @@ try {
   erwarte("C legt eine Analyse über sich an", await lege("C", "C"), 403);
   erwarte("C löscht die freigegebene Analyse", await loesche("C", "C", analysen.Cfrei), 403);
 
-  console.log("\nTRAINER — Athlet und Kollege:");
-  erwarte("A (Trainer) liest C-Analyse unfreigegeben", await lese("A", "C", analysen.Cprivat), 200);
-  erwarte("B (Trainer) liest C-Analyse (gym-weit)", await lese("B", "C", analysen.Cprivat), 200);
+  console.log("\nTRAINER — Athlet (DeepFight-Tor gilt fuer ALLE seit 16.09.):");
+  erwarte("A (Trainer) liest C-Analyse OHNE Freigabe", await lese("A", "C", analysen.Cprivat), 403);
+  erwarte("B (Trainer) liest C-Analyse OHNE Freigabe", await lese("B", "C", analysen.Cprivat), 403);
+  // C gibt NUR A frei (neue Form { uids, gyms }).
+  await db.collection("users").doc(uids.C).set({ profileShares: { athlet: { uids: [], gyms: [] }, deepfight: { uids: [uids.A], gyms: [] }, wettkampf: { uids: [], gyms: [] } } }, { merge: true });
+  erwarte("C gibt A frei → A liest", await lese("A", "C", analysen.Cprivat), 200);
+  erwarte("… B weiterhin nicht", await lese("B", "C", analysen.Cprivat), 403);
+  // C gibt ALLE Trainer des Gyms frei (lebende Regel) → auch B.
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: { uids: [], gyms: [GYM] } } }, { merge: true });
+  erwarte("C gibt das Gym frei → B liest", await lese("B", "C", analysen.Cprivat), 200);
+  erwarte("… A liest ebenfalls", await lese("A", "C", analysen.Cprivat), 200);
+  // Alte Form (Namensliste) bleibt lesbar.
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: [uids.B] } }, { merge: true });
+  erwarte("alte Listenform: B liest", await lese("B", "C", analysen.Cprivat), 200);
+  erwarte("… A nicht", await lese("A", "C", analysen.Cprivat), 403);
+  await db.collection("users").doc(uids.C).set({ profileShares: { deepfight: { uids: [], gyms: [GYM] } } }, { merge: true });
+
+  console.log("\nTRAINER — Kollege:");
   erwarte("A liest B-Analyse (Kollege, privat)", await lese("A", "B", analysen.Bprivat), 403);
   erwarte("C liest B-Analyse", await lese("C", "B", analysen.Bprivat), 403);
-  await db.collection("users").doc(uids.B).set({ profileShares: { athlet: [], deepfight: [uids.A], wettkampf: [] } }, { merge: true });
+  await db.collection("users").doc(uids.B).set({ profileShares: { athlet: { uids: [], gyms: [] }, deepfight: { uids: [uids.A], gyms: [] }, wettkampf: { uids: [], gyms: [] } } }, { merge: true });
   erwarte("deepfight frei → A liest B-Analyse", await lese("A", "B", analysen.Bprivat), 200);
   erwarte("A setzt Freigabe an C-Analyse (Trainer-Schreiben)", await patche("A", "C", analysen.Cprivat, { sharedWithAthlete: { booleanValue: true } }), 200);
   erwarte("… danach liest C sie", await lese("C", "C", analysen.Cprivat), 200);

@@ -452,10 +452,10 @@ function NewCompetitionContent() {
             s.uid !== user?.uid &&
             isStaffEntry(s) &&
             !isGhostAccount(s) &&
-            darfSehen(s.profileShares, "wettkampf", user?.uid ?? ""),
+            darfSehen(s.profileShares, "wettkampf", user?.uid ?? "", gymId),
         )
         .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "de")),
-    [filteredMembers, user?.uid],
+    [filteredMembers, user?.uid, gymId],
   );
   const studentEntries = useMemo(
     () => filteredMembers.filter((s) => s.uid !== user?.uid && !isStaffEntry(s)),

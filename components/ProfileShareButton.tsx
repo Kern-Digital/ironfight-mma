@@ -12,14 +12,16 @@
  * im Sheet.
  *
  * DER ZUSTAND BLEIBT TROTZDEM SICHTBAR: Wer gerade etwas teilt, sieht die Zahl
- * am Knopf. Ohne sie wäre die einzige Antwort auf „teile ich eigentlich was?"
- * ein Klick — und eine Freigabe, an die man sich nicht erinnert, ist genau
- * das, was dieser Bereich verhindern soll.
+ * am Knopf — oder „Alle", wenn ein Bereich für alle Trainer des Gyms offen
+ * ist. Ohne das wäre die einzige Antwort auf „teile ich eigentlich was?" ein
+ * Klick — und eine Freigabe, an die man sich nicht erinnert, ist genau das,
+ * was dieser Bereich verhindern soll.
  *
- * NUR FÜR STAB-KONTEN. Bei einem Athleten bewirkt `profileShares` gar nichts:
- * `istStabKonto()` in den Regeln prüft die drei Häkchen, und ein Athlet ist
- * für alle Trainer seines Gyms ohnehin sichtbar (so war es immer, und so soll
- * es bleiben). Ein Knopf, der nichts ändert, gehört nicht auf die Seite.
+ * FÜR JEDEN, NICHT NUR FÜR STAB-KONTEN (Leon 16.09.2026): Jeder Athlet
+ * entscheidet selbst, welche Trainer sein Kampfprofil und seine DeepFight-
+ * Analysen sehen — ohne Freigabe kann ihn niemand analysieren. Ein Athlet
+ * vergibt dabei nur den Bereich DeepFight; Athletenprofil und Wettkämpfe sind
+ * für die Trainer seines Gyms ohnehin offen (`bereicheFuerKonto`).
  *
  * EINE ABFRAGE FÜR BEIDE RICHTUNGEN: `listAllMembers(gymId)` liefert an jedem
  * Eintrag auch dessen `profileShares` — damit beantwortet dieselbe Liste
@@ -40,6 +42,7 @@ import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import { memberName } from "@/lib/members";
 import {
+  alleTrainerBereiche,
   bereicheFuer,
   empfaenger,
   type ProfileShares,
@@ -72,12 +75,12 @@ export default function ProfileShareButton() {
     [profile?.profileShares],
   );
 
-  // Athleten haben hier nichts zu entscheiden (siehe Kopfkommentar). Die
-  // Bedingung ist dieselbe wie `istStabKonto()` in den Firestore-Regeln.
+  // Dieselbe Bedingung wie `istStabKonto()` in den Firestore-Regeln — sie
+  // entscheidet nur noch, WELCHE Bereiche das Sheet zeigt.
   const istStab = rights.trainer || rights.verwaltung || rights.admin;
 
   useEffect(() => {
-    if (!istStab || !eigeneUid) return;
+    if (!eigeneUid) return;
     let lebt = true;
     listAllMembers(gymId)
       .then((liste) => {
@@ -89,7 +92,7 @@ export default function ProfileShareButton() {
     return () => {
       lebt = false;
     };
-  }, [istStab, eigeneUid, gymId]);
+  }, [eigeneUid, gymId]);
 
   /**
    * Trainer des Gyms außer mir selbst — nur sie können überhaupt lesen.
@@ -115,23 +118,28 @@ export default function ProfileShareButton() {
    * Wer MICH freigegeben hat — die Gegenrichtung (Leons Wunsch 03.09.).
    *
    * NUR FÜR TRAINER, und zwar nicht aus Bequemlichkeit: `canAccessMemberData`
-   * verlangt `isTrainerOrAdmin()`. Eine reine Verwaltung ohne Trainer-Häkchen
-   * kann die freigegebenen Daten also gar nicht lesen — ihr zu melden, jemand
-   * teile etwas mit ihr, wäre ein Versprechen, das die Regeln nicht einlösen.
-   * Ihre eigene Freigabe oben bleibt trotzdem: Sie IST ein Stab-Konto und
-   * damit selbst privat.
+   * verlangt `isTrainerOrAdmin()`. Ein Athlet kann fremde Daten gar nicht
+   * lesen — ihm zu melden, jemand teile etwas mit ihm, wäre ein Versprechen,
+   * das die Regeln nicht einlösen. Seit dem 16.09. zählen hier auch Athleten
+   * des Gyms, die mich namentlich oder über „alle Trainer" freigegeben haben.
    */
   const teilenMitMir: GeteiltMitMir[] = useMemo(
     () =>
       rights.trainer
-        ? kollegen
-            .map((k) => ({
-              eintrag: k,
-              bereiche: bereicheFuer(k.profileShares, eigeneUid),
+        ? (members ?? [])
+            .filter((m) => m.uid !== eigeneUid && !isGhostAccount(m))
+            .map((m) => ({
+              eintrag: m,
+              bereiche: bereicheFuer(m.profileShares, eigeneUid, gymId),
             }))
             .filter((x) => x.bereiche.length > 0)
+            .sort((a, b) =>
+              memberName(a.eintrag).localeCompare(memberName(b.eintrag), "de", {
+                sensitivity: "base",
+              }),
+            )
         : [],
-    [kollegen, eigeneUid, rights.trainer],
+    [members, eigeneUid, gymId, rights.trainer],
   );
 
   const speichern = useCallback(
@@ -143,13 +151,12 @@ export default function ProfileShareButton() {
     [eigeneUid, refreshProfile],
   );
 
-  if (!istStab) return null;
-
   // Die Zahl kommt aus dem GESPEICHERTEN Stand, nicht aus der Namensliste:
   // Wer das Trainer-Häkchen verloren hat, steht nicht mehr in `kollegen`,
   // seine Freigabe steht aber weiter im Dokument (und wirkt dort auch nicht
   // mehr). Die Zahl darf davon nicht springen, während die Liste lädt.
   const anzahl = empfaenger(shares).length;
+  const alle = alleTrainerBereiche(shares, gymId).length > 0;
 
   return (
     <>
@@ -166,16 +173,14 @@ export default function ProfileShareButton() {
           // `--accent` statt eines blauen Hex: Das Blau IST der Gym-Akzent
           // (DESIGN-BRIEF §1.1) — bei einem Gym mit anderer Marke folgt der
           // Rahmen dessen Farbe, statt als einzige Stelle der App blau zu
-          // bleiben. Er hebt den Knopf gegen die neutrale Kante ringsum ab,
-          // ohne mit dem gefüllten „Meine Analyse starten" darunter zu
-          // konkurrieren.
+          // bleiben.
           border: "1px solid var(--accent)",
           color: "var(--text-body)",
         }}
       >
         <Icon name="share" size={20} strokeWidth={2} />
         Profil teilen
-        {anzahl > 0 && (
+        {(alle || anzahl > 0) && (
           <span
             className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-pill px-1.5"
             style={{
@@ -185,7 +190,7 @@ export default function ProfileShareButton() {
               color: "var(--accent-text)",
             }}
           >
-            {anzahl}
+            {alle ? "Alle" : anzahl}
           </span>
         )}
       </button>
@@ -198,6 +203,8 @@ export default function ProfileShareButton() {
         shares={shares}
         kollegen={kollegen}
         teilenMitMir={teilenMitMir}
+        gymId={gymId}
+        istStab={istStab}
         onSave={speichern}
         onClose={() => setOffen(false)}
       />

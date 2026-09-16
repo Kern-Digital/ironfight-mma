@@ -218,11 +218,10 @@ function KampfprofilContent() {
             {/* Sichtbarkeit — wer aus dem Team mich sehen darf. Sitzt seit
                 dem 04.09.2026 hier ÜBER „Meine Analyse starten" statt als
                 eigene Karte weiter unten (Leons Festlegung): beides sind
-                Handlungen am eigenen Profil und gehören zusammen. Der Knopf
-                blendet sich bei Athleten aus (Begründung in der Komponente),
-                deshalb steht er AUSSERHALB der isTrainer-Bedingung — eine
-                reine Verwaltung ist ebenfalls ein Stab-Konto und damit
-                privat, startet aber keine Analyse. */}
+                Handlungen am eigenen Profil und gehören zusammen. Er steht
+                AUSSERHALB der isTrainer-Bedingung, weil seit dem 16.09.2026
+                JEDER ihn braucht: Auch ein Athlet entscheidet selbst, welche
+                Trainer sein DeepFight sehen und ihn analysieren dürfen. */}
             <div className="mt-4 flex flex-col items-start gap-2">
               <ProfileShareButton />
               {isTrainer && user && (

@@ -12,12 +12,17 @@
 
 import { ACTION_CATALOG } from "../fight-stats";
 import type {
+  CornerColor,
   FighterDescription,
   GeminiTier,
+  PreviewFighter,
+  Sport,
   VideoObservation,
+  VideoPreview,
   VideoSource,
+  VideoType,
 } from "../video-analysis";
-import { CORNER_LABEL } from "../video-analysis";
+import { CORNER_LABEL, isSport, sportFromText } from "../video-analysis";
 
 const BASE = "https://generativelanguage.googleapis.com";
 
@@ -326,16 +331,38 @@ class GeminiHttpError extends Error {
   }
 }
 
-/** Ein einzelner generateContent-Aufruf; liefert den Text der Antwort. */
+/**
+ * Ein einzelner generateContent-Aufruf; liefert den Text der Antwort.
+ *
+ * `timeoutMs` (Etappe 2): Ein überlastetes Modell meldet nicht immer sofort
+ * 503 — gemessen am 16.09.2026 hing `gemini-flash-latest` bis zu Googles
+ * eigenem Limit (~300 s), bevor die Kette weiterging; der Vorlauf brauchte
+ * damit fünf Minuten für zwei Minuten Video. Mit Zeitlimit gilt ein hängender
+ * Aufruf als 504 und die Kette nimmt das nächste Modell.
+ */
 async function generateContentOnce(
   model: string,
   body: Record<string, unknown>,
+  timeoutMs?: number,
 ): Promise<string> {
-  const res = await fetch(`${BASE}/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": apiKey(), "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const ctrl = timeoutMs ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": apiKey(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl?.signal,
+    });
+  } catch (err) {
+    if (ctrl?.signal.aborted) {
+      throw new GeminiHttpError(504, `Zeitlimit ${Math.round((timeoutMs ?? 0) / 1000)} s überschritten`);
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new GeminiHttpError(res.status, detail);
@@ -363,16 +390,18 @@ async function generateContentOnce(
 async function generateContentResilient(
   chain: string[],
   body: Record<string, unknown>,
+  timeoutMs?: number,
 ): Promise<{ text: string; model: string }> {
   let lastError: unknown = null;
   for (const model of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        return { text: await generateContentOnce(model, body), model };
+        return { text: await generateContentOnce(model, body, timeoutMs), model };
       } catch (err) {
         lastError = err;
         if (err instanceof GeminiHttpError) {
           if (err.status === 429) break; // Quota dieses Modells leer → nächstes
+          if (err.status === 504) break; // hängt → nicht noch einmal warten, nächstes
           if (err.status >= 500) {
             await new Promise((r) => setTimeout(r, 4000));
             continue; // einmal wiederholen, dann nächstes Modell
@@ -442,4 +471,130 @@ export async function observeVideo(args: {
   });
   const parsed = parseModelJson<Partial<VideoObservation>>(text);
   return { observation: normalizeObservation(parsed), model };
+}
+
+// ─── Der Vorlauf (Etappe 2, 16.09.2026) ─────────────────────────────────────
+
+/** Wie viel vom Video der Vorlauf sieht. */
+export const PREVIEW_SECONDS = 120;
+/**
+ * Zeitlimit je Modell für den Vorlauf. Zwei Minuten Video in niedriger
+ * Auflösung brauchen Sekunden, nicht Minuten — was länger hängt, ist
+ * überlastet. Drei Modelle × 40 s bleiben unter dem 120-s-Budget der Route.
+ */
+const PREVIEW_TIMEOUT_MS = 40_000;
+
+/**
+ * Nur die ersten zwei Minuten — bei YouTube ab dem gewählten Start. Ein
+ * Ende, das der Nutzer enger gesetzt hat, bleibt enger.
+ */
+function previewParts(source: VideoSource): GeminiPart[] {
+  if (source.kind === "upload") {
+    return [
+      {
+        fileData: { fileUri: source.fileUri, mimeType: source.mimeType },
+        videoMetadata: { endOffset: `${PREVIEW_SECONDS}s` },
+      },
+    ];
+  }
+  const start = Math.max(0, Math.floor(source.startSeconds ?? 0));
+  const endeGewuenscht =
+    source.endSeconds != null && source.endSeconds > start
+      ? Math.floor(source.endSeconds)
+      : Infinity;
+  const end = Math.min(start + PREVIEW_SECONDS, endeGewuenscht);
+  const metadata: { startOffset?: string; endOffset: string } = { endOffset: `${end}s` };
+  if (start > 0) metadata.startOffset = `${start}s`;
+  return [{ fileData: { fileUri: source.url }, videoMetadata: metadata }];
+}
+
+const PREVIEW_PROMPT = `Du bist ein professioneller Kampfsport-Videoanalyst (MMA, K1, Boxen, Grappling, Sambo, Judo).
+Du siehst die ERSTEN ZWEI MINUTEN eines Videos. Deine Aufgabe: die Hauptkämpfer finden und das Video einordnen.
+
+REGELN:
+1. Kein Raten: Was nicht sichtbar ist, bleibt null bzw. leer.
+2. fighters = die Hauptpersonen, höchstens zwei: bei einem Kampf oder Sparring die zwei Kämpfer (bei Training das Paar, das am längsten im Bild ist); bei einem Einzeltraining, Drill oder Schattenboxen die EINE Person. Leer nur, wenn niemand kämpft oder trainiert. Je Kämpfer:
+   corner = Ecke, falls erkennbar ("red"/"blue"), sonst "unknown";
+   clothing = Hose, Rashguard, Jacke, Handschuhe MIT Farben;
+   features = Tattoos, Haare, Statur, Größe im Vergleich;
+   description = EIN Satz, an dem ein Trainer ihn sofort wiedererkennt;
+   bestSecond = Sekunde ab Videostart (0–120), in der Gesicht und Oberkörper frei und nah zu sehen sind.
+3. videoType: "full" = ganzer Wettkampf mit Ringrichter oder Anzeige, "excerpt" = Teil eines Wettkampfs, "sparring" = Training oder Sparring ohne Wettkampfrahmen, "highlight" = Zusammenschnitt aus Treffern.
+4. sport nach Regeln und Ausrüstung: Käfig oder MMA-Handschuhe → "mma"; nur Fäuste mit Boxhandschuhen → "boxen"; Tritte oder Knie mit Handschuhen, kein Boden → "kickboxen"; Ringen ohne Jacke, keine Schläge → "ringen"; Jacke (Kurtka/Gi) mit Würfen und Standkampf → "sambo"; Bodenkampf und Aufgabegriffe ohne Schläge (mit oder ohne Gi) → "bjj"; unklar → null. sportSeen = was du siehst, in Worten.
+5. fightMonth "JJJJ-MM" NUR bei sichtbarer Datumseinblendung, sonst null.
+6. Antworte auf Deutsch in den Freitextfeldern.
+
+Gib AUSSCHLIESSLICH ein JSON-Objekt mit exakt dieser Struktur zurück (keine Kommentare, kein Markdown):
+{
+  "fighters": [{ "corner": "red"|"blue"|"unknown", "clothing": string, "features": string, "description": string, "bestSecond": number|null }],
+  "videoType": "full"|"excerpt"|"sparring"|"highlight",
+  "sport": "mma"|"boxen"|"kickboxen"|"ringen"|"sambo"|"bjj"|null,
+  "sportSeen": string|null,
+  "fightMonth": string|null
+}`;
+
+const VIDEO_TYPES: VideoType[] = ["full", "excerpt", "sparring", "highlight"];
+
+function normalizePreview(
+  p: Partial<{
+    fighters: Partial<PreviewFighter>[];
+    videoType: string;
+    sport: string | null;
+    sportSeen: string | null;
+    fightMonth: string | null;
+  }>,
+  model: string,
+): VideoPreview {
+  const corner = (c: unknown): CornerColor =>
+    c === "red" || c === "blue" ? c : "unknown";
+  const text = (s: unknown) => (typeof s === "string" ? s.trim() : "");
+  const fighters: PreviewFighter[] = (Array.isArray(p.fighters) ? p.fighters : [])
+    .slice(0, 2)
+    .map((f) => {
+      const sek = Number(f?.bestSecond);
+      return {
+        corner: corner(f?.corner),
+        clothing: text(f?.clothing),
+        features: text(f?.features),
+        description: text(f?.description),
+        bestSecond:
+          Number.isFinite(sek) && sek >= 0 && sek <= PREVIEW_SECONDS ? Math.floor(sek) : null,
+      };
+    });
+  const videoType = (VIDEO_TYPES as string[]).includes(p.videoType ?? "")
+    ? (p.videoType as VideoType)
+    : "excerpt";
+  const sport: Sport | null = isSport(p.sport) ? p.sport : sportFromText(p.sportSeen);
+  const fightMonth =
+    typeof p.fightMonth === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(p.fightMonth)
+      ? p.fightMonth
+      : null;
+  return { fighters, videoType, sport, fightMonth, model };
+}
+
+/**
+ * Der Vorlauf: Gemini Flash über die ersten zwei Minuten in NIEDRIGER
+ * Auflösung — billig und schnell. Immer die Flash-Kette, unabhängig von der
+ * Analyse-Stufe: Es geht ums Finden, nicht ums Zählen.
+ */
+export async function previewVideo(source: VideoSource): Promise<VideoPreview> {
+  const { text, model } = await generateContentResilient(
+    FLASH_CHAIN,
+    {
+      contents: [
+        {
+          role: "user",
+          parts: [...previewParts(source), { text: PREVIEW_PROMPT }],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 4096,
+        temperature: 0.2,
+        mediaResolution: "MEDIA_RESOLUTION_LOW",
+      },
+    },
+    PREVIEW_TIMEOUT_MS,
+  );
+  return normalizePreview(parseModelJson(text), model);
 }

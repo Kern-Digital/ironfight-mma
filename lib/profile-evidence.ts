@@ -59,9 +59,20 @@
  * STÄRKE: `evidenceTotal` = Summe der Gewichte aller zählenden Analysen.
  *   Die Anzeige ist ein Füllstand mit Prozent (Leon 16.09., Frage c);
  *   `EVIDENCE_FULL` sagt, was 100 % bedeutet.
+ *
+ * NUR WAS VORKAM (Etappe 2, Leon 16.09.): Ein Video beantwortet nur Fragen
+ *   zu dem, was in ihm passiert ist. Eine reine Boxrunde aus dem
+ *   MMA-Training stärkt die Schlagfragen und lässt die Takedown-Fragen
+ *   unberührt — weder Befund noch Bestätigung. Das Signal kommt aus Stufe 1
+ *   (Split, Zähler, Kontrollzeiten, Zonen); `SIGNAL_JE_FRAGE` sagt, welche
+ *   Frage welches Signal braucht. Fehlt JEDES Signal (Bestand ohne Split
+ *   und Zähler), bleibt alles offen wie bisher — ein unbekanntes Video ist
+ *   kein leeres Video. Dasselbe Muster wie `HIGHLIGHT_KATEGORIEN`, nur je
+ *   Frage statt je Kategorie.
  */
 
 import {
+  ACTION_CATALOG,
   cleanActionStats,
   cleanDnaSplit,
   isDnaSplitEmpty,
@@ -74,6 +85,7 @@ import {
   FIGHT_RECENCY_RANK,
   type AnalysisMode,
   type VideoAnalysis,
+  type VideoObservation,
   type VideoType,
 } from "./video-analysis";
 
@@ -100,6 +112,81 @@ export const MANUAL_SIDE = "manual";
 const ZAHLEN_ARTEN_GEGNER = new Set<VideoType>(["full", "excerpt"]);
 const ZAHLEN_ARTEN_ATHLET = new Set<VideoType>(["full", "excerpt", "sparring"]);
 const SPLIT_ARTEN = new Set<VideoType>(["full", "excerpt"]);
+
+// ─── Nur was vorkam ──────────────────────────────────────────────────────────
+
+/** Was in einem Video passiert sein muss, damit eine Frage offen ist. */
+export type Signal = "strikes" | "kicks" | "takedowns" | "ground" | "clinch" | "cage";
+
+/**
+ * Frage → nötiges Signal. Fragen ohne Eintrag sind stilneutral und immer
+ * offen (43 der 60). Die anderen setzen Schläge, Tritte, Takedowns, Boden,
+ * Clinch oder einen Käfig voraus.
+ */
+export const SIGNAL_JE_FRAGE: Readonly<Record<string, Signal>> = {
+  "real-habits_after-hit": "strikes",
+  "real-habits_after-miss": "strikes",
+  "real-habits_after-td-attempt": "takedowns",
+  "entry-patterns_jab": "strikes",
+  "entry-patterns_clinch": "clinch",
+  "entry-patterns_takedown": "takedowns",
+  "entry-patterns_center-or-cage": "cage",
+  "preferred-weapons_kick": "kicks",
+  "preferred-weapons_punch": "strikes",
+  "preferred-weapons_takedown": "takedowns",
+  "defensive-reactions_jabs": "strikes",
+  "defensive-reactions_low-kicks": "kicks",
+  "defensive-reactions_takedowns": "takedowns",
+  "defensive-reactions_parry-shell": "strikes",
+  "defensive-reactions_shoots": "takedowns",
+  "cage-space_at-cage": "cage",
+  "cage-space_pushes-cage": "cage",
+  "cage-space_escapes-cage": "cage",
+  "weaknesses_gets-hit-by": "strikes",
+  "drills_cage-situations": "cage",
+  "drills_takedown-sequences": "takedowns",
+};
+
+const GRUPPE_JE_AKTION = new Map(ACTION_CATALOG.map((a) => [a.id, a.group] as const));
+
+/**
+ * Die Signale eines Videos aus Stufe 1 — oder null, wenn die Beobachtung
+ * gar nichts hergibt (kein Split, keine Zähler, keine Zeiten): Dann ist das
+ * Video unbekannt, nicht leer, und nichts wird gesperrt.
+ */
+export function beobachteteSignale(o: VideoObservation | undefined): Set<Signal> | null {
+  if (!o) return null;
+  const split = o.dnaSplit && !isDnaSplitEmpty(o.dnaSplit) ? cleanDnaSplit(o.dnaSplit) : null;
+  const actions = (o.actions ?? []).filter((a) => (a.attempted ?? 0) > 0 || (a.landed ?? 0) > 0);
+  const def = o.defense ?? ({} as VideoObservation["defense"]);
+  const ctl = o.controlTime;
+  const n = (x: number | null | undefined) => (typeof x === "number" && x > 0 ? x : 0);
+  const zonen = [...actions, ...(o.combos ?? [])].some((a) => a.zone === "cage");
+
+  const irgendwas =
+    !!split ||
+    actions.length > 0 ||
+    n(def?.takedownsAgainst) + n(def?.takedownsDefended) + n(def?.strikesAgainst) + n(def?.strikesAvoided) > 0 ||
+    (!!ctl && n(ctl.clinchSeconds) + n(ctl.topSeconds) + n(ctl.bottomSeconds) + n(ctl.cagePressureSeconds) + n(ctl.pressedSeconds) > 0);
+  if (!irgendwas) return null;
+
+  const gruppe = (g: string) => actions.some((a) => GRUPPE_JE_AKTION.get(a.id) === g);
+  const s = new Set<Signal>();
+  if ((split?.boxing ?? 0) > 0 || gruppe("strike") || n(def?.strikesAgainst) + n(def?.strikesAvoided) > 0) s.add("strikes");
+  if ((split?.kicking ?? 0) > 0 || gruppe("kick")) { s.add("kicks"); s.add("strikes"); }
+  if ((split?.wrestling ?? 0) > 0 || gruppe("takedown") || n(def?.takedownsAgainst) + n(def?.takedownsDefended) > 0) s.add("takedowns");
+  if ((split?.ground ?? 0) > 0 || gruppe("ground") || n(ctl?.topSeconds) + n(ctl?.bottomSeconds) > 0) s.add("ground");
+  if ((split?.clinch ?? 0) > 0 || n(ctl?.clinchSeconds) > 0) s.add("clinch");
+  if (zonen || n(ctl?.cagePressureSeconds) + n(ctl?.pressedSeconds) > 0) s.add("cage");
+  return s;
+}
+
+/** Darf dieses Video diese Frage beantworten? */
+export function frageOffen(questionId: string, signale: Set<Signal> | null): boolean {
+  const noetig = SIGNAL_JE_FRAGE[questionId];
+  if (!noetig || signale === null) return true;
+  return signale.has(noetig);
+}
 
 // ─── Ergebnis-Typen (so stehen sie im Profil-Dokument) ──────────────────────
 
@@ -225,9 +312,13 @@ function collectPulls(
     const order = sorted.indexOf(a);
     const w = a.weight.value;
     const isHighlight = a.videoType === "highlight";
+    // Nur was vorkam: einmal je Video gerechnet, gilt für Befunde UND
+    // Bestätigungen — ein Video ohne Takedowns bestätigt auch keinen.
+    const signale = beobachteteSignale(a.observation);
     for (const f of a.evaluation.findings) {
       if (!f.questionId || !f.answer.trim()) continue;
       if (isHighlight && !HIGHLIGHT_KATEGORIEN.has(f.categoryId)) continue;
+      if (!frageOffen(f.questionId, signale)) continue;
       push(f.questionId, {
         side: f.sideKey,
         text: f.answer.trim(),
@@ -240,6 +331,7 @@ function collectPulls(
     for (const c of a.evaluation.merge.confirms) {
       if (!c.questionId || c.evidence.length === 0) continue;
       if (isHighlight) continue; // ein Clip bestätigt nichts mit Gewicht
+      if (!frageOffen(c.questionId, signale)) continue;
       const target =
         latestSide.get(c.questionId) ??
         (existing[c.questionId]?.trim()

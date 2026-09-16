@@ -1,71 +1,83 @@
 /**
- * Angefangene Analysen finden, ohne `VideoAnalysisSection` zu mounten.
+ * Angefangene Analysen finden, ohne den Upload-Fluss zu mounten.
  *
  * ─── DAS PROBLEM (Leons Entwurf 08.09.2026, Punkt 8) ────────────────────────
  *
  * Wer eine Analyse abbricht, bekommt auf der Landung ein Feld: „Mach weiter,
- * wo du aufgehört hast." Der gerettete Zwischenstand liegt aber in
- * `VideoAnalysisSection` — und die steht im neuen Fluss zwei Klicks tief. Ohne
+ * wo du aufgehört hast." Der gerettete Zwischenstand liegt aber im
+ * `localStorage` des Upload-Flusses — und der steht einen Klick tief. Ohne
  * dieses Feld fände ihn niemand, und die teure Video-Stufe liefe ein zweites
  * Mal auf eigene Rechnung.
  *
  * ─── WARUM HIER GELESEN WIRD UND NICHT DORT ─────────────────────────────────
  *
- * Die Sektion zu mounten, nur um zu FRAGEN, ob etwas angefangen ist, startet
- * ihre Firestore-Abfragen (`listVideoAnalyses`) und ihre Pipeline-Zustände.
- * Für eine Zeile Text wäre das eine Ladung Arbeit pro Landungsbesuch. Also
- * liest diese Datei den `localStorage` direkt — **nur lesend**. Geschrieben
- * wird der Schlüssel ausschließlich von der Sektion.
+ * Den Fluss zu mounten, nur um zu FRAGEN, ob etwas angefangen ist, startet
+ * seine Firestore-Abfragen und seine Pipeline-Zustände. Für eine Zeile Text
+ * wäre das eine Ladung Arbeit pro Landungsbesuch. Also liest diese Datei den
+ * `localStorage` direkt — **nur lesend**. Geschrieben wird der Schlüssel
+ * ausschließlich vom Fluss.
  *
  * ES WIRD ABSICHTLICH NICHTS GELÖSCHT. Verwerfen bleibt dort, wo der
- * Zwischenstand zu Hause ist: in der Sektion, die weiß, was noch daran hängt.
- * Ein zweiter Löschweg, der nur den Schlüssel entfernt, wäre ein halbes
- * Verwerfen — und die Landung führt ohnehin genau dorthin.
+ * Zwischenstand zu Hause ist: im Fluss, der weiß, was noch daran hängt.
+ *
+ * ─── SEIT ETAPPE 2 (16.09.2026): DER SCHLÜSSEL TRÄGT KEIN ZIEL MEHR ─────────
+ *
+ * Der Ablauf ist umgedreht — erst Upload, dann Vorlauf, dann Zuordnung. Ein
+ * Zwischenstand kann also kein `{mode}:{targetId}` mehr tragen, bevor
+ * zugeordnet ist. Der Schlüssel heißt jetzt
+ * `ta-video-analysis-form:upload:{uploadId}`; das Ziel steht IM Stand (die
+ * Zuordnungen), nicht im Schlüssel. Ältere Schlüssel mit Ziel gehören zum
+ * alten Ablauf, den es nicht mehr gibt — sie werden ignoriert (Bestand ist
+ * Demo, Leon 16.09.).
  *
  * ─── DIE FALLE, DIE HIER NICHT GILT — UND WARUM SIE TROTZDEM ERWÄHNT IST ────
  *
  * CLAUDE.md, „Der gespeicherte Formularzustand — eine Falle, teuer gemessen":
- * Die „schon geladen"-Marke der Sektion gehört in den State und trägt den
+ * Die „schon geladen"-Marke des Flusses gehört in den State und trägt den
  * SCHLÜSSEL, nie in ein Ref. Diese Datei hat keine solche Marke — sie liest
  * einmalig und schreibt nie, es gibt kein Fenster zwischen Lesen und
  * Schreiben. Wer sie je um einen Schreibweg erweitert, liest den Absatz dort
  * ZUERST.
- *
- * Der Schlüssel ist der der Sektion: `ta-video-analysis-form:{mode}:{targetId}`
- * mit `mode` aus `AnalysisMode` („athlete" / „opponent") — nicht die
- * Modus-Wörter der Oberfläche („leute" / „gegner"). Diese Datei übersetzt.
  */
 
-import type { DeepFightModus } from "@/components/deepfight/deepfight-modus";
+const PRAEFIX = "ta-video-analysis-form:upload:";
 
-const PRAEFIX = "ta-video-analysis-form:";
+/** Der Schlüssel eines Upload-Standes — EINE Stelle für Leser und Schreiber. */
+export function zwischenstandKey(uploadId: string): string {
+  return `${PRAEFIX}${uploadId}`;
+}
 
 /**
  * Wie lange ein Zwischenstand etwas wert ist: Google löscht ein hochgeladenes
- * Video nach 48 Stunden von selbst. Derselbe Wert wie `PENDING_GUELTIG_MS` in
- * `VideoAnalysisSection` — er steht dort bei der Pipeline, hier bei der
- * Anzeige; laufen sie je auseinander, zeigt die Landung ein Angebot, das die
- * Sektion nicht mehr einlösen kann.
+ * Video nach 48 Stunden von selbst. Derselbe Wert wie `PENDING_GUELTIG_MS`
+ * im Fluss — er steht dort bei der Pipeline, hier bei der Anzeige; laufen sie
+ * je auseinander, zeigt die Landung ein Angebot, das der Fluss nicht mehr
+ * einlösen kann.
  */
 export const ZWISCHENSTAND_GUELTIG_MS = 48 * 60 * 60 * 1000;
 
 export interface Zwischenstand {
-  modus: DeepFightModus;
-  zielId: string;
-  /** Dateiname des wartenden Videos, falls einer gespeichert ist. */
-  dateiname: string | null;
-  /** Liegt das Video schon bei Google? */
+  uploadId: string;
+  /** Dateiname bzw. YouTube-Link des wartenden Videos. */
+  quelle: string | null;
+  /** Liegt das Video schon bei Google (bzw. ist der Link gemerkt)? */
   videoLiegt: boolean;
-  /** Ist die teure Gemini-Stufe schon durch? */
+  /** Ist der Vorlauf durch — warten die Karten auf eine Zuordnung? */
+  zugeordnet: boolean;
+  /** Ist mindestens eine teure Beobachtung schon durch? */
   ausgewertet: boolean;
-  /** Wann der Stand gespeichert wurde (ms). Alte Einträge tragen ihn nicht. */
+  /** Wann der Stand gespeichert wurde (ms). */
   gespeichertAm: number | null;
 }
 
 /** Nur das, was diese Datei aus dem gespeicherten Zustand braucht. */
 type RoherStand = Partial<{
+  sourceKind: "upload" | "youtube";
+  youtubeUrl: string;
   pendingUpload: { name?: string; fileName?: string } | null;
-  pendingObservation: { fingerprint?: string } | null;
+  preview: { fighters?: unknown[] } | null;
+  zuordnungen: ({ person?: { id?: string } | null; ignoriert?: boolean } | null)[];
+  beobachtungen: Record<string, unknown>;
   pendingSavedAt: number | null;
 }>;
 
@@ -73,15 +85,12 @@ type RoherStand = Partial<{
  * Alle angefangenen Analysen, neueste zuerst.
  *
  * Ein Eintrag zählt nur, wenn wirklich etwas Gerettetes darin liegt — ein
- * hochgeladenes Video ODER eine fertige Beobachtung. Ein Schlüssel, in dem nur
- * eine halb getippte Kämpferbeschreibung steht, ist kein Zwischenstand, und
- * ein Feld dafür wäre eine Aufforderung ohne Gegenwert.
+ * hochgeladenes Video (oder ein gemerkter Link mit Vorlauf). Ein Schlüssel
+ * mit einer halb gewählten Datei ist kein Zwischenstand.
  *
  * Abgelaufene Stände (älter als 48 h) fallen raus: Das Video ist dann bei
- * Google weg, und „mach weiter" wäre ein Versprechen, das die Sektion nicht
- * halten kann. Einträge OHNE Zeitstempel (von vor dem 08.09.2026) bleiben
- * drin — sie sind nicht nachweislich abgelaufen, und die Sektion zeigt sie
- * ebenso, nur ohne Restzeit.
+ * Google weg, und „mach weiter" wäre ein Versprechen, das der Fluss nicht
+ * halten kann.
  */
 export function leseZwischenstaende(): Zwischenstand[] {
   const out: Zwischenstand[] = [];
@@ -97,17 +106,8 @@ export function leseZwischenstaende(): Zwischenstand[] {
   for (let i = 0; i < speicher.length; i++) {
     const key = speicher.key(i);
     if (!key || !key.startsWith(PRAEFIX)) continue;
-
-    // `{mode}:{targetId}` — der Modus ist das erste Stück, alles danach ist
-    // die ID (Firestore-IDs und uids tragen keinen Doppelpunkt, aber ein
-    // Split mit Limit ist billiger als die Annahme).
-    const rest = key.slice(PRAEFIX.length);
-    const trenn = rest.indexOf(":");
-    if (trenn <= 0) continue;
-    const mode = rest.slice(0, trenn);
-    const zielId = rest.slice(trenn + 1);
-    if (!zielId) continue;
-    if (mode !== "athlete" && mode !== "opponent") continue;
+    const uploadId = key.slice(PRAEFIX.length);
+    if (!uploadId) continue;
 
     let s: RoherStand;
     try {
@@ -118,9 +118,9 @@ export function leseZwischenstaende(): Zwischenstand[] {
       continue; // defekter Eintrag — überspringen, nie aufräumen
     }
 
-    const videoLiegt = !!s.pendingUpload?.name;
-    const ausgewertet = !!s.pendingObservation?.fingerprint;
-    if (!videoLiegt && !ausgewertet) continue;
+    const videoLiegt =
+      !!s.pendingUpload?.name || (s.sourceKind === "youtube" && !!s.youtubeUrl && !!s.preview);
+    if (!videoLiegt) continue;
 
     const gespeichertAm =
       typeof s.pendingSavedAt === "number" ? s.pendingSavedAt : null;
@@ -129,17 +129,15 @@ export function leseZwischenstaende(): Zwischenstand[] {
     }
 
     out.push({
-      modus: mode === "opponent" ? "gegner" : "leute",
-      zielId,
-      dateiname: s.pendingUpload?.fileName ?? null,
+      uploadId,
+      quelle: s.pendingUpload?.fileName ?? s.youtubeUrl ?? null,
       videoLiegt,
-      ausgewertet,
+      zugeordnet: (s.zuordnungen ?? []).some((z) => !!z?.person?.id && !z.ignoriert),
+      ausgewertet: Object.keys(s.beobachtungen ?? {}).length > 0,
       gespeichertAm,
     });
   }
 
-  // Neueste zuerst; Stände ohne Zeitstempel ans Ende (sie sind die ältesten,
-  // die es geben kann — das Feld gibt es erst seit dem 08.09.2026).
   return out.sort((a, b) => (b.gespeichertAm ?? 0) - (a.gespeichertAm ?? 0));
 }
 

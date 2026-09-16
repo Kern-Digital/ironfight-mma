@@ -40,6 +40,7 @@ import {
   type DnaSplit,
 } from "./fight-stats";
 import type { ProfileEvidence } from "./profile-evidence";
+import type { Sport } from "./video-analysis";
 
 export interface FightProfile {
   /** Qualitative DNA-Antworten (questionId → Freitext), gleiche IDs wie beim Gegner. */
@@ -124,13 +125,26 @@ function userRef(uid: string) {
   return doc(getFirestoreDb(), "users", uid);
 }
 
-/** Die Heimat des Kampfprofils (siehe Kopfkommentar). */
-export function fightProfileRef(uid: string) {
-  return doc(getFirestoreDb(), "users", uid, "fightProfile", "main");
+/**
+ * Die Heimat des Kampfprofils (siehe Kopfkommentar). `main` ist das
+ * Gesamtprofil; seit Etappe 2 liegt daneben je Kampfart ein eigenes
+ * Dokument (`fightProfile/mma`, `fightProfile/sambo` …), geschrieben vom
+ * Server aus nur den Analysen dieser Kampfart.
+ */
+export function fightProfileRef(uid: string, docId: string = "main") {
+  return doc(getFirestoreDb(), "users", uid, "fightProfile", docId);
 }
 
-/** Liest das Kampfprofil eines Nutzers (leer, wenn noch keins existiert). */
-export async function getFightProfile(uid: string): Promise<FightProfile> {
+/**
+ * Liest das Kampfprofil eines Nutzers (leer, wenn noch keins existiert).
+ * Mit `sport` das Profil dieser Kampfart — ohne Übergangs-Rückfall, das gab
+ * es vor Etappe 2 nicht.
+ */
+export async function getFightProfile(uid: string, sport?: Sport): Promise<FightProfile> {
+  if (sport) {
+    const snap = await getDoc(fightProfileRef(uid, sport));
+    return snap.exists() ? decode(snap.data() as FightProfileDoc) : emptyFightProfile();
+  }
   const snap = await getDoc(fightProfileRef(uid));
   if (snap.exists()) return decode(snap.data() as FightProfileDoc);
   // Übergang: altes Feld am users-Dokument (bis zur Migration).

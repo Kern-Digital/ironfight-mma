@@ -234,12 +234,15 @@ function AthletenAuswahlInhalt() {
   }, [load]);
 
   /**
-   * Wer hier steht: ich selbst, Kollegen NUR mit Freigabe im Bereich
-   * `deepfight`, Athleten — und keine Ghost-Konten. Wortgleich zur
-   * Ziel-Auswahl der Werkbank (app/trainer/deepfight/page.tsx).
+   * Wer hier steht: ich selbst, Kollegen UND Athleten nur mit Freigabe im
+   * Bereich `deepfight` (namentlich oder über mein Gym) — und keine
+   * Ghost-Konten. Wortgleich zu `sichtbareMitglieder` (lib/deepfight-
+   * analysen.ts). Seit dem 16.09.2026 entscheidet jeder Athlet selbst,
+   * welche Trainer ihn sehen und analysieren.
    *
-   * `staffGesamt` zählt die Kollegen VOR dem Freigabe-Filter. Nur so kann die
-   * Seite den leeren Fall erklären, statt die Gruppe wortlos wegzulassen.
+   * `staffGesamt` und `studentsGesamt` zählen VOR dem Freigabe-Filter. Nur so
+   * kann die Seite den leeren Fall erklären, statt die Gruppe wortlos
+   * wegzulassen.
    */
   const gruppen = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -254,17 +257,26 @@ function AthletenAuswahlInhalt() {
       (s) => s.uid !== eigeneUid && isStaffEntry(s) && !isGhostAccount(s),
     );
     const staff = kollegen
-      .filter((s) => darfSehen(s.profileShares, "deepfight", eigeneUid))
+      .filter((s) => darfSehen(s.profileShares, "deepfight", eigeneUid, gymId))
       .sort((a, b) => labelOf(a).localeCompare(labelOf(b), "de"));
-    const students = alle.filter((s) => s.uid !== eigeneUid && !isStaffEntry(s));
-    return { self, staff, staffGesamt: kollegen.length, students };
-  }, [members, search, eigeneUid]);
+    const athleten = alle.filter((s) => s.uid !== eigeneUid && !isStaffEntry(s));
+    const students = athleten.filter((s) =>
+      darfSehen(s.profileShares, "deepfight", eigeneUid, gymId),
+    );
+    return {
+      self,
+      staff,
+      staffGesamt: kollegen.length,
+      students,
+      studentsGesamt: athleten.length,
+    };
+  }, [members, search, eigeneUid, gymId]);
 
   const leer =
     members !== null &&
     gruppen.self === null &&
     gruppen.staffGesamt === 0 &&
-    gruppen.students.length === 0;
+    gruppen.studentsGesamt === 0;
 
   return (
     <main className="min-h-screen pb-12" style={{ color: "var(--text-body)" }}>
@@ -398,6 +410,33 @@ function AthletenAuswahlInhalt() {
                   </FlowItem>
                 ))}
               </Gruppe>
+            )}
+
+            {/* Seit dem 16.09.2026 entscheidet auch jeder ATHLET selbst, wer
+                ihn sieht — der leere Fall bekommt seinen Grund, wie oben bei
+                den Kollegen. */}
+            {gruppen.studentsGesamt > gruppen.students.length && (
+              <div>
+                {gruppen.students.length === 0 && (
+                  <p className="t-label mb-2">Athleten</p>
+                )}
+                <div className="t-card px-4 py-3.5">
+                  <p style={{ font: "var(--type-body-strong)" }}>
+                    Deine Athleten entscheiden selbst.
+                  </p>
+                  <p
+                    className="mt-1"
+                    style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                  >
+                    {gruppen.studentsGesamt - gruppen.students.length === 1
+                      ? "Ein Athlet hat dich noch nicht freigegeben"
+                      : `${gruppen.studentsGesamt - gruppen.students.length} Athleten haben dich noch nicht freigegeben`}{" "}
+                    — sie tun das über &bdquo;Profil teilen&ldquo; in ihrem
+                    eigenen Kampfprofil, namentlich oder für alle Trainer des
+                    Gyms. Danach wertest du sie hier aus.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         )}

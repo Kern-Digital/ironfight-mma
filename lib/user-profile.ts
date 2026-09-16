@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { getFirestoreDb } from "./firebase";
-import { readShares, type ProfileShares } from "./profile-sharing";
+import { readShares, vollstaendig, type ProfileShares } from "./profile-sharing";
 import { NO_RIGHTS, readRoleSet } from "./roles";
 import {
   DEFAULT_USER_SETTINGS,
@@ -318,7 +318,9 @@ export async function setProfileShares(
   uid: string,
   shares: ProfileShares,
 ): Promise<void> {
-  await setDoc(profileRef(uid), { profileShares: shares }, { merge: true });
+  // Immer die vollständige neue Form ({ uids, gyms } je Bereich) — die
+  // Regel liest beide Formen, geschrieben wird nur noch diese.
+  await setDoc(profileRef(uid), { profileShares: vollstaendig(shares) }, { merge: true });
 }
 
 /**

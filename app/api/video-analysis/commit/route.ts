@@ -39,6 +39,7 @@ import {
 import { evidenceStrengthPct } from "@/lib/profile-evidence";
 import {
   computeVideoWeight,
+  isSport,
   monthKey,
   sideKeyFromText,
   videoTypeFromObservation,
@@ -58,6 +59,7 @@ function validate(a: VideoAnalysisInput | undefined): string | null {
   if (!a.evaluation || !Array.isArray(a.evaluation.findings)) return "Bewertung fehlt.";
   if (a.recency && !RECENCIES.has(a.recency)) return "Ungültiger Zeitraum.";
   if (a.videoType && !TYPES.has(a.videoType)) return "Ungültige Video-Art.";
+  if (a.sport != null && !isSport(a.sport)) return "Ungültige Kampfart.";
   return null;
 }
 
@@ -169,6 +171,9 @@ export async function POST(req: Request) {
         tier: input.tier ?? "flash",
         recency,
         videoType,
+        // Kampfart des VIDEOS (Etappe 2) — der Trainer hat sie auf dem
+        // Zuordnungs-Schirm bestätigt; gültig ist sie oben geprüft.
+        sport: isSport(input.sport) ? input.sport : null,
         fightMonth: input.fightMonth ?? null,
         weight,
         models: input.models ?? { gemini: "", claude: "" },

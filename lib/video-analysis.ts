@@ -123,7 +123,7 @@ export type VideoType = "full" | "excerpt" | "sparring" | "highlight";
 export const VIDEO_TYPE_LABEL: Record<VideoType, string> = {
   full: "Kompletter Kampf",
   excerpt: "Teil eines Kampfs",
-  sparring: "Training oder Sparring",
+  sparring: "Training / Sparring",
   highlight: "Best-of-Zusammenschnitt",
 };
 
@@ -139,6 +139,92 @@ export const VIDEO_TYPE_WEIGHT: Record<VideoType, number> = {
   sparring: 0.6,
   highlight: 0.3,
 };
+
+// ─── Kampfart ───────────────────────────────────────────────────────────────
+
+/**
+ * KAMPFART — die Regeln, unter denen das VIDEO entstand (Leon 16.09.2026).
+ *
+ * Sie gehört zum Video, nicht zur Person: Wer im Video MMA kämpft, hat MMA
+ * gekämpft, egal was in seinem Profil steht. Deshalb wird sie EINMAL je
+ * Upload festgelegt und gilt für alle Kämpfer darin — Athlet B mit Sambo als
+ * Hauptdisziplin bekommt aus einem MMA-Sparring eine MMA-Analyse und damit
+ * ein MMA-Profil neben seinem Sambo-Profil. Der Vorlauf schlägt sie aus dem
+ * Gesehenen vor (Jacke und Matte oder Handschuhe und Käfig), der Trainer
+ * bestätigt oder ändert — nur er weiß, ob die reine Boxrunde MMA-Training
+ * war. Sie entscheidet, in welches Profil je Kampfart die Analyse läuft
+ * (`users/{uid}/fightProfile/{sport}`, lib/server/profile-recompute.ts).
+ *
+ * Sechs Einträge: Verwandtes zusammengefasst, Jacke und keine Jacke
+ * getrennt. Die Reihenfolge ist die der Anzeige.
+ */
+export type Sport = "mma" | "boxen" | "kickboxen" | "ringen" | "sambo" | "bjj";
+
+export const SPORT_ORDER: Sport[] = ["mma", "boxen", "kickboxen", "ringen", "sambo", "bjj"];
+
+/** Voller Name — für Auswahllisten. */
+export const SPORT_LABEL: Record<Sport, string> = {
+  mma: "MMA",
+  boxen: "Boxen",
+  kickboxen: "Kickboxen, K1 und Muay Thai",
+  ringen: "Ringen",
+  sambo: "Sambo und Judo",
+  bjj: "BJJ und Grappling",
+};
+
+/** Kurzform — für Chips und Zeilen. */
+export const SPORT_KURZ: Record<Sport, string> = {
+  mma: "MMA",
+  boxen: "Boxen",
+  kickboxen: "Kickboxen",
+  ringen: "Ringen",
+  sambo: "Sambo",
+  bjj: "BJJ",
+};
+
+export function isSport(x: unknown): x is Sport {
+  return typeof x === "string" && (SPORT_ORDER as string[]).includes(x);
+}
+
+/**
+ * „Passt hinein": Welche gesehene Kampfart in einer gewählten aufgeht. Eine
+ * reine Boxrunde im MMA-Training bleibt MMA — Boxen passt in MMA. Eine
+ * Jacke passt nicht in MMA, also springt der Vorschlag auf Sambo. Grundlage
+ * für `vorschlagSport`.
+ */
+const SPORT_ENTHAELT: Record<Sport, Sport[]> = {
+  mma: ["mma", "boxen", "kickboxen", "ringen", "bjj"],
+  boxen: ["boxen"],
+  kickboxen: ["kickboxen", "boxen"],
+  ringen: ["ringen"],
+  sambo: ["sambo", "ringen", "bjj"],
+  bjj: ["bjj"],
+};
+
+/**
+ * Der Vorschlag auf dem Zuordnungs-Schirm: Die zuletzt gewählte Kampfart des
+ * Trainers bleibt stehen, solange das Gesehene hineinpasst — so tippt der
+ * MMA-Trainer nach dem ersten Mal fast nie, obwohl viele Runden reines Boxen
+ * oder reines Grappling sind. Sonst gilt das Gesehene, sonst das Zuletzt-
+ * Gewählte, sonst MMA.
+ */
+export function vorschlagSport(gesehen: Sport | null, zuletzt: Sport | null): Sport {
+  if (zuletzt && gesehen && SPORT_ENTHAELT[zuletzt].includes(gesehen)) return zuletzt;
+  return gesehen ?? zuletzt ?? "mma";
+}
+
+/** Freitext des Modells („Grappling no-gi", „K-1") → Kampfart, sonst null. */
+export function sportFromText(text: string | null | undefined): Sport | null {
+  const t = (text ?? "").toLowerCase();
+  if (!t.trim()) return null;
+  if (/(mma|mixed|vale tudo|käfig|cage)/.test(t)) return "mma";
+  if (/(sambo|judo|jacke|kurtka|\bgi\b)/.test(t)) return "sambo";
+  if (/(bjj|jiu|grappl|no-gi|nogi|submission)/.test(t)) return "bjj";
+  if (/(ringen|wrestl|freistil|greco)/.test(t)) return "ringen";
+  if (/(kick|k-?1|muay|thai)/.test(t)) return "kickboxen";
+  if (/box/.test(t)) return "boxen";
+  return null;
+}
 
 /**
  * Art aus der Beobachtung (Stufe 1) ableiten — Übergang bis zum Vorlauf.
@@ -577,6 +663,12 @@ export interface VideoAnalysis {
   recency: FightRecency;
   /** Art des Videos (legt die KI fest) — zweiter Faktor der Gewichtung. */
   videoType: VideoType;
+  /**
+   * Kampfart des VIDEOS (Etappe 2, 16.09.2026) — bestimmt das Profil je
+   * Kampfart, in das diese Analyse läuft. null bei Bestand vor Etappe 2:
+   * zählt dann nur ins Gesamtprofil.
+   */
+  sport: Sport | null;
   /** Kampfmonat „JJJJ-MM", falls bekannt (Etappe 2: Datumseinblendung) — sortiert genauer als `recency`. */
   fightMonth: string | null;
   /** Gewicht zum Zeitpunkt des Speicherns, aufgeschlüsselt. Rechnet der Server. */
@@ -614,11 +706,12 @@ export type VideoAnalysisInput = Omit<
   | "targetIsStaff"
   | "weight"
   | "videoType"
+  | "sport"
   | "wrongFighter"
   | "sharedWithAthlete"
   | "createdBy"
   | "createdByName"
-> & { videoType?: VideoType };
+> & { videoType?: VideoType; sport?: Sport | null };
 
 /** Rohform in Firestore — auch ältere Dokumente ohne die neuen Felder. */
 export type VideoAnalysisDoc = Partial<Omit<VideoAnalysis, "id" | "createdAt">> & {
@@ -706,6 +799,7 @@ export function decodeVideoAnalysis(id: string, d: VideoAnalysisDoc): VideoAnaly
     tier: d.tier ?? "flash",
     recency,
     videoType,
+    sport: isSport(d.sport) ? d.sport : null,
     fightMonth: d.fightMonth ?? null,
     weight,
     models: d.models ?? { gemini: "", claude: "" },
@@ -737,18 +831,19 @@ function analysesCol(mode: AnalysisMode, targetId: string) {
 const decode = decodeVideoAnalysis;
 
 /**
- * Alle Analysen eines Gyms mit EINER Abfrage — ersetzt den Fächer je Ziel
- * in `lib/deepfight-analysen.ts`. Die Regel verlangt BEIDE Filter
- * (`gymId` und `targetIsStaff == false`, direkter Feldzugriff); fehlt einer,
- * weist Firestore die Abfrage komplett ab. Analysen zu Stab-Konten fehlen
- * hier absichtlich — sie laufen über den direkten Pfad und die Freigabe.
+ * Alle GEGNER-Analysen eines Gyms mit EINER Abfrage. Die Regel verlangt
+ * BEIDE Filter (`gymId` und `mode == "opponent"`, direkter Feldzugriff);
+ * fehlt einer, weist Firestore die Abfrage komplett ab. Analysen zu
+ * Menschen (Athleten wie Kollegen) fehlen hier absichtlich — seit dem
+ * DeepFight-Tor für alle (16.09.2026) laufen sie über den direkten Pfad und
+ * die Freigabe (`lib/deepfight-analysen.ts`).
  */
 export async function listGymVideoAnalyses(gymId: string): Promise<VideoAnalysis[]> {
   const snap = await getDocs(
     query(
       collectionGroup(getFirestoreDb(), "videoAnalyses"),
       where("gymId", "==", gymId),
-      where("targetIsStaff", "==", false),
+      where("mode", "==", "opponent"),
       orderBy("createdAt", "desc"),
     ),
   );
@@ -1127,6 +1222,26 @@ export interface AnalyzeRequest {
    * (300 s) bekommt — sonst reißt ein langes Video das Gesamtlimit.
    */
   observeOnly?: boolean;
+  /**
+   * Die hochgeladene Datei nach der Bewertung bei Google STEHEN lassen
+   * (Etappe 2): Aus einem Upload werden bis zu zwei Auswertungen, und die
+   * zweite braucht das Video noch. Der Fluss löscht nach der letzten Person
+   * über `deleteUploadedFile`.
+   */
+  keepFile?: boolean;
+}
+
+/**
+ * Löscht die hochgeladene Datei bei Google — der Fluss ruft das nach der
+ * letzten Auswertung eines Uploads. Best effort: Google räumt nach 48 h
+ * ohnehin auf, ein Fehler hier lässt nichts scheitern.
+ */
+export async function deleteUploadedFile(name: string): Promise<void> {
+  try {
+    await postJson<{ ok: true }>("/api/video-analysis/delete-upload", { name });
+  } catch {
+    /* Auto-Expiry (48 h) greift als Fallback */
+  }
 }
 
 /**
@@ -1184,6 +1299,45 @@ export async function runVideoObservation(
   if (!observation)
     throw new Error("Video-Beobachtung lieferte kein Ergebnis");
   return observation;
+}
+
+// ─── Der Vorlauf (Etappe 2) ─────────────────────────────────────────────────
+
+/** Ein Kämpfer, den der Vorlauf in den ersten zwei Minuten gefunden hat. */
+export interface PreviewFighter {
+  corner: CornerColor;
+  clothing: string;
+  features: string;
+  /** Ein Satz zum Wiedererkennen — der Rückfall, wenn kein Standbild geht (YouTube). */
+  description: string;
+  /** Sekunde ab Videostart, in der er klar zu sehen ist — für das Standbild. */
+  bestSecond: number | null;
+}
+
+/**
+ * Was der Vorlauf liefert. Der Nutzer sieht davon NICHTS direkt (Leon
+ * 16.09.): Die Kämpfer werden zu Karten, Art und Kampfart zu einer
+ * vorbelegten Zeile unter den Karten.
+ */
+export interface VideoPreview {
+  fighters: PreviewFighter[];
+  videoType: VideoType;
+  sport: Sport | null;
+  fightMonth: string | null;
+  model: string;
+}
+
+/**
+ * Vorlauf: Gemini Flash über die ersten 120 s in niedriger Auflösung —
+ * findet die Kämpfer für die Karten und schlägt Art und Kampfart vor.
+ * Eigener Request mit eigenem Zeitbudget (/api/video-analysis/preview).
+ */
+export async function runVideoPreview(source: VideoSource): Promise<VideoPreview> {
+  const data = await postJson<{ preview: VideoPreview }>(
+    "/api/video-analysis/preview",
+    { source },
+  );
+  return data.preview;
 }
 
 export interface AnalyzeResult {

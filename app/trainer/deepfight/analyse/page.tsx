@@ -55,6 +55,7 @@ import {
 } from "@/components/deepfight/deepfight-modus";
 import DnaCompletenessRing from "@/components/trainer/DnaCompletenessRing";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
+import VideoUploadFlow from "@/components/trainer/VideoUploadFlow";
 import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
@@ -100,6 +101,8 @@ function AnalyseSeiteInhalt() {
   const modus: DeepFightModus = roherModus === "gegner" ? "gegner" : "leute";
   const zielId = searchParams.get("ziel");
   const expandId = searchParams.get("analyse");
+  /** Ein gemerkter Zwischenstand des Upload-Flusses (Landung, „In Arbeit"). */
+  const uploadId = searchParams.get("upload");
 
   const [zielLeute, setZielLeute] = useState<{
     entry: StudentEntry;
@@ -192,47 +195,13 @@ function AnalyseSeiteInhalt() {
       <h1 className="sr-only">DeepFight — Neue Analyse</h1>
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-4 sm:px-6">
-        {/* ── Kein Ziel in der Adresse ─────────────────────────────────────
-            Passiert, wer die Seite ohne Parameter aufruft. Statt einer leeren
-            Seite der Weg zurück in die Auswahl. */}
+        {/* ── Kein Ziel in der Adresse: der Upload-Fluss ───────────────────
+            Seit Etappe 2 (16.09.2026) ist das der NORMALFALL — erst das
+            Video, dann der Vorlauf, dann die Zuordnung auf den Karten. Ein
+            `?upload=` holt einen gemerkten Zwischenstand zurück. */}
         {!zielId ? (
-          <section className="t-card flex flex-col items-start gap-3 p-6 sm:p-8">
-            <div className="t-label">Wen analysierst du?</div>
-            <p style={{ font: "var(--type-body)", color: "var(--text-2)" }}>
-              Wähl zuerst ein Ziel — einen eigenen Athleten oder einen Gegner.
-              Danach lädst du hier dein Video ab.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/trainer/deepfight/athleten?fuer=analyse"
-                data-press
-                className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
-                style={{
-                  ...BTN_FONT,
-                  background: "var(--accent)",
-                  color: "var(--on-accent)",
-                  boxShadow: "var(--accent-glow)",
-                  textDecoration: "none",
-                }}
-              >
-                <Icon name="user" size={13} strokeWidth={2.4} />
-                Eigene Athleten
-              </Link>
-              <Link
-                href="/trainer/deepfight/gegner?fuer=analyse"
-                data-press
-                className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
-                style={{
-                  ...BTN_FONT,
-                  border: "1px solid var(--line-strong)",
-                  color: "var(--text-body)",
-                  textDecoration: "none",
-                }}
-              >
-                <Icon name="target" size={13} strokeWidth={2.4} />
-                Gegner
-              </Link>
-            </div>
+          <section className="t-card p-4 sm:p-5">
+            <VideoUploadFlow uploadId={uploadId} />
           </section>
         ) : gesperrt ? (
           <section className="t-card flex flex-col items-start gap-1.5 p-6 sm:p-8">
@@ -325,9 +294,9 @@ function AnalyseSeiteInhalt() {
               </Link>
             </section>
 
-            {/* ── Die Ablage ───────────────────────────────────────────────
-                Pro Ziel neu gemountet — der Zwischenstand liegt im
-                localStorage der Sektion, nicht im React-Zustand. */}
+            {/* ── Die Auswertungen dieses Ziels ────────────────────────────
+                Pro Ziel neu gemountet. Ein neues Video legt niemand mehr FÜR
+                ein Ziel ab — der Knopf in der Sektion führt in den Fluss. */}
             <section className="t-card p-4 sm:p-5">
               {modus === "leute" && zielLeute ? (
                 <VideoAnalysisSection
@@ -335,7 +304,6 @@ function AnalyseSeiteInhalt() {
                   mode="athlete"
                   targetId={zielLeute.entry.uid}
                   targetName={nameVon(zielLeute.entry)}
-                  fightProfile={zielLeute.profil}
                   onFightProfileUpdated={() => void ladeProfil(zielLeute.entry.uid)}
                   onAnalysesLoaded={setVideoCount}
                   expandId={expandId}
@@ -346,7 +314,6 @@ function AnalyseSeiteInhalt() {
                   mode="opponent"
                   targetId={zielGegner.id}
                   targetName={zielGegner.name}
-                  opponent={zielGegner}
                   onOpponentUpdated={() => void ladeGegner(zielGegner.id)}
                   onAnalysesLoaded={setVideoCount}
                   expandId={expandId}

@@ -408,6 +408,17 @@ ${JSON.stringify(EVALUATION_SCHEMA)}`;
     err instanceof Anthropic.APIError &&
     typeof err.status === "number" &&
     err.status >= 500;
+  // Verbindungsabbrüche (SDK: „Connection error.", kein Status) sind
+  // vorübergehend wie eine Überlastung — gemessen 16.09. im Browser-Lauf:
+  // die Bewertung brach nach 18 s ab, zehn Minuten vorher lief dieselbe
+  // Route sauber. Die Wortmarke „überlastet" löst im Client den
+  // Auto-Neustart aus; ein Modellwechsel hülfe hier nicht.
+  const isConnection = (err: unknown): boolean =>
+    err instanceof Anthropic.APIConnectionError;
+  const connectionError = () =>
+    new Error(
+      "Claude ist gerade nicht erreichbar (Verbindungsabbruch, wie bei Überlastung — überlastet). Bitte in 1–2 Minuten erneut versuchen.",
+    );
 
   // Opus 5 zuerst; bei Überlastung (529/5xx nach SDK-Retries) automatisch
   // auf Sonnet 5 ausweichen — ABER: bei der Detail-Analyse (tier="pro") wird
@@ -422,12 +433,14 @@ ${JSON.stringify(EVALUATION_SCHEMA)}`;
   try {
     message = await run(usedModel);
   } catch (err) {
+    if (isConnection(err)) throw connectionError();
     if (!isOverloaded(err)) throw err;
     if (args.tier === "pro") throw overloadedError();
     usedModel = "claude-sonnet-5";
     try {
       message = await run(usedModel);
     } catch (err2) {
+      if (isConnection(err2)) throw connectionError();
       if (isOverloaded(err2)) throw overloadedError();
       throw err2;
     }

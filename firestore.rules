@@ -102,8 +102,20 @@ service cloud.firestore {
              || d.get("verwaltung", false) == true
              || d.get("admin", false) == true;
     }
+    // ZWEI FORMEN JE BEREICH (seit Etappe 2 der Automatik, 16.09.2026):
+    //   alt   ["uid", …]                          eine Namensliste
+    //   neu   { uids: ["uid", …], gyms: ["gymId", …] }
+    // `gyms` ist Leons LEBENDE Regel „alle Trainer dieses Gyms, auch
+    // kuenftige": Ein neu eingestellter Trainer sieht am ersten Tag, was
+    // seine Kollegen sehen — ohne dass jeder Athlet ihn einzeln hinzufuegt.
+    // Die alte Form bleibt lesbar (Bestand ist Demo, aber ein Regelfehler
+    // waere ein Auswertungsfehler = verboten, und das faende niemand).
     function hatFreigabe(d, bereich) {
-      return request.auth.uid in d.get(["profileShares", bereich], []);
+      let v = d.get(["profileShares", bereich], []);
+      return (v is list && request.auth.uid in v)
+             || (v is map
+                 && (request.auth.uid in v.get("uids", [])
+                     || userGymId() in v.get("gyms", [])));
     }
     //
     // SICH SELBST DARF EIN TRAINER IMMER: Er analysiert sich „exakt wie einen
@@ -112,13 +124,24 @@ service cloud.firestore {
     // — er ist Stab-Konto und steht nicht in seiner eigenen Freigabeliste.
     // Bewusst an isTrainerOrAdmin() gebunden: Ein ATHLET schreibt sein
     // Kampfprofil weiterhin nie (Regel unten).
+    //
+    // DEEPFIGHT GILT FUER ALLE (Leon 16.09.2026): Jeder Athlet entscheidet
+    // selbst, welche Trainer sein Kampfprofil und seine Analysen sehen — die
+    // Stab-Ausnahme faellt fuer den Bereich `deepfight`. Fuer `athlet` und
+    // `wettkampf` bleibt es wie bisher: Athleten sind fuer alle Trainer des
+    // Gyms offen, nur Stab-Konten brauchen eine Freigabe. Dasselbe Tor
+    // serverseitig in lib/server/member-access.ts — beide Orte gemeinsam
+    // aendern. FOLGE: Ein Athlet ohne Freigabe ist auch nicht ANALYSIERBAR
+    // (das Tor gilt fuer /api/video-analysis/commit); Bestand ist Demo, keine
+    // Vorbelegung noetig.
     function canAccessMemberData(uid, bereich) {
       let d = get(/databases/$(database)/documents/users/$(uid)).data;
       return isAdmin()
              || (isTrainerOrAdmin()
                  && (request.auth.uid == uid
                      || (sameGym(d)
-                         && (!istStabKonto(d) || hatFreigabe(d, bereich)))));
+                         && (hatFreigabe(d, bereich)
+                             || (bereich != "deepfight" && !istStabKonto(d))))));
     }
 
     // ─── Wettkampf-Freigabe: das materialisierte `ownerIsStaff` ────────────
@@ -352,10 +375,20 @@ service cloud.firestore {
     // fuer Gegner fest false) — der Client legt keine Analysen mehr an.
     // Bestand ohne das Feld (Demo) faellt hier durch (Auswertungsfehler =
     // verboten) und ist ueber den direkten Pfad weiter lesbar.
+    //
+    // SEIT DEM DEEPFIGHT-TOR FUER ALLE (16.09.2026) TRAEGT DIE ABFRAGE NUR
+    // NOCH GEGNER: Athleten-Analysen laufen ueber die Freigabe, und die kann
+    // eine Query nicht pruefen. Trainer fragen deshalb where("mode","==",
+    // "opponent") + gymId (Index gymId/mode/createdAt); die Athleten holt
+    // der Faecher ueber den direkten Pfad, nur fuer die, die freigegeben
+    // haben (lib/deepfight-analysen.ts). Der Plattform-Admin liest weiter
+    // alles (Betreiber-Sache, Kostenbild).
     match /{path=**}/videoAnalyses/{analysisId} {
       allow read: if request.auth != null
-                  && resource.data.targetIsStaff == false
-                  && (isAdmin() || (isTrainerOrAdmin() && sameGym(resource.data)));
+                  && (isAdmin()
+                      || (resource.data.mode == "opponent"
+                          && isTrainerOrAdmin()
+                          && sameGym(resource.data)));
     }
 
     // CollectionGroup-Query: zentraler Wettkampfbereich liest fightCamps

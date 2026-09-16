@@ -1034,7 +1034,7 @@ Gedächtnis `analyse-automatik-entscheidung`. Kurzfassung:
   erst dann voll gefärbt, sonst „Wähle mind. eine Person zur Auswertung
   aus" · f) Admin-SDK (liegt ohnehin in `lib/server/firebase-admin.ts`).
 
-### ETAPPE 1 GEBAUT — WÄHRUNG UND NEUBERECHNUNG (16.09.2026, nicht committet)
+### ETAPPE 1 GEBAUT — WÄHRUNG UND NEUBERECHNUNG (16.09.2026, committet 97ca7cd, LIVE)
 - **Analyse-Dokument** trägt `gymId`, `targetIsStaff`, `videoType`
   (full/excerpt/sparring/highlight), `recency`, `fightMonth`, `weight`
   (aufgeschlüsselt, vom Server gerechnet), `fileFingerprint`, `wrongFighter`;
@@ -1103,6 +1103,136 @@ Gedächtnis `analyse-automatik-entscheidung`. Kurzfassung:
   in Regex, keine `for…of` über Map/Set (Array.from). (3) Kombinierende
   Unicode-Zeichen im Quelltext werden vom Werkzeug „normalisiert" — nach
   `normalize("NFD")` stattdessen `[^\x00-\x7f]` streichen.
+
+### ETAPPE 2 GEBAUT — VORLAUF, ZUORDNUNG, KAMPFART (16.09.2026, nicht committet)
+Leons Entscheidungen vom 16.09. (Gedächtnis `analyse-automatik-entscheidung`,
+Abschnitt „ETAPPE 2"): **erst Upload, dann Vorlauf, dann Zuordnung** — wen es
+betrifft, fragt vor dem Video niemand mehr.
+- **Der Fluss** ist `components/trainer/VideoUploadFlow.tsx` auf
+  `/trainer/deepfight/analyse` OHNE `?ziel=` (mit `?upload=<id>` ein
+  gemerkter Zwischenstand). `VideoAnalysisSection` zeigt nur noch Liste und
+  Bericht eines Ziels (`?modus=&ziel=`); ihre Ablage, Pipeline und
+  Formular-Persistenz sind in den Fluss gewandert, der Fortschritts-Haken
+  nach `lib/use-analysis-progress.ts`. „Start" auf der Landung führt
+  DIREKT zur Ablage — die zwei Platten Athleten/Gegner sind weg
+  (`FightDnaEntry` hat nur noch `onStart`; die `.df-entry__choice*`-Stile
+  in globals.css haben keinen Aufrufer mehr).
+- **Vorlauf** `POST /api/video-analysis/preview` → `previewVideo()` in
+  lib/server/gemini.ts: Flash-Kette über die ersten 120 s
+  (`videoMetadata.endOffset`, bei YouTube ab Start), `mediaResolution:
+  MEDIA_RESOLUTION_LOW`, Antwort `VideoPreview` (fighters mit corner/
+  clothing/features/description/bestSecond, videoType, sport, fightMonth).
+  Der Nutzer sieht davon NICHTS — die Kämpfer werden Karten, Art und
+  Kampfart eine vorbelegte Zeile. **Zeitlimit 40 s je Modell** (504 → sofort
+  nächstes Modell): Im Free Tier hing `gemini-flash-latest` bis 300 s.
+  Gemessen: Free Tier 72–107 s, **Bezahltarif 10 s** (seit 16.09. Paid Tier 1,
+  Gedächtnis `gemini-bezahltarif`).
+- **Zuordnungs-Schirm** genau nach Leon (e): Karte = Standbild aus der
+  lokalen Datei (Canvas an `bestSecond`; YouTube: Beschreibung + Sprung ins
+  Video), am Rand „X Ignorieren" (Karte grau, Tipp auf die graue Karte holt
+  sie zurück — kein Extra-Knopf), Tipp auf die aktive Karte → Blur (nur mit
+  `canBlur`, MOTION-BRIEF §3.5) + Felder „Athlet / Gegner" → `SheetShell`
+  mit `GooeySearch`; Person von Karte 1 ist auf Karte 2 grau. Darunter
+  DREI Angaben zum VIDEO: Zeitraum (Pflicht, ohne Vorbelegung, „Weiß ich
+  nicht" zählt als gewählt), Art und Kampfart in EINER Zeile, beide von der
+  KI gesetzt und antippbar. „Analysieren" voll farbig erst bei ≥ 1 Zuordnung
+  UND Zeitraum, sonst sagt der Klick, was fehlt (`data-bereit`, BEWUSST kein
+  `aria-disabled` — der Knopf ist klickbar). Beschreibungsfelder als
+  zugeklappter Rückfall. Analyse-Stufe (Flash/Pro) hat KEINEN Schalter mehr
+  im Fluss — immer Flash; Detail-Analyse ist eine eigene Entscheidung.
+- **KAMPFART GEHÖRT ZUM VIDEO, NICHT ZUR PERSON** (Leons Einwand: Athlet B
+  mit Sambo-Profil kämpft im Video MMA → MMA-Analyse). `Sport` in
+  lib/video-analysis.ts: sechs Einträge `mma · boxen · kickboxen · ringen ·
+  sambo · bjj` (SPORT_ORDER/SPORT_LABEL/SPORT_KURZ), EINMAL je Upload, gilt
+  für alle Karten, Feld `sport` am Analyse-Dokument (commit prüft
+  `isSport`). Vorschlag = `vorschlagSport(gesehen, zuletzt)`: die zuletzt
+  gewählte Kampfart des Trainers (`localStorage ta-deepfight-sport`) bleibt,
+  solange das Gesehene hineinpasst (Boxen passt in MMA, Jacke nicht).
+  Hauptdisziplin im Athletenprofil entscheidet NICHTS mehr über die Ablage.
+- **Profil je Kampfart:** `recomputeProfile` schreibt beim Athleten neben
+  `fightProfile/main` je Kampfart `fightProfile/{sport}` aus NUR den
+  Analysen dieser Kampfart (dieselbe reine Rechnung, gefilterte Liste),
+  löscht Kampfart-Dokumente ohne zählende Analyse. Gegner behalten EIN
+  Profil. `getFightProfile(uid, sport?)`. Das Gesamtprofil `main` rechnet
+  bis Etappe 3 über alle Kampfarten — die Gesamtansicht als
+  ZUSAMMENSTELLUNG der Kampfart-Profile und der Umschalter sind Sache des
+  Berichts (Etappe 3).
+- **Regel „nur was vorkam"** (lib/profile-evidence.ts): Ein Video
+  beantwortet nur Fragen zu dem, was in ihm passiert ist — `SIGNAL_JE_FRAGE`
+  (21 Fragen → strikes/kicks/takedowns/ground/clinch/cage),
+  `beobachteteSignale()` aus Split, Zählern, Verteidigungszahlen,
+  Kontrollzeiten und Zonen; gilt für Befunde UND Bestätigungen; ohne jedes
+  Signal (Bestand ohne Split/Zähler) bleibt alles offen. Kein zweites
+  Regelwerk-Feld (zurückgenommen: eine Boxrunde im Käfig sieht für die KI
+  wie MMA aus, „was erlaubt war" ist nicht beobachtbar).
+  `scripts/test-profil-rechnung.mjs` 45/45.
+- **Zwischenstand** `ta-video-analysis-form:upload:{uploadId}`
+  (lib/deepfight-zwischenstand.ts): Upload, Vorlauf, Zuordnungen, Angaben,
+  fertige Beobachtungen je Karte; die Adresse bekommt `?upload=` sobald
+  etwas gerettet ist (ohne Neumounten — die ID lebt im State, sonst ginge
+  die lokale Datei und mit ihr die Standbilder verloren). Landung „Analysen
+  in Arbeit" listet ihn mit Dateiname und Zustand. Alte Ziel-Schlüssel
+  werden ignoriert (Bestand ist Demo).
+- **Messung:** `scripts/mess-e2-vorlauf.mjs` (Route live gegen Leons
+  Testvideo, Konto mess-e2v@…), `scripts/mess-e2-schirm.mjs` (Schirme über
+  gemerkten Stand, 20 Prüfungen, Konto mess-e2@…), `scripts/mess-e2-ablauf.mjs`
+  (ganzer Weg mit echter KI gegen ZWEI Prüfkonten, Firestore-Nachweis).
+  **Testvideo IMMER** `C:\Users\reich\Desktop\Trainingsvideo Leon , Alec.mp4`
+  (Gedächtnis `testvideo-leon-alec`); das WhatsApp-Video im Repo ist ein
+  Einzeltraining.
+- **Fallen aus dem Bau:** (1) Playwright hält `aria-disabled="true"` für
+  deaktiviert und klickt nicht — ein Knopf, der mit einem Hinweis antwortet,
+  trägt das Attribut nicht. (2) `SheetShell` kennt kein Escape; im Test den
+  Schleier oben links anklicken (`position: {x:12,y:12}`), mittig deckt ihn
+  das Panel. (3) `hasText: "Athlet"` trifft auch die Karten-Knöpfe („Athlet ·
+  tipp zum Ändern") — die Auswahl-Felder tragen `aria-label="Kämpfer N als
+  Athlet zuordnen"`. (4) Der Vorlauf-Prompt muss Einzelpersonen ausdrücklich
+  zulassen, sonst liefert ein Drill-Video null Kämpfer.
+- **Markierte Analyse, bleibender Text — Befund aus Etappe 1, behoben
+  16.09.:** `recomputeProfile` las den zuvor ERRECHNETEN Profiltext als
+  Bestand (Seite `manual`) zurück; eine als „falscher Kämpfer" markierte
+  Analyse fiel aus der Rechnung, ihr Text stand aber weiter im Profil.
+  `manuellerBestand()` behält nur Fragen, deren Sieger in der gespeicherten
+  Rechnung `manual` war (oder ohne Rechnung, vor der Automatik). Bewiesen
+  mit `scripts/check-profil-je-kampfart.mjs` (8/8, echte Neuberechnung ohne
+  KI: main/mma/sambo, Markieren löscht das Kampfart-Dokument und den Text).
+- **Ganzer Weg mit echter KI bewiesen (16.09., Dev-Log):** Vorlauf 47 s,
+  je Person Beobachtung 19–25 s + Bewertung 177–208 s + commit, danach
+  delete-upload — zwei Auswertungen aus einem Upload in 7,5 min. Danach war
+  das ANTHROPIC-GUTHABEN leer („credit balance is too low"); Leon lädt auf.
+  Verbindungsabbrüche des SDK („Connection error.") gelten als „überlastet"
+  → Auto-Neustart im Client (lib/server/claude.ts).
+- **Zwei Auswertungen aus einem Upload — die Löschfalle (gemessen 16.09.):**
+  /analyze löschte die Google-Datei nach der ersten Bewertung, die zweite
+  Person bekam „Gemini HTTP 403: You do not have permission to access the
+  File". Seither löscht /analyze nur ohne `keepFile`; der Fluss setzt
+  `keepFile: true` und löscht nach der LETZTEN Person über
+  `POST /api/video-analysis/delete-upload` (`deleteUploadedFile`).
+- **DEEPFIGHT-FREIGABE FÜR ALLE (Leon 16.09., gebaut im selben Fenster):**
+  Jeder Athlet entscheidet selbst, welche Trainer sein Kampfprofil und seine
+  Analysen sehen; ohne Freigabe ist er nicht analysierbar (dasselbe Tor gilt
+  für /commit). `profileShares.{bereich}` ist jetzt `{ uids, gyms }` —
+  `gyms` = Leons LEBENDE Regel „alle Trainer dieses Gyms, auch künftige";
+  die alte Listenform lesen `readShares` und `hatFreigabe()` weiter. Das
+  Tor: `canAccessMemberData` (Rules) und `canAccessMember`
+  (lib/server/member-access.ts) — `hatFreigabe ODER (Bereich ≠ deepfight UND
+  kein Stab-Konto)`; `athlet`/`wettkampf` bleiben für Athleten offen. Die
+  cg-Abfrage `{path=**}/videoAnalyses` trägt nur noch GEGNER (`mode ==
+  "opponent"` + gymId, neuer Index gymId/mode/createdAt); Athleten und
+  Kollegen kommen über den Fächer je sichtbarer Person
+  (`sichtbareMitglieder(members, uid, gymId)`). Oberfläche: „Profil teilen"
+  auf /kampfprofil für JEDEN (Athlet vergibt nur DeepFight,
+  `bereicheFuerKonto`), im Sheet oben die Karte „Alle Trainer deines Gyms"
+  mit Bereichs-Chips (`mitGym`), Namens-Chips sind gesperrt, wo „alle" schon
+  deckt; Badge am Knopf „Alle" oder Zahl. Athleten-Bibliothek erklärt den
+  leeren Fall („N Athleten haben dich noch nicht freigegeben").
+  Messskripte angepasst: `check-analyse-freigabe.mjs` (Namen, Gym, alte
+  Form), `check-analyse-automatik.mjs` (cg nur Gegner). **Rules + Index:
+  Deploy einzeln bei Leon anfragen; bis dahin gilt live das alte Tor.**
+- **OFFEN nach Etappe 2:** `.df-entry__choice*` aus globals.css entfernen.
+  Etappe 3: Bericht als Kurzinfo + „Details anzeigen", Gesamtansicht als
+  Zusammenstellung, Umschalter je Kampfart, Einwilligungs-Schritt beim
+  ersten Start (Athlet bestätigt die Freigabe-Logik).
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

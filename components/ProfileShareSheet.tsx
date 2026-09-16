@@ -30,10 +30,14 @@ import { memberName } from "@/lib/members";
 import Link from "next/link";
 import {
   SHARE_AREAS,
+  alleTrainerBereiche,
   bereicheFuer,
+  bereicheFuerKonto,
   gleicheShares,
   mitBereich,
+  mitGym,
   satzFuerPerson,
+  vollstaendig,
   type ProfileShares,
 } from "@/lib/profile-sharing";
 import { useEffect, useState } from "react";
@@ -114,11 +118,17 @@ function ShareSheetInhalt({
   shares,
   kollegen,
   teilenMitMir,
+  gymId,
+  istStab,
   onSave,
   onClose,
 }: {
   /** Der gespeicherte Stand. */
   shares: ProfileShares;
+  /** Das eigene Gym — die lebende Regel „alle Trainer, auch künftige" hängt daran. */
+  gymId: string;
+  /** Stab vergibt alle drei Bereiche, ein Athlet nur DeepFight (`bereicheFuerKonto`). */
+  istStab: boolean;
   /**
    * Trainer des eigenen Gyms, ohne einen selbst UND ohne Plattform-Admins —
    * die filtert `ProfileShareButton` heraus (Ghost-Konten, Begründung an
@@ -154,6 +164,9 @@ function ShareSheetInhalt({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = !gleicheShares(entwurf, shares);
+  const bereiche = bereicheFuerKonto(istStab);
+  /** Welche Bereiche für ALLE Trainer des Gyms offen sind (lebende Regel). */
+  const alleTrainer = alleTrainerBereiche(entwurf, gymId);
 
   useEffect(() => {
     const vorher = document.body.style.overflow;
@@ -176,7 +189,9 @@ function ShareSheetInhalt({
     setSaving(true);
     setError(null);
     try {
-      await onSave(entwurf);
+      // Jeder Bereich als vollständiger Eintrag — ein fehlender gälte als
+      // unverändert, und eine zurückgenommene Freigabe bliebe stehen.
+      await onSave(vollstaendig(entwurf));
       onClose();
     } catch (err) {
       setError(
@@ -188,7 +203,7 @@ function ShareSheetInhalt({
   }
 
   const anzahl = kollegen.filter(
-    (k) => bereicheFuer(entwurf, k.uid).length > 0,
+    (k) => bereicheFuer(entwurf, k.uid, gymId).length > 0,
   ).length;
 
   return (
@@ -218,8 +233,9 @@ function ShareSheetInhalt({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
           <div className="flex flex-col gap-4 pb-2">
             <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Als Trainer entscheidest du selbst, mit wem du deine Daten und
-              Analysen teilst.
+              {istStab
+                ? "Als Trainer entscheidest du selbst, mit wem du deine Daten und Analysen teilst."
+                : "Du entscheidest selbst, welche Trainer dein Kampfprofil und deine DeepFight-Analysen sehen. Wen du freigibst, der kann dich auch analysieren."}
             </p>
 
             {/* Was die Bereiche umfassen — EINMAL, statt unter jedem Häkchen
@@ -232,7 +248,7 @@ function ShareSheetInhalt({
                 border: "1px solid var(--line)",
               }}
             >
-              {SHARE_AREAS.map((bereich) => (
+              {bereiche.map((bereich) => (
                 <div key={bereich.key} className="flex flex-col gap-0.5">
                   <span className="t-label">{bereich.label}</span>
                   <span
@@ -244,15 +260,67 @@ function ShareSheetInhalt({
               ))}
             </div>
 
+            {/* ─── Alle Trainer, auch künftige — die LEBENDE Regel ───────────
+                (Leon 16.09.2026). Wer Namen anklickt, meint Namen; wer „alle"
+                anklickt, meint auch den Trainer, der nächsten Monat anfängt.
+                Deshalb ist es ein eigener Eintrag über den Personen und keine
+                Momentaufnahme der heutigen Liste. */}
+            <div className="t-card flex flex-col gap-3 p-3.5">
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
+                  style={{
+                    background: "var(--accent-subtle)",
+                    border:
+                      "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
+                    color: "var(--accent-text)",
+                  }}
+                >
+                  <Icon name="users" size={18} strokeWidth={2} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span
+                    className="truncate"
+                    style={{ font: "var(--type-body-strong)" }}
+                  >
+                    Alle Trainer deines Gyms
+                  </span>
+                  <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                    {alleTrainer.length === 0
+                      ? "Gilt auch für Trainer, die später dazukommen."
+                      : `${satzFuerPerson(alleTrainer, bereiche.length)} Auch, wer später dazukommt.`}
+                  </span>
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {bereiche.map((bereich) => (
+                  <BereichChip
+                    key={bereich.key}
+                    label={bereich.label}
+                    an={alleTrainer.includes(bereich.key)}
+                    gesperrt={saving}
+                    onToggle={() =>
+                      setEntwurf((v) =>
+                        mitGym(v, bereich.key, gymId, !alleTrainerBereiche(v, gymId).includes(bereich.key)),
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+
             {kollegen.length === 0 ? (
               <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                In deinem Gym trainiert gerade kein zweiter Trainer. Sobald
-                jemand das Trainer-Häkchen bekommt, steht er hier.
+                {istStab
+                  ? "In deinem Gym trainiert gerade kein zweiter Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."
+                  : "In deinem Gym gibt es gerade keinen Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."}
               </p>
             ) : (
               kollegen.map((kollege) => {
                 const name = memberName(kollege);
-                const aktive = bereicheFuer(entwurf, kollege.uid);
+                // Namentlich ODER über „alle Trainer" — der Satz sagt, was gilt.
+                const aktive = bereicheFuer(entwurf, kollege.uid, gymId);
                 const offen = offenerKollege === kollege.uid;
                 return (
                   <div
@@ -301,7 +369,7 @@ function ShareSheetInhalt({
                             color: "var(--text-3)",
                           }}
                         >
-                          {satzFuerPerson(aktive)}
+                          {satzFuerPerson(aktive, bereiche.length)}
                         </span>
                       </span>
                       <span
@@ -327,26 +395,32 @@ function ShareSheetInhalt({
                         jeder Chip seinen Namen in einer Zeile. */}
                     <Collapse open={offen}>
                     <div className="flex flex-col gap-2">
-                      {SHARE_AREAS.map((bereich) => (
-                        <BereichChip
-                          key={bereich.key}
-                          label={bereich.label}
-                          an={aktive.includes(bereich.key)}
-                          gesperrt={saving}
-                          onToggle={() =>
-                            setEntwurf((v) =>
-                              mitBereich(
-                                v,
-                                bereich.key,
-                                kollege.uid,
-                                !bereicheFuer(v, kollege.uid).includes(
+                      {bereiche.map((bereich) => {
+                        // Deckt „alle Trainer" den Bereich schon ab, ist das
+                        // Namens-Häkchen an und gesperrt — abwählen ginge nur
+                        // oben, bei allen.
+                        const ueberAlle = alleTrainer.includes(bereich.key);
+                        return (
+                          <BereichChip
+                            key={bereich.key}
+                            label={
+                              ueberAlle ? `${bereich.label} (über alle Trainer)` : bereich.label
+                            }
+                            an={aktive.includes(bereich.key)}
+                            gesperrt={saving || ueberAlle}
+                            onToggle={() =>
+                              setEntwurf((v) =>
+                                mitBereich(
+                                  v,
                                   bereich.key,
+                                  kollege.uid,
+                                  !(v[bereich.key]?.uids ?? []).includes(kollege.uid),
                                 ),
-                              ),
-                            )
-                          }
-                        />
-                      ))}
+                              )
+                            }
+                          />
+                        );
+                      })}
                     </div>
                     </Collapse>
                   </div>
@@ -416,9 +490,11 @@ function ShareSheetInhalt({
           >
             {error ??
               (dirty
-                ? anzahl === 0
-                  ? "Neu: dein Profil bleibt bei dir"
-                  : `Neu: ${anzahl} ${anzahl === 1 ? "Kollege sieht" : "Kollegen sehen"} etwas von dir`
+                ? alleTrainer.length > 0
+                  ? "Neu: alle Trainer deines Gyms sehen etwas von dir"
+                  : anzahl === 0
+                    ? "Neu: dein Profil bleibt bei dir"
+                    : `Neu: ${anzahl} ${anzahl === 1 ? "Trainer sieht" : "Trainer sehen"} etwas von dir`
                 : "")}
           </span>
           <button
@@ -449,6 +525,8 @@ export default function ProfileShareSheet({
   shares: ProfileShares;
   kollegen: StudentEntry[];
   teilenMitMir: GeteiltMitMir[];
+  gymId: string;
+  istStab: boolean;
   onSave: (naechste: ProfileShares) => Promise<void>;
   onClose: () => void;
 }) {

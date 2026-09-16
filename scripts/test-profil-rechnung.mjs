@@ -207,6 +207,50 @@ console.log("\nHIGHLIGHT NUR IN WAFFEN UND ENTRIES:");
   erwarte("Verhalten aus Clip: nein", "real-habits_when-tired" in p.dna, false);
 }
 
+console.log("\nNUR WAS VORKAM (Etappe 2):");
+{
+  // Eine reine Boxrunde: Split 100 % Boxen, ein Cross gezählt, kein Ringen.
+  const boxrunde = analyse({
+    videoType: "sparring",
+    findings: [
+      { q: "preferred-weapons_punch", side: "cross", text: "Der Cross sitzt." },
+      { q: "defensive-reactions_takedowns", side: "sprawl", text: "Sprawlt sauber." },
+      { q: "real-habits_when-tired", side: "rueckwaerts", text: "Geht rückwärts." },
+    ],
+    confirms: [{ questionId: "entry-patterns_takedown", evidence: ["01:10"] }],
+  });
+  boxrunde.observation = {
+    ...boxrunde.observation,
+    dnaSplit: { boxing: 100, kicking: 0, wrestling: 0, ground: 0, clinch: 0 },
+    actions: [{ id: "cross", otherLabel: null, attempted: 8, landed: 3, zone: "center", setup: null, damage: 1, timestamps: [] }],
+    defense: {}, controlTime: null, combos: [],
+  };
+  const p = computeProfile("athlete", [boxrunde], { dna: { "entry-patterns_takedown": "Double Leg aus dem Jab." } });
+  erwarte("Schlagfrage aus der Boxrunde: ja", "preferred-weapons_punch" in p.dna, true);
+  erwarte("Takedown-Frage aus der Boxrunde: nein", "defensive-reactions_takedowns" in p.dna, false);
+  erwarte("stilneutrale Frage: ja", "real-habits_when-tired" in p.dna, true);
+  erwarte("Bestätigung einer Takedown-Antwort ohne Takedowns wiegt nichts", p.evidence.answers["entry-patterns_takedown"].total, 0);
+}
+{
+  // Ein MMA-Kampf mit Takedowns: dieselbe Takedown-Frage ist offen.
+  const mma = analyse({
+    findings: [{ q: "defensive-reactions_takedowns", side: "sprawl", text: "Sprawlt sauber." }],
+  });
+  mma.observation = {
+    ...mma.observation,
+    dnaSplit: { boxing: 50, kicking: 10, wrestling: 30, ground: 10, clinch: 0 },
+    actions: [], defense: {}, controlTime: null, combos: [],
+  };
+  const p = computeProfile("athlete", [mma], { dna: {} });
+  erwarte("Takedown-Frage mit Ringen im Split: ja", "defensive-reactions_takedowns" in p.dna, true);
+}
+{
+  // Bestand ohne Split und Zähler: unbekannt, nicht leer → nichts gesperrt.
+  const alt = analyse({ findings: [{ q: "preferred-weapons_kick", side: "low-kick", text: "Low Kick." }] });
+  const p = computeProfile("athlete", [alt], { dna: {} });
+  erwarte("ohne jedes Signal bleibt alles offen", "preferred-weapons_kick" in p.dna, true);
+}
+
 // resolveAnswer direkt: Gleichstand mit identischem Alter → Schlüssel entscheidet.
 {
   const e = resolveAnswer(
