@@ -155,12 +155,15 @@ export default function GameplanBlock({
   const [jetzt, setJetzt] = useState(() => Date.now());
 
   // Solange Claude schreibt, einmal je halbe Minute prüfen, ob der Lauf hängt.
+  // Wartet ein Scouting-Nachlauf, alle 5 s — die Zeile verschwindet mit dem Aufschub.
   const schreibt = gameplan?.status === "schreibt";
+  const aufschubBis = gameplan?.aufschubBis?.getTime() ?? 0;
   useEffect(() => {
-    if (!schreibt) return;
-    const t = window.setInterval(() => setJetzt(Date.now()), 30_000);
+    if (!schreibt && !aufschubBis) return;
+    setJetzt(Date.now());
+    const t = window.setInterval(() => setJetzt(Date.now()), schreibt ? 30_000 : 5_000);
     return () => window.clearInterval(t);
-  }, [schreibt]);
+  }, [schreibt, aufschubBis]);
   // Sobald das Dokument einen neuen Zustand meldet, ist der Start-Knopf erledigt.
   useEffect(() => {
     setStartet(false);
@@ -181,6 +184,9 @@ export default function GameplanBlock({
   const inhalt = gameplan?.inhalt ?? null;
   const kurz = sport ? SPORT_KURZ[sport] : null;
   const laeuft = (schreibt && !haengt) || startet;
+  // Gegnerprofil von Hand geändert (Leon 17.09.2026: „Gameplan folgt dem
+  // Scouting") — der Server wartet noch auf weitere Änderungen.
+  const wartet = !laeuft && aufschubBis > jetzt;
 
   const knopf = (label: string, primaer = false) => (
     <button
@@ -264,6 +270,16 @@ export default function GameplanBlock({
         </p>
       </div>
       <div className="t-card p-4 sm:p-5">
+        {wartet && !profilGesperrt && !gesperrt && sport && (
+          <div
+            className="mb-4 flex items-center gap-2"
+            data-gameplan-aufschub
+            style={{ ...META_FONT, color: "var(--accent-text)" }}
+          >
+            <span aria-hidden className="h-2 w-2 rounded-full motion-safe:animate-pulse" style={{ background: "var(--accent)" }} />
+            Neues Scouting · Claude schreibt den Gameplan gleich neu
+          </div>
+        )}
         {koerper}
         {startFehler && (
           <p className="mt-3" role="alert" style={{ font: "var(--type-sub)", color: "var(--negative)" }}>

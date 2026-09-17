@@ -15,7 +15,10 @@
  * Übungen kommen aus der Exercise-DB, gefiltert nach Phase + Intensität.
  *
  * Kein KI-System, sondern eine erklärbare Heuristik. Trainer darf den Plan
- * danach frei editieren (im UI).
+ * danach frei editieren (im UI) — seit 17.09.2026 Stufe 1: Fokus, Einheiten,
+ * Sparring-Anteil und Notiz je Phase (components/trainer/PhasenEditor.tsx,
+ * lib/fight-camp.ts `updateFightCampPhase`). Techniken-Auswahl, Kampfdatum
+ * und Phasenlängen folgen in späteren Stufen.
  */
 
 import { ALL_TECHNIQUES } from "./techniques";

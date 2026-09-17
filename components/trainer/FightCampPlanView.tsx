@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ALL_TECHNIQUES } from "@/lib/techniques";
 import { EXERCISES } from "@/lib/exercises";
 import {
@@ -9,9 +10,14 @@ import {
   PHASE_LABEL,
   type FightCamp,
   type FightCampPhase,
+  type PhasenAenderung,
+  type PlanAenderung,
 } from "@/lib/fight-camp";
 import type { GameplanDrill } from "@/lib/gameplan";
 import { TRAINING_AREA_LABEL } from "@/lib/types";
+import { MorphSwap } from "@/components/motion";
+import Icon from "@/components/ui/Icon";
+import PhasenEditor from "@/components/trainer/PhasenEditor";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("de-DE", {
@@ -19,6 +25,20 @@ function formatDate(d: Date): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** „Geändert von Leon · heute" — für die Phase und den Kopf des Athleten-Sheets. */
+export function aenderungText(g: PlanAenderung, jetzt = new Date()): string {
+  const d = new Date(g.at);
+  const tag = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const tage = Math.round((tag(jetzt) - tag(d)) / 86_400_000);
+  const wann =
+    tage === 0
+      ? "heute"
+      : tage === 1
+        ? "gestern"
+        : d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+  return `Geändert von ${g.name} · ${wann}`;
 }
 
 const TECH_BY_ID = new Map(ALL_TECHNIQUES.map((t) => [t.id, t]));
@@ -94,6 +114,9 @@ export default function FightCampPlanView({
   camp,
   showOpponent = true,
   drillsFuer,
+  sicht = "trainer",
+  kopf = true,
+  onPhaseSpeichern,
 }: {
   camp: FightCamp;
   /** Gegner-Zusammenfassung anzeigen. Im Wettkampf-Detail aus, da dort die
@@ -106,13 +129,25 @@ export default function FightCampPlanView({
    * ersetzt sie, ohne den Plan anzufassen.
    */
   drillsFuer?: (phase: FightCampPhase) => GameplanDrill[];
+  /** „athlet" = der Plan im Sheet des Athleten (Leon 11.09.: „Athlet sieht den Plan seines Wettkampfs"). */
+  sicht?: "trainer" | "athlet";
+  /** Die Kopfkarte mit Name und Fortschritt — im Sheet steht beides schon darüber. */
+  kopf?: boolean;
+  /**
+   * Phase von Hand ändern (Leon 17.09.2026: „Wettkampf-Plan bearbeiten,
+   * Stufe 1"). Ohne diese Funktion bleibt der Plan reine Anzeige.
+   */
+  onPhaseSpeichern?: (phase: FightCampPhase, aenderung: PhasenAenderung) => Promise<void>;
 }) {
   const progress = fightCampProgress(camp);
+  // Immer nur EINE Phase im Editor — zwei offene Formulare laden zum Verlieren ein.
+  const [bearbeitet, setBearbeitet] = useState<FightCampPhase | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
       {/* Camp-Kopf. Kein Verlauf mehr als Flächenfüllung (DESIGN-BRIEF §3):
           eine Karte, und die Betonung macht die Typo. */}
+      {kopf && (
       <div className="t-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -239,6 +274,7 @@ export default function FightCampPlanView({
         </div>
         )}
       </div>
+      )}
 
       {/* Phasen */}
       {camp.phases.map((phase, idx) => {
@@ -252,6 +288,7 @@ export default function FightCampPlanView({
         const accent = PHASE_FG[zustand];
         const accentBg = PHASE_BG[zustand];
         const accentBorder = PHASE_BORDER[zustand];
+        const imEditor = bearbeitet === phase.phase;
 
         return (
           <div
@@ -304,28 +341,85 @@ export default function FightCampPlanView({
                   </div>
                 </div>
               </div>
-              {isCurrent && (
-                <span
-                  className="rounded-badge px-2 py-1"
-                  style={{
-                    ...META_FONT,
-                    background: accentBg,
-                    border: `1px solid ${accentBorder}`,
-                    color: accent,
-                  }}
-                >
-                  Aktuelle Phase
-                </span>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {isCurrent && (
+                  <span
+                    className="rounded-badge px-2 py-1"
+                    style={{
+                      ...META_FONT,
+                      background: accentBg,
+                      border: `1px solid ${accentBorder}`,
+                      color: accent,
+                    }}
+                  >
+                    Aktuelle Phase
+                  </span>
+                )}
+                {/* Dieselbe ruhige Pille wie „Bearbeiten" im Kopf der
+                    Wettkampfseite — Wort und Stift, kein nacktes Zeichen. */}
+                {onPhaseSpeichern && !imEditor && (
+                  <button
+                    type="button"
+                    onClick={() => setBearbeitet(phase.phase)}
+                    data-press
+                    data-aktion="phase-bearbeiten"
+                    data-phase={phase.phase}
+                    aria-label={`${PHASE_LABEL[phase.phase]} bearbeiten`}
+                    className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-pill px-3.5"
+                    style={{
+                      ...META_FONT,
+                      border: "1px solid var(--line)",
+                      color: "var(--text-body)",
+                    }}
+                  >
+                    <Icon name="edit" size={16} strokeWidth={2.2} />
+                    Bearbeiten
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Focus */}
-            <p
-              className="mt-3"
-              style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
-            >
-              {phase.focus}
-            </p>
+            {/* Fokus, Notiz und „geändert von" — der Editor steht an derselben Stelle. */}
+            <MorphSwap activeKey={imEditor ? "editor" : "ansicht"} className="mt-3">
+              {imEditor && onPhaseSpeichern ? (
+                <PhasenEditor
+                  phase={phase}
+                  onSpeichern={async (a) => {
+                    await onPhaseSpeichern(phase.phase, a);
+                    setBearbeitet(null);
+                  }}
+                  onAbbrechen={() => setBearbeitet(null)}
+                />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                    {phase.focus}
+                  </p>
+                  {phase.notes && (
+                    <div
+                      className="rounded-field px-3 py-2.5"
+                      data-phasen-notiz={phase.phase}
+                      style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
+                    >
+                      <div className="t-label">
+                        {sicht === "athlet" ? "Notiz von deinem Trainer" : "Notiz"}
+                      </div>
+                      <p
+                        className="mt-1 whitespace-pre-line"
+                        style={{ font: "var(--type-sub)", color: "var(--text-body)" }}
+                      >
+                        {phase.notes}
+                      </p>
+                    </div>
+                  )}
+                  {phase.geaendert && (
+                    <div data-phasen-geaendert={phase.phase} style={{ ...META_FONT, color: "var(--text-3)" }}>
+                      {aenderungText(phase.geaendert)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </MorphSwap>
 
             {/* Drills aus dem Gameplan — zuerst, weil sie genau diesem Gegner gelten. */}
             {(drillsFuer?.(phase.phase) ?? []).length > 0 && (
@@ -353,7 +447,8 @@ export default function FightCampPlanView({
               </div>
             )}
 
-            {/* Stats */}
+            {/* Stats — im Editor stehen Einheiten und Sparring als Stepper, hier nicht doppelt. */}
+            {!imEditor && (
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div
                 className="rounded-field px-2 py-2 text-center"
@@ -407,6 +502,7 @@ export default function FightCampPlanView({
                 </div>
               </div>
             </div>
+            )}
 
             {/* Training areas tags */}
             {phase.trainingAreas.length > 0 && (
@@ -488,15 +584,24 @@ export default function FightCampPlanView({
       })}
 
       {/* Disclaimer */}
-      <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-        <strong style={{ color: "var(--text-2)" }}>Zur Einordnung:</strong>{" "}
-        Dieser Plan entsteht aus der Trainings-Historie deines Athleten, dem
-        Stil des Gegners und der Kampfart des Wettkampfs — eine Faustregel, kein
-        wissenschaftliches Ergebnis. Die Drills &bdquo;Aus dem Gameplan&ldquo; schreibt
-        Claude aus beiden DeepFight-Profilen.
-        Geh die Phasen durch, bevor du sie einsetzt, und pass sie an
-        Belastbarkeit, Verletzungen und Tagesform an.
-      </div>
+      {sicht === "athlet" ? (
+        <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          Dein Trainer plant die Phasen und passt sie an. Die Drills
+          &bdquo;Aus dem Gameplan&ldquo; schreibt Claude aus deinem Profil und dem
+          deines Gegners. Zwickt etwas, sprich mit deinem Trainer.
+        </div>
+      ) : (
+        <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+          <strong style={{ color: "var(--text-2)" }}>Zur Einordnung:</strong>{" "}
+          Dieser Plan entsteht aus der Trainings-Historie deines Athleten, dem
+          Stil des Gegners und der Kampfart des Wettkampfs — eine Faustregel, kein
+          wissenschaftliches Ergebnis. Die Drills &bdquo;Aus dem Gameplan&ldquo; schreibt
+          Claude aus beiden DeepFight-Profilen.
+          {onPhaseSpeichern
+            ? " Pass jede Phase über „Bearbeiten“ an Belastbarkeit, Verletzungen und Tagesform an — dein Athlet sieht die Änderung sofort."
+            : " Geh die Phasen durch, bevor du sie einsetzt, und pass sie an Belastbarkeit, Verletzungen und Tagesform an."}
+        </div>
+      )}
     </div>
   );
 }

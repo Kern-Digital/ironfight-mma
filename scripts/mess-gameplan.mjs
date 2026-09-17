@@ -28,13 +28,30 @@
  *   • Athlet (eigenes Konto): Dashboard-Karte „Dein Gameplan" → Sheet mit drei
  *     Blöcken und Drills — liest das Gameplan-Dokument mit dem Client-SDK
  *     (Regel: Inhaber liest fightProfile/*).
+ *
+ * Fenster d5 (17.09.2026 abends) — Gameplan folgt dem Scouting + Plan bearbeiten:
+ *   • Firestore: zwei Scouting-Änderungen am Stück (Aufschub 1,5 s) → die
+ *     erste tritt zurück, die zweite schreibt „offen · gegner" (kein Claude).
+ *   • Browser Trainer: Phase 2 bearbeiten (Fokus, 4→3 Einheiten, 20→25 %
+ *     Sparring, Notiz) → nur diese Phase im Dokument, „Geändert von … · heute";
+ *     Abbrechen ändert nichts; Gegnerprofil speichern → Hinweis „schreibt in
+ *     90 Sekunden neu", Marke am Gameplan, Zeile „Neues Scouting" auf der
+ *     Wettkampfseite, nach ≥ 90 s „offen · gegner" (echte Route, kein Claude).
+ *   • Browser Athlet: Karte mit „Dein Trainingsplan" + „Dein Gameplan", Plan-
+ *     Sheet zeigt die Trainer-Änderung, eine Admin-Änderung erscheint LIVE,
+ *     Reiter wechselt zum Gameplan; Handy-Breite 390 px ohne Quer-Überlauf.
  */
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { initAdmin } from "./lib/admin-app.mjs";
 import { claimsWithRights, rightsMirror } from "./lib/role-claims.mjs";
 import { recomputeProfile } from "../lib/server/profile-recompute.ts";
-import { betroffeneWettkaempfe, schreibeGameplan } from "../lib/server/gameplan.ts";
+import {
+  betroffeneWettkaempfe,
+  gameplaeneNachScouting,
+  merkeScoutingAenderung,
+  schreibeGameplan,
+} from "../lib/server/gameplan.ts";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const THEME = process.env.THEME ?? "dark";
@@ -244,8 +261,55 @@ async function main() {
     });
     sagt(true, "fertiger Gameplan von Hand geschrieben (Schirm-Daten)");
 
+    // ── Gameplan folgt dem Scouting — ohne Claude (Fenster d5) ─────────────
+    // Leerer Gegner: Eine Änderung an den Maßen ist kein Scouting, die
+    // Voraussetzung bleibt „gegner" — so läuft der ganze Weg ohne KI-Kosten.
+    const scout = db.collection("opponents").doc();
+    gegnerIds.push(scout.id);
+    await scout.set({
+      gymId: GYM_ID, name: "Mess Gegner Scouting", style: "all-rounder", stance: "orthodox", heightCm: null, weightKg: null, reachCm: null,
+      strengths: [], weaknesses: [], favoriteAttacks: [], notes: null, dna: {}, sharedWith: [],
+      createdBy: trainerUid, createdByName: "Mess Trainer 2d", createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+    });
+    const scoutCamp = camps.doc();
+    await scoutCamp.set(camp(athletUid, trainerUid, { name: "Mess Scouting d5", sport: "mma", opponentId: scout.id, opponentName: "Mess Gegner Scouting", tage: 45 }));
+    const scoutPlan = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${scoutCamp.id}`);
+    const planFertig = {
+      campId: scoutCamp.id, sport: "mma", status: "fertig",
+      inhalt: { lage: "Vorher-Stand Scouting.", waffen: [{ titel: "Vorher", text: "Stand vor dem Scouting.", beleg: "Scouting-Notiz" }], gefahren: [], soKaempfstDu: [], drills: [] },
+      stand: null, geschriebenAt: new Date().toISOString(), gestartetAt: null, offen: null, fehler: null, model: "mess", usage: null, laufId: null, eingabeSchluessel: "mess",
+    };
+    await scoutPlan.set(planFertig);
+    const m1 = await merkeScoutingAenderung(db, { opponentId: scout.id, gymId: GYM_ID, aufschubMs: 1500 });
+    const nachM1 = (await scoutPlan.get()).data();
+    sagt(
+      m1.betroffen.length === 1 && nachM1?.aufschubId === m1.aufschubId && !!nachM1?.aufschubBis && nachM1?.status === "fertig",
+      `Scouting: Marke am Gameplan des anstehenden Wettkampfs (${m1.betroffen.length}), Status bleibt ${nachM1?.status}`,
+    );
+    const m2 = await merkeScoutingAenderung(db, { opponentId: scout.id, gymId: GYM_ID, aufschubMs: 1500 });
+    const frist = Date.now() + 280_000;
+    const [r1, r2] = await Promise.all([
+      gameplaeneNachScouting(db, m1, { frist, aufschubMs: 1500 }),
+      gameplaeneNachScouting(db, m2, { frist, aufschubMs: 1500 }),
+    ]);
+    sagt(r1[0]?.ergebnis === "ueberholt" && r2[0]?.ergebnis === "offen", `Scouting: zwei Änderungen am Stück — die erste tritt zurück (${r1[0]?.ergebnis}), die zweite schreibt (${r2[0]?.ergebnis})`);
+    const nachScout = (await scoutPlan.get()).data();
+    sagt(
+      nachScout?.status === "offen" && nachScout?.offen === "gegner" && !nachScout?.aufschubId && !nachScout?.aufschubBis &&
+        nachScout?.inhalt?.lage === "Vorher-Stand Scouting." && !nachScout?.usage,
+      "Scouting: Marke abgenommen, „offen · gegner“, Inhalt bleibt, kein Claude-Aufruf",
+    );
+    const neuPlan = (await db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${neu.id}`).get()).data();
+    sagt(!neuPlan?.aufschubId, "Scouting: Wettkampf gegen einen anderen Gegner trägt keine Marke");
+    await scoutPlan.set(planFertig);
+
     if (BROWSER || process.env.FLAG === "1") await markierenNachweis({ db, athletUid, trainerUid, gegnerIds });
-    if (BROWSER) await schirme({ athletUid, neuId: neu.id, bestandId: bestand.id, gegnerId: gegner.id, db });
+    if (BROWSER) {
+      await schirme({
+        athletUid, trainerUid, neuId: neu.id, bestandId: bestand.id, gegnerId: gegner.id, db,
+        scoutId: scout.id, scoutCampId: scoutCamp.id,
+      });
+    }
   } catch (err) {
     fehler += 1;
     console.log(`  FEHL Ausnahme: ${err?.name ?? ""} ${err?.message ?? err}`);
@@ -358,11 +422,16 @@ async function warteAuf(pruefe, ms = 30000) {
   return null;
 }
 
-async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
+async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, db, scoutId, scoutCampId }) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const konsole = [];
+  const scoutPlanRef = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${scoutCampId}`);
+  let tSpeichern = 0;
   try {
+    const ohneToken = await fetch(`${BASE}/api/wettkampf/gameplan/scouting`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    sagt(ohneToken.status === 403, `Scouting-Route: POST ohne Token → ${ohneToken.status}`);
+
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: THEME });
     const page = await ctx.newPage();
     page.on("console", (m) => { if (m.type() === "error") konsole.push(m.text()); });
@@ -407,6 +476,50 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
     sagt(athletText.includes("mattenmitte") || athletText.includes("matte"), "Athleten-Karte: Matten-Wörter aus seinem MMA-Profil");
     await page.screenshot({ path: `${OUT}/mess-2d-athlet-${THEME}.png`, fullPage: false });
 
+    // ── Plan bearbeiten, Stufe 1 (Fenster d5) ───────────────────────────────
+    const phase2 = page.locator("#plan-phase-specific-prep");
+    await phase2.scrollIntoViewIfNeeded();
+    sagt((await page.locator('[data-aktion="phase-bearbeiten"]').count()) === 4, "Plan: jede der vier Phasen trägt „Bearbeiten“");
+    await phase2.locator('[data-aktion="phase-bearbeiten"]').click();
+    const editor = phase2.locator('[data-phasen-editor="specific-prep"]');
+    await editor.waitFor({ timeout: 10000 });
+    sagt((await page.locator("[data-phasen-editor]").count()) === 1, "Plan: „Bearbeiten“ öffnet den Editor genau einer Phase");
+    await editor.locator('[data-feld="fokus"]').fill("Takedown-Abwehr am Zaun");
+    await editor.locator('[data-feld="einheiten"] button[aria-label$="weniger"]').click();
+    await editor.locator('[data-feld="sparring"] button[aria-label$="mehr"]').click();
+    await editor.locator('[data-feld="notiz"]').fill("Sparring nur mit Kopfschutz");
+    await page.waitForTimeout(500);
+    const edText = (await editor.innerText()).toLowerCase();
+    sagt(edText.includes("3×") && edText.includes("25 %"), "Plan: Stepper 4 → 3 Einheiten, 20 → 25 % Sparring");
+    await phase2.screenshot({ path: `${OUT}/mess-d5-phase-editor-${THEME}.png` });
+    await editor.locator('[data-aktion="phase-speichern"]').click();
+    await phase2.locator('[data-phasen-geaendert="specific-prep"]').waitFor({ timeout: 15000 });
+    await page.waitForTimeout(700);
+    const p2Text = (await phase2.innerText()).toLowerCase();
+    sagt(
+      p2Text.includes("takedown-abwehr am zaun") && p2Text.includes("sparring nur mit kopfschutz") && p2Text.includes("3×") && p2Text.includes("25%"),
+      "Plan: Ansicht zeigt Fokus, Notiz, 3× und 25 %",
+    );
+    sagt(p2Text.includes("geändert von mess trainer 2d · heute"), "Plan: „Geändert von Mess Trainer 2d · heute“");
+    await phase2.screenshot({ path: `${OUT}/mess-d5-phase-gespeichert-${THEME}.png` });
+    const campNeu = (await db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId).get()).data();
+    const [pa, pb] = campNeu.phases;
+    sagt(
+      pb.focus === "Takedown-Abwehr am Zaun" && pb.sessionsPerWeek === 3 && pb.sparringRatio === 0.25 && pb.notes === "Sparring nur mit Kopfschutz" &&
+        pb.geaendert?.uid === trainerUid && pb.geaendert?.name === "Mess Trainer 2d" && pb.startsAt instanceof Timestamp,
+      "Plan: Dokument trägt die Änderung an Phase 2 samt Autor, Datumsfelder bleiben Timestamps",
+    );
+    sagt(pa.focus === "Aufbau." && !pa.geaendert && campNeu.phases.length === 4 && campNeu.ownerIsStaff === false, "Plan: die anderen Phasen und ownerIsStaff unberührt");
+    // Abbrechen ändert nichts
+    const taper = page.locator("#plan-phase-taper");
+    await taper.scrollIntoViewIfNeeded();
+    await taper.locator('[data-aktion="phase-bearbeiten"]').click();
+    await taper.locator('[data-phasen-editor="taper"] [data-feld="fokus"]').fill("Soll nicht gespeichert werden");
+    await taper.getByRole("button", { name: "Abbrechen" }).click();
+    await page.waitForTimeout(800);
+    const taperDoc = (await db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId).get()).data().phases[3];
+    sagt((await page.locator("[data-phasen-editor]").count()) === 0 && taperDoc.focus === "Taper." && !taperDoc.geaendert, "Plan: Abbrechen schließt den Editor und speichert nichts");
+
     // Bestand ohne Kampfart
     await page.goto(`${BASE}/trainer/competitions/${athletUid}/${bestandId}`, { waitUntil: "domcontentloaded" });
     await page.locator('[data-feld="kampfart-waehlen"]').waitFor({ timeout: 60000 });
@@ -444,6 +557,32 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
     sagt(profText.includes("käfig"), "Gegnerprofil: Käfig-Wörter (eine Kampfart, Fläche Käfig)");
     await page.screenshot({ path: `${OUT}/mess-2d-gegnerprofil-${THEME}.png`, fullPage: false });
 
+    // ── Gameplan folgt dem Scouting zur Laufzeit (Fenster d5, echte Route) ──
+    await page.goto(`${BASE}/trainer/deepfight/gegner/${scoutId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Bearbeiten" }).first().click();
+    await page.getByLabel("Größe cm").fill("181");
+    await page.getByRole("button", { name: "Speichern" }).first().click();
+    tSpeichern = Date.now();
+    const hinweis = page.locator('[data-gameplan-nachzug="1"]');
+    await hinweis.waitFor({ timeout: 30000 });
+    const hinweisText = (await hinweis.innerText()).toLowerCase();
+    sagt(hinweisText.includes("in 90 sekunden neu") && hinweisText.includes("mess gegner scouting"), `Scouting: Hinweis nach dem Speichern (${Math.round((Date.now() - tSpeichern) / 100) / 10} s)`);
+    await page.waitForTimeout(1000); // MorphSwap darunter federt nach
+    await page.screenshot({ path: `${OUT}/mess-d5-scouting-gegner-${THEME}.png`, fullPage: false });
+    const marke = await warteAuf(async () => {
+      const d = (await scoutPlanRef.get()).data();
+      return d?.aufschubId ? d : null;
+    }, 15000);
+    const bis = marke?.aufschubBis ? new Date(marke.aufschubBis).getTime() - tSpeichern : 0;
+    sagt(!!marke && marke.status === "fertig" && bis > 80_000 && bis < 100_000, `Scouting: Marke am Gameplan, fällig in ${Math.round(bis / 1000)} s, Status ${marke?.status}`);
+    await page.goto(`${BASE}/trainer/competitions/${athletUid}/${scoutCampId}`, { waitUntil: "domcontentloaded" });
+    const aufschubZeile = page.locator("[data-gameplan-aufschub]");
+    await aufschubZeile.waitFor({ timeout: 60000 });
+    await page.waitForTimeout(1500);
+    sagt((await aufschubZeile.innerText()).toLowerCase().includes("claude schreibt den gameplan gleich neu"), "Scouting: Wettkampfseite zeigt „Neues Scouting · Claude schreibt den Gameplan gleich neu“");
+    await page.locator("section#gameplan").scrollIntoViewIfNeeded();
+    await page.locator("section#gameplan").screenshot({ path: `${OUT}/mess-d5-scouting-block-${THEME}.png` });
+
     // Anlegen mit Vorbelegung
     await page.goto(`${BASE}/trainer/competitions/new?student=${athletUid}`, { waitUntil: "domcontentloaded" });
     await page.locator('[data-feld="kampfart"]').waitFor({ timeout: 60000 });
@@ -464,11 +603,35 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
     await apage.evaluate((t) => localStorage.setItem("ta-theme", t), THEME);
     await apage.goto(`${BASE}/dashboard`, { waitUntil: "domcontentloaded" });
     const knopf = apage.locator('[data-aktion="gameplan-oeffnen"]');
+    const planKnopf = apage.locator('[data-aktion="plan-oeffnen"]');
     await knopf.waitFor({ timeout: 60000 });
     await apage.waitForTimeout(1500);
-    sagt(true, "Athlet: Wettkampf-Karte zeigt „Dein Gameplan“");
-    await apage.screenshot({ path: `${OUT}/mess-5b-athlet-karte-${THEME}.png`, fullPage: false });
-    await knopf.click();
+    sagt((await planKnopf.count()) === 1, "Athlet: Wettkampf-Karte zeigt „Dein Trainingsplan“ und „Dein Gameplan“");
+    await apage.screenshot({ path: `${OUT}/mess-d5-athlet-karte-${THEME}.png`, fullPage: false });
+
+    // Trainingsplan im Sheet (Fenster d5)
+    await planKnopf.click();
+    const planSheet = apage.getByRole("dialog", { name: "Dein Trainingsplan" });
+    await planSheet.waitFor({ timeout: 15000 });
+    await apage.waitForTimeout(1200);
+    const pText = (await planSheet.innerText()).toLowerCase();
+    sagt(
+      pText.includes("takedown-abwehr am zaun") && pText.includes("notiz von deinem trainer") && pText.includes("sparring nur mit kopfschutz"),
+      "Athlet: Plan-Sheet zeigt Fokus und Notiz des Trainers",
+    );
+    sagt(pText.includes("geändert von mess trainer 2d · heute") && pText.includes("mma · käfig · gegen mess gegner käfig"), "Athlet: „Geändert von … · heute“ + Kopf „MMA · Käfig · gegen …“");
+    sagt(
+      (await planSheet.locator('[data-aktion="phase-bearbeiten"]').count()) === 0 && (await planSheet.locator("[data-reiter]").count()) === 2,
+      "Athlet: nur lesen (kein „Bearbeiten“), zwei Reiter",
+    );
+    const neuRef = db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId);
+    const neuDaten = (await neuRef.get()).data();
+    neuDaten.phases[0].focus = "Live geändert d5.";
+    await neuRef.update({ phases: neuDaten.phases });
+    const live = await warteAuf(async () => (await planSheet.innerText()).includes("Live geändert d5."), 15000);
+    sagt(!!live, "Athlet: Änderung am Plan erscheint LIVE im offenen Sheet");
+    await apage.screenshot({ path: `${OUT}/mess-d5-athlet-plan-${THEME}.png`, fullPage: false });
+    await apage.locator('[data-reiter="gameplan"]').click();
     const sheet = apage.getByRole("dialog", { name: "Dein Gameplan" });
     await sheet.waitFor({ timeout: 15000 });
     await apage.waitForTimeout(1200);
@@ -478,6 +641,45 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
     sagt(!sText.includes("neu schreiben"), "Athlet: nur lesen, kein „Neu schreiben“");
     await apage.screenshot({ path: `${OUT}/mess-5b-athlet-sheet-${THEME}.png`, fullPage: false });
     await actx.close();
+
+    // Handy-Breite 390 px (bisher nicht gemessen)
+    const hctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: THEME, hasTouch: true, isMobile: true });
+    const hpage = await hctx.newPage();
+    hpage.on("console", (m) => { if (m.type() === "error") konsole.push(`[handy] ${m.text()}`); });
+    await anmelden(hpage, ATHLET);
+    await hpage.evaluate((t) => localStorage.setItem("ta-theme", t), THEME);
+    await hpage.goto(`${BASE}/dashboard`, { waitUntil: "domcontentloaded" });
+    await hpage.locator('[data-aktion="plan-oeffnen"]').waitFor({ timeout: 60000 });
+    await hpage.waitForTimeout(1200);
+    await hpage.locator('[data-aktion="plan-oeffnen"]').click();
+    const hSheet = hpage.getByRole("dialog", { name: "Dein Trainingsplan" });
+    await hSheet.waitFor({ timeout: 15000 });
+    await hpage.waitForTimeout(1500);
+    const quer = await hpage.evaluate(() => {
+      const d = document.querySelector('[role="dialog"]');
+      const els = d ? [d, ...d.querySelectorAll("*")] : [];
+      return {
+        seite: document.documentElement.scrollWidth - window.innerWidth,
+        breiter: els.filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length,
+      };
+    });
+    sagt(quer.seite <= 0 && quer.breiter === 0, `Handy 390 px: Plan-Sheet ohne Quer-Überlauf (Seite ${quer.seite}, Elemente rechts drüber ${quer.breiter})`);
+    await hpage.screenshot({ path: `${OUT}/mess-d5-handy-plan-${THEME}.png`, fullPage: false });
+    await hpage.locator('[data-reiter="gameplan"]').click();
+    await hpage.waitForTimeout(1200);
+    await hpage.screenshot({ path: `${OUT}/mess-d5-handy-gameplan-${THEME}.png`, fullPage: false });
+    await hctx.close();
+
+    // Scouting-Nachlauf fertig? Frühestens 90 s nach dem Speichern.
+    const scoutFertig = await warteAuf(async () => {
+      const d = (await scoutPlanRef.get()).data();
+      return d?.status === "offen" && !d?.aufschubId ? d : null;
+    }, Math.max(0, 100_000 - (Date.now() - tSpeichern)) + 40_000);
+    const sek = Math.round((Date.now() - tSpeichern) / 1000);
+    sagt(
+      scoutFertig?.offen === "gegner" && scoutFertig?.inhalt?.lage === "Vorher-Stand Scouting." && !scoutFertig?.usage && sek >= 88,
+      `Scouting zur Laufzeit: ${sek} s nach dem Speichern „offen · ${scoutFertig?.offen}“, Inhalt bleibt, kein Claude-Aufruf`,
+    );
 
     const echt = konsole.filter((k) => !/favicon|Download the React DevTools/i.test(k));
     sagt(echt.length === 0, `Konsole ohne Fehler (${echt.length})`);

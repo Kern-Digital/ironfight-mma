@@ -1598,12 +1598,184 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
     zweite jose 6 über `@vercel/oidc` — raus, `lib/server/nachlauf.ts`
     ersetzt `waitUntil`. Prüfen nach jedem Deploy: POST ohne Token an eine
     Admin-SDK-Route muss 403 liefern, nicht 500.
-  - **Offen:** Markieren-Nachlauf mit echter KI nicht laufzeit-geprüft ·
-    Gameplan für den Athleten sichtbar machen (Regel lässt den Inhaber schon
-    lesen, inkl. Gegner-Inhalt — Leon entscheiden) · Trainer mit DeepFight-,
-    aber ohne Wettkampf-Freigabe könnte das Gameplan-Dokument lesen (keine
-    UI) · Gegnerprofil-Seite (/trainer/deepfight/gegner/[id]) noch im
-    Alt-Look · Fläche des WETTKAMPFS (Käfig/Ring) unbekannt → Gameplan neutral.
+  - **Offen (Stand 2d, am selben Abend von 5b abgearbeitet — siehe unten):**
+    Markieren-Nachlauf zur Laufzeit · Gameplan für den Athleten · Trainer mit
+    DeepFight-, aber ohne Wettkampf-Freigabe liest das Gameplan-Dokument ·
+    Gegnerprofil-Seite im Alt-Look · Fläche des Wettkampfs.
+  - **RUNDE 2: FLÄCHE AM WETTKAMPF + GAMEPLAN FÜR DEN ATHLETEN (17.09.2026
+    abends, Fenster tidal-athletics-5b, COMMITTET + GEPUSHT 8b55331, Vercel
+    success, Produktion nachgemessen).** Leons Antworten (wörtlich): KI-Nachweis
+    „Ja, ca. 0,20–0,25 € (Empfohlen)" · Athlet „Ja, sofort über seine
+    Wettkampf-Karte (Empfohlen)" · Fläche (Freitext) „ja vorbelegt nachdem was
+    eingetragen worden ist bei der wettkampferstellung" · Abnahme „Passt so
+    (Empfohlen)" · dritter KI-Lauf „Nein, so committen (Empfohlen)" · Commit
+    „Ja, committen (Empfohlen)" · Push „Ja, pushen (Empfohlen)".
+    - **Fläche:** `FightCamp.flaeche?: Flaeche | null` (null/fehlend =
+      Vorbelegung). `lib/kampfart-steckbrief.ts`: `FLAECHE_ORT`,
+      `STANDARD_FLAECHE` (MMA Käfig · Boxen/Kickboxen Ring · Ringen/Sambo/BJJ
+      Matte), `flaecheDesWettkampfs({ sport, flaeche })` (IMMER darüber lesen),
+      `flaecheWaehlbar(sport)` (BJJ ohne Feld, `hatZonen`). Anlegen: Feld
+      „Fläche" neben der Kampfart (Grid lg 4 statt 3), eine Wahl von Hand gilt
+      nur für die Kampfart, zu der sie gewählt wurde, gespeichert wird, was der
+      Trainer sah; Hilfstext „… und plant den Kampf im Käfig". Wettkampfseite:
+      Select im Kopf (`data-feld="flaeche"`, `data-flaeche`), `handleFlaeche`
+      speichert mit `ownerFlag()` und stößt den Gameplan an (die Fläche steckt
+      im Fingerabdruck). GameplanBlock-Kopf „MMA · Käfig · A gegen B". Die
+      Gegner-Seite behält die Fläche aus SEINEN Videos (`evidence.flaeche`).
+    - **Prompt:** `GameplanEingabe.flaeche`, `flaechenSatz(e, flaeche)`: Mitte/
+      Rand der Fläche, verbotene Wörter je Fläche (Käfig: „Seile"; Ring:
+      Käfig/Cage/Zaun; Matte: alle), Käfig-Wortschatz (Zaun, Wall-Wrestling,
+      Cage Control) über `begriffe(sport, flaeche)`. Profile, deren Videos auf
+      ANDERER Fläche liefen (`evidence.flaeche`), werden benannt („Die Videos
+      deines Athleten zeigen die Matte.") und still übertragen — „ohne diesen
+      Satz zu zitieren". Ohne Fläche der neutrale Satz wie bisher. Bestehende
+      Gameplans schreiben sich beim nächsten Anlass einmal neu (Prompt anders).
+    - **Athlet:** `components/GameplanSheet.tsx` (SheetShell, XKnopf, EIN
+      Scrollbereich `min-h-0 flex-1`, Lage + drei Blöcke untereinander +
+      „Deine Drills" je Phase + Stand-Zeile, nur lesen, „Claude schreibt deinen
+      Gameplan gerade neu" bei status schreibt). `GameplanBloecke` und
+      `gameplanZeit` aus GameplanBlock geteilt. app/dashboard/page.tsx
+      (`DashboardContent`, NICHT TrainerDashboardContent): `useGameplan` für
+      `nextCamp`, Zeile „Dein Gameplan" (`data-aktion="gameplan-oeffnen"`) nur
+      mit Inhalt. KEINE Regeländerung: Inhaber liest `fightProfile/*`, und das
+      Camp-Dokument mit dem Gegner-Snapshot (Stärken, Notizen) las er schon
+      vorher. Trainer mit DeepFight- ohne Wettkampf-Freigabe: bewusst so
+      gelassen (Inhalt stammt aus Profilen, die er ohnehin liest; keine UI).
+    - **KI-Nachweis** (A gegen B, MMA im Käfig, `LAUF=2 FLAECHE=kaefig`,
+      `nachweis-2d/gameplan-A-gegen-B-2.json`): 107 s, **0,30 €** (13.594 ein /
+      9.131 aus — über der Ansage 0,20–0,25, weil länger), 3/3/4 Punkte, 5
+      Drills in Phase 2/3, Belege Ø 55 / max 63 Zeichen (Lauf 1: Ø 183, 12 von
+      12 über 70), „er/sein/ihn" 0 Sätze (Lauf 1: 17), 6 Sätze nutzen den
+      Käfig, 0 × Seile, 0 Kleinstmengen-Urteile. Befund: lage zitierte die
+      Übertrags-Anweisung fast wörtlich → Satz geschärft (s. o.), NICHT mit KI
+      nachgemessen (Leon: „so committen").
+    - **Messung:** test-gameplan **53/53** · test-kampfart-steckbrief 70/70 ·
+      test-profil-rechnung 86/86 · tsc/eslint 0 · `scripts/mess-gameplan.mjs`
+      **38/38 dunkel + hell** (Konsole 0, aufgeräumt 7 Auth / 37 users): Fläche
+      im Kopf vorbelegt, Bestand „MMA" → Käfig → Ring schreibt `flaeche` +
+      Route „offen · gegner" ohne Claude, Anlegen folgt der Kampfart, Athlet
+      öffnet das Sheet über die Karte, und der **Markieren-Nachlauf zur
+      Laufzeit**: Prüf-Gegner mit einer Analyse, POST /api/video-analysis/flag
+      mit echtem ID-Token → 200 in 790 ms, 1,6 s später Gameplan „offen ·
+      gegner", Inhalt bleibt, kein Claude. Aufruf: `BROWSER=1 THEME=dark
+      GAMEPLAN_JSON=<…-2.json> node --use-system-ca --experimental-transform-types
+      --import ./scripts/lib/ts-loader-register.mjs scripts/mess-gameplan.mjs`
+      (nur Markieren: `FLAG=1`). Produktion nach 8b55331: /login 200, POST ohne
+      Token an commit/flag/gameplan 403, GET 405, /, /dashboard,
+      /trainer/competitions(/new) 307, Chunks 200, 0 × 500 in `vercel logs`.
+    - **Fallen:** (20) **Kaspersky bricht HTTPS auf** (Stamm „Kaspersky
+      Anti-Virus Personal Root Certificate"): `node` scheitert an
+      api.anthropic.com mit SELF_SIGNED_CERT_IN_CHAIN — auch außerhalb des
+      Sandkastens, und rufeClaude meldet es als „Verbindungsabbruch …
+      überlastet" (sieht aus wie Überlastung!). PowerShell kommt durch
+      (Windows-Speicher). Fix: `node --use-system-ca …` für jedes Skript mit
+      KI, Identity-Toolkit oder anderem HTTPS. Der Dev-Server lief ohne das
+      Flag — ein lokaler Claude-Aufruf aus einer Route würde dort genauso
+      scheitern. (21) JS-`\b` kennt keine Umlaute: `\ber\b` trifft „eröffnet"
+      und „3er-Handserie" → Pronomen-Prüfungen mit `(?<!\p{L})…(?!\p{L})` und
+      Flag `u`. (22) Falle 18 zum dritten Mal — im Prompt-Code UND im
+      Test-Label: nach „ nie ASCII-" in "…"-Strings. (23) In einem Grid mit
+      optionalem viertem Feld die Spaltenzahl mitschalten (lg 4 ↔ 3), sonst
+      eine Lücke bei BJJ.
+    - **Roadmap** (Artifact Version 23): neue Station „DF · DeepFight &
+      Wettkampf" (Läuft, „Du bist hier") zwischen MO und P3, P3/P4 Seiten
+      gedreht, 11 Stationen; Becken 18 Ideen (+ „Genaue Analyse", Leons Wunsch
+      16.09.), `--base` 16,8cqw; „Gameplan folgt dem Scouting" als offener
+      Schritt der Station (kein Platz im Becken).
+    - **Offen:** Gameplan neu, wenn der Trainer das Gegnerprofil von Hand
+      ändert (mit Aufschub, damit fünf Änderungen einen Lauf kosten) ·
+      /trainer/deepfight/gegner/[id] Alt-Look · Handy-Breite des Sheets nicht
+      gemessen · geschärfter Übertrags-Satz ohne KI-Messung · jwks-rsa-Override
+      entfernen, sobald Vercel require(esm) kann · Kostenbuchung „gameplan" in
+      aiUsage erst beim nächsten echten Lauf über die Route prüfbar (der
+      Nachweis lief als Skript ohne Firestore).
+  - **RUNDE 3: GAMEPLAN FOLGT DEM SCOUTING + TRAININGSPLAN BEARBEITEN, STUFE 1
+    (17.09.2026 abends, Fenster tidal-athletics-d5, abgestimmt mit e8).**
+    Leons Antworten (wörtlich): Scouting „Ja, mit Aufschub (Empfohlen)" · Plan
+    „Ja, Stufe 1 jetzt (Empfohlen)" · KI-Lauf „Ja, ein Lauf ca. 0,30 €
+    (Empfohlen)" · Abnahme der Schirme (inkl. Drills doppelt im Sheet) „Passt
+    so (Empfohlen)" · Commit „Ja, committen (Empfohlen)".
+    - **Scouting-Nachlauf:** `lib/server/gameplan.ts` `merkeScoutingAenderung`
+      (betroffene Wettkämpfe gegen den Gegner, an JEDEM Gameplan-Dokument
+      `aufschubId` + `aufschubBis` setzen — nichts am Gegner, dessen abgeleitete
+      Felder gehören der Profilrechnung) und `gameplaeneNachScouting` (wartet
+      `SCOUTING_AUFSCHUB_MS` = 90 s, nimmt die Marke in einer Transaktion ab,
+      nur wer sie noch trägt, schreibt; sonst `ueberholt`). Die Schleife mit
+      Frist und Höchstzahl ist jetzt `schreibeReihe` (auch für
+      `gameplaeneNachAnalyse`, Signatur unverändert). 90 s + 150 s Claude passen
+      ins 280-s-Budget. Route `POST /api/wettkampf/gameplan/scouting`
+      `{ opponentId }` (Trainer desselben Gyms / Admin, antwortet 202
+      `{ wettkaempfe }` NACH dem Markieren, 200 bei 0). Client
+      `meldeScoutingAenderung` in lib/gameplan.ts, aufgerufen in `handleSave`
+      der Gegnerseite (nach `updateOpponent`), dort Hinweis „Gespeichert. Claude
+      schreibt den Gameplan … in 90 Sekunden neu" (`data-gameplan-nachzug`).
+      GameplanBlock zeigt während des Aufschubs „Neues Scouting · Claude
+      schreibt den Gameplan gleich neu" (`data-gameplan-aufschub`).
+      `decodeGameplan` liefert `null` für ein Dokument ohne Status (nur Marke).
+      Gleiche Eingabe (nur gespeichert) → `unveraendert`, kein Aufruf.
+    - **Plan bearbeiten, Stufe 1:** `FightCampPhaseBlock.geaendert?:
+      PlanAenderung` ({ uid, name, at }), `PhasenAenderung`, `PHASE_GRENZEN`
+      (0–14 Einheiten, Fokus 400, Notiz 1000), `saeubereAenderung` (Sparring in
+      5-%-Schritten, leerer Fokus → PHASE_FOCUS), `planZuletztGeaendert`,
+      `updateFightCampPhase` (TRANSAKTION über das ganze phases-Array, sucht die
+      Phase per `phase`, schreibt `ownerIsStaff` mit) und
+      `beobachteFightCamp` (onSnapshot) in lib/fight-camp.ts. KEINE Regeländerung.
+      `components/trainer/PhasenEditor.tsx` (Fokus, zwei Stepper, Notiz,
+      Speichern/Abbrechen, Escape). FightCampPlanView: `onPhaseSpeichern` →
+      Pille „Bearbeiten" je Phase, MorphSwap Ansicht↔Editor, immer nur EINE
+      Phase offen, Stats-Kacheln im Editor ausgeblendet; Notiz-Kasten und
+      „Geändert von … · heute" (`aenderungText`); `sicht="athlet"` (Notiz „von
+      deinem Trainer", eigener Einordnungstext), `kopf={false}`.
+      Wettkampfseite `handlePhase` + `autorName()`.
+    - **Athlet:** `components/GameplanSheet.tsx` ist jetzt das Wettkampf-Sheet
+      mit Reitern Trainingsplan · Gameplan (`tab: "plan" | "gameplan" | null`,
+      Reiter nur mit Gameplan-Inhalt), das Camp kommt LIVE per
+      `beobachteFightCamp`, solange das Sheet offen ist. Dashboard-Karte:
+      „Dein Trainingsplan" (`data-aktion="plan-oeffnen"`, immer) + „Dein
+      Gameplan" (mit Inhalt). Die Drills stehen im Plan-Reiter unter Phase 2/3
+      UND im Gameplan-Reiter (abgenommene 5b-Fassung unverändert).
+    - **Messung:** tsc/eslint 0 · test-gameplan **64/64** · test-kampfart-
+      steckbrief 70/70 · test-profil-rechnung 86/86 · mess-gameplan **60/60
+      dunkel + hell** (Konsole 0, aufgeräumt 7 Auth / 37 users): zwei
+      Scouting-Änderungen am Stück (erste `ueberholt`, zweite schreibt „offen ·
+      gegner"), Phase 2 bearbeiten (nur diese Phase im Dokument, Timestamps
+      bleiben, Abbrechen speichert nichts), Gegnerprofil über die UI speichern →
+      Hinweis, Marke fällig in 91 s, Zeile auf der Wettkampfseite, **zur
+      Laufzeit 91/92 s** später „offen · gegner" ohne Claude; Athlet: Plan-Sheet
+      mit Trainer-Änderung, Admin-Änderung erscheint LIVE, Reiterwechsel,
+      **Handy 390 px ohne Quer-Überlauf**. Scouting-Route ohne Token → 403.
+      Bilder `D:\Tidal-Athletics\tmp\beweis-steckbrief-2026-09-17\nachweis-d5\`.
+    - **KI-Nachweis** (Skript `nachweis-d5/nachweis-ki-kosten-d5.mjs`, Test-Gym
+      `mess-d5-kosten`, danach gelöscht): Stärke „harter Low Kick" nachgetragen
+      → Scouting-Nachlauf mit echtem Claude **54 s, 0,122 €** (4.102 ein /
+      4.061 aus, Opus 5 — kleine synthetische Profile, darum unter der Ansage),
+      Inhalt greift den Low Kick auf, lage zitiert die Übertrags-Anweisung
+      NICHT (geschärfter Satz aus 5b damit bestätigt), Belege 37–61 Zeichen.
+      `aiUsage/gym-…`: `anzahlJeArt.gameplan` 1, `spentEurJeArt.gameplan` =
+      `months.2026-09.spentEur` = 0,122, keine analysisCount, keine Punkt-Felder;
+      `aiUsage/summary` gameplan 0 → 1 (echter Betrag bleibt dort). Zweiter
+      Lauf ohne Änderung → `unveraendert`, weiter 1 Buchung. Die Pronomen-
+      Prüfung schlug einmal an: „check **ihn** früh" meint den Kick, nicht den
+      Gegner.
+    - **Fallen:** (24) Ein Pronomen-Treffer ist nicht automatisch der Gegner —
+      „ihn" für den Kick; die Prüfung liefert Kandidaten, lesen muss man.
+      (25) Wegwerf-Skripte mit KI laden `.env.local` NICHT von selbst —
+      `hatClaudeSchluessel` ist dann false, der Lauf endet nach 3 s mit „fehler"
+      und kostet nichts (Muster aus nachweis-gameplan.mjs übernehmen).
+      (26) Screenshot direkt nach einer Hinweiszeile über einem MorphSwap zeigt
+      die Layout-Feder mittendrin (Zeile und Knopf überlappen) — 1 s warten.
+    - **Roadmap** (Artifact Version 24): Station DF Schritt 7 „Gameplan folgt
+      dem Scouting" und NEU 8 „Trainingsplan bearbeiten, Stufe 1" = Gebaut,
+      9 „Stufen 2–4" + 10 „Kampfart über den Kurs" offen; „Wettkampf-Plan
+      bearbeiten" aus dem Becken auf die Route (17 Ideen); die zwei alten
+      Kreuzungen geheilt (rubriken 25,5/40, termine 69,5/59 am Hub, gesucht mit
+      `tools/roadmap-karte/fit-d5.mjs`); Bau `build-2026-09-17-d5.mjs` (LIVE=1
+      nach dem Push), `mess.mjs` verlangt jetzt 17 Ideen, 17 Linien und NULL
+      Kreuzungen — alles grün über sechs Breiten.
+    - **Offen:** Trainingsplan Stufen 2–4 (Datum verschieben mit Nachrücken,
+      Techniken-/Übungs-Picker, Phasenlängen) · Gegnerseite im Alt-Look ·
+      jwks-rsa-Override. Drills doppelt im Wettkampf-Sheet (Plan UND Gameplan)
+      bleiben so (Leon: „Passt so").
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

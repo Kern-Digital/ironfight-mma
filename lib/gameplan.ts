@@ -13,6 +13,11 @@
  *     Phase 3 (Sparring) des Trainingsplans.
  *   • Kampfart am Wettkampf ist Pflicht; bestehende Wettkämpfe wählen sie
  *     einmal auf der Seite („Kampfart einmal auf der Seite wählen").
+ *   • „Gameplan folgt dem Scouting" (17.09.2026 abends: „Ja, mit Aufschub") —
+ *     ändert ein Trainer das Gegnerprofil von Hand, schreiben sich die
+ *     Gameplans gegen diesen Gegner 90 s nach dem LETZTEN Speichern neu
+ *     (`meldeScoutingAenderung`, lib/server/gameplan.ts). Fünf Änderungen am
+ *     Stück kosten einen Lauf.
  *
  * WO ER LIEGT: `users/{uid}/fightProfile/gameplan-{campId}` — NICHT am
  * Wettkampf-Dokument. Der Gameplan besteht aus dem DeepFight-Profil des
@@ -87,6 +92,8 @@ export interface Gameplan {
   fehler: string | null;
   model: string | null;
   usage: AnalysisUsage | null;
+  /** Scouting geändert: Bis hierhin wartet der Nachlauf auf weitere Änderungen, dann schreibt er neu. */
+  aufschubBis: Date | null;
 }
 
 /** Rohform in Firestore (Client- und Admin-SDK). */
@@ -106,6 +113,9 @@ export interface GameplanDoc {
   laufId?: string | null;
   /** Fingerabdruck der Eingabe des fertigen Inhalts — gleiche Eingabe, kein neuer Aufruf. */
   eingabeSchluessel?: string | null;
+  /** Kennung der JÜNGSTEN Scouting-Änderung — nur ihr Nachlauf schreibt, ältere treten zurück. */
+  aufschubId?: string | null;
+  aufschubBis?: string | null;
 }
 
 export const GAMEPLAN_PREFIX = "gameplan-";
@@ -121,7 +131,9 @@ const datum = (s: string | null | undefined): Date | null => {
 };
 
 export function decodeGameplan(d: GameplanDoc | undefined | null): Gameplan | null {
-  if (!d) return null;
+  // Ohne Status trägt das Dokument nur die Aufschub-Marke einer Scouting-
+  // Änderung (Wettkampf ohne bisherigen Gameplan) — das ist noch keiner.
+  if (!d?.status) return null;
   return {
     campId: d.campId,
     sport: d.sport ?? null,
@@ -134,6 +146,7 @@ export function decodeGameplan(d: GameplanDoc | undefined | null): Gameplan | nu
     fehler: d.fehler ?? null,
     model: d.model ?? null,
     usage: d.usage ?? null,
+    aufschubBis: datum(d.aufschubBis),
   };
 }
 
@@ -170,6 +183,26 @@ export async function starteGameplan(uid: string, campId: string, erzwingen = fa
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `Gameplan konnte nicht starten (${res.status}).`);
   }
+}
+
+/**
+ * Eine Hand-Änderung am Gegnerprofil melden (Client →
+ * /api/wettkampf/gameplan/scouting). Aufrufen NACH dem Speichern — der Server
+ * wartet 90 s auf weitere Änderungen und schreibt dann die Gameplans aller
+ * anstehenden Wettkämpfe gegen diesen Gegner neu. Liefert, wie viele
+ * Wettkämpfe betroffen sind.
+ */
+export async function meldeScoutingAenderung(opponentId: string): Promise<number> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("Nicht angemeldet");
+  const res = await fetch("/api/wettkampf/gameplan/scouting", {
+    method: "POST",
+    headers: { authorization: `Bearer ${await user.getIdToken()}`, "content-type": "application/json" },
+    body: JSON.stringify({ opponentId }),
+  });
+  const body = (await res.json().catch(() => null)) as { error?: string; wettkaempfe?: number } | null;
+  if (!res.ok) throw new Error(body?.error ?? `Gameplan konnte nicht nachziehen (${res.status}).`);
+  return typeof body?.wettkaempfe === "number" ? body.wettkaempfe : 0;
 }
 
 /**

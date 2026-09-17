@@ -25,6 +25,7 @@ import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { DNA_CATEGORIES, answeredCount, dnaCompleteness } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 import { ansichtDesProfils } from "@/lib/kampfart-steckbrief";
+import { meldeScoutingAenderung } from "@/lib/gameplan";
 import XKnopf from "@/components/ui/XKnopf";
 
 /**
@@ -293,6 +294,8 @@ function OpponentDetailContent({ id }: { id: string }) {
   const [deleting, setDeleting] = useState(false);
   const [tab, setTab] = useState<DetailTab>("uebersicht");
   const [sharingOpen, setSharingOpen] = useState(false);
+  // Wie viele Gameplans sich nach dem letzten Speichern neu schreiben.
+  const [nachzug, setNachzug] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -323,11 +326,19 @@ function OpponentDetailContent({ id }: { id: string }) {
   async function handleSave(value: OpponentEditorValue) {
     if (!opponent) return;
     setBusy(true);
+    setNachzug(null);
     try {
       await updateOpponent(opponent.id, {
         ...value,
         updatedBy: user?.uid ?? null,
       });
+      // Gameplan folgt dem Scouting (Leon 17.09.2026: „Ja, mit Aufschub"):
+      // Der Server wartet 90 s auf weitere Änderungen und schreibt dann die
+      // Gameplans der anstehenden Wettkämpfe gegen diesen Gegner neu.
+      // Scheitert die Meldung, bleibt das Speichern trotzdem gültig.
+      void meldeScoutingAenderung(opponent.id)
+        .then((n) => setNachzug(n > 0 ? n : null))
+        .catch(() => {});
       await load();
       setEditing(false);
     } catch (err) {
@@ -542,6 +553,22 @@ function OpponentDetailContent({ id }: { id: string }) {
           <div className="mb-4">
             <ErrorState title="Fehler" message={error} onRetry={load} />
           </div>
+        )}
+
+        {nachzug !== null && !editing && (
+          <p
+            role="status"
+            data-gameplan-nachzug={nachzug}
+            className="mb-4 flex items-center gap-2"
+            style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+          >
+            <span aria-hidden style={{ color: "var(--accent-text)", lineHeight: 0 }}>
+              <Icon name="target" size={15} strokeWidth={2.2} />
+            </span>
+            {nachzug === 1
+              ? `Gespeichert. Claude schreibt den Gameplan für den anstehenden Wettkampf gegen ${opponent.name} in 90 Sekunden neu.`
+              : `Gespeichert. Claude schreibt die Gameplans für ${nachzug} anstehende Wettkämpfe gegen ${opponent.name} in 90 Sekunden neu.`}
+          </p>
         )}
 
         {sharingOpen && !editing && (

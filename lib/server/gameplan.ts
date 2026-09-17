@@ -3,12 +3,16 @@
  * Rechnung (Voraussetzungen, Prompt, Schema) liegt in ./gameplan-prompt.ts,
  * Leons Entscheidungen und die Ablage stehen im Kopf von lib/gameplan.ts.
  *
- * ZWEI EINSTIEGE:
+ * DREI EINSTIEGE:
  *   • `schreibeGameplan` — EIN Wettkampf. Ruft die Route
  *     /api/wettkampf/gameplan (Anlegen, Kampfart nachgetragen, „Neu schreiben").
  *   • `gameplaeneNachAnalyse` — der Nachlauf der commit-Route (Leon: „nach
  *     jeder neuen Analyse automatisch"). Sucht die anstehenden Wettkämpfe, die
  *     diese Analyse berührt, und schreibt ihre Gameplans neu.
+ *   • `merkeScoutingAenderung` + `gameplaeneNachScouting` — die Route
+ *     /api/wettkampf/gameplan/scouting nach einer Hand-Änderung am
+ *     Gegnerprofil (Leon: „Ja, mit Aufschub"): markieren, 90 s warten, nur
+ *     der jüngste Nachlauf schreibt.
  *
  * ZEITBUDGET (abgestimmt mit Etappe 3): Der Nachlauf läuft per `waitUntil` im
  * selben 300-s-Budget wie die Route, und Etappe 3 hängt die Profilsätze davor.
@@ -320,6 +324,38 @@ export interface NachlaufErgebnis {
 }
 
 /**
+ * Schreibt die Gameplans einer Liste nacheinander — höchstens
+ * GAMEPLAENE_JE_NACHLAUF, und nur, solange die Zeit bis `frist` für einen
+ * Aufruf reicht; der Rest wird „offen · zeit". `darf` prüft je Wettkampf, ob
+ * dieser Lauf überhaupt noch dran ist (Scouting-Aufschub). Ohne `daten` liest
+ * `schreibeGameplan` den Wettkampf frisch.
+ */
+async function schreibeReihe(
+  db: Firestore,
+  liste: { camp: CampRoh; daten?: DocumentData }[],
+  frist: number,
+  darf?: (camp: CampRoh) => Promise<boolean>,
+): Promise<NachlaufErgebnis[]> {
+  const ergebnisse: NachlaufErgebnis[] = [];
+  let geschrieben = 0;
+  for (const { camp, daten } of liste) {
+    if (darf && !(await darf(camp).catch(() => false))) {
+      ergebnisse.push({ wettkampf: camp.id, ergebnis: "ueberholt" });
+      continue;
+    }
+    const zeitReicht = frist - Date.now() >= GAMEPLAN_AUFRUF_MS;
+    if (geschrieben >= GAMEPLAENE_JE_NACHLAUF || !zeitReicht) {
+      await markiereOffen(db, camp, "zeit").catch(() => {});
+      ergebnisse.push({ wettkampf: camp.id, ergebnis: "offen-zeit" });
+      continue;
+    }
+    geschrieben++;
+    ergebnisse.push({ wettkampf: camp.id, ergebnis: await schreibeGameplan(db, camp.studentUid, camp.id, { campDaten: daten }) });
+  }
+  return ergebnisse;
+}
+
+/**
  * Der Nachlauf der commit-Route. `frist` = Epoch-ms, bis zu der die Funktion
  * sicher läuft. Wirft nie.
  */
@@ -327,22 +363,77 @@ export async function gameplaeneNachAnalyse(
   db: Firestore,
   a: { mode: AnalysisMode; targetId: string; sport: Sport | null; gymId: string; frist: number },
 ): Promise<NachlaufErgebnis[]> {
-  const ergebnisse: NachlaufErgebnis[] = [];
   let betroffen: Awaited<ReturnType<typeof betroffeneWettkaempfe>>;
   try {
     betroffen = await betroffeneWettkaempfe(db, a);
   } catch {
-    return ergebnisse;
+    return [];
   }
-  for (let i = 0; i < betroffen.length; i++) {
-    const { camp, daten } = betroffen[i];
-    const zeitReicht = a.frist - Date.now() >= GAMEPLAN_AUFRUF_MS;
-    if (i >= GAMEPLAENE_JE_NACHLAUF || !zeitReicht) {
-      await markiereOffen(db, camp, "zeit").catch(() => {});
-      ergebnisse.push({ wettkampf: camp.id, ergebnis: "offen-zeit" });
-      continue;
-    }
-    ergebnisse.push({ wettkampf: camp.id, ergebnis: await schreibeGameplan(db, camp.studentUid, camp.id, { campDaten: daten }) });
+  return schreibeReihe(db, betroffen, a.frist);
+}
+
+// ─── Nachlauf nach einer Hand-Änderung am Gegnerprofil ───────────────────────
+
+/**
+ * So lange wartet der Scouting-Nachlauf nach dem LETZTEN Speichern (Leon
+ * 17.09.2026: „Ja, mit Aufschub"). 90 s Warten + 150 s Claude passen ins
+ * 300-s-Budget der Route; eine weitere Änderung in dieser Zeit übernimmt.
+ */
+export const SCOUTING_AUFSCHUB_MS = 90_000;
+
+export interface ScoutingMarke {
+  aufschubId: string;
+  betroffen: { camp: CampRoh }[];
+}
+
+/**
+ * Schritt 1 — sofort in der Route: die anstehenden Wettkämpfe gegen diesen
+ * Gegner finden und an JEDEM Gameplan die Marke dieser Änderung setzen. Eine
+ * spätere Änderung überschreibt die Marke; der ältere Nachlauf sieht das nach
+ * seiner Wartezeit und tritt zurück. So kosten fünf Änderungen am Stück EINEN
+ * Lauf. Nur Gameplan-Dokumente, nichts am Gegner (dessen abgeleitete Felder
+ * gehören der Profilrechnung).
+ */
+export async function merkeScoutingAenderung(
+  db: Firestore,
+  a: { opponentId: string; gymId: string; aufschubMs?: number },
+  jetzt = Date.now(),
+): Promise<ScoutingMarke> {
+  const betroffen = await betroffeneWettkaempfe(db, { mode: "opponent", targetId: a.opponentId, sport: null, gymId: a.gymId }, jetzt);
+  const aufschubId = randomUUID();
+  const aufschubBis = new Date(jetzt + (a.aufschubMs ?? SCOUTING_AUFSCHUB_MS)).toISOString();
+  await Promise.all(
+    betroffen.map(({ camp }) =>
+      gameplanRef(db, camp.studentUid, camp.id).set({ campId: camp.id, aufschubId, aufschubBis }, { merge: true }),
+    ),
+  );
+  return { aufschubId, betroffen: betroffen.map(({ camp }) => ({ camp })) };
+}
+
+/**
+ * Schritt 2 — per `nachAntwortWeiter`: warten, dann schreiben, was noch diese
+ * Marke trägt. Die Marke wird in einer Transaktion abgenommen; gleiche
+ * Eingabe wie beim letzten Inhalt (z. B. nur gespeichert, nichts geändert)
+ * kostet keinen Aufruf. Wirft nie.
+ */
+export async function gameplaeneNachScouting(
+  db: Firestore,
+  marke: ScoutingMarke,
+  a: { frist: number; aufschubMs?: number },
+): Promise<NachlaufErgebnis[]> {
+  if (marke.betroffen.length === 0) return [];
+  await new Promise((r) => setTimeout(r, a.aufschubMs ?? SCOUTING_AUFSCHUB_MS));
+  try {
+    return await schreibeReihe(db, marke.betroffen, a.frist, (camp) =>
+      db.runTransaction(async (tx) => {
+        const ref = gameplanRef(db, camp.studentUid, camp.id);
+        const snap = await tx.get(ref);
+        if ((snap.data() as GameplanDoc | undefined)?.aufschubId !== marke.aufschubId) return false;
+        tx.set(ref, { aufschubId: null, aufschubBis: null }, { merge: true });
+        return true;
+      }),
+    );
+  } catch {
+    return [];
   }
-  return ergebnisse;
 }

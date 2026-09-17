@@ -62,8 +62,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -219,6 +221,60 @@ export interface FightCampPhaseBlock {
   sparringRatio: number;
   /** Trainer-Notizen für diese Phase (editierbar) */
   notes?: string;
+  /** Wer die Phase zuletzt von Hand geändert hat — null = so, wie der Generator sie schrieb. */
+  geaendert?: PlanAenderung | null;
+}
+
+/**
+ * Letzte Hand-Änderung an einer Phase (Leon 17.09.2026: „Wettkampf-Plan
+ * bearbeiten, Stufe 1" — „geändert von Leon · heute"). Name DENORMALISIERT
+ * wie bei `CampNotiz`: Der Athlet liest keine fremden users-Dokumente, und der
+ * Name zum Zeitpunkt der Änderung ist genau das, was er sehen soll.
+ */
+export interface PlanAenderung {
+  uid: string;
+  name: string;
+  /** Millisekunden seit Epoche. */
+  at: number;
+}
+
+/** Was der Trainer an einer Phase von Hand ändert (Stufe 1). */
+export interface PhasenAenderung {
+  focus: string;
+  sessionsPerWeek: number;
+  /** 0..1 */
+  sparringRatio: number;
+  notes: string;
+}
+
+/** Grenzen des Editors — dieselben im Client und beim Speichern. */
+export const PHASE_GRENZEN = {
+  einheitenMax: 14,
+  fokusMax: 400,
+  notizMax: 1000,
+} as const;
+
+/**
+ * Bringt eine Eingabe in gültige Form: ganze Einheiten 0–14, Sparring in
+ * 5-%-Schritten, Fokus nie leer (leer = der Fokus der Phase aus dem Generator).
+ */
+export function saeubereAenderung(phase: FightCampPhase, a: PhasenAenderung): PhasenAenderung {
+  const zahl = (n: number) => (Number.isFinite(n) ? n : 0);
+  return {
+    focus: a.focus.trim().slice(0, PHASE_GRENZEN.fokusMax) || PHASE_FOCUS[phase],
+    sessionsPerWeek: Math.min(PHASE_GRENZEN.einheitenMax, Math.max(0, Math.round(zahl(a.sessionsPerWeek)))),
+    sparringRatio: Math.min(1, Math.max(0, Math.round(zahl(a.sparringRatio) * 20) / 20)),
+    notes: a.notes.trim().slice(0, PHASE_GRENZEN.notizMax),
+  };
+}
+
+/** Die jüngste Hand-Änderung am ganzen Plan — für „zuletzt geändert". */
+export function planZuletztGeaendert(camp: Pick<FightCamp, "phases">): PlanAenderung | null {
+  let juengste: PlanAenderung | null = null;
+  for (const p of camp.phases) {
+    if (p.geaendert && (!juengste || p.geaendert.at > juengste.at)) juengste = p.geaendert;
+  }
+  return juengste;
 }
 
 export interface FightCamp {
@@ -306,6 +362,7 @@ type PhaseDoc = {
   sessionsPerWeek: number;
   sparringRatio: number;
   notes?: string;
+  geaendert?: PlanAenderung;
 };
 
 type FightCampDoc = {
@@ -329,6 +386,24 @@ type FightCampDoc = {
   isDemo?: boolean;
 };
 
+function decodePhase(p: PhaseDoc): FightCampPhaseBlock {
+  return {
+    phase: p.phase,
+    startsAt: p.startsAt.toDate(),
+    endsAt: p.endsAt.toDate(),
+    weeks: p.weeks,
+    focus: p.focus,
+    techniqueIds: p.techniqueIds,
+    exerciseIds: p.exerciseIds,
+    trainingAreas: p.trainingAreas,
+    categories: p.categories,
+    sessionsPerWeek: p.sessionsPerWeek,
+    sparringRatio: p.sparringRatio,
+    notes: p.notes,
+    geaendert: p.geaendert ?? null,
+  };
+}
+
 function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
   const d = snap.data();
   return {
@@ -348,20 +423,7 @@ function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
     weeksTotal: d.weeksTotal,
     startedAt: d.startedAt.toDate(),
     opponent: d.opponent,
-    phases: d.phases.map((p) => ({
-      phase: p.phase,
-      startsAt: p.startsAt.toDate(),
-      endsAt: p.endsAt.toDate(),
-      weeks: p.weeks,
-      focus: p.focus,
-      techniqueIds: p.techniqueIds,
-      exerciseIds: p.exerciseIds,
-      trainingAreas: p.trainingAreas,
-      categories: p.categories,
-      sessionsPerWeek: p.sessionsPerWeek,
-      sparringRatio: p.sparringRatio,
-      notes: p.notes,
-    })),
+    phases: d.phases.map(decodePhase),
     status: d.status,
     trainerNotes: d.trainerNotes,
     notizen: Array.isArray(d.notizen) ? d.notizen : [],
@@ -415,6 +477,7 @@ function encodePhase(p: FightCampPhaseBlock): PhaseDoc {
     sparringRatio: p.sparringRatio,
   };
   if (p.notes && p.notes.trim()) out.notes = p.notes.trim();
+  if (p.geaendert) out.geaendert = p.geaendert;
   return out;
 }
 
@@ -492,6 +555,68 @@ export async function updateFightCamp(
   // updateDoc statt setDoc(merge): ersetzt das `opponent`-Feld komplett, damit
   // gelöschte Gegner-DNA-Antworten nicht durch Deep-Merge erhalten bleiben.
   await updateDoc(fightCampDoc(uid, campId), data);
+}
+
+/**
+ * EINE Phase von Hand ändern (Leon 17.09.2026: „Wettkampf-Plan bearbeiten,
+ * Stufe 1"). In einer Transaktion: Das Dokument trägt alle Phasen als EIN
+ * Array — zwei Trainer, die gleichzeitig verschiedene Phasen speichern, sollen
+ * sich nicht gegenseitig überschreiben. Der Athlet liest dasselbe Dokument
+ * und sieht die Änderung sofort (Leon 11.09.: „direkt mitgeändert").
+ *
+ * Keine neue Regel: Trainer mit Wettkampf-Freigabe schreiben das Camp schon
+ * heute, `ownerIsStaff` muss wie bei jedem Speichern mit (Kopfkommentar).
+ */
+export async function updateFightCampPhase(
+  uid: string,
+  campId: string,
+  phase: FightCampPhase,
+  aenderung: PhasenAenderung,
+  autor: { uid: string; name: string },
+  extra: { ownerIsStaff?: boolean } = {},
+): Promise<FightCampPhaseBlock> {
+  const ref = fightCampDoc(uid, campId);
+  const sauber = saeubereAenderung(phase, aenderung);
+  return runTransaction(getFirestoreDb(), async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Wettkampf nicht gefunden.");
+    const phases = [...(snap.data() as FightCampDoc).phases];
+    const i = phases.findIndex((p) => p.phase === phase);
+    if (i < 0) throw new Error("Diese Phase gibt es im Plan nicht mehr — lad die Seite neu.");
+    const neu: PhaseDoc = {
+      ...phases[i],
+      focus: sauber.focus,
+      sessionsPerWeek: sauber.sessionsPerWeek,
+      sparringRatio: sauber.sparringRatio,
+      geaendert: { uid: autor.uid, name: autor.name, at: Date.now() },
+    };
+    // `notes` fällt beim Leeren ganz weg, statt als "" stehen zu bleiben.
+    delete neu.notes;
+    if (sauber.notes) neu.notes = sauber.notes;
+    phases[i] = neu;
+    tx.update(ref, {
+      phases,
+      ...(extra.ownerIsStaff !== undefined ? { ownerIsStaff: extra.ownerIsStaff } : {}),
+    });
+    return decodePhase(neu);
+  });
+}
+
+/**
+ * Ein Camp live beobachten — der Athlet sieht Änderungen am Plan, während
+ * sein Sheet offen ist. Liefert die Abmelde-Funktion.
+ */
+export function beobachteFightCamp(
+  uid: string,
+  campId: string,
+  onDaten: (camp: FightCamp | null) => void,
+  onFehler: (err: unknown) => void,
+): () => void {
+  return onSnapshot(
+    fightCampDoc(uid, campId),
+    (snap) => onDaten(snap.exists() ? decode({ id: snap.id, data: () => snap.data() as FightCampDoc }) : null),
+    onFehler,
+  );
 }
 
 export async function getFightCamp(

@@ -38,7 +38,7 @@ import {
   type FightCamp,
 } from "@/lib/fight-camp";
 import { getSessionCountForWeek } from "@/lib/training-sessions";
-import GameplanSheet from "@/components/GameplanSheet";
+import GameplanSheet, { type WettkampfTab } from "@/components/GameplanSheet";
 import { useGameplan } from "@/components/trainer/GameplanBlock";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -261,7 +261,9 @@ function DashboardContent() {
   // Wettkampf-Karte"). Der Inhaber liest ihn schon über die fightProfile-Regel;
   // die Zeile auf der Karte erscheint erst, wenn ein Inhalt steht.
   const gp = useGameplan(user?.uid ?? "", nextCamp?.id ?? "", !!user && !!nextCamp?.sport);
-  const [gameplanOffen, setGameplanOffen] = useState(false);
+  // Das Wettkampf-Sheet: Trainingsplan (immer, Leon 17.09.: „Ja, Stufe 1
+  // jetzt") und Gameplan (sobald ein Inhalt steht). Die Zeile wählt den Reiter.
+  const [wettkampfTab, setWettkampfTab] = useState<WettkampfTab | null>(null);
   const gameplanDa = !!nextCamp?.sport && !!gp.gameplan?.inhalt && gp.gameplan.campId === nextCamp.id;
 
   // Wochenlast (letzte 7 Tage) + Vergleich zur Vorwoche
@@ -367,26 +369,34 @@ function DashboardContent() {
                   <span style={{ width: `${campPct}%` }} />
                 </div>
               </div>
-              {gameplanDa && (
-                <button
-                  type="button"
-                  onClick={() => setGameplanOffen(true)}
-                  data-press="surface"
-                  data-aktion="gameplan-oeffnen"
-                  className="t-interactive mt-1 flex min-h-hit w-full items-center gap-2.5 rounded-field px-3 text-left"
-                  style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
-                >
-                  <span aria-hidden style={{ color: "var(--accent-text)", lineHeight: 0 }}>
-                    <Icon name="target" size={16} strokeWidth={2.2} />
-                  </span>
-                  <span className="flex-1" style={{ font: "var(--type-body-strong)" }}>
-                    Dein Gameplan
-                  </span>
-                  <span aria-hidden style={{ color: "var(--text-3)", lineHeight: 0 }}>
-                    <Icon name="arrow-right" size={16} strokeWidth={2.2} />
-                  </span>
-                </button>
-              )}
+              {(
+                [
+                  { tab: "plan", label: "Dein Trainingsplan", icon: "calendar", aktion: "plan-oeffnen", da: true },
+                  { tab: "gameplan", label: "Dein Gameplan", icon: "target", aktion: "gameplan-oeffnen", da: gameplanDa },
+                ] as const
+              )
+                .filter((z) => z.da)
+                .map((z, i) => (
+                  <button
+                    key={z.tab}
+                    type="button"
+                    onClick={() => setWettkampfTab(z.tab)}
+                    data-press="surface"
+                    data-aktion={z.aktion}
+                    className={`t-interactive ${i === 0 ? "mt-1 " : ""}flex min-h-hit w-full items-center gap-2.5 rounded-field px-3 text-left`}
+                    style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
+                  >
+                    <span aria-hidden style={{ color: "var(--accent-text)", lineHeight: 0 }}>
+                      <Icon name={z.icon} size={16} strokeWidth={2.2} />
+                    </span>
+                    <span className="flex-1" style={{ font: "var(--type-body-strong)" }}>
+                      {z.label}
+                    </span>
+                    <span aria-hidden style={{ color: "var(--text-3)", lineHeight: 0 }}>
+                      <Icon name="arrow-right" size={16} strokeWidth={2.2} />
+                    </span>
+                  </button>
+                ))}
             </div>
           ) : (
             <div className="t-glass flex flex-col gap-2.5 p-4">
@@ -775,8 +785,9 @@ function DashboardContent() {
         <GameplanSheet
           camp={nextCamp}
           gameplan={gameplanDa ? gp.gameplan : null}
-          offen={gameplanOffen}
-          onClose={() => setGameplanOffen(false)}
+          tab={wettkampfTab}
+          onTab={setWettkampfTab}
+          onClose={() => setWettkampfTab(null)}
         />
       )}
 

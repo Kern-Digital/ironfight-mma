@@ -29,6 +29,8 @@ import {
 } from "../lib/kampfart-steckbrief.ts";
 import { ALL_TECHNIQUES } from "../lib/techniques";
 import { buchungsZuwachs, altfelder } from "../lib/server/ki-kosten.ts";
+import { GAMEPLAN_AUFRUF_MS, SCOUTING_AUFSCHUB_MS } from "../lib/server/gameplan.ts";
+import { PHASE_FOCUS, PHASE_GRENZEN, planZuletztGeaendert, saeubereAenderung } from "../lib/fight-camp.ts";
 import { preisJeMillion, kostenAusUsage } from "../lib/server/claude-aufruf.ts";
 
 let fehler = 0;
@@ -186,6 +188,32 @@ sagt(g.geschriebenAt instanceof Date && drillsFuerPhase(g, "specific-prep").leng
 const haengt = decodeGameplan({ campId: "x", status: "schreibt", gestartetAt: new Date(Date.now() - 7 * 60_000).toISOString() });
 const laeuft = decodeGameplan({ campId: "x", status: "schreibt", gestartetAt: new Date(Date.now() - 60_000).toISOString() });
 sagt(gameplanHaengt(haengt) && !gameplanHaengt(laeuft), "schreibt > 6 min = hängt");
+
+console.log("── Gameplan folgt dem Scouting (Fenster d5)");
+sagt(decodeGameplan({ campId: "x", aufschubId: "a", aufschubBis: "2026-09-17T19:00:00Z" }) === null, "Dokument nur mit Aufschub-Marke (ohne Status) = noch kein Gameplan");
+const mitAufschub = decodeGameplan({ campId: "x", status: "fertig", inhalt: n, aufschubId: "a", aufschubBis: "2026-09-17T19:00:00Z" });
+sagt(mitAufschub.aufschubBis instanceof Date && mitAufschub.aufschubBis.toISOString() === "2026-09-17T19:00:00.000Z", "aufschubBis als Datum");
+sagt(decodeGameplan({ campId: "x", status: "fertig" }).aufschubBis === null, "ohne Aufschub → null");
+sagt(SCOUTING_AUFSCHUB_MS === 90_000 && SCOUTING_AUFSCHUB_MS + GAMEPLAN_AUFRUF_MS <= 280_000, "90 s Aufschub + 150 s Claude passen ins 280-s-Budget der Route");
+
+console.log("── Wettkampf-Plan bearbeiten, Stufe 1 (Fenster d5)");
+const s1 = saeubereAenderung("specific-prep", { focus: "  Takedown-Abwehr am Zaun  ", sessionsPerWeek: 3.4, sparringRatio: 0.27, notes: "  Kopfschutz " });
+sagt(s1.focus === "Takedown-Abwehr am Zaun" && s1.notes === "Kopfschutz", "Fokus und Notiz getrimmt");
+sagt(s1.sessionsPerWeek === 3 && s1.sparringRatio === 0.25, "Einheiten ganzzahlig, Sparring in 5-%-Schritten");
+const s2 = saeubereAenderung("taper", { focus: "   ", sessionsPerWeek: 99, sparringRatio: -1, notes: "x".repeat(2000) });
+sagt(s2.focus === PHASE_FOCUS.taper, "leerer Fokus → Fokus der Phase aus dem Generator");
+sagt(s2.sessionsPerWeek === PHASE_GRENZEN.einheitenMax && s2.sparringRatio === 0 && s2.notes.length === PHASE_GRENZEN.notizMax, "Grenzen: 14 Einheiten, 0 %, 1000 Zeichen");
+sagt(saeubereAenderung("taper", { focus: "a", sessionsPerWeek: Number.NaN, sparringRatio: Number.NaN, notes: "" }).sessionsPerWeek === 0, "keine Zahl → 0");
+const zuletzt = planZuletztGeaendert({
+  phases: [
+    { geaendert: { uid: "a", name: "Alt", at: 1000 } },
+    { geaendert: null },
+    { geaendert: { uid: "b", name: "Leon", at: 5000 } },
+    {},
+  ],
+});
+sagt(zuletzt?.name === "Leon", "zuletzt geändert = jüngste Phase");
+sagt(planZuletztGeaendert({ phases: [{}, { geaendert: null }] }) === null, "unberührter Plan → null");
 
 console.log("── Kampfart am Wettkampf: Plan-Kategorien");
 sagt(KATEGORIEN_JE_KAMPFART.boxen.join() === "boxing", "Boxen → nur boxing");

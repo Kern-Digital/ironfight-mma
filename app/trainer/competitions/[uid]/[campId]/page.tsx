@@ -58,6 +58,13 @@
  * vorbelegt aus der Kampfart und jederzeit änderbar — der Gameplan schreibt
  * danach neu. Darunter steht der Gameplan (components/trainer/GameplanBlock.tsx), seine
  * Drills erscheinen in Phase 2 und 3 des Plans.
+ *
+ * ─── PLAN BEARBEITEN (Leon 17.09.2026: „Ja, Stufe 1 jetzt") ────────────────
+ *
+ * Jede Phase trägt „Bearbeiten": Fokus, Einheiten pro Woche, Sparring-Anteil
+ * und eine Notiz, gespeichert nur für diese Phase (`handlePhase`). Der Athlet
+ * sieht den Plan in seinem Wettkampf-Sheet auf dem Dashboard, live aus
+ * demselben Dokument (components/GameplanSheet.tsx).
  */
 
 import PageHead from "@/components/shell/PageHead";
@@ -97,9 +104,12 @@ import {
   getFightCamp,
   removeCampNotiz,
   updateFightCamp,
+  updateFightCampPhase,
   type CampNotiz,
   type FightCamp,
+  type FightCampPhase,
   type OpponentProfile,
+  type PhasenAenderung,
 } from "@/lib/fight-camp";
 import {
   getOpponent,
@@ -400,17 +410,23 @@ function CompetitionDetailContent({
 
   // ── Notizen ───────────────────────────────────────────────────────────────
 
+  /** Der Name, unter dem Notizen und Plan-Änderungen erscheinen. */
+  function autorName(): string {
+    return (
+      profile?.displayName?.trim() ||
+      user?.displayName?.trim() ||
+      user?.email ||
+      "Trainer"
+    );
+  }
+
   async function handleAddNotiz(text: string) {
     if (!camp || !user) return;
     const notiz: CampNotiz = {
       id: neueId(),
       text,
       authorUid: user.uid,
-      authorName:
-        profile?.displayName?.trim() ||
-        user.displayName?.trim() ||
-        user.email ||
-        "Trainer",
+      authorName: autorName(),
       createdAt: Date.now(),
     };
     await addCampNotiz(uid, campId, notiz, ownerFlag());
@@ -425,6 +441,30 @@ function CompetitionDetailContent({
     setCamp((prev) =>
       prev
         ? { ...prev, notizen: prev.notizen.filter((n) => n.id !== notiz.id) }
+        : prev,
+    );
+  }
+
+  // ── Plan bearbeiten (Leon 17.09.2026: „Wettkampf-Plan bearbeiten, Stufe 1") ─
+
+  /**
+   * Eine Phase speichern — nur diese eine, in einer Transaktion. Der Athlet
+   * liest dasselbe Dokument und sieht die Änderung sofort. Wirft bei Fehlern,
+   * damit der Editor offen bleibt und die Meldung zeigt.
+   */
+  async function handlePhase(phase: FightCampPhase, aenderung: PhasenAenderung) {
+    if (!user) throw new Error("Nicht angemeldet.");
+    const neu = await updateFightCampPhase(
+      uid,
+      campId,
+      phase,
+      aenderung,
+      { uid: user.uid, name: autorName() },
+      ownerFlag(),
+    );
+    setCamp((prev) =>
+      prev
+        ? { ...prev, phases: prev.phases.map((p) => (p.phase === phase ? neu : p)) }
         : prev,
     );
   }
@@ -951,6 +991,7 @@ function CompetitionDetailContent({
               camp={camp}
               showOpponent={false}
               drillsFuer={(phase) => drillsFuerPhase(gp.gameplan, phase)}
+              onPhaseSpeichern={handlePhase}
             />
           </div>
 
