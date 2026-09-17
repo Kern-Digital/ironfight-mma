@@ -34,6 +34,7 @@ import { decodeFightProfile, type FightProfileDoc } from "../fight-profile";
 import { decodeOpponent, type Opponent, type OpponentDoc } from "../opponents";
 import { gameplanDocId, type GameplanDoc, type GameplanOffen } from "../gameplan";
 import { isSport, type AnalysisMode, type Sport } from "../video-analysis";
+import { flaecheDesWettkampfs, isFlaeche, type Flaeche } from "../kampfart-steckbrief";
 import { hatClaudeSchluessel, rufeClaude } from "./claude-aufruf";
 import { bucheKiKosten } from "./ki-kosten";
 import {
@@ -62,6 +63,8 @@ interface CampRoh {
   competitionDate: Date;
   status: string;
   sport: Sport | null;
+  /** Gespeicherte Wahl des Trainers — null heißt Vorbelegung der Kampfart. */
+  flaeche: Flaeche | null;
   opponentId: string | null;
   opponent: OpponentProfile;
 }
@@ -76,6 +79,7 @@ function campAusDoc(id: string, studentUid: string, d: DocumentData): CampRoh {
     competitionDate: d.competitionDate instanceof Timestamp ? d.competitionDate.toDate() : new Date(0),
     status: typeof d.status === "string" ? d.status : "active",
     sport: isSport(d.sport) ? d.sport : null,
+    flaeche: isFlaeche(d.flaeche) ? d.flaeche : null,
     opponentId: (typeof d.opponentId === "string" && d.opponentId) || opponent.opponentId || null,
     opponent,
   };
@@ -118,6 +122,7 @@ async function leseEingabe(db: Firestore, camp: CampRoh, sport: Sport): Promise<
 
   const eingabe: GameplanEingabe = {
     sport,
+    flaeche: flaecheDesWettkampfs({ sport, flaeche: camp.flaeche }),
     wettkampf: { name: camp.competitionName, datum: camp.competitionDate },
     athlet: {
       name: athletName,

@@ -54,7 +54,9 @@
  * Der Gegner nimmt Fragen und Wörter der Kampfart, die Fläche aus seinen
  * Videos. Bestehende Wettkämpfe ohne Kampfart wählen sie EINMAL oben im Kopf
  * („Kampfart einmal auf der Seite wählen"); der Plan bleibt dabei, wie er ist.
- * Darunter steht der Gameplan (components/trainer/GameplanBlock.tsx), seine
+ * Neben der Kampfart steht die Fläche des Wettkampfs (Käfig / Ring / Matte),
+ * vorbelegt aus der Kampfart und jederzeit änderbar — der Gameplan schreibt
+ * danach neu. Darunter steht der Gameplan (components/trainer/GameplanBlock.tsx), seine
  * Drills erscheinen in Phase 2 und 3 des Plans.
  */
 
@@ -123,6 +125,12 @@ import {
   type Sport,
 } from "@/lib/video-analysis";
 import { drillsFuerPhase, starteGameplan } from "@/lib/gameplan";
+import {
+  FLAECHE_LABEL,
+  flaecheDesWettkampfs,
+  flaecheWaehlbar,
+  isFlaeche,
+} from "@/lib/kampfart-steckbrief";
 import { useAuth } from "@/lib/auth-context";
 import { hasAnyRight } from "@/lib/roles";
 
@@ -215,6 +223,7 @@ function CompetitionDetailContent({
   const [profilDerKampfart, setProfilDerKampfart] = useState(false);
   const [profilGesperrt, setProfilGesperrt] = useState(false);
   const [kampfartSpeichert, setKampfartSpeichert] = useState(false);
+  const [flaecheSpeichert, setFlaecheSpeichert] = useState(false);
   // Wie viele Analysen es je Seite gibt — null heißt „nicht lesbar".
   const [anzahl, setAnzahl] = useState<Record<Seite, number | null>>({
     athlet: null,
@@ -342,6 +351,26 @@ function CompetitionDetailContent({
       setError(err instanceof Error ? err.message : "Kampfart konnte nicht gespeichert werden");
     } finally {
       setKampfartSpeichert(false);
+    }
+  }
+
+  /**
+   * Fläche ändern (Leon 17.09.2026: vorbelegt aus der Kampfart, der Trainer
+   * korrigiert). Der Gameplan schreibt danach neu — die Fläche steckt in
+   * seinem Fingerabdruck.
+   */
+  async function handleFlaeche(wert: string) {
+    if (!camp || !isFlaeche(wert) || flaecheSpeichert) return;
+    if (wert === flaecheDesWettkampfs(camp)) return;
+    setFlaecheSpeichert(true);
+    try {
+      await updateFightCamp(uid, campId, { flaeche: wert, ...ownerFlag() });
+      setCamp((prev) => (prev ? { ...prev, flaeche: wert } : prev));
+      void starteGameplan(uid, campId).catch(() => {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fläche konnte nicht gespeichert werden");
+    } finally {
+      setFlaecheSpeichert(false);
     }
   }
 
@@ -572,6 +601,22 @@ function CompetitionDetailContent({
                   onChange={(v) => void handleKampfart(v)}
                   placeholder={kampfartSpeichert ? "Speichert…" : "Kampfart wählen"}
                   options={SPORT_ORDER.map((s) => ({ value: s, label: SPORT_LABEL[s] }))}
+                />
+              </div>
+            )}
+
+            {/* Fläche: die Vorbelegung der Kampfart oder die Wahl des
+              Trainers — immer änderbar, BJJ ohne Feld. */}
+            {flaecheWaehlbar(camp.sport) && (
+              <div className="w-36" data-feld="flaeche" data-flaeche={flaecheDesWettkampfs(camp) ?? ""}>
+                <Select
+                  value={flaecheDesWettkampfs(camp) ?? ""}
+                  onChange={(v) => void handleFlaeche(v)}
+                  placeholder={flaecheSpeichert ? "Speichert…" : "Fläche"}
+                  options={(["kaefig", "ring", "matte"] as const).map((f) => ({
+                    value: f,
+                    label: FLAECHE_LABEL[f],
+                  }))}
                 />
               </div>
             )}
@@ -877,6 +922,7 @@ function CompetitionDetailContent({
             uid={uid}
             campId={campId}
             sport={camp.sport}
+            flaeche={flaecheDesWettkampfs(camp)}
             athletName={studentName}
             gegnerName={effOpponent.name}
             profilGesperrt={profilGesperrt}

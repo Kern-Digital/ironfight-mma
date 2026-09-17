@@ -188,6 +188,40 @@ export function flaecheFromText(text: string | null | undefined): Flaeche | null
   return null;
 }
 
+/** Ortsangabe im Satz: „Gekämpft wird im Käfig". */
+export const FLAECHE_ORT: Record<Flaeche, string> = {
+  kaefig: "im Käfig",
+  ring: "im Ring",
+  matte: "auf der Matte",
+};
+
+/**
+ * Die Fläche eines WETTKAMPFS (Leon 17.09.2026: „ja, vorbelegt nach dem, was
+ * bei der Wettkampferstellung eingetragen worden ist"). Anders als beim Video
+ * erkennt sie kein Vorlauf — der Trainer weiß, wo gekämpft wird. Die Kampfart
+ * belegt sie vor, der Trainer ändert sie beim Anlegen oder auf der Seite.
+ * BJJ trägt keine Zonen und bekommt kein Feld; die Matte gilt dort still.
+ */
+export const STANDARD_FLAECHE: Readonly<Record<Sport, Flaeche>> = {
+  mma: "kaefig",
+  boxen: "ring",
+  kickboxen: "ring",
+  ringen: "matte",
+  sambo: "matte",
+  bjj: "matte",
+};
+
+/** Gespeicherte Wahl des Trainers, sonst die Vorbelegung der Kampfart; ohne Kampfart null. */
+export function flaecheDesWettkampfs(w: { sport: Sport | null; flaeche?: Flaeche | null }): Flaeche | null {
+  if (isFlaeche(w.flaeche)) return w.flaeche;
+  return w.sport ? STANDARD_FLAECHE[w.sport] : null;
+}
+
+/** Ob der Trainer die Fläche wählt — BJJ hat keine Zonen, dort gibt es nichts zu wählen. */
+export function flaecheWaehlbar(sport: Sport | null | undefined): boolean {
+  return !!sport && steckbrief(sport)?.hatZonen !== false;
+}
+
 // ─── Die Form eines Steckbriefs ──────────────────────────────────────────────
 
 /** Die Wörter einer Kampfart auf ihrer Fläche — für Claudes Texte und die Oberfläche. */

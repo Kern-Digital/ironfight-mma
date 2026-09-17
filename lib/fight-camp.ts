@@ -88,6 +88,7 @@ import {
   type DnaSplit,
 } from "./fight-stats";
 import { isSport, type Sport } from "./video-analysis";
+import { isFlaeche, type Flaeche } from "./kampfart-steckbrief";
 
 // ─── Gegner-Stil ───────────────────────────────────────────────────────────
 
@@ -249,6 +250,14 @@ export interface FightCamp {
    * lässt sie einmal wählen.
    */
   sport: Sport | null;
+  /**
+   * Wo gekämpft wird — Käfig, Ring oder Matte (Leon 17.09.2026: „vorbelegt
+   * nach dem, was bei der Wettkampferstellung eingetragen worden ist"). Mit
+   * Fläche darf der Gameplan „am Käfig" sagen und Wall-Wrestling planen.
+   * null/fehlend = die Vorbelegung der Kampfart gilt — gelesen wird immer über
+   * `flaecheDesWettkampfs` (lib/kampfart-steckbrief.ts).
+   */
+  flaeche?: Flaeche | null;
   /** Wie viele Wochen Vorbereitung */
   weeksTotal: number;
   /** Wann gestartet wurde (Default: heute) */
@@ -309,6 +318,7 @@ type FightCampDoc = {
   competitionDate: Timestamp;
   competitionName: string;
   sport?: Sport | null;
+  flaeche?: Flaeche | null;
   weeksTotal: number;
   startedAt: Timestamp;
   opponent: OpponentProfile;
@@ -334,6 +344,7 @@ function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
     competitionDate: d.competitionDate.toDate(),
     competitionName: d.competitionName,
     sport: isSport(d.sport) ? d.sport : null,
+    flaeche: isFlaeche(d.flaeche) ? d.flaeche : null,
     weeksTotal: d.weeksTotal,
     startedAt: d.startedAt.toDate(),
     opponent: d.opponent,
@@ -425,6 +436,7 @@ function encode(camp: Omit<FightCamp, "id" | "createdAt">): FightCampDoc {
   };
   if (camp.gymId) out.gymId = camp.gymId;
   if (camp.sport) out.sport = camp.sport;
+  if (camp.flaeche) out.flaeche = camp.flaeche;
   if (camp.opponentId) out.opponentId = camp.opponentId;
   if (camp.trainerNotes && camp.trainerNotes.trim())
     out.trainerNotes = camp.trainerNotes.trim();
@@ -464,6 +476,7 @@ export async function updateFightCamp(
   if (patch.competitionName !== undefined)
     data.competitionName = patch.competitionName;
   if (patch.sport !== undefined) data.sport = patch.sport;
+  if (patch.flaeche !== undefined) data.flaeche = patch.flaeche;
   if (patch.weeksTotal !== undefined) data.weeksTotal = patch.weeksTotal;
   if (patch.startedAt !== undefined)
     data.startedAt = Timestamp.fromDate(patch.startedAt);

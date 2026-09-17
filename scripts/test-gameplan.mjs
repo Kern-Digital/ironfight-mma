@@ -21,7 +21,12 @@ import {
 } from "../lib/server/gameplan-prompt.ts";
 import { decodeGameplan, drillsFuerPhase, gameplanDocId, gameplanHaengt } from "../lib/gameplan.ts";
 import { KATEGORIEN_JE_KAMPFART, generateFightCampPhases } from "../lib/fight-camp-generator.ts";
-import { ansichtDesProfils } from "../lib/kampfart-steckbrief.ts";
+import {
+  ansichtDesProfils,
+  flaecheDesWettkampfs,
+  flaecheWaehlbar,
+  STANDARD_FLAECHE,
+} from "../lib/kampfart-steckbrief.ts";
 import { ALL_TECHNIQUES } from "../lib/techniques";
 import { buchungsZuwachs, altfelder } from "../lib/server/ki-kosten.ts";
 import { preisJeMillion, kostenAusUsage } from "../lib/server/claude-aufruf.ts";
@@ -120,6 +125,32 @@ sagt(/Was nutzt du am häufigsten|Du nutzt|du/.test(p.user.split("GEGNER —")[0
 const boxen = gameplanPrompt({ ...eingabe(), sport: "boxen" });
 sagt(boxen.user.includes("Gesperrt:") && !boxen.user.includes("Double Leg aus dem Clinch"), "Boxen: gesperrte Gruppen genannt, Takedown-Frage fällt weg");
 sagt(!boxen.user.includes("Body Kick:"), "Boxen: Body Kick aus den Zählern gefiltert");
+
+console.log("── Fläche des Wettkampfs (Leon 17.09.: vorbelegt aus der Kampfart)");
+sagt(
+  STANDARD_FLAECHE.mma === "kaefig" && STANDARD_FLAECHE.boxen === "ring" && STANDARD_FLAECHE.kickboxen === "ring" && STANDARD_FLAECHE.ringen === "matte" && STANDARD_FLAECHE.sambo === "matte",
+  "Vorbelegung: MMA Käfig, Boxen/Kickboxen Ring, Ringen/Sambo Matte",
+);
+sagt(flaecheDesWettkampfs({ sport: "mma" }) === "kaefig" && flaecheDesWettkampfs({ sport: "mma", flaeche: "ring" }) === "ring", "Wahl des Trainers schlägt die Vorbelegung");
+sagt(flaecheDesWettkampfs({ sport: null }) === null && flaecheDesWettkampfs({ sport: "boxen", flaeche: "wiese" }) === "ring", "ohne Kampfart null, ungültige Wahl → Vorbelegung");
+sagt(flaecheWaehlbar("mma") && !flaecheWaehlbar("bjj") && !flaecheWaehlbar(null), "BJJ und ohne Kampfart: kein Feld");
+const kaefig = gameplanPrompt(eingabe({ flaeche: "kaefig" }));
+sagt(kaefig.user.includes("FLÄCHE: Gekämpft wird im Käfig") && kaefig.user.includes(`Rand „am Käfig"`), `Käfig: Flächen-Satz mit Rand „am Käfig"`);
+sagt(kaefig.user.includes("Wall-Wrestling") && kaefig.user.includes(`„Seile" schreibst du nie`), "Käfig: Wall-Wrestling im Wortschatz, Seile verboten");
+sagt(!kaefig.user.includes("überträgst du still"), "Käfig: Profile ohne andere Fläche → kein Übertrags-Satz");
+const matteVideos = eingabe({ flaeche: "kaefig" });
+matteVideos.athlet.profil.evidence = evidence({ antworten: {}, flaeche: "matte" });
+matteVideos.gegner.profil.evidence = evidence({ gezaehlt: 2, flaeche: "kaefig" });
+const uebertrag = gameplanPrompt(matteVideos).user;
+sagt(
+  uebertrag.includes("Die Videos deines Athleten zeigen die Matte.") && !uebertrag.includes("Die Videos von Marco K.") && uebertrag.includes("überträgst du still auf den Käfig — ohne diesen Satz zu zitieren"),
+  "Käfig-Wettkampf, Athlet auf der Matte: nur seine Videos genannt, still übertragen, nicht zitieren",
+);
+const ring = gameplanPrompt(eingabe({ sport: "boxen", flaeche: "ring" }));
+sagt(ring.user.includes("Gekämpft wird im Ring") && ring.user.includes(`„Käfig", „Cage" und „Zaun" schreibst du nie`) && !ring.user.includes("Wall-Wrestling"), "Ring: Käfig-Wörter verboten, kein Wall-Wrestling");
+const matte = gameplanPrompt(eingabe({ sport: "ringen", flaeche: "matte" }));
+sagt(matte.user.includes("Gekämpft wird auf der Matte") && matte.user.includes(`Rand „am Mattenrand"`), "Matte: am Mattenrand");
+sagt(gameplanSchluessel(kaefig) !== gameplanSchluessel(gameplanPrompt(eingabe({ flaeche: "ring" }))), "andere Fläche → neuer Schlüssel (Gameplan schreibt neu)");
 
 console.log("── Schlüssel, Stand");
 sagt(gameplanSchluessel(p) === gameplanSchluessel(gameplanPrompt(eingabe())), "gleiche Eingabe → gleicher Schlüssel");

@@ -32,6 +32,12 @@
  * Gameplan. Vorbelegt, sobald der gewählte Athlet genau EINE Kampfart im
  * Profil hat — eine Wahl von Hand bleibt stehen. Nach dem Anlegen stößt die
  * Seite den Gameplan an (die Route antwortet sofort).
+ *
+ * DIE FLÄCHE FOLGT DER KAMPFART (Leon 17.09.2026: „vorbelegt nach dem, was
+ * bei der Wettkampferstellung eingetragen worden ist"): MMA → Käfig, Boxen
+ * und Kickboxen → Ring, Ringen und Sambo → Matte. Eine Wahl von Hand gilt,
+ * bis die Kampfart wechselt — dann belegt die neue Kampfart wieder vor. BJJ
+ * hat keine Zonen und kein Feld.
  */
 
 import GooeySearch from "@/components/ui/GooeySearch";
@@ -82,6 +88,14 @@ import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
 import { getFightProfile } from "@/lib/fight-profile";
 import { starteGameplan } from "@/lib/gameplan";
 import { SPORT_KURZ, SPORT_LABEL, SPORT_ORDER, isSport, type Sport } from "@/lib/video-analysis";
+import {
+  FLAECHE_LABEL,
+  FLAECHE_ORT,
+  STANDARD_FLAECHE,
+  flaecheWaehlbar,
+  isFlaeche,
+  type Flaeche,
+} from "@/lib/kampfart-steckbrief";
 import { dnaCompleteness } from "@/lib/gegner-dna";
 import { ATHLETE_LEVEL_LABEL, type TechniqueProgress } from "@/lib/types";
 
@@ -316,6 +330,14 @@ function NewCompetitionContent() {
   const [sport, setSport] = useState<Sport | null>(null);
   // Eine Wahl von Hand überschreibt die Vorbelegung aus dem Profil nie.
   const [sportVonHand, setSportVonHand] = useState(false);
+  // Die Fläche von Hand — gilt nur für die Kampfart, zu der sie gewählt wurde.
+  const [flaecheVonHand, setFlaecheVonHand] = useState<{ sport: Sport; flaeche: Flaeche } | null>(null);
+  const flaecheZeigen = flaecheWaehlbar(sport);
+  const flaeche: Flaeche | null = !sport
+    ? null
+    : flaecheVonHand?.sport === sport
+      ? flaecheVonHand.flaeche
+      : STANDARD_FLAECHE[sport];
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -574,6 +596,8 @@ function NewCompetitionContent() {
       });
       const created = await createFightCamp({
         ...base,
+        // Gespeichert wird, was der Trainer sah — auch die Vorbelegung.
+        flaeche: flaecheZeigen ? flaeche : null,
         gymId,
         opponentId: opponent.id,
         // Dieselbe Bedingung wie `istStabKonto()` in den Firestore-Regeln:
@@ -631,7 +655,9 @@ function NewCompetitionContent() {
             {/* Schritt 1: die Eckdaten — das Einzige, was nur hier entsteht */}
             <section>
               <StepHeader n={1} title="Wettkampf" />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${flaecheZeigen ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+              >
                 <label className="flex flex-col gap-1.5">
                   <span className="t-label">Wettkampf-Name</span>
                   <input
@@ -665,11 +691,26 @@ function NewCompetitionContent() {
                     options={SPORT_ORDER.map((s) => ({ value: s, label: SPORT_LABEL[s] }))}
                   />
                 </div>
+                {flaecheZeigen && sport && (
+                  <div className="flex flex-col gap-1.5" data-feld="flaeche">
+                    <span className="t-label">Fläche</span>
+                    <Select
+                      value={flaeche ?? ""}
+                      onChange={(v) => {
+                        if (isFlaeche(v)) setFlaecheVonHand({ sport, flaeche: v });
+                      }}
+                      options={(["kaefig", "ring", "matte"] as const).map((f) => ({
+                        value: f,
+                        label: FLAECHE_LABEL[f],
+                      }))}
+                    />
+                  </div>
+                )}
               </div>
               {/* Der Hilfstext folgt der Wahl (Gedächtnis „hilfstexte-erklaerend"). */}
               <p className="mt-2" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
                 {sport
-                  ? `Der Plan nimmt nur Techniken aus ${SPORT_LABEL[sport]}. Der Gameplan liest dazu das ${SPORT_KURZ[sport]}-Profil deines Athleten und das Profil des Gegners.`
+                  ? `Der Plan nimmt nur Techniken aus ${SPORT_LABEL[sport]}. Der Gameplan liest dazu das ${SPORT_KURZ[sport]}-Profil deines Athleten und das Profil des Gegners${flaecheZeigen && flaeche ? ` und plant den Kampf ${FLAECHE_ORT[flaeche]}` : ""}.`
                   : "Die Kampfart bestimmt, welche Techniken im Plan stehen und welches Profil der Gameplan liest."}
               </p>
             </section>

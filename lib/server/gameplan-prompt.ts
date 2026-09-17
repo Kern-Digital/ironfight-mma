@@ -21,10 +21,12 @@ import {
   begriffe,
   erlaubteTechniken,
   filtereTechnikStats,
+  FLAECHE_ORT,
   frageGiltFuer,
   gesperrteGruppen,
   splitNachSteckbrief,
   steckbrief,
+  type Flaeche,
 } from "../kampfart-steckbrief";
 import { SPORT_LABEL, type Sport } from "../video-analysis";
 import type { AnswerEvidence, ProfileEvidence } from "../profile-evidence";
@@ -47,6 +49,11 @@ export interface GameplanProfil {
 
 export interface GameplanEingabe {
   sport: Sport;
+  /**
+   * Fläche des Wettkampfs (Trainer-Wahl oder Vorbelegung der Kampfart,
+   * `flaecheDesWettkampfs`). Fehlt sie, schreibt der Gameplan neutral.
+   */
+  flaeche?: Flaeche | null;
   wettkampf: { name: string; datum: Date };
   athlet: { name: string; profil: GameplanProfil | null };
   gegner: {
@@ -183,15 +190,49 @@ function profilBlock(p: GameplanProfil | null, sport: Sport, ohneVideos: string,
   return teile.join("\n");
 }
 
-function kampfartText(sport: Sport): string {
-  const b = begriffe(sport, null);
+const FLAECHE_AKK: Record<Flaeche, string> = { kaefig: "den Käfig", ring: "den Ring", matte: "die Matte" };
+
+/**
+ * Der Flächen-Satz (Leon 17.09.2026: Fläche am Wettkampf, vorbelegt aus der
+ * Kampfart). Die Videos eines Profils laufen oft auf einer anderen Fläche
+ * (Gym-Sparring auf der Matte, der Gegner im Käfig) — ihre Rand-Muster gelten
+ * auch am Wettkampf, erfundene Käfig-Zahlen nicht. Nachweis 17.09.: Ohne den
+ * Hinweis „nicht zitieren" schrieb Claude die Anweisung wörtlich in lage.
+ */
+function flaechenSatz(e: GameplanEingabe, flaeche: Flaeche | null): string {
+  if (!flaeche) {
+    return `Die Kampffläche des Wettkampfs ist unbekannt: Schreib neutral „Mitte" und „am Rand", nie „Käfig", „Cage" oder „Seile".`;
+  }
+  const b = begriffe(e.sport, flaeche);
+  const verboten: Record<Flaeche, string> = {
+    kaefig: `„Seile"`,
+    ring: `„Käfig", „Cage" und „Zaun"`,
+    matte: `„Käfig", „Cage", „Zaun" und „Seile"`,
+  };
+  const anders = (
+    [
+      ["deines Athleten", e.athlet.profil?.evidence?.flaeche],
+      [e.gegner.name, e.gegner.profil?.evidence?.flaeche],
+    ] as const
+  )
+    .filter(([, f]) => f && f !== flaeche)
+    .map(([wer, f]) => `Die Videos ${wer === "deines Athleten" ? wer : `von ${wer}`} zeigen ${FLAECHE_AKK[f!]}.`);
+  const uebertrag = anders.length
+    ? ` ${anders.join(" ")} Was diese Profile über Mitte und Rand zeigen, überträgst du still auf ${FLAECHE_AKK[flaeche]} — ohne diesen Satz zu zitieren. Zahlen, die kein Profil nennt, erfindest du nicht.`
+    : "";
+  return `FLÄCHE: Gekämpft wird ${FLAECHE_ORT[flaeche]} (Angabe des Trainers). Mitte heißt „${b.mitte}", Rand „${b.rand}". ${verboten[flaeche]} schreibst du nie.${uebertrag}`;
+}
+
+function kampfartText(e: GameplanEingabe, flaeche: Flaeche | null): string {
+  const sport = e.sport;
+  const b = begriffe(sport, flaeche);
   const erlaubt = erlaubteTechniken(sport).map((id) => actionLabel(id)).join(", ");
   const gesperrt = gesperrteGruppen(sport).map((g) => ACTION_GROUP_META[g].label);
   const phasen = [b.phaseStand, b.phaseKontakt, b.phaseBoden].filter(Boolean).join(" / ");
   return [
     `KAMPFART: ${SPORT_LABEL[sport]}. Phasen: ${phasen}. Fachwörter, die passen: ${b.wortschatz.join(", ")}.`,
     `Techniken, die in dieser Kampfart zählen: ${erlaubt}.${gesperrt.length ? ` Gesperrt: ${gesperrt.join(", ")} — nie als Waffe, Gefahr oder Drill.` : ""}`,
-    `Die Kampffläche des Wettkampfs ist unbekannt: Schreib neutral „Mitte" und „am Rand", nie „Käfig", „Cage" oder „Seile".`,
+    flaechenSatz(e, flaeche),
   ].join("\n");
 }
 
@@ -226,7 +267,7 @@ ${REGELN}`;
 
   const datum = e.wettkampf.datum.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
   const user = `WETTKAMPF: „${e.wettkampf.name}" am ${datum}.
-${kampfartText(e.sport)}
+${kampfartText(e, e.flaeche ?? null)}
 
 ATHLET — ${e.athlet.name} (Profil der Kampfart ${SPORT_LABEL[e.sport]}):
 ${profilBlock(e.athlet.profil, e.sport, "Noch kein ausgewertetes Video in dieser Kampfart.", "athlet")}

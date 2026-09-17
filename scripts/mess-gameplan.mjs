@@ -17,6 +17,17 @@
  * Browser (Trainer): Wettkampfseite mit Kampfart-Chip, Gameplan-Block, Drills in
  * Phase 2/3, Athletensicht (keine Vorschläge, Profilstärke), Gegner mit Käfig;
  * Bestand mit „Kampfart wählen"; Gegnerprofil; Anlegen mit vorbelegter Kampfart.
+ *
+ * Fenster 5b (17.09.2026 abends) — Fläche am Wettkampf + Gameplan für den Athleten:
+ *   • Kopf der Wettkampfseite: Fläche vorbelegt aus der Kampfart (MMA → Käfig),
+ *     Gameplan-Kopf „MMA · Käfig · …".
+ *   • Bestand: Kampfart wählen → Fläche erscheint (Käfig) → Ring wählen →
+ *     Camp trägt flaeche ring, die Route schreibt „offen · gegner" (leerer
+ *     Gegner, KEIN Claude-Aufruf).
+ *   • Anlegen: Fläche folgt der vorbelegten Kampfart.
+ *   • Athlet (eigenes Konto): Dashboard-Karte „Dein Gameplan" → Sheet mit drei
+ *     Blöcken und Drills — liest das Gameplan-Dokument mit dem Client-SDK
+ *     (Regel: Inhaber liest fightProfile/*).
  */
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -233,6 +244,7 @@ async function main() {
     });
     sagt(true, "fertiger Gameplan von Hand geschrieben (Schirm-Daten)");
 
+    if (BROWSER || process.env.FLAG === "1") await markierenNachweis({ db, athletUid, trainerUid, gegnerIds });
     if (BROWSER) await schirme({ athletUid, neuId: neu.id, bestandId: bestand.id, gegnerId: gegner.id, db });
   } catch (err) {
     fehler += 1;
@@ -263,7 +275,90 @@ async function anmelden(page, email) {
   await page.waitForTimeout(1500);
 }
 
-async function schirme({ athletUid, neuId, bestandId, gegnerId }) {
+/**
+ * Laufzeit-Nachweis des Markieren-Nachlaufs (Leon 17.09.: „Ja, auch beim
+ * Markieren") OHNE Claude-Kosten: Prüf-Gegner mit EINER Analyse, Wettkampf
+ * gegen ihn mit einem fertigen Gameplan. Der Prüf-Trainer markiert die Analyse
+ * über POST /api/video-analysis/flag (echtes ID-Token) → der Gegner hat keine
+ * zählende Analyse mehr → der Nachlauf setzt den Gameplan auf „offen · gegner",
+ * der letzte Inhalt bleibt stehen. Braucht den Dev-Server (BASE).
+ */
+async function markierenNachweis({ db, athletUid, trainerUid, gegnerIds }) {
+  const { readFileSync } = await import("node:fs");
+  const env = Object.fromEntries(
+    readFileSync(".env.local", "utf8").split(/\r?\n/).filter((l) => l.includes("=") && !l.startsWith("#"))
+      .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
+  );
+  const fg = db.collection("opponents").doc();
+  gegnerIds.push(fg.id);
+  await fg.set({
+    gymId: GYM_ID, name: "Mess Gegner Markieren", style: "striker", stance: "orthodox", heightCm: null, weightKg: null, reachCm: null,
+    strengths: [], weaknesses: [], favoriteAttacks: [], notes: null, dna: {}, sharedWith: [],
+    createdBy: trainerUid, createdByName: "Mess Trainer 2d", createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+  });
+  await fg.collection("videoAnalyses").doc("flag-1").set(analyse("opponent", fg.id, "Mess Gegner Markieren", {
+    sport: "mma", flaeche: "kaefig", tageAlt: 2,
+    findings: [befund("preferred-weapons_most-common", "jab", "Sein Jab ist die häufigste Waffe.")],
+    actionStats: [{ id: "jab", attempted: 15, landed: 6, zone: "center" }],
+    dnaSplit: { boxing: 80, kicking: 10, wrestling: 5, ground: 0, clinch: 5 },
+  }));
+  const { profil } = await recomputeProfile(db, "opponent", fg.id, "mess");
+  sagt(profil.evidence.countedAnalyses === 1, `Markieren: Prüf-Gegner zählt vorher ${profil.evidence.countedAnalyses} Analyse`);
+
+  const campRef = db.collection("users").doc(athletUid).collection("fightCamps").doc();
+  await campRef.set(camp(athletUid, trainerUid, { name: "Mess Markieren 5b", sport: "mma", opponentId: fg.id, opponentName: "Mess Gegner Markieren", tage: 50 }));
+  const planRef = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${campRef.id}`);
+  const inhalt = {
+    lage: "Vorher-Stand.", waffen: [{ titel: "Vorher", text: "Stand vor dem Markieren.", beleg: "Gegner: 1 Video" }],
+    gefahren: [], soKaempfstDu: [], drills: [],
+  };
+  await planRef.set({
+    campId: campRef.id, sport: "mma", status: "fertig", inhalt, stand: null, geschriebenAt: new Date().toISOString(),
+    gestartetAt: null, offen: null, fehler: null, model: "mess", usage: null, laufId: null, eingabeSchluessel: "mess",
+  });
+
+  const ohne = await fetch(`${BASE}/api/video-analysis/flag`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  sagt(ohne.status === 403, `Markieren: POST ohne Token → ${ohne.status}`);
+
+  const login = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${env.NEXT_PUBLIC_FIREBASE_API_KEY}`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: TRAINER, password: PASSWORD, returnSecureToken: true }),
+  });
+  const { idToken } = await login.json();
+  sagt(!!idToken, "Markieren: echtes ID-Token des Prüf-Trainers (Identity Toolkit)");
+  const t0 = Date.now();
+  const res = await fetch(`${BASE}/api/video-analysis/flag`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${idToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ mode: "opponent", targetId: fg.id, analysisId: "flag-1", action: "flag", wrongFighter: true }),
+  });
+  const antwort = await res.json().catch(() => ({}));
+  sagt(res.status === 200 && antwort.analysis?.wrongFighter === true, `Markieren: Route antwortet ${res.status}, wrongFighter ${antwort.analysis?.wrongFighter} (${Date.now() - t0} ms)`);
+  const nachher = await warteAuf(async () => {
+    const d = (await planRef.get()).data();
+    return d?.status === "offen" ? d : null;
+  }, 45000);
+  sagt(nachher?.offen === "gegner", `Markieren: Nachlauf setzt den Gameplan auf „offen · ${nachher?.offen}“ (${Math.round((Date.now() - t0) / 100) / 10} s nach dem Aufruf)`);
+  sagt(nachher?.inhalt?.lage === "Vorher-Stand." && !nachher?.usage, "Markieren: letzter Inhalt bleibt stehen, kein Claude-Aufruf");
+}
+
+/** Eine Option in einem components/ui/Select wählen. */
+async function waehle(page, feld, label) {
+  await page.locator(`${feld} button[aria-haspopup="listbox"]`).click();
+  await page.locator('[role="listbox"] [role="option"]', { hasText: label }).first().click();
+}
+
+async function warteAuf(pruefe, ms = 30000) {
+  const ende = Date.now() + ms;
+  while (Date.now() < ende) {
+    const wert = await pruefe();
+    if (wert) return wert;
+    await new Promise((r) => setTimeout(r, 750));
+  }
+  return null;
+}
+
+async function schirme({ athletUid, neuId, bestandId, gegnerId, db }) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const konsole = [];
@@ -283,6 +378,10 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId }) {
     const gText = (await gameplan.innerText()).toLowerCase();
     sagt(gText.includes("deine waffen") && gText.includes("die gefahren") && gText.includes("so kämpfst du"), "Gameplan: drei Blöcke");
     sagt((gText.match(/\bbeleg\b/g) ?? []).length >= 4 && gText.includes("mma · "), "Gameplan: Beleg je Punkt, Kampfart im Kopf");
+    sagt(
+      (await page.locator('[data-feld="flaeche"][data-flaeche="kaefig"]').count()) === 1 && gText.includes("mma · käfig · "),
+      "Fläche: Kopf vorbelegt mit Käfig (MMA), Gameplan-Kopf „MMA · Käfig“",
+    );
     const d2 = await page.locator('[data-gameplan-drills="specific-prep"] li').count();
     const d3 = await page.locator('[data-gameplan-drills="sparring-simulation"] li').count();
     sagt(d2 >= 1 && d3 >= 1, `Drills in Phase 2 (${d2}) und Phase 3 (${d3}) des Plans`);
@@ -313,7 +412,30 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId }) {
     await page.locator('[data-feld="kampfart-waehlen"]').waitFor({ timeout: 60000 });
     await page.waitForTimeout(3500);
     sagt((await page.locator("section#gameplan").innerText()).toLowerCase().includes("wähl oben die kampfart"), "Bestand: „Kampfart wählen“ + Hinweis im Gameplan");
+    sagt((await page.locator('[data-feld="flaeche"]').count()) === 0, "Bestand ohne Kampfart: noch kein Flächen-Feld");
     await page.screenshot({ path: `${OUT}/mess-2d-bestand-${THEME}.png`, fullPage: false });
+
+    // Bestand: Kampfart wählen → Fläche erscheint vorbelegt → Ring wählen
+    const bestandRef = db.collection("users").doc(athletUid).collection("fightCamps").doc(bestandId);
+    const planRef = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${bestandId}`);
+    await waehle(page, '[data-feld="kampfart-waehlen"]', "MMA");
+    await page.locator('[data-kampfart="mma"]').waitFor({ timeout: 30000 });
+    await page.locator('[data-feld="flaeche"][data-flaeche="kaefig"]').waitFor({ timeout: 15000 });
+    sagt(true, "Bestand: nach „MMA“ steht die Fläche vorbelegt auf Käfig");
+    await warteAuf(async () => (await planRef.get()).data()?.status === "offen");
+    await waehle(page, '[data-feld="flaeche"]', "Ring");
+    await page.locator('[data-feld="flaeche"][data-flaeche="ring"]').waitFor({ timeout: 15000 });
+    const campNachher = await warteAuf(async () => {
+      const d = (await bestandRef.get()).data();
+      return d?.flaeche === "ring" ? d : null;
+    });
+    sagt(campNachher?.sport === "mma" && campNachher?.flaeche === "ring", `Bestand: Camp trägt sport ${campNachher?.sport} + flaeche ${campNachher?.flaeche}`);
+    const planNachher = await warteAuf(async () => {
+      const d = (await planRef.get()).data();
+      return d?.status === "offen" && d?.offen === "gegner" ? d : null;
+    });
+    sagt(!!planNachher && !planNachher.usage, `Bestand: Route schreibt „offen · ${planNachher?.offen}“ ohne Claude-Aufruf`);
+    await page.screenshot({ path: `${OUT}/mess-5b-bestand-flaeche-${THEME}.png`, fullPage: false });
 
     // Gegnerprofil
     await page.goto(`${BASE}/trainer/deepfight/gegner/${gegnerId}`, { waitUntil: "domcontentloaded" });
@@ -328,7 +450,34 @@ async function schirme({ athletUid, neuId, bestandId, gegnerId }) {
     await page.waitForTimeout(4000);
     const feld = (await page.locator('[data-feld="kampfart"]').innerText()).toLowerCase();
     sagt(feld.includes("mma"), `Anlegen: Kampfart vorbelegt (${feld.replace(/\s+/g, " ").trim()})`);
+    const flaecheFeld = page.locator('[data-feld="flaeche"]');
+    const flaecheText = (await flaecheFeld.count()) ? (await flaecheFeld.innerText()).toLowerCase() : "";
+    const hilfe = (await page.locator("main").last().innerText()).toLowerCase();
+    sagt(flaecheText.includes("käfig") && hilfe.includes("plant den kampf im käfig"), `Anlegen: Fläche folgt der Kampfart (${flaecheText.replace(/\s+/g, " ").trim()}) + Hilfstext`);
     await page.screenshot({ path: `${OUT}/mess-2d-anlegen-${THEME}.png`, fullPage: false });
+
+    // Athlet: Dashboard-Karte → „Dein Gameplan" → Sheet (eigenes Konto, Client-SDK)
+    const actx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: THEME });
+    const apage = await actx.newPage();
+    apage.on("console", (m) => { if (m.type() === "error") konsole.push(`[athlet] ${m.text()}`); });
+    await anmelden(apage, ATHLET);
+    await apage.evaluate((t) => localStorage.setItem("ta-theme", t), THEME);
+    await apage.goto(`${BASE}/dashboard`, { waitUntil: "domcontentloaded" });
+    const knopf = apage.locator('[data-aktion="gameplan-oeffnen"]');
+    await knopf.waitFor({ timeout: 60000 });
+    await apage.waitForTimeout(1500);
+    sagt(true, "Athlet: Wettkampf-Karte zeigt „Dein Gameplan“");
+    await apage.screenshot({ path: `${OUT}/mess-5b-athlet-karte-${THEME}.png`, fullPage: false });
+    await knopf.click();
+    const sheet = apage.getByRole("dialog", { name: "Dein Gameplan" });
+    await sheet.waitFor({ timeout: 15000 });
+    await apage.waitForTimeout(1200);
+    const sText = (await sheet.innerText()).toLowerCase();
+    sagt(sText.includes("deine waffen") && sText.includes("die gefahren") && sText.includes("so kämpfst du"), "Athlet: Sheet mit drei Blöcken");
+    sagt(sText.includes("deine drills") && sText.includes("mma · käfig · gegen mess gegner käfig"), "Athlet: Drills + Kopf „MMA · Käfig · gegen …“");
+    sagt(!sText.includes("neu schreiben"), "Athlet: nur lesen, kein „Neu schreiben“");
+    await apage.screenshot({ path: `${OUT}/mess-5b-athlet-sheet-${THEME}.png`, fullPage: false });
+    await actx.close();
 
     const echt = konsole.filter((k) => !/favicon|Download the React DevTools/i.test(k));
     sagt(echt.length === 0, `Konsole ohne Fehler (${echt.length})`);

@@ -24,9 +24,11 @@ import {
   gameplanHaengt,
   starteGameplan,
   type Gameplan,
+  type GameplanInhalt,
   type GameplanPunkt,
 } from "@/lib/gameplan";
 import { SPORT_KURZ, type Sport } from "@/lib/video-analysis";
+import { FLAECHE_LABEL, type Flaeche } from "@/lib/kampfart-steckbrief";
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -85,8 +87,8 @@ function Punkte({ titel, icon, punkte }: { titel: string; icon: IconName; punkte
               <p className="mt-0.5" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
                 {p.text}
               </p>
-              {/* Belege sind ganze Sätze mit Zahlen (Nachweis 17.09.: bis 200
-                  Zeichen) — in Versalien unlesbar, deshalb die kleine Fließschrift. */}
+              {/* Belege tragen Zahlen und Namen („Du: Hook 12 Versuche, 50 %")
+                  — in Versalien schwer lesbar, deshalb die kleine Fließschrift. */}
               {p.beleg && (
                 <p className="mt-1" style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                   <span style={META_FONT}>Beleg</span> {p.beleg}
@@ -100,7 +102,25 @@ function Punkte({ titel, icon, punkte }: { titel: string; icon: IconName; punkte
   );
 }
 
-function zeit(d: Date | null): string {
+/**
+ * Lage und die drei Blöcke — dieselbe Ansicht für den Trainer (Wettkampfseite)
+ * und den Athleten (GameplanSheet über seine Wettkampf-Karte). `spalten` =
+ * nebeneinander ab lg; im schmalen Sheet stehen sie untereinander.
+ */
+export function GameplanBloecke({ inhalt, spalten = true }: { inhalt: GameplanInhalt; spalten?: boolean }) {
+  return (
+    <>
+      {inhalt.lage && <p style={{ font: "var(--type-body)" }}>{inhalt.lage}</p>}
+      <div className={`grid grid-cols-1 gap-6${spalten ? " lg:grid-cols-3" : ""}`}>
+        <Punkte titel="Deine Waffen" icon="target" punkte={inhalt.waffen} />
+        <Punkte titel="Die Gefahren" icon="shield" punkte={inhalt.gefahren} />
+        <Punkte titel="So kämpfst du" icon="spark" punkte={inhalt.soKaempfstDu} />
+      </div>
+    </>
+  );
+}
+
+export function gameplanZeit(d: Date | null): string {
   if (!d) return "";
   return d.toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
@@ -109,6 +129,7 @@ export default function GameplanBlock({
   uid,
   campId,
   sport,
+  flaeche = null,
   athletName,
   gegnerName,
   profilGesperrt,
@@ -119,6 +140,8 @@ export default function GameplanBlock({
   uid: string;
   campId: string;
   sport: Sport | null;
+  /** Fläche des Wettkampfs (`flaecheDesWettkampfs`) — steht neben der Kampfart. */
+  flaeche?: Flaeche | null;
   athletName: string;
   gegnerName: string;
   /** Kampfprofil nicht freigegeben — dann gibt es auch keinen Gameplan zu lesen. */
@@ -211,12 +234,7 @@ export default function GameplanBlock({
       <div className="flex flex-col gap-5">
         {(gameplan.status !== "fertig" || startet) &&
           zustandsHinweis(gameplan, haengt, athletName, gegnerName, kurz, hinweis, knopf, laeuft)}
-        {inhalt.lage && <p style={{ font: "var(--type-body)" }}>{inhalt.lage}</p>}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Punkte titel="Deine Waffen" icon="target" punkte={inhalt.waffen} />
-          <Punkte titel="Die Gefahren" icon="shield" punkte={inhalt.gefahren} />
-          <Punkte titel="So kämpfst du" icon="spark" punkte={inhalt.soKaempfstDu} />
-        </div>
+        <GameplanBloecke inhalt={inhalt} />
         <div
           className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between"
           style={{ borderColor: "var(--line)" }}
@@ -224,7 +242,7 @@ export default function GameplanBlock({
           <div style={{ ...META_FONT, color: "var(--text-3)" }}>
             {gameplan.stand &&
               `Du: ${gameplan.stand.athletAnalysen} ${gameplan.stand.athletAnalysen === 1 ? "Video" : "Videos"} · Profilstärke ${gameplan.stand.athletStaerke} %  ·  ${gegnerName}: ${gameplan.stand.gegnerAnalysen} ${gameplan.stand.gegnerAnalysen === 1 ? "Video" : "Videos"}${gameplan.stand.gegnerScouting ? " + Scouting" : ""}`}
-            {gameplan.geschriebenAt && ` · geschrieben ${zeit(gameplan.geschriebenAt)}`}
+            {gameplan.geschriebenAt && ` · geschrieben ${gameplanZeit(gameplan.geschriebenAt)}`}
             {inhalt.drills.length > 0 && " · Drills im Trainingsplan, Phase 2 und 3"}
           </div>
           {gameplan.status === "fertig" && knopf("Neu schreiben")}
@@ -241,6 +259,7 @@ export default function GameplanBlock({
         </h2>
         <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
           {kurz ? `${kurz} · ` : ""}
+          {kurz && flaeche ? `${FLAECHE_LABEL[flaeche]} · ` : ""}
           {athletName} gegen {gegnerName}
         </p>
       </div>
