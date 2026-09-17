@@ -16,7 +16,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
+import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { canAccessMember, canAccessOpponent, readMember } from "@/lib/server/member-access";
 import { schreibeGameplan } from "@/lib/server/gameplan";
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       }
     }
 
-    waitUntil(schreibeGameplan(db, uid, campId, { erzwingen: body.erzwingen === true, campDaten: camp }));
+    nachAntwortWeiter(schreibeGameplan(db, uid, campId, { erzwingen: body.erzwingen === true, campDaten: camp }));
     return NextResponse.json({ gestartet: true }, { status: 202 });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {

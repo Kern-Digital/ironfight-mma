@@ -21,7 +21,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
+import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import {
   canAccessMember,
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     const rohSport = snap.data()?.sport;
     const sport = isSport(rohSport) ? rohSport : null;
     const nachlauf = () =>
-      waitUntil(gameplaeneNachAnalyse(db, { mode, targetId, sport, gymId, frist }));
+      nachAntwortWeiter(gameplaeneNachAnalyse(db, { mode, targetId, sport, gymId, frist }));
 
     if (action === "delete") {
       await ref.delete();

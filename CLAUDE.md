@@ -1536,9 +1536,12 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
     `gameplaeneNachAnalyse(db, { mode, targetId, sport, gymId, frist })`:
     höchstens 2 je Nachlauf, ≥ 150 s Restzeit je Aufruf, sonst „offen · zeit").
     Route `POST /api/wettkampf/gameplan` (Tor wettkampf + deepfight + Gegner-
-    Gym, antwortet 202, Arbeit per `waitUntil`). Nachlauf in commit UND flag
-    (e8 setzte flag): `maxDuration = 300`, `frist = Date.now() + 280_000`,
-    `waitUntil(gameplaeneNachAnalyse(…))` nach der Neuberechnung.
+    Gym, antwortet 202, Arbeit per `nachAntwortWeiter`). Nachlauf in commit UND
+    flag (e8 setzte flag): `maxDuration = 300`, `frist = Date.now() + 280_000`,
+    `nachAntwortWeiter(gameplaeneNachAnalyse(…))` nach der Neuberechnung.
+    `lib/server/nachlauf.ts` reicht das Promise an `waitUntil` des Vercel-
+    Anfragekontexts (`Symbol.for("@vercel/request-context")`), lokal läuft es
+    einfach weiter — OHNE das Paket `@vercel/functions` (Falle 19).
     `components/trainer/GameplanBlock.tsx` (Deine Waffen · Die Gefahren · So
     kämpfst du, Beleg je Punkt, Zustände schreibt/offen/fehler/hängt, „Neu
     schreiben"); Drills „Aus dem Gameplan" in Phase 2/3 von FightCampPlanView.
@@ -1569,15 +1572,32 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
     Punkt-Pfade nur in `update`; derselbe Pfad darf in EINEM update nur einmal
     stehen (Altfeld + Buchung erst addieren). (15) `npm install <paket>` (mit
     Speichern) entfernt alle per `--no-save` installierten Pakete — Playwright
-    war weg, der laufende Dev-Server lieferte danach auf jeder Seite 500 mit
-    leerem Body; Neustart heilte ihn, Playwright 1.62.1 (passt zu Chromium 1234)
-    mit `--no-save` zurück. Nach jedem gespeicherten Install
-    `Test-Path node_modules\playwright`. (16) Skripte, die lib/server/gameplan.ts
+    war weg (etwa gleichzeitig lieferte der alte Waisen-Dev-Server auf jeder
+    Seite 500 mit leerem Body; Neustart heilte ihn, Zusammenhang unbelegt),
+    Playwright 1.62.1 (passt zu Chromium 1234) mit `--no-save` zurück. Nach
+    jedem gespeicherten Install `Test-Path node_modules\playwright`. (16) Skripte, die lib/server/gameplan.ts
     oder claude.ts laden, brauchen `--experimental-transform-types` (gemini.ts).
     (17) In JSX zwischen Label-Span und Text ein ECHTES Leerzeichen (`{" "}`) —
     ein CSS-Abstand liefert innerText/Screenreader „BelegDu:". (18) Doppelte
     ASCII-Anführung nach „ in einem "…"-String beendet ihn (Falle 1) — auch in
-    Konstanten-Objekten; Template-Literale nehmen.
+    Konstanten-Objekten; Template-Literale nehmen. (19) PRODUKTION: Nach dem
+    Push b770354 antworteten commit, flag, /api/wettkampf/gameplan UND das
+    unberührte /api/invites/preview mit 500 — `vercel logs`: ERR_REQUIRE_ESM,
+    `jwks-rsa/src/utils.js` ruft `require('jose')` auf jose 6 (nur ESM).
+    firebase-admin 14 bringt seit Juni jwks-rsa 4.0.1 mit; Vercels Loader
+    (`/opt/rust/nodejs.js`, Projekt steht schon auf Node 24.x) kann kein
+    require(esm) — lokal unsichtbar, weil Node 24 es kann. JEDE Route, die
+    `lib/server/firebase-admin.ts` lädt (importiert firebase-admin/auth),
+    war betroffen, vermutlich seit Juni (Logs reichen nur einen Tag, vorher
+    kein Aufruf). Lokal nachstellen: `node --no-experimental-require-module -e
+    "require('firebase-admin/auth')"` bzw. Dev-Server mit `NODE_OPTIONS=
+    --no-experimental-require-module`. Fix: package.json `"overrides": {
+    "jwks-rsa": "^3.2.0" }` (3.2.2 + jose 4.15.9 CJS, Schnittstelle identisch)
+    — später prüfen, ob Vercels Loader require(esm) kann, dann Override weg
+    (v4-Sicherheitsupdates). `@vercel/functions` v3 brachte zusätzlich eine
+    zweite jose 6 über `@vercel/oidc` — raus, `lib/server/nachlauf.ts`
+    ersetzt `waitUntil`. Prüfen nach jedem Deploy: POST ohne Token an eine
+    Admin-SDK-Route muss 403 liefern, nicht 500.
   - **Offen:** Markieren-Nachlauf mit echter KI nicht laufzeit-geprüft ·
     Gameplan für den Athleten sichtbar machen (Regel lässt den Inhaber schon
     lesen, inkl. Gegner-Inhalt — Leon entscheiden) · Trainer mit DeepFight-,

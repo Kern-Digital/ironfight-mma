@@ -23,7 +23,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
+import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { gameplaeneNachAnalyse } from "@/lib/server/gameplan";
@@ -217,7 +217,7 @@ export async function POST(req: Request) {
     // ── Nachlauf: Gameplans der anstehenden Wettkämpfe neu schreiben ──────
     // Leon 17.09.2026: „nach jeder neuen Analyse automatisch". Läuft nach der
     // Antwort weiter und wirft nie (lib/server/gameplan.ts).
-    waitUntil(gameplaeneNachAnalyse(db, { mode: input.mode, targetId: input.targetId, sport, gymId, frist }));
+    nachAntwortWeiter(gameplaeneNachAnalyse(db, { mode: input.mode, targetId: input.targetId, sport, gymId, frist }));
 
     return NextResponse.json({
       analysis: { ...doc, id: ref.id, createdAt: now.toISOString(), wirkung },
