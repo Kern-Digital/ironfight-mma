@@ -26,6 +26,7 @@ import AthleteProfileForm from "@/components/AthleteProfileForm";
 import ProfileShareButton from "@/components/ProfileShareButton";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
+import KampfartUmschalter, { useKampfartAnsicht } from "@/components/deepfight/KampfartUmschalter";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import VideoAnalysisResult from "@/components/trainer/VideoAnalysisResult";
 import Skeleton from "@/components/ui/Skeleton";
@@ -46,7 +47,7 @@ import { listOpponentsSharedWith, type Opponent } from "@/lib/opponents";
 import { listVideoAnalyses, type VideoAnalysis } from "@/lib/video-analysis";
 import { DISCIPLINE_LABEL, WEIGHT_CLASS_LABEL } from "@/lib/types";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
-import { dnaCompleteness, totalAnswered } from "@/lib/gegner-dna";
+import { dnaCompleteness } from "@/lib/gegner-dna";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("de-DE", {
@@ -172,8 +173,11 @@ function KampfprofilContent() {
   const sharedAnalyses = analyses ?? [];
   const sharedOpponents = opponents ?? [];
   const profileEmpty = isFightProfileEmpty(fightProfile);
-  const dnaEntries = fightProfile ? totalAnswered(fightProfile.dna) : 0;
-  const dnaPct = fightProfile ? dnaCompleteness(fightProfile.dna) : 0;
+  // Umschalter je Kampfart (Etappe 3): „Fight-DNA · MMA · Sambo" — erst ab
+  // zwei Kampfarten sichtbar. Die Ansicht liefert Profil, Kampfart, Fläche
+  // und Profilstärke des gewählten Eintrags.
+  const ansicht = useKampfartAnsicht(user?.uid, fightProfile);
+  const gezeigt = ansicht.profil ?? fightProfile;
   const athlete = profile?.athlete;
 
   return (
@@ -211,8 +215,13 @@ function KampfprofilContent() {
                   {WEIGHT_CLASS_LABEL[athlete.weightClass]}
                 </HeaderChip>
               )}
-              {dnaEntries > 0 && (
-                <HeaderChip tone="fight">DNA {dnaPct} %</HeaderChip>
+              {/* EINE Zahl überall (Leon 17.09.2026): die Profilstärke der
+                  Fight-DNA — wie stark du ausgewertet bist, nicht wie viele
+                  Fragen einen Text tragen. */}
+              {(fightProfile?.evidence?.countedAnalyses ?? 0) > 0 && (
+                <HeaderChip tone="fight">
+                  Profilstärke {fightProfile?.evidence?.staerke ?? 0} %
+                </HeaderChip>
               )}
             </div>
             {/* Sichtbarkeit — wer aus dem Team mich sehen darf. Sitzt seit
@@ -267,6 +276,7 @@ function KampfprofilContent() {
               subtitle="Dein Kampf-Stil aus KI-Video-Analysen und Trainer-Beobachtungen"
               brandCase
             />
+            <KampfartUmschalter ansicht={ansicht} />
             {/* Zweispaltigkeit gilt NUR für diese Sektion: Helix links, Karte
                 rechts; mobil untereinander (Helix oben). items-start, weil die
                 Karte ein Akkordeon mit wechselnder Höhe ist — die Helix darf
@@ -274,11 +284,12 @@ function KampfprofilContent() {
                 profileEmpty-Ternärs: ein leeres Profil zeigt dank der
                 Bauplan-Sprossen trotzdem etwas. */}
             <div className={fightProfile ? "grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-6" : undefined}>
-              {fightProfile && (
+              {gezeigt && (
                 <FightDnaHelix
-                  profile={fightProfile}
+                  profile={gezeigt}
                   variant="athlete"
                   size="lg"
+                  staerke={ansicht.staerke}
                 />
               )}
               {fightProfile === null && loading ? (
@@ -298,16 +309,21 @@ function KampfprofilContent() {
                     className="mx-auto mt-1 max-w-md"
                     style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
                   >
+                    {/* Seit der Automatik (16.09.2026) übernimmt niemand mehr
+                        Befunde — jede Analyse rechnet sich selbst ein. */}
                     {isTrainer
-                      ? "Starte eine Video-Analyse zu dir selbst und übernimm die Befunde — dein Profil wächst mit jedem Video."
-                      : "Dein Trainer baut dein Kampfprofil Schritt für Schritt aus Video-Analysen und eigenen Beobachtungen auf — sobald erste Befunde übernommen sind, erscheinen sie hier."}
+                      ? "Starte eine Video-Analyse zu dir selbst — dein Profil wächst mit jedem Video."
+                      : "Jedes Video, das dein Trainer mit dir auswertet, fließt hier ein. Dein Profil wächst mit jedem Video."}
                   </p>
                 </div>
-              ) : fightProfile ? (
+              ) : gezeigt ? (
                 <FightProfileView
-                  dna={fightProfile.dna}
-                  dnaSplit={fightProfile.dnaSplit}
-                  actionStats={fightProfile.actionStats}
+                  dna={gezeigt.dna}
+                  dnaSplit={gezeigt.dnaSplit}
+                  actionStats={gezeigt.actionStats}
+                  sport={ansicht.sportFuerKarte}
+                  flaeche={ansicht.flaeche}
+                  mode="athlete"
                 />
               ) : null}
             </div>

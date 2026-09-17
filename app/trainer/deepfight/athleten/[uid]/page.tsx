@@ -8,6 +8,7 @@ import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
+import KampfartUmschalter, { useKampfartAnsicht } from "@/components/deepfight/KampfartUmschalter";
 import FightProfileView from "@/components/trainer/FightProfileView";
 import {
   getMemberEntry,
@@ -41,8 +42,11 @@ function initialsOf(entry: StudentEntry): string {
  * ist verlinkbar, aus dem DeepFight-Menü wie aus dem Schülerprofil erreichbar
  * und lädt nicht die komplette Trainings-Historie mit.
  *
- * Übernommene Befunde landen im Kampfprofil (users/{uid}.fightProfile) und
- * werden unten als gemergter Profil-Stand angezeigt.
+ * Seit der Automatik (16.09.2026) rechnet der Server jede Analyse selbst ins
+ * Profil ein. Unten steht die Fight-DNA — seit Etappe 3 mit dem Umschalter
+ * „Fight-DNA · MMA · Sambo", sobald es mehr als eine Kampfart gibt. Der
+ * Trainer sieht das Profil seines Athleten in DESSEN Du-Fassung
+ * (`mode="athlete"`) — dieselben Worte, die der Athlet liest.
  */
 function AthleteDeepFightContent({ uid }: { uid: string }) {
   const { user } = useAuth();
@@ -54,6 +58,9 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
   // für DeepFight — Analyse UND Auswertung).
   const [gesperrt, setGesperrt] = useState<string | null>(null);
   const previousProfileRef = useRef<FightProfile | null>(null);
+  // Vor jedem frühen Return: Hooks laufen in derselben Reihenfolge.
+  const ansicht = useKampfartAnsicht(uid, fightProfile);
+  const gezeigt = ansicht.profil ?? fightProfile;
 
   const isSelf = user?.uid === uid;
 
@@ -90,7 +97,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
     } catch (err) {
       if (isPermissionDenied(err)) {
         const wer = await getMemberEntry(uid).catch(() => null);
-        setGesperrt(wer ? labelOf(wer) : "Dieser Trainer");
+        setGesperrt(wer ? labelOf(wer) : "Diese Person");
         return;
       }
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -111,19 +118,18 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
           lane="wide"
           back={{ href: "/trainer/deepfight/athleten", label: "Athleten-Analysen" }}
           title={gesperrt}
-          description="Ein Trainer entscheidet selbst, wer seine DeepFight-Analysen sieht."
+          description="Jeder entscheidet selbst, wer die eigenen DeepFight-Analysen sieht."
         />
         <div className="mx-auto w-full max-w-7xl px-4 pt-1 sm:px-6">
           <div className="t-card flex flex-col gap-2 p-6">
             <span className="t-label">Noch nicht freigegeben</span>
             <p style={{ font: "var(--type-body-strong)" }}>
-              {gesperrt} hat das eigene Athletenprofil noch nicht für dich
-              freigegeben — dazu gehören auch die DeepFight-Analysen und ihre
-              Auswertung.
+              {gesperrt} hat die eigene Fight-DNA noch nicht für dich
+              freigegeben — dazu gehören auch die DeepFight-Analysen.
             </p>
             <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Sobald du freigeschaltet bist, kannst du hier Videos hochladen
-              und Befunde übernehmen wie bei jedem Athleten.
+              Sobald du freigeschaltet bist, analysierst du hier wie bei jedem
+              Athleten.
             </p>
           </div>
         </div>
@@ -251,42 +257,51 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
               {isSelf ? "Mich analysieren" : "Video analysieren"}
             </Link>
 
-            {/* Gemergtes Kampfprofil — Stand aller übernommenen Befunde */}
+            {/* Die Fight-DNA — aus allen Analysen gerechnet (Automatik) */}
             {fightProfile && !isFightProfileEmpty(fightProfile) && (
               <section>
                 <h2
                   className="font-display-ta font-black uppercase"
                   style={{ fontSize: "18px", letterSpacing: "0.06em" }}
                 >
-                  Kampfprofil
+                  Fight-DNA
                 </h2>
                 <p
                   className="font-mono-ta mt-1 text-[10px]"
                   style={{ letterSpacing: "0.18em", color: "var(--fg-4)" }}
                 >
-                  Gemergter Stand aus allen übernommenen Analysen
+                  Aus allen ausgewerteten Videos gerechnet
                 </p>
+                <div className="mt-4">
+                  <KampfartUmschalter ansicht={ansicht} />
+                </div>
                 {/* Zweispaltig wie auf /kampfprofil (Leon, 2026-08-26): Helix
                     links, Fight-DNA-Karte rechts; mobil untereinander. items-start,
                     weil die Karte ein Akkordeon mit wechselnder Höhe ist. */}
                 <div className="mt-4 grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-6">
                   <FightDnaHelix
-                    profile={fightProfile}
+                    profile={gezeigt ?? fightProfile}
                     variant="athlete"
                     size="lg"
-                    grownQuestionIds={grownQuestionIds}
+                    staerke={ansicht.staerke}
+                    // Das Wachstum gehört zur Fight-DNA nach einer Analyse,
+                    // nicht zum Wechsel der Kampfart.
+                    grownQuestionIds={ansicht.sport ? [] : grownQuestionIds}
                   />
                   <FightProfileView
-                    dna={fightProfile.dna}
-                    dnaSplit={fightProfile.dnaSplit}
-                    actionStats={fightProfile.actionStats}
+                    dna={(gezeigt ?? fightProfile).dna}
+                    dnaSplit={(gezeigt ?? fightProfile).dnaSplit}
+                    actionStats={(gezeigt ?? fightProfile).actionStats}
+                    sport={ansicht.sportFuerKarte}
+                    flaeche={ansicht.flaeche}
+                    mode="athlete"
                   />
                 </div>
               </section>
             )}
 
             {/* Leer heißt hier: Es gibt noch nichts zu zeigen, weil noch
-                niemand etwas übernommen hat. Ohne diesen Satz stünde die
+                kein Video ausgewertet ist. Ohne diesen Satz stünde die
                 Seite nach dem Umzug der Ablage fast leer da. */}
             {fightProfile && isFightProfileEmpty(fightProfile) && (
               <section className="t-card p-8 text-center">
@@ -299,8 +314,8 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
                   className="mx-auto mt-1 max-w-md"
                   style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                 >
-                  Analysier ein Kampf-Video und übernimm die Befunde — ab dann
-                  wächst das Profil hier mit jedem Video.
+                  Analysier ein Kampf-Video — ab dann wächst das Profil hier mit
+                  jedem Video.
                 </p>
               </section>
             )}

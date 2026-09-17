@@ -352,9 +352,15 @@ const ZONEN_RING: Record<CageZone, ZonenText> = {
   open: { label: "Offener Raum", phrase: "im offenen Raum" },
   cage: { label: "An den Seilen", phrase: "an den Seilen" },
 };
+/**
+ * `open` heißt auch auf der Matte „Offener Raum" (17.09.2026, Abnahme): Das
+ * Ringer-Wort „Kampffläche" las sich neben „Mattenmitte" und „Am Mattenrand"
+ * wie die ganze Matte — „100 % auf der Kampffläche" hielt ein Prüfer für eine
+ * fehlende Zone.
+ */
 const ZONEN_MATTE: Record<CageZone, ZonenText> = {
   center: { label: "Mattenmitte", phrase: "in der Mattenmitte" },
-  open: { label: "Kampffläche", phrase: "auf der Kampffläche" },
+  open: { label: "Offener Raum", phrase: "im offenen Raum" },
   cage: { label: "Am Mattenrand", phrase: "am Mattenrand" },
 };
 /** Ohne Kampfart (Gegnerprofil, Gesamtprofil über mehrere Kampfarten). */

@@ -21,7 +21,7 @@ import { Collapse } from "@/components/motion";
 import { Fragment, useState } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import {
-  dnaCompleteness,
+  isAnswered,
   totalAnswered,
   type GegnerDnaAnswers,
 } from "@/lib/gegner-dna";
@@ -136,13 +136,16 @@ export default function FightProfileView({
 
   // ── Aufklappbare Punkte ────────────────────────────────────────────────────
   const phrase = zonenPhrase(sport, flaeche) ?? undefined;
+  // Im Athleten-Profil keine Vorschläge aus Gegnersicht (siehe FightInsights).
   const hintCount =
     deriveTendencies(stats, phrase).length +
-    deriveSuggestions(dnaSplit, stats, {
-      zonenPhrase: phrase,
-      mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
-      grappling: gesperrteGruppen(sport).includes("strike"),
-    }).length;
+    (mode === "athlete"
+      ? 0
+      : deriveSuggestions(dnaSplit, stats, {
+          zonenPhrase: phrase,
+          mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+          grappling: gesperrteGruppen(sport).includes("strike"),
+        }).length);
   if (hintCount > 0) {
     blocks.push({
       id: "insights",
@@ -151,7 +154,7 @@ export default function FightProfileView({
       sub: "Abgeleitet aus Split und Statistik",
       summary: `${hintCount} Hinweise`,
       content: (
-        <FightInsights split={dnaSplit} stats={stats} only="insights" sport={sport} flaeche={flaeche} />
+        <FightInsights split={dnaSplit} stats={stats} only="insights" sport={sport} flaeche={flaeche} mode={mode} />
       ),
     });
   }
@@ -170,12 +173,18 @@ export default function FightProfileView({
   }
 
   if (totalAnswered(dna) > 0) {
+    // Eine ANZAHL statt „53 %": Neben der Helix steht die Profilstärke als
+    // einzige Prozentzahl (Leon 17.09.2026: „EINE Zahl überall") — die
+    // Vollständigkeit daneben las sich als zweite, widersprechende Stärke.
+    const antworten = sport
+      ? offeneFragen(sport).filter((id) => isAnswered(dna[id])).length
+      : totalAnswered(dna);
     blocks.push({
       id: "dna",
       icon: "shield",
       title: "Kampf-DNA",
       sub: "Beobachtungen in 9 Kategorien",
-      summary: `${dnaCompleteness(dna, sport ? offeneFragen(sport) : undefined)} %`,
+      summary: `${antworten} ${antworten === 1 ? "Antwort" : "Antworten"}`,
       content: <DnaCategoryGrid answers={dna} sport={sport} flaeche={flaeche} mode={mode} />,
     });
   }

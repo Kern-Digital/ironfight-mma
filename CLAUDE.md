@@ -1283,17 +1283,40 @@ einfach falsch") — der Bericht beschreibt den BELEG, nie eine Tatsache.
   (Zusammenstellung, Kampfarten, Stärke, Wirkung an der Analyse). Im
   Echtlauf des Fensters „Daten sauber" (17.09. 13:04): commit ohne Fehler,
   `wirkung` an allen 4 Analysen, `evidence.staerke` geschrieben.
-- **OFFEN (Runden 2–5):** Satzschreiber mit Opus 5 (Satz-Cache je Frage,
-  „Satz offen" + Nachholen, er/du glätten, Käfig-Wörter nur mit Fläche) ·
-  Kurzinfo im Bericht mit Füllstand + EIN „Details anzeigen" (inkl.
-  `verworfen`-Zeile, Zonen über `zonenLabel(sport, flaeche)`) · Umschalter
-  „Fight-DNA · MMA · Sambo" auf /kampfprofil und athleten/[uid] mit
-  `sport`/`mode`/`flaeche` an FightProfileView, Helix-Zahl = Profilstärke,
+- **RUNDE 4 GEBAUT (17.09., vor Runde 2 gezogen — Leon: „Etappe 3 baut
+  ZUERST nur die Seiten … Dann EIN Push. Claude-Sätze und Kurzinfo kommen
+  danach."):** `components/deepfight/KampfartUmschalter.tsx` (Leiste
+  „Fight-DNA · MMA · Sambo" erst ab zwei Kampfarten, erster Eintrag heißt
+  „Fight-DNA", nie „Gesamt"; Hook `useKampfartAnsicht(uid, main)` lädt
+  `fightProfile/{sport}` nach und liefert `sportFuerKarte` — gewählte oder
+  einzige Kampfart —, `flaeche` und `staerke`). `FightDnaHelix` nimmt
+  `staerke` (Kennzahl und Fokus-Karte zeigen `evidence.staerke` statt der
+  Vollständigkeit). /kampfprofil: Umschalter, Kopf-Chip „Profilstärke x %"
+  statt „DNA x %", Karte mit `sport`/`flaeche`/`mode="athlete"`, Leer-Texte
+  ohne „übernehmen". /trainer/deepfight/athleten/[uid]: dasselbe (auch dort
+  `mode="athlete"` — der Trainer liest die Du-Fassung seines Athleten),
+  Überschrift „Fight-DNA · Aus allen ausgewerteten Videos gerechnet", Hook VOR
+  den frühen Returns, Wachstum nur in der Fight-DNA-Ansicht. Messung
+  `scripts/mess-e3-umschalter.mjs` 11/11 (Athlet + Trainer, echte
+  Neuberechnung ohne KI) und im vollen KI-Lauf von Fenster 95 (37/37, beide
+  Themes: Matte rund, Helix = Profilstärke 20). Falle: In der Stab-Hülle gibt
+  es ZWEI `main`-Elemente → `locator("main").last()`.
+- **LÜCKEN ÜBER MEHRERE VIDEOS (Leon 17.09., für Runde 2/3):** „ja ab mehreren
+  videos aber diese müssen natürlich in der gleichen kategorie sein … wenn ich
+  5 Analysen mit der Kategorie MMA laufen lasse und in 4 sieht man keinen
+  Takedown, dann steht das natürlich offen zu trainieren." Nur innerhalb
+  eines Kampfart-Profils, nur vom Steckbrief erlaubte Phasen, eigene
+  Aktionen; die Einzel-Bewertung bleibt „nur was vorkam". Schwelle liegt Leon
+  vor (Vorschlag: ab 5 Videos der Kampfart ohne Clips, fehlt in ≥ 80 %).
+- **OFFEN (Runden 2, 3, 5):** Satzschreiber mit Opus 5 (Satz-Cache je Frage,
+  „Satz offen" + Nachholen, er/du glätten, Käfig-Wörter nur mit Fläche,
+  Lücken-Sätze) · Kurzinfo im Bericht mit Füllstand + EIN „Details anzeigen"
+  (inkl. `verworfen`-Zeile, Zonen über `zonenLabel(sport, flaeche)`) ·
   Auslage „laut dir / in deinen Videos" (Leon JA) · Einwilligung mit Leons
-  Wortlaut + Knopf „Einzelne Trainer auswählen" · Offene Leon-Frage: soll
-  auch „beides" 2 Videos brauchen?
+  Wortlaut + Knopf „Einzelne Trainer auswählen" · Offene Leon-Fragen: Soll
+  auch „beides" 2 Videos brauchen? Schwelle der Lücken?
 
-### KAMPFART-STECKBRIEFE GEBAUT (17.09.2026, nicht committet)
+### KAMPFART-STECKBRIEFE GEBAUT (17.09.2026, committet de22189 mit Etappe 3, abgenommen und mit Runde 4 gepusht)
 
 Spezifikation mit Quellen: `docs/kampfart-steckbriefe.md`. Leon hat alle
 sechs Entscheidungen wie empfohlen beantwortet: `entry-patterns_jab`
@@ -1423,6 +1446,50 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
     Ersetzungsskripte mit Regex per Write-Werkzeug in den Scratchpad. (9)
     claude.ts, gemini.ts, video-analysis.ts, VideoUploadFlow.tsx sind CRLF,
     `grep $'\r'` im Bash-Werkzeug erkennt das NICHT — mit Node prüfen.
+- **ABNAHME (17.09.2026 nachmittags, Fenster tidal-athletics-95):**
+  - Vorschau ohne Kosten, BEVOR Runde 4 stand: Profil per reiner Rechnung
+    (`computeProfile` + `stelleZusammen`) aus 3bs Nachweis-Bewertung, auf
+    einer temporären /dev-Seite (danach gelöscht). Matte: Karte rund,
+    „Mattenmitte / Am Mattenrand", „Matte & Raum", kurze Du-Fragen, 0 × Käfig;
+    ohne Fläche: Achteck, „Mitte / Am Rand", „Raum & Rand".
+  - Leons Antworten (gewählte Optionen): Matte „Passt so" · Push „Runde 4
+    vorziehen" · Auto-Insights „Im Athletenprofil weglassen" · voller Lauf
+    „Ja, nach Runde 4" · Vorlauf kippt MMA/Kickboxen „So lassen" · weniger
+    Befunde „klingt ok mit beleg", dazu die LÜCKEN-REGEL (Leon: Lücken erst
+    über mehrere Videos DERSELBEN Kampfart, z. B. 4 von 5 MMA-Analysen ohne
+    eigenen Takedown → offen zu trainieren; ein Stand-Video allein sagt
+    nichts) → Bau in Etappe 3 · Commit + Push „Ja".
+  - Gebaut: `FightInsights`/`FightProfileView` zeigen bei `mode="athlete"`
+    keine Gameplan-/Drill-Vorschläge (sie waren aus Gegnersicht: „Defense &
+    Konter gegen Jab" meinte im eigenen Profil den eigenen Jab; die Drills
+    schreibt Claude in Du-Form unter „Drills"). Matte-Zone `open` heißt
+    „Offener Raum" statt „Kampffläche" (las sich neben „Mattenmitte" wie die
+    ganze Matte). Die Zeile „Kampf-DNA" zeigt eine ANZAHL („35 Antworten")
+    statt `dnaCompleteness` in Prozent — neben der Helix steht die
+    Profilstärke als EINZIGE Prozentzahl. Die Zonen-Legende zeigt absichtlich
+    nur die zwei anderen Zonen (Hero-Zahl = dominante Zone), es fehlt keine.
+  - **Voller Lauf mit echter KI nach Runde 4 (Leon/Alec, beide Personen):**
+    37/37 — Vorlauf live mma + matte, Analyse 6 min 17 s, `flaeche` an beiden
+    Analysen und `evidence.flaeche` in main + mma; athleten/[uid] und
+    /kampfprofil dunkel + hell: Karte rund, Matten-Wörter, 0 × Käfig, Helix
+    und Kopf-Chip = `evidence.staerke` (20 %), „Matte & Raum", Du-Fragen, keine
+    Vorschläge, Konsole 0. Texte alt → neu (A / B): Befunde 48/48 → 33/36,
+    Käfig-Wörter 26/36 → 0/0, Abwesenheits-Sätze 9/16 → 0/1, Feldnamen 70/79
+    → 0/0, summary in Du-Form nein → ja, Brüche unter 5 2/3 → 0/0, **Claude
+    0,56/0,58 € → 0,41/0,43 €** (Ausgabe 14–15 Tsd. Tokens; der Nachweis mit
+    einer Person lag bei 0,32 €). Rest: zwei Kleinstmengen-Sätze ohne Prozent
+    („Teep bei 2 Versuchen einmal gestoppt", „Body Kick 2 Versuche ohne
+    Treffer"). Rohdaten + Prüfskripte:
+    `D:\Tidal-Athletics\tmp\beweis-steckbrief-2026-09-17\lauf3-abnahme\`.
+  - **Fallen:** (10) Eine /dev-Seite mit statischem Profil-JSON erzeugt eine
+    Hydration-Warnung der Helix (Kommazahlen im `polyline`) — nur weil der
+    Server das Profil schon rendert; echte Seiten laden clientseitig. (11) Wer
+    eine /dev-Seite löscht, lässt `.next/types/app/dev/<seite>` zurück → tsc
+    meldet TS2307, bis dieser Ordner weg ist (Server unberührt). (12)
+    Markdown-Links auf Bilder außerhalb der App öffnet Leon im Editor nicht
+    („sehe nichts") → per `Start-Process <url|bild>` öffnen. (13)
+    `scripts/mess-e3-umschalter.mjs` braucht `--import
+    ./scripts/lib/ts-loader-register.mjs` (importiert profile-recompute.ts).
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

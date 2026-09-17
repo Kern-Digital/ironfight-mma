@@ -402,7 +402,8 @@ dem Break, MMA nach dem Stand-up).
 - **`clinch`** — Knie, kurze Schläge und Fegen im stehenden Griffkontakt.
   Heute zählt ein Clinch-Knie als `knee` (Gruppe `kick`) und ein Dump aus dem
   Muay-Thai-Clinch als `trip` (Gruppe `takedown`) — im Stresstest wurde daraus
-  ein „Takedown" im Kickbox-Sparring. UFC Stats führt Clinch als eigene
+  ein „Takedown" im MMA-Sparring mit viel Kickboxen (Leon 17.09.: die
+  Stresstest-Videos sind MMA, niemand geht zu Boden). UFC Stats führt Clinch als eigene
   Position mit eigener Zählung; im Muay Thai ist der Clinch eine
   Wertungszone; K-1/GLORY erlauben genau ein Knie. Signal: `clinch`.
 - **`submission`** — Würger, Armhebel, Beinhebel statt eines Sammeleintrags
@@ -574,7 +575,7 @@ Passivitätszone/Mattenrand). Anzeige je Kampfart:
 | | MMA (Käfig) | MMA (Ring, z. B. Rizin) | Boxen · Kickboxen | Ringen · Sambo/Judo | BJJ |
 |---|---|---|---|---|---|
 | center | Käfigmitte | Ringmitte | Ringmitte | Mattenmitte | — |
-| open | offener Raum | offener Raum | Halbdistanz frei | Kampffläche | — |
+| open | offener Raum | offener Raum | Halbdistanz frei | offener Raum (Einbau 17.09.: „Kampffläche" las sich neben „Mattenmitte" wie die ganze Matte) | — |
 | cage | am Käfig | an den Seilen | an den Seilen / in der Ecke | am Mattenrand / in der Zone | — (keine Zone; Rand = Neustart) |
 
 `controlTime.cagePressureSeconds` / `pressedSeconds` gelten überall, wo es

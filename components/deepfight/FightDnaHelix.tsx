@@ -47,6 +47,13 @@ export interface FightDnaHelixProps {
    * nichts — kein zweiter Look, keine gebündelte Entscheidung.
    */
   kennzahlZeigen?: boolean;
+  /**
+   * Die Profilstärke 0–100 aus der Rechnung (`evidence.staerke`, Etappe 3).
+   * Leon 17.09.2026: „92 % Profilstärke sollte aussagen, wie stark der Athlet
+   * ausgewertet wurde" — gesetzt, zeigt die Kennzahl DIESEN Wert statt der
+   * Vollständigkeit. Ohne Wert (Dev-Seite, Demo) bleibt die Vollständigkeit.
+   */
+  staerke?: number | null;
   nearParticleCount?: number;
   farParticleCount?: number;
   glowIntensity?: number;
@@ -144,6 +151,7 @@ export default function FightDnaHelix({
   tilt = 5,
   completenessLabel = "Profilstärke",
   kennzahlZeigen = true,
+  staerke = null,
   nearParticleCount = 288,
   farParticleCount = 80,
   glowIntensity = 1.3,
@@ -189,6 +197,8 @@ export default function FightDnaHelix({
   className,
 }: FightDnaHelixProps) {
   const model = useMemo(() => buildHelixModel(profile), [profile]);
+  /** Die Zahl über der Helix: Profilstärke, wenn die Rechnung sie liefert. */
+  const kennzahl = typeof staerke === "number" ? Math.round(staerke) : model.completeness;
   const hostRef = useRef<HTMLDivElement>(null);
   const recoveryTimerRef = useRef<number | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -607,7 +617,7 @@ export default function FightDnaHelix({
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          {model.completeness}
+          {kennzahl}
         </span>
         <span style={{ font: "var(--type-label)", color: "var(--text-3)", letterSpacing: "var(--ls-label)", textTransform: "uppercase" }}>
           Prozent {completenessLabel}
@@ -707,7 +717,7 @@ export default function FightDnaHelix({
                   <span style={{ flex: 1, height: 1, background: "var(--line-strong)" }} />
                 </div>
                 <p style={{ margin: 0, display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, color: "var(--text-3)", font: "var(--type-label)", letterSpacing: "var(--ls-label)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  <span>{completenessLabel}</span><span style={{ color: focusColor, fontFamily: "var(--font-mono), monospace", fontWeight: 700 }}>{model.completeness} %</span>
+                  <span>{completenessLabel}</span><span style={{ color: focusColor, fontFamily: "var(--font-mono), monospace", fontWeight: 700 }}>{kennzahl} %</span>
                 </p>
                 <XKnopf
                   onClick={() => onFocusChange?.(null)}

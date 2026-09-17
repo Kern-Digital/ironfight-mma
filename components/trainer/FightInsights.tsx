@@ -85,9 +85,17 @@ export default function FightInsights({
   only,
   sport = null,
   flaeche = null,
+  mode = "opponent",
 }: {
   split: DnaSplit | null | undefined;
   stats: ActionStat[];
+  /**
+   * Athleten-Profil: keine Gameplan-/Drill-Vorschläge (Leon 17.09.2026: „Im
+   * Athletenprofil weglassen"). Die Vorschläge sind aus Gegnersicht gedacht —
+   * „Defense & Konter gegen Jab" meinte im eigenen Profil den eigenen Jab. Die
+   * Drills des Athleten schreibt Claude in Du-Form unter „Drills".
+   */
+  mode?: "opponent" | "athlete";
   /**
    * Kampfart des Profils (Kampfart-Steckbriefe, 17.09.2026): keine Karte im
    * BJJ, kein Boden-Plan im Boxen. null = Gegnerprofil oder Gesamtprofil.
@@ -106,11 +114,14 @@ export default function FightInsights({
   const label = zonenLabel(sport, flaeche);
   const phrase = zonenPhrase(sport, flaeche);
   const tendencies = deriveTendencies(stats, phrase ?? undefined);
-  const suggestions = deriveSuggestions(split, stats, {
-    zonenPhrase: phrase ?? undefined,
-    mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
-    grappling: gesperrteGruppen(sport).includes("strike"),
-  });
+  const suggestions =
+    mode === "athlete"
+      ? []
+      : deriveSuggestions(split, stats, {
+          zonenPhrase: phrase ?? undefined,
+          mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+          grappling: gesperrteGruppen(sport).includes("strike"),
+        });
   const zones = zoneDistribution(stats);
   const zoneTotal = label ? zones.center + zones.open + zones.cage : 0;
 
