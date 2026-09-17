@@ -406,6 +406,7 @@ export default function FightCampPlanView({
               {imEditor && onPhaseSpeichern ? (
                 <PhasenEditor
                   phase={phase}
+                  sport={camp.sport}
                   onSpeichern={async (a) => {
                     await onPhaseSpeichern(phase.phase, a);
                     setBearbeitet(null);
@@ -546,11 +547,15 @@ export default function FightCampPlanView({
               </div>
             )}
 
-            {/* Techniques */}
-            {phase.techniqueIds.length > 0 && (
-              <div className="mt-4">
+            {/* Techniken. Im Editor stehen sie als Kacheln mit Suche — hier
+                nicht doppelt (wie die Stats-Kacheln). „Empfohlen" stimmt nur,
+                solange der Generator allein geschrieben hat: Sobald jemand die
+                Phase von Hand ändert, ist es geplant (Leon 17.09.2026,
+                Stufe 3). */}
+            {!imEditor && phase.techniqueIds.length > 0 && (
+              <div className="mt-4" data-plan-techniken={phase.phase}>
                 <div className="t-label mb-2">
-                  Empfohlene Techniken
+                  {phase.geaendert ? "Geplante Techniken" : "Empfohlene Techniken"}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {phase.techniqueIds.map((id) => {
@@ -574,11 +579,11 @@ export default function FightCampPlanView({
               </div>
             )}
 
-            {/* Exercises */}
-            {phase.exerciseIds.length > 0 && (
-              <div className="mt-4">
+            {/* Übungen — dieselbe Regel wie bei den Techniken. */}
+            {!imEditor && phase.exerciseIds.length > 0 && (
+              <div className="mt-4" data-plan-uebungen={phase.phase}>
                 <div className="t-label mb-2">
-                  Empfohlene Übungen
+                  {phase.geaendert ? "Geplante Übungen" : "Empfohlene Übungen"}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {phase.exerciseIds.map((id) => {

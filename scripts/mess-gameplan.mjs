@@ -525,6 +525,54 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     const edText = (await editor.innerText()).toLowerCase();
     sagt(edText.includes("3×") && edText.includes("25 %"), "Plan: Stepper 4 → 3 Einheiten, 20 → 25 % Sparring");
     await phase2.screenshot({ path: `${OUT}/mess-d5-phase-editor-${THEME}.png` });
+
+    // ── Techniken tauschen, Stufe 3 (Fenster a0) ────────────────────────────
+    // Dieselbe Phase, DERSELBE Speichervorgang: Techniken und Übungen tragen
+    // die Marke „Geändert von" zusammen mit Fokus und Notiz.
+    const tWahl = editor.locator('[data-wahl="techniken"]');
+    const uWahl = editor.locator('[data-wahl="uebungen"]');
+    // innerText liefert den GERENDERTEN Text — der Zähler steht in Versalien
+    // („0 VON 12"), also case-egal vergleichen.
+    const zaehler = async (w) => (await w.locator("[data-anzahl]").innerText()).trim().toLowerCase();
+    sagt(
+      (await zaehler(tWahl)) === "0 von 12" && (await tWahl.innerText()).includes("Noch ohne Technik"),
+      "Stufe 3: leere Phase zeigt „0 von 12“ und den Hinweis",
+    );
+    await tWahl.locator(".goo-pill").click();
+    await tWahl.locator("input.goo-input").fill("Gibtsnichtimkatalog");
+    await page.waitForTimeout(400);
+    sagt(
+      (await tWahl.locator('[data-treffer-liste="techniken"]').innerText()).includes("Bibliothek nichts"),
+      "Stufe 3: Suche ohne Treffer sagt es in einem Satz",
+    );
+    // „double leg" ohne Bindestrich — die Technik heißt „Double-Leg Takedown".
+    await tWahl.locator("input.goo-input").fill("double leg");
+    await tWahl.locator('[data-treffer="wrestling_double_leg"]').waitFor({ timeout: 10000 });
+    sagt(true, "Stufe 3: MMA-Kampf bietet das Double-Leg an, auch ohne Bindestrich getippt");
+    await tWahl.locator('[data-treffer="wrestling_double_leg"]').click();
+    await tWahl.locator("input.goo-input").fill("Jab");
+    await tWahl.locator('[data-treffer="boxing_jab"]').click();
+    await page.waitForTimeout(300);
+    sagt(
+      (await zaehler(tWahl)) === "2 von 12" && (await tWahl.locator("[data-gewaehlt]").count()) === 2,
+      "Stufe 3: zwei Techniken in der Phase, Zähler „2 von 12“",
+    );
+    // Das X der App nimmt eine wieder raus (components/ui/XKnopf).
+    await tWahl
+      .locator('[data-gewaehlt="wrestling_double_leg"] [data-aktion="wahl-raus-techniken"]')
+      .click();
+    await page.waitForTimeout(300);
+    sagt(
+      (await tWahl.locator("[data-gewaehlt]").count()) === 1 &&
+        (await tWahl.locator('[data-gewaehlt="boxing_jab"]').count()) === 1,
+      "Stufe 3: das X nimmt genau die angetippte Technik raus",
+    );
+    await uWahl.locator(".goo-pill").click();
+    await uWahl.locator("input.goo-input").fill("Seilspringen");
+    await uWahl.locator('[data-treffer="warmup_jump_rope"]').click();
+    await page.waitForTimeout(300);
+    sagt((await zaehler(uWahl)) === "1 von 12", "Stufe 3: Übung dazu, eigener Zähler");
+    await phase2.screenshot({ path: `${OUT}/mess-a0-phase-wahl-${THEME}.png` });
     await editor.locator('[data-aktion="phase-speichern"]').click();
     await phase2.locator('[data-phasen-geaendert="specific-prep"]').waitFor({ timeout: 15000 });
     await page.waitForTimeout(700);
@@ -534,6 +582,23 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
       "Plan: Ansicht zeigt Fokus, Notiz, 3× und 25 %",
     );
     sagt(p2Text.includes("geändert von mess trainer 2d · heute"), "Plan: „Geändert von Mess Trainer 2d · heute“");
+    // Eng auf den Technik-Block gezielt: Im Drill „Sprawl nach Jab" steht das
+    // Double Leg als Zweck — im Fließtext der Phase wäre die Prüfung blind.
+    const tBlock = (await phase2.locator('[data-plan-techniken="specific-prep"]').innerText()).toLowerCase();
+    const uBlock = (await phase2.locator('[data-plan-uebungen="specific-prep"]').innerText()).toLowerCase();
+    sagt(
+      tBlock.includes("geplante techniken") && tBlock.includes("jab") && !tBlock.includes("double leg"),
+      "Stufe 3: aus „Empfohlene Techniken“ wird „Geplante Techniken“ mit dem Jab",
+    );
+    sagt(
+      uBlock.includes("geplante übungen") && uBlock.includes("seilspringen"),
+      "Stufe 3: „Geplante Übungen“ mit Seilspringen",
+    );
+    const phase1Text = (await page.locator("#plan-phase-foundation").innerText()).toLowerCase();
+    sagt(
+      !phase1Text.includes("geplante techniken"),
+      "Stufe 3: die unberührte Phase 1 bleibt bei „Empfohlene“",
+    );
     await phase2.screenshot({ path: `${OUT}/mess-d5-phase-gespeichert-${THEME}.png` });
     const campNeu = (await db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId).get()).data();
     const [pa, pb] = campNeu.phases;
@@ -541,6 +606,14 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
       pb.focus === "Takedown-Abwehr am Zaun" && pb.sessionsPerWeek === 3 && pb.sparringRatio === 0.25 && pb.notes === "Sparring nur mit Kopfschutz" &&
         pb.geaendert?.uid === trainerUid && pb.geaendert?.name === "Mess Trainer 2d" && pb.startsAt instanceof Timestamp,
       "Plan: Dokument trägt die Änderung an Phase 2 samt Autor, Datumsfelder bleiben Timestamps",
+    );
+    sagt(
+      pb.techniqueIds.join() === "boxing_jab" && pb.exerciseIds.join() === "warmup_jump_rope",
+      "Stufe 3: Dokument trägt genau die gewählten Listen (das Double Leg ging wieder raus)",
+    );
+    sagt(
+      pa.techniqueIds.length === 0 && pa.exerciseIds.length === 0,
+      "Stufe 3: die anderen Phasen behalten ihre Listen",
     );
     sagt(pa.focus === "Aufbau." && !pa.geaendert && campNeu.phases.length === 4 && campNeu.ownerIsStaff === false, "Plan: die anderen Phasen und ownerIsStaff unberührt");
     // Abbrechen ändert nichts
@@ -764,6 +837,12 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     sagt(
       (await planSheet.locator('[data-aktion="phase-bearbeiten"]').count()) === 0 && (await planSheet.locator("[data-reiter]").count()) === 2,
       "Athlet: nur lesen (kein „Bearbeiten“), zwei Reiter",
+    );
+    const aBlock = (await planSheet.locator('[data-plan-techniken="specific-prep"]').innerText()).toLowerCase();
+    sagt(
+      aBlock.includes("geplante techniken") && aBlock.includes("jab") &&
+        (await planSheet.locator('[data-plan-uebungen="specific-prep"]').innerText()).toLowerCase().includes("seilspringen"),
+      "Stufe 3 beim Athleten: „Geplante Techniken“ mit Jab, „Geplante Übungen“ mit Seilspringen",
     );
     const neuRef = db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId);
     const neuDaten = (await neuRef.get()).data();

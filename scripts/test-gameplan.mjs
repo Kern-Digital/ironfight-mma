@@ -20,7 +20,12 @@ import {
   normalisiereGameplan,
 } from "../lib/server/gameplan-prompt.ts";
 import { decodeGameplan, drillsFuerPhase, gameplanDocId, gameplanHaengt } from "../lib/gameplan.ts";
-import { KATEGORIEN_JE_KAMPFART, generateFightCampPhases } from "../lib/fight-camp-generator.ts";
+import {
+  KATEGORIEN_JE_KAMPFART,
+  generateFightCampPhases,
+  waehlbareTechniken,
+  waehlbareUebungen,
+} from "../lib/fight-camp-generator.ts";
 import {
   ansichtDesProfils,
   flaecheDesWettkampfs,
@@ -28,6 +33,7 @@ import {
   STANDARD_FLAECHE,
 } from "../lib/kampfart-steckbrief.ts";
 import { ALL_TECHNIQUES } from "../lib/techniques";
+import { EXERCISES } from "../lib/exercises.ts";
 import { buchungsZuwachs, altfelder } from "../lib/server/ki-kosten.ts";
 import { GAMEPLAN_AUFRUF_MS, SCOUTING_AUFSCHUB_MS } from "../lib/server/gameplan.ts";
 import {
@@ -214,13 +220,14 @@ sagt(decodeGameplan({ campId: "x", status: "fertig" }).aufschubBis === null, "oh
 sagt(SCOUTING_AUFSCHUB_MS === 90_000 && SCOUTING_AUFSCHUB_MS + GAMEPLAN_AUFRUF_MS <= 280_000, "90 s Aufschub + 150 s Claude passen ins 280-s-Budget der Route");
 
 console.log("── Wettkampf-Plan bearbeiten, Stufe 1 (Fenster d5)");
-const s1 = saeubereAenderung("specific-prep", { focus: "  Takedown-Abwehr am Zaun  ", sessionsPerWeek: 3.4, sparringRatio: 0.27, notes: "  Kopfschutz " });
+const LEER = { techniqueIds: [], exerciseIds: [] };
+const s1 = saeubereAenderung("specific-prep", { focus: "  Takedown-Abwehr am Zaun  ", sessionsPerWeek: 3.4, sparringRatio: 0.27, notes: "  Kopfschutz ", ...LEER });
 sagt(s1.focus === "Takedown-Abwehr am Zaun" && s1.notes === "Kopfschutz", "Fokus und Notiz getrimmt");
 sagt(s1.sessionsPerWeek === 3 && s1.sparringRatio === 0.25, "Einheiten ganzzahlig, Sparring in 5-%-Schritten");
-const s2 = saeubereAenderung("taper", { focus: "   ", sessionsPerWeek: 99, sparringRatio: -1, notes: "x".repeat(2000) });
+const s2 = saeubereAenderung("taper", { focus: "   ", sessionsPerWeek: 99, sparringRatio: -1, notes: "x".repeat(2000), ...LEER });
 sagt(s2.focus === PHASE_FOCUS.taper, "leerer Fokus → Fokus der Phase aus dem Generator");
 sagt(s2.sessionsPerWeek === PHASE_GRENZEN.einheitenMax && s2.sparringRatio === 0 && s2.notes.length === PHASE_GRENZEN.notizMax, "Grenzen: 14 Einheiten, 0 %, 1000 Zeichen");
-sagt(saeubereAenderung("taper", { focus: "a", sessionsPerWeek: Number.NaN, sparringRatio: Number.NaN, notes: "" }).sessionsPerWeek === 0, "keine Zahl → 0");
+sagt(saeubereAenderung("taper", { focus: "a", sessionsPerWeek: Number.NaN, sparringRatio: Number.NaN, notes: "", ...LEER }).sessionsPerWeek === 0, "keine Zahl → 0");
 const zuletzt = planZuletztGeaendert({
   phases: [
     { geaendert: { uid: "a", name: "Alt", at: 1000 } },
@@ -312,6 +319,60 @@ sagt(
   wannText(jetzt.getTime() - TAG, jetzt) === "gestern" &&
     wannText(vorFuenf.getTime(), jetzt) === vorFuenf.toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
   "wannText: gestern, sonst Tag und Monat",
+);
+
+console.log("── Techniken tauschen, Stufe 3 (Fenster a0)");
+sagt(PHASE_GRENZEN.inhalteMax === 12, "Leons Deckel: 12 Techniken bzw. Übungen je Phase");
+const wahl = (techniqueIds, exerciseIds = []) =>
+  saeubereAenderung("foundation", { focus: "a", sessionsPerWeek: 4, sparringRatio: 0.1, notes: "", techniqueIds, exerciseIds });
+sagt(
+  wahl(["boxing_cross", "boxing_jab"]).techniqueIds.join() === "boxing_cross,boxing_jab",
+  "Reihenfolge bleibt, wie der Trainer sie legt",
+);
+sagt(wahl(["boxing_jab", "gibtsnicht", 42, null]).techniqueIds.join() === "boxing_jab", "unbekannte IDs fallen raus");
+sagt(wahl(["boxing_jab", "boxing_jab"]).techniqueIds.length === 1, "dieselbe Technik nur einmal");
+const vieleTechniken = ALL_TECHNIQUES.slice(0, 20).map((t) => t.id);
+sagt(wahl(vieleTechniken).techniqueIds.length === 12, "20 Techniken → 12 bleiben stehen");
+const vieleUebungen = EXERCISES.slice(0, 20).map((e) => e.id);
+sagt(wahl([], vieleUebungen).exerciseIds.length === 12, "derselbe Deckel für Übungen");
+sagt(wahl("keinArray").techniqueIds.length === 0 && wahl(undefined).techniqueIds.length === 0, "kein Array → leere Liste");
+// Bewusst NICHT gefiltert: Was schon in der Phase steht, überlebt das Speichern
+// auch dann, wenn die Kampfart es heute nicht mehr anbietet.
+sagt(
+  wahl(["wrestling_double_leg"]).techniqueIds.join() === "wrestling_double_leg",
+  "Technik außerhalb der Kampfart bleibt beim Speichern stehen",
+);
+
+const boxWahl = waehlbareTechniken("boxen");
+sagt(
+  boxWahl.length > 0 && boxWahl.every((t) => t.category === "boxing"),
+  `Boxkampf bietet nur Box-Techniken an (${boxWahl.length})`,
+);
+sagt(waehlbareTechniken("mma").length === ALL_TECHNIQUES.length, "MMA bietet die ganze Bibliothek an");
+sagt(waehlbareTechniken(null).length === ALL_TECHNIQUES.length, "ohne Kampfart wie MMA");
+sagt(
+  waehlbareTechniken("kickboxen").every((t) => t.category === "boxing" || t.category === "muay-thai") &&
+    waehlbareTechniken("kickboxen").length > boxWahl.length,
+  "Kickboxen: Boxen + Muay Thai",
+);
+const kbSort = waehlbareTechniken("kickboxen");
+sagt(
+  kbSort.findIndex((t) => t.category === "muay-thai") > kbSort.findLastIndex((t) => t.category === "boxing"),
+  "sortiert: erst die Kategorien der Kampfart, dann Namen",
+);
+const boxUebungen = waehlbareUebungen("boxen");
+sagt(
+  boxUebungen.every((e) => e.category === "boxing" || e.category === "any") &&
+    boxUebungen.some((e) => e.category === "any"),
+  "Übungen: Boxen plus die kampfartfreien (Seilspringen, Sprints)",
+);
+sagt(
+  boxUebungen.findIndex((e) => e.category === "any") > boxUebungen.findLastIndex((e) => e.category === "boxing"),
+  "kampfartfreie Übungen stehen hinten",
+);
+sagt(
+  waehlbareUebungen("bjj").every((e) => e.category === "bjj" || e.category === "any"),
+  "BJJ-Kampf bietet keine Box-Übungen an",
 );
 
 console.log("── Kampfart am Wettkampf: Plan-Kategorien");

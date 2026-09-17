@@ -91,6 +91,8 @@ import {
 } from "./fight-stats";
 import { isSport, type Sport } from "./video-analysis";
 import { isFlaeche, type Flaeche } from "./kampfart-steckbrief";
+import { ALL_TECHNIQUES } from "./techniques";
+import { EXERCISES } from "./exercises";
 
 // ─── Gegner-Stil ───────────────────────────────────────────────────────────
 
@@ -238,13 +240,25 @@ export interface PlanAenderung {
   at: number;
 }
 
-/** Was der Trainer an einer Phase von Hand ändert (Stufe 1). */
+/**
+ * Was der Trainer an einer Phase von Hand ändert (Stufe 1 + Stufe 3).
+ *
+ * Die beiden Listen sind PFLICHT, nicht optional: Der Editor schickt immer den
+ * ganzen Stand der Phase zurück. Ein optionales Feld hieße „undefined = nicht
+ * angefasst" — und ein Aufrufer, der es vergisst, löschte lautlos alle
+ * Techniken der Phase. So zwingt TypeScript jede Stelle, sich zu entscheiden
+ * (dieselbe Überlegung wie bei `ownerIsStaff`, Kopfkommentar).
+ */
 export interface PhasenAenderung {
   focus: string;
   sessionsPerWeek: number;
   /** 0..1 */
   sparringRatio: number;
   notes: string;
+  /** Technik-IDs dieser Phase (Stufe 3). */
+  techniqueIds: string[];
+  /** Übungs-IDs dieser Phase (Stufe 3). */
+  exerciseIds: string[];
 }
 
 /** Grenzen des Editors — dieselben im Client und beim Speichern. */
@@ -252,11 +266,39 @@ export const PHASE_GRENZEN = {
   einheitenMax: 14,
   fokusMax: 400,
   notizMax: 1000,
+  /** Techniken bzw. Übungen je Phase (Leon 17.09.2026: „Höchstens 12"). */
+  inhalteMax: 12,
 } as const;
+
+const TECHNIK_IDS = new Set(ALL_TECHNIQUES.map((t) => t.id));
+const UEBUNG_IDS = new Set(EXERCISES.map((e) => e.id));
+
+/**
+ * Eine Inhaltsliste der Phase in gültige Form bringen: nur IDs, die es in der
+ * Bibliothek gibt, jede höchstens einmal, höchstens zwölf (Leon 17.09.2026).
+ *
+ * WAS HIER BEWUSST NICHT GEPRÜFT WIRD: ob die Technik zur Kampfart des
+ * Wettkampfs passt. Die Kampfart filtert das ANGEBOT der Suche
+ * (`waehlbareTechniken` im Generator) — hier würde sie Inhalte wegwerfen, die
+ * schon in der Phase stehen. Ein Plan, der vor der Kampfart entstand oder
+ * dessen Kampfart später wechselte, verlöre beim Speichern einer Notiz seine
+ * halbe Technikliste, ohne dass es jemand sieht.
+ */
+function saeubereListe(ids: unknown, erlaubt: Set<string>): string[] {
+  if (!Array.isArray(ids)) return [];
+  const raus: string[] = [];
+  for (const id of ids) {
+    if (typeof id !== "string" || !erlaubt.has(id) || raus.includes(id)) continue;
+    raus.push(id);
+    if (raus.length === PHASE_GRENZEN.inhalteMax) break;
+  }
+  return raus;
+}
 
 /**
  * Bringt eine Eingabe in gültige Form: ganze Einheiten 0–14, Sparring in
- * 5-%-Schritten, Fokus nie leer (leer = der Fokus der Phase aus dem Generator).
+ * 5-%-Schritten, Fokus nie leer (leer = der Fokus der Phase aus dem
+ * Generator), Techniken und Übungen als gültige, doppelfreie Listen bis zwölf.
  */
 export function saeubereAenderung(phase: FightCampPhase, a: PhasenAenderung): PhasenAenderung {
   const zahl = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -265,6 +307,8 @@ export function saeubereAenderung(phase: FightCampPhase, a: PhasenAenderung): Ph
     sessionsPerWeek: Math.min(PHASE_GRENZEN.einheitenMax, Math.max(0, Math.round(zahl(a.sessionsPerWeek)))),
     sparringRatio: Math.min(1, Math.max(0, Math.round(zahl(a.sparringRatio) * 20) / 20)),
     notes: a.notes.trim().slice(0, PHASE_GRENZEN.notizMax),
+    techniqueIds: saeubereListe(a.techniqueIds, TECHNIK_IDS),
+    exerciseIds: saeubereListe(a.exerciseIds, UEBUNG_IDS),
   };
 }
 
@@ -624,6 +668,10 @@ export async function updateFightCampPhase(
       focus: sauber.focus,
       sessionsPerWeek: sauber.sessionsPerWeek,
       sparringRatio: sauber.sparringRatio,
+      // Stufe 3: Techniken und Übungen gehen denselben Weg wie Fokus und
+      // Notiz — EINE Marke `geaendert` für die ganze Phase, nicht je Feld.
+      techniqueIds: sauber.techniqueIds,
+      exerciseIds: sauber.exerciseIds,
       geaendert: { uid: autor.uid, name: autor.name, at: Date.now() },
     };
     // `notes` fällt beim Leeren ganz weg, statt als "" stehen zu bleiben.

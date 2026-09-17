@@ -1884,6 +1884,68 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       Zeilen: Intro läuft mit `data-sound="playing"`, Tondatei 200). Playwright
       braucht dafür `--autoplay-policy=no-user-gesture-required`, sonst sperrt
       Chromium den Ton und der Zustand ist immer „blocked".
+  - **STUFE 3: TECHNIKEN TAUSCHEN (17.09.2026 nachts, Fenster
+    tidal-athletics-a0, alleiniger Baum — e8 und b4 zu, b2 meldete „frei").**
+    Leons Antworten (wörtlich): „Stufe 3: Techniken tauschen (Empfohlen)" ·
+    Gameplan nach einem Tausch „Nein, Gameplan bleibt (Empfohlen)" · Deckel
+    „Höchstens 12 (Empfohlen)".
+    - **Was der Trainer darf:** `PhasenAenderung` trägt jetzt `techniqueIds`
+      und `exerciseIds` — beide PFLICHT, nicht optional: Der Editor schickt
+      immer den ganzen Stand der Phase, und ein Aufrufer, der das Feld
+      vergisst, löschte sonst lautlos die Liste. `PHASE_GRENZEN.inhalteMax`
+      = 12 gilt für BEIDE Listen. `saeubereAenderung` wirft unbekannte IDs
+      weg, dedupliziert, kappt bei zwölf — und prüft die Kampfart NICHT:
+      Die filtert das ANGEBOT der Suche, hier würde sie Inhalte wegwerfen,
+      die schon in der Phase stehen (Plan von vor der Kampfart, oder Kampfart
+      später gewechselt). `updateFightCampPhase` schreibt beide Listen in
+      DERSELBEN Transaktion wie Fokus, Einheiten, Sparring und Notiz — die
+      Phase trägt weiter EINE Marke `geaendert`.
+    - **Das Angebot:** `waehlbareTechniken(sport)` / `waehlbareUebungen(sport)`
+      in lib/fight-camp-generator.ts (dort, wo `KATEGORIEN_JE_KAMPFART` schon
+      steht — fight-camp.ts darf den Generator nicht importieren, der
+      importiert seinerseits `phasenZeitachse`). Sortiert nach den Kategorien
+      der Kampfart, darin nach Namen; Übungen mit `category: "any"`
+      (Seilspringen, Sprints) passen zu jeder Kampfart und stehen hinten.
+      Zahlen: Boxkampf 26 Techniken, MMA 58 (die Kickbox- und MMA-Basics-
+      Dateien tragen ebenfalls `category: "boxing"` — die Dateinamen sagen
+      nichts über die Kategorie).
+    - **Oberfläche:** `components/trainer/InhaltsWahl.tsx` (neu) — Kacheln der
+      gewählten Einträge mit dem X der App (`XKnopf`, Wort „Raus"), Zähler
+      „7 von 12", darunter `GooeySearch`. Die Trefferliste erscheint ERST mit
+      einer Eingabe (eine offene Liste mit 58 Einträgen schöbe „Speichern" aus
+      dem Bild), höchstens acht Treffer. Voll → Hinweis „Zwölf ist das Maximum
+      — nimm erst eine raus." Die Suche vergleicht über `schlicht()`: nur
+      Buchstaben und Ziffern, damit „double leg" das „Double-Leg Takedown"
+      findet. `PhasenEditor` reicht `sport` durch und hängt beide Blöcke über
+      die Notiz. `FightCampPlanView`: „Empfohlene Techniken" → **„Geplante
+      Techniken"**, sobald `geaendert` steht (dasselbe für Übungen), Marken
+      `data-plan-techniken` / `data-plan-uebungen`; im Editor bleiben beide
+      Blöcke aus (wie die Stats-Kacheln), sonst stünde alles doppelt.
+    - **Gameplan unberührt** (Leon: „Nein, Gameplan bleibt"): Der Prompt liest
+      die beiden Kampfprofile, nicht die Technikliste der Phase — ein Tausch
+      kostet nichts und ändert den Fingerabdruck nicht.
+    - **Messung:** tsc/eslint 0 · test-gameplan **98/98** (+16: Reihenfolge,
+      unbekannte IDs, Dopplung, Deckel 12 für beide Listen, „kein Array",
+      Technik außerhalb der Kampfart überlebt, Angebot je Kampfart und
+      Sortierung) · `scripts/mess-gameplan.mjs` erweitert um elf Zeilen:
+      leere Phase „0 von 12", Suche ohne Treffer, „double leg" ohne
+      Bindestrich findet das Takedown, zwei Techniken, X nimmt genau eine
+      raus, Übung mit eigenem Zähler, nach dem Speichern „Geplante Techniken"
+      mit Jab und „Geplante Übungen" mit Seilspringen, Phase 1 bleibt bei
+      „Empfohlene", Dokument trägt genau die gewählten Listen, andere Phasen
+      unberührt, Athlet sieht beides im Sheet.
+    - **Fallen:** (30) Playwrights `innerText` liefert den GERENDERTEN Text —
+      ein Element mit `text-transform: uppercase` kommt als „0 VON 12" zurück.
+      In Messungen case-egal vergleichen. (31) Das tsconfig dieser App hat
+      KEIN `target` (= ES5): `\p{L}` mit Flag `u` scheitert an TS1501 — in
+      App-Code Zeichenklassen ausschreiben (`[^a-z0-9äöüß]`), Unicode-
+      Eigenschaften gehen nur in den Skripten. (32) Technik-Namen tragen
+      Bindestriche („Double-Leg Takedown"), die niemand mittippt — jede Suche
+      über die Bibliothek normalisiert deshalb erst.
+    - **Offen:** Stufe 4 (Phasenlängen von Hand) · Gegnerseite im Alt-Look ·
+      jwks-rsa-Override. Der Deckel 12 greift nur beim Hinzufügen; ein
+      Bestandsplan mit mehr Einträgen (gibt es heute nicht, der Generator
+      schreibt höchstens 12) würde beim Speichern gekappt.
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

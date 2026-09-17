@@ -21,7 +21,9 @@
  * Phasen verteilen sich neu (`verschiebeKampf`). Die Zeitachse rechnet für
  * BEIDE Wege `phasenZeitachse` (lib/fight-camp.ts) — Leons Ansage „wie beim
  * Anlegen neu verteilen" hält nur, solange es EINE Verteilung gibt.
- * Techniken-Auswahl und eigene Phasenlängen folgen in späteren Stufen.
+ * Stufe 3: Der Trainer tauscht Techniken und Übungen je Phase — was er dabei
+ * zur Wahl hat, sagt `waehlbareTechniken`/`waehlbareUebungen` (unten), und das
+ * ist dieselbe Kampfart-Regel wie beim Anlegen. Eigene Phasenlängen folgen.
  */
 
 import { ALL_TECHNIQUES } from "./techniques";
@@ -41,6 +43,8 @@ import {
 import type {
   AthleteLevel,
   Category,
+  Exercise,
+  Technique,
   TrainingArea,
 } from "./types";
 import type { Sport } from "./video-analysis";
@@ -60,6 +64,45 @@ export const KATEGORIEN_JE_KAMPFART: Record<Sport, Category[]> = {
 };
 
 const ALLE_KATEGORIEN: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
+
+/** Die Kategorien, aus denen ein Wettkampf dieser Kampfart schöpft. */
+export function kategorienDerKampfart(sport: Sport | null | undefined): Category[] {
+  return sport ? KATEGORIEN_JE_KAMPFART[sport] : ALLE_KATEGORIEN;
+}
+
+/**
+ * WAS DER TRAINER IN EINE PHASE LEGEN DARF (Leon 17.09.2026, Stufe 3:
+ * „Techniken tauschen"). Dieselbe Regel wie beim Anlegen des Plans: Ein
+ * Boxkampf bietet Box-Techniken an, kein Double Leg. Ohne Kampfart am
+ * Wettkampf steht die ganze Bibliothek offen (MMA-Mischung wie bisher).
+ *
+ * Sortiert nach Kategorie in der Reihenfolge der Kampfart und darin nach
+ * Namen — die Suche zeigt so bei „ha" erst den Haken, nicht den Hammerfaust-
+ * Treffer aus einer Randkategorie.
+ */
+export function waehlbareTechniken(sport: Sport | null | undefined): Technique[] {
+  const cats = kategorienDerKampfart(sport);
+  return ALL_TECHNIQUES.filter((t) => cats.includes(t.category)).sort(
+    (a, b) =>
+      cats.indexOf(a.category) - cats.indexOf(b.category) ||
+      a.name.localeCompare(b.name, "de"),
+  );
+}
+
+/**
+ * Dasselbe für die Übungen. `category: "any"` (Seilspringen, Sprints, Mobility)
+ * passt zu jeder Kampfart und steht immer zur Wahl — die stehen am Ende, weil
+ * die kampfartnahen Übungen die eigentliche Arbeit der Phase sind.
+ */
+export function waehlbareUebungen(sport: Sport | null | undefined): Exercise[] {
+  const cats = kategorienDerKampfart(sport);
+  return EXERCISES.filter((e) => e.category === "any" || cats.includes(e.category)).sort(
+    (a, b) =>
+      (a.category === "any" ? cats.length : cats.indexOf(a.category)) -
+        (b.category === "any" ? cats.length : cats.indexOf(b.category)) ||
+      a.name.localeCompare(b.name, "de"),
+  );
+}
 
 // ─── Phasen-Charakteristik ─────────────────────────────────────────────────
 
@@ -265,7 +308,7 @@ export function generateFightCampPhases(
   const focus = recommendFocus(input.analysis, input.opponent);
 
   // Kategorien der Kampfart — ohne Kampfart alle vier, wie vor dem 17.09.2026.
-  const primaryCats: Category[] = input.sport ? KATEGORIEN_JE_KAMPFART[input.sport] : ALLE_KATEGORIEN;
+  const primaryCats: Category[] = kategorienDerKampfart(input.sport);
 
   // Schwerpunkt der Phase 2 = Critical Gaps + Style-Areas
   const specificPrepAreas: TrainingArea[] = [
