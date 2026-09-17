@@ -1864,6 +1864,26 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       Hand) · Gegnerseite im Alt-Look · jwks-rsa-Override. Der Schalter
       „Gameplan gleich neu schreiben" ist noch nicht mit echtem Claude
       gemessen (derselbe Weg wie „Neu schreiben", das seit Runde 1 läuft).
+  - **VERSUS-INTRO MIT LEONS TON (17.09.2026 nachts, Fenster 12).** Leon:
+    „freesound_community-062864_ese-24142.mp3 liegt in Download, nimm den Sound
+    für die Versus-Animation beim Wettkampf" · nach dem Hören: „einen Ticken
+    vorne abschneiden vom Sound, ca. 0,7 Sekunden, dann passt".
+    - Datei in `public/audio/` (Name behält die Herkunft wie die Timer-Töne),
+      160 kbit/s, 24 kHz, ~7 s. Abgespielt in
+      `components/trainer/versus-intro.js` (Abweichung 5) über DENSELBEN
+      AudioContext wie der synthetische Ton — die Autoplay-Logik (Zeitfenster
+      1200 ms, `data-sound` pending/playing/blocked, Stopper) bleibt
+      unverändert, neu ist der Zustand `late` (Datei kam zu spät → stumm, statt
+      nach dem Aufschlag zu tönen). `holeTon()` holt die Bytes EINMAL je
+      Sitzung, schon beim Einhängen des Intros; `spieleTonDatei` startet bei
+      `TON_START` 0,7 s, spielt mit `TON_PEGEL` 0,8 und BLENDET über 0,42 s
+      aus, wenn das Intro endet (2,75 s) — die Datei ist länger als das Intro.
+      Der synthetische `scheduleVersusSound` bleibt Rückfall (Datei lädt nicht
+      oder zu langsam), damit das Intro nie stumm wirkt.
+    - Messung: `scripts/mess-gameplan.mjs` **76/76 dunkel + hell** (zwei neue
+      Zeilen: Intro läuft mit `data-sound="playing"`, Tondatei 200). Playwright
+      braucht dafür `--autoplay-policy=no-user-gesture-required`, sonst sperrt
+      Chromium den Ton und der Zustand ist immer „blocked".
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

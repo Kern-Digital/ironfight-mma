@@ -438,7 +438,9 @@ async function warteAuf(pruefe, ms = 30000) {
 
 async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leerId, db, scoutId, scoutCampId }) {
   const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
+  // Der Schalter erlaubt Ton ohne Nutzergeste — sonst sperrt Chromium den
+  // Versus-Ton und der Zustand wäre immer „blocked" (Leons Ton, 17.09.2026).
+  const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
   const konsole = [];
   const scoutPlanRef = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${scoutCampId}`);
   let tSpeichern = 0;
@@ -453,7 +455,24 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     await page.evaluate((t) => localStorage.setItem("ta-theme", t), THEME);
 
     // Wettkampfseite (neu, mit Kampfart)
+    const tonAntworten = [];
+    page.on("response", (r) => { if (r.url().includes("/audio/")) tonAntworten.push({ url: r.url(), status: r.status() }); });
     await page.goto(`${BASE}/trainer/competitions/${athletUid}/${neuId}`, { waitUntil: "domcontentloaded" });
+    // ── Versus-Intro mit Leons Ton (17.09.2026) ─────────────────────────────
+    const intro = page.locator(".tidal-vs-intro");
+    const introDa = await intro
+      .waitFor({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
+    const tonZustand = introDa
+      ? await warteAuf(async () => {
+          const v = await intro.getAttribute("data-sound").catch(() => null);
+          return v && v !== "pending" ? v : null;
+        }, 6000)
+      : null;
+    sagt(introDa && tonZustand === "playing", `Versus-Intro läuft, Ton-Zustand „${tonZustand}"`);
+    const tonDatei = await warteAuf(async () => tonAntworten.find((r) => r.url.includes("062864")) ?? null, 8000);
+    sagt(tonDatei?.status === 200, `Versus-Ton wird ausgeliefert (${tonDatei?.status ?? "keine Anfrage"})`);
     await page.locator('[data-kampfart="mma"]').waitFor({ timeout: 60000 });
     const gameplan = page.locator('section#gameplan');
     await gameplan.waitFor({ timeout: 30000 });

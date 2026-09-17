@@ -35,6 +35,64 @@ const seenInMemory = new Set();
 let activeIntro = null;
 const DURATION = 2750;
 
+/*
+ * 5. LEONS TON STATT DES SYNTHETISCHEN (17.09.2026): „nimm den Sound für die
+ *    Versus-Animation beim Wettkampf". Die Datei liegt in public/audio (Name
+ *    behält die Herkunft wie die Timer-Töne). Sie ist rund 7 Sekunden lang,
+ *    das Intro dauert 2,75 — deshalb BLENDET sie mit dem Intro aus, statt am
+ *    Ende abzubrechen. Der synthetische Ton bleibt als Rückfall: Solange die
+ *    Datei noch lädt oder nicht ausgeliefert wird, klingt das Intro wie bisher.
+ *    Gespielt wird über denselben AudioContext wie vorher — die ganze
+ *    Autoplay-Logik (Zeitfenster, „blocked", Stopper) bleibt, wie sie war.
+ */
+const TON_URL = '/audio/freesound_community-062864_ese-24142.mp3';
+/** Pegel der Datei (der synthetische Ton hört weiter auf `volume`). */
+const TON_PEGEL = 0.8;
+/**
+ * Erste 0,7 Sekunden der Datei überspringen (Leon 17.09.2026: „einen Ticken
+ * vorne abschneiden vom Sound, ca. 0,7 Sekunden"). Der Anlauf der Datei lag
+ * vor dem Bild; so setzt der Ton mit der Animation ein.
+ */
+const TON_START = 0.7;
+let tonBytes = null;
+let tonLauf = null;
+
+/** Holt die Tondatei EINMAL je Sitzung und behält die Rohbytes. */
+function holeTon() {
+  if (tonBytes) return Promise.resolve(tonBytes);
+  if (!tonLauf) {
+    tonLauf = fetch(TON_URL)
+      .then(r => (r.ok ? r.arrayBuffer() : null))
+      .then(b => { tonBytes = b; return b; })
+      .catch(() => { tonLauf = null; return null; });
+  }
+  return tonLauf;
+}
+
+/**
+ * Spielt Leons Ton und blendet ihn zum Ende des Intros aus. `restMs` ist die
+ * Zeit, die dem Intro noch bleibt. Liefert den Stopper.
+ */
+function spieleTonDatei(context, puffer, restMs) {
+  const AUSKLANG = 0.42;
+  const start = context.currentTime + 0.01;
+  const ab = Math.min(TON_START, Math.max(0, puffer.duration - 0.6));
+  const laenge = Math.max(AUSKLANG + 0.1, Math.min(puffer.duration - ab, restMs / 1000));
+  const source = context.createBufferSource();
+  source.buffer = puffer;
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(TON_PEGEL, start);
+  gain.gain.setValueAtTime(TON_PEGEL, start + laenge - AUSKLANG);
+  gain.gain.linearRampToValueAtTime(0.0001, start + laenge);
+  source.connect(gain).connect(context.destination);
+  source.start(start, ab);
+  source.stop(start + laenge + 0.02);
+  return () => {
+    try { source.stop(); } catch { /* Already finished. */ }
+    try { source.disconnect(); gain.disconnect(); } catch { /* Already disconnected. */ }
+  };
+}
+
 /** Original intro sound: stereo whoosh, low impact and metallic tail. */
 export function scheduleVersusSound(context, volume = 0.35) {
   const start = context.currentTime + 0.015;
@@ -111,6 +169,9 @@ export function mountVersusIntro(host, options = {}) {
   const { onceKey = host.getAttribute('aria-label') || 'match', sound = true, volume = 0.35, autoPlay = true } = options;
   const storageKey = `tidal-versus:intro:v2:${onceKey}`;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  // Der Ton wird schon beim Einhängen geholt — beim Abspielen zählen
+  // Millisekunden (Zeitfenster 1200 ms, Abweichung 2).
+  if (sound) holeTon();
   let disposed = false;
   let finish = null;
   let observer = null;
@@ -185,12 +246,39 @@ export function mountVersusIntro(host, options = {}) {
       try {
         const Audio = window.AudioContext || window.webkitAudioContext;
         audioContext = new Audio();
+        const imFenster = () => finish && audioContext.state === 'running' && performance.now() - started < 1200;
         const schedule = () => {
           // A suspended autoplay request must never trigger late, detached sound.
-          if (finish && audioContext.state === 'running' && performance.now() - started < 1200) { // Abweichung 2 (siehe Kopf)
-            stopSound = scheduleVersusSound(audioContext, volume);
-            overlay.dataset.sound = 'playing';
-          } else if (overlay.isConnected) overlay.dataset.sound = 'blocked';
+          if (!imFenster()) { // Abweichung 2 (siehe Kopf)
+            if (overlay.isConnected) overlay.dataset.sound = 'blocked';
+            return;
+          }
+          overlay.dataset.sound = 'playing';
+          // Abweichung 5: Leons Datei, sonst der synthetische Ton.
+          let abgebrochen = false;
+          stopSound = () => { abgebrochen = true; };
+          holeTon()
+            .then(bytes => (bytes && imFenster() ? audioContext.decodeAudioData(bytes.slice(0)) : null))
+            .then(puffer => {
+              if (abgebrochen) return;
+              // Lud die Datei zu lange, bleibt das Intro stumm — ein Ton, der
+              // erst nach dem Aufschlag kommt, klingt wie ein Fehler.
+              if (!imFenster()) {
+                stopSound = null;
+                if (overlay.isConnected) overlay.dataset.sound = 'late';
+                return;
+              }
+              if (puffer) {
+                stopSound = spieleTonDatei(audioContext, puffer, DURATION - (performance.now() - started));
+              } else {
+                stopSound = scheduleVersusSound(audioContext, volume);
+              }
+              if (abgebrochen) stopSound();
+            })
+            .catch(() => {
+              if (abgebrochen || !imFenster()) return;
+              stopSound = scheduleVersusSound(audioContext, volume);
+            });
         };
         // Resolve on the next microtask so finish is ready even in a click handler.
         if (audioContext.state === 'running') queueMicrotask(schedule);
