@@ -3,13 +3,15 @@
 import {
   ACTION_CATALOG,
   ACTION_GROUP_META,
-  CAGE_ZONE_LABEL,
   actionTotals,
   hasActionData,
   statsByGroup,
   successRate,
   type ActionStat,
+  type CageZone,
 } from "@/lib/fight-stats";
+import { zonenLabel, type Flaeche } from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -29,8 +31,19 @@ const META_FONT: React.CSSProperties = {
  * Rollout-Etappe 3a: `frameless` ist weg, die Kopfzeile gehört dem Aufrufer
  * (Begründung im Kopf von FightDnaSplit.tsx).
  */
-export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
+export default function FightStatsBlock({
+  stats,
+  sport = null,
+  flaeche = null,
+}: {
+  stats: ActionStat[];
+  /** Kampfart des Profils — BJJ hat keine Zone. */
+  sport?: Sport | null;
+  /** Fläche des Profils — Zonen-Wörter (Käfig, Seile, Mattenrand); null = neutral. */
+  flaeche?: Flaeche | null;
+}) {
   const grouped = statsByGroup(stats);
+  const zonen = zonenLabel(sport, flaeche);
   if (grouped.length === 0) return null;
 
   return (
@@ -70,7 +83,7 @@ export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
                 .filter(hasActionData)
                 .sort((a, b) => b.attempted - a.attempted)
                 .map((s) => (
-                  <StatRow key={s.id} stat={s} color={meta.color} />
+                  <StatRow key={s.id} stat={s} color={meta.color} zonen={zonen} />
                 ))}
             </div>
           </div>
@@ -80,10 +93,18 @@ export default function FightStatsBlock({ stats }: { stats: ActionStat[] }) {
   );
 }
 
-function StatRow({ stat, color }: { stat: ActionStat; color: string }) {
+function StatRow({
+  stat,
+  color,
+  zonen,
+}: {
+  stat: ActionStat;
+  color: string;
+  zonen: Record<CageZone, string> | null;
+}) {
   const rate = successRate(stat);
   const meta: string[] = [];
-  if (stat.zone) meta.push(CAGE_ZONE_LABEL[stat.zone]);
+  if (stat.zone && zonen) meta.push(zonen[stat.zone]);
   if (stat.setup) meta.push(`Setup: ${stat.setup}`);
 
   return (

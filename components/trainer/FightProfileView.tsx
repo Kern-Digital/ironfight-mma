@@ -39,6 +39,14 @@ import DnaCategoryGrid from "./DnaCategoryGrid";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
 import FightInsights from "./FightInsights";
+import {
+  gesperrteGruppen,
+  offeneFragen,
+  zonenLabel,
+  zonenPhrase,
+  type Flaeche,
+} from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 
 // Meta-Typo der Zeilen (Muster der Kampfprofil-Listen)
 const META_FONT: React.CSSProperties = {
@@ -77,10 +85,26 @@ export default function FightProfileView({
   dna,
   dnaSplit,
   actionStats,
+  sport = null,
+  flaeche = null,
+  mode = "opponent",
 }: {
   dna: GegnerDnaAnswers;
   dnaSplit?: DnaSplit | null;
   actionStats?: ActionStat[];
+  /**
+   * Kampfart des angezeigten Profils (Kampfart-Steckbriefe, 17.09.2026) —
+   * Wörter und Form der Zonen-Karte, gültige Fragen, Nenner der
+   * Vollständigkeit. null = Gegnerprofil oder Gesamtprofil (neutral).
+   */
+  sport?: Sport | null;
+  /**
+   * Fläche des Profils (Käfig, Ring, Matte — Leon 17.09.2026: „Käfig nur, wenn
+   * einer da ist"): Wörter der Zonen und Form der Karte. null = neutral.
+   */
+  flaeche?: Flaeche | null;
+  /** Athleten-Profil zeigt die Du-Fassung der Fragen. */
+  mode?: "opponent" | "athlete";
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const stats = actionStats ?? [];
@@ -98,20 +122,27 @@ export default function FightProfileView({
   }
 
   const zones = zoneDistribution(stats);
-  const zoneTotal = zones.center + zones.open + zones.cage;
+  // BJJ hat keine Zone (Rand = Neustart) — dann gibt es die Karte nicht.
+  const zoneTotal = zonenLabel(sport, flaeche) ? zones.center + zones.open + zones.cage : 0;
   if (zoneTotal > 0) {
     blocks.push({
       id: "zones",
       icon: "mat",
       title: "Wo passiert die Aktion",
-      sub: "Anteil der Aktionen nach Käfig-Zone",
-      content: <FightInsights split={dnaSplit} stats={stats} only="zones" />,
+      sub: "Anteil der Aktionen nach Zone",
+      content: <FightInsights split={dnaSplit} stats={stats} only="zones" sport={sport} flaeche={flaeche} />,
     });
   }
 
   // ── Aufklappbare Punkte ────────────────────────────────────────────────────
+  const phrase = zonenPhrase(sport, flaeche) ?? undefined;
   const hintCount =
-    deriveTendencies(stats).length + deriveSuggestions(dnaSplit, stats).length;
+    deriveTendencies(stats, phrase).length +
+    deriveSuggestions(dnaSplit, stats, {
+      zonenPhrase: phrase,
+      mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+      grappling: gesperrteGruppen(sport).includes("strike"),
+    }).length;
   if (hintCount > 0) {
     blocks.push({
       id: "insights",
@@ -120,7 +151,7 @@ export default function FightProfileView({
       sub: "Abgeleitet aus Split und Statistik",
       summary: `${hintCount} Hinweise`,
       content: (
-        <FightInsights split={dnaSplit} stats={stats} only="insights" />
+        <FightInsights split={dnaSplit} stats={stats} only="insights" sport={sport} flaeche={flaeche} />
       ),
     });
   }
@@ -134,7 +165,7 @@ export default function FightProfileView({
       title: "Technik-Statistik",
       sub: "Gezählt aus den KI-Video-Analysen",
       summary: `${techCount} Techniken · ${Math.round(totals.rate * 100)} %`,
-      content: <FightStatsBlock stats={stats} />,
+      content: <FightStatsBlock stats={stats} sport={sport} flaeche={flaeche} />,
     });
   }
 
@@ -144,8 +175,8 @@ export default function FightProfileView({
       icon: "shield",
       title: "Kampf-DNA",
       sub: "Beobachtungen in 9 Kategorien",
-      summary: `${dnaCompleteness(dna)} %`,
-      content: <DnaCategoryGrid answers={dna} />,
+      summary: `${dnaCompleteness(dna, sport ? offeneFragen(sport) : undefined)} %`,
+      content: <DnaCategoryGrid answers={dna} sport={sport} flaeche={flaeche} mode={mode} />,
     });
   }
 

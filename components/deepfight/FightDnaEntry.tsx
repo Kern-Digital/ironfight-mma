@@ -18,7 +18,7 @@
  * ist (erst Upload, dann Vorlauf, dann Zuordnung auf den Karten), ist diese
  * Frage erst nach dem Upload dran. „Start" führt deshalb direkt zur Ablage;
  * die Bibliotheken bleiben über die Leiste erreichbar. Die Stile der Platten
- * (`.df-entry__choice*` in globals.css) haben keinen Aufrufer mehr.
+ * (`.df-entry__choice*`) sind aus globals.css entfernt (14972ff).
  *
  * ─── DER LICHTREFLEX LÄUFT, WENN MAN IHN SEHEN KANN (Leon 12.09.) ───────────
  *

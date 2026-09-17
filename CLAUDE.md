@@ -1229,10 +1229,200 @@ betrifft, fragt vor dem Video niemand mehr.
   Messskripte angepasst: `check-analyse-freigabe.mjs` (Namen, Gym, alte
   Form), `check-analyse-automatik.mjs` (cg nur Gegner). **Rules + Index:
   Deploy einzeln bei Leon anfragen; bis dahin gilt live das alte Tor.**
-- **OFFEN nach Etappe 2:** `.df-entry__choice*` aus globals.css entfernen.
+- **OFFEN nach Etappe 2:** ~~`.df-entry__choice*` aus globals.css entfernen~~ (erledigt in 14972ff, 17.09. nachgeprüft).
   Etappe 3: Bericht als Kurzinfo + „Details anzeigen", Gesamtansicht als
   Zusammenstellung, Umschalter je Kampfart, Einwilligungs-Schritt beim
   ersten Start (Athlet bestätigt die Freigabe-Logik).
+
+### ETAPPE 3, RUNDE 1 GEBAUT — DIE RECHNUNG (17.09.2026, Fenster tidal-athletics-e8)
+Leons Entscheidungen im Planungsfenster (Gedächtnis `analyse-automatik-entscheidung`,
+Abschnitt „ETAPPE 3 — Planungsrunde"). „Neu / Geändert" im Bericht hat Leon
+ABGELEHNT („du hast 15 Analysen, er sagt Neu … dann wäre unsere Aussage
+einfach falsch") — der Bericht beschreibt den BELEG, nie eine Tatsache.
+- **Wiederholungs-Regel** (`resolveAnswer`, Leon JA): Eine Antwort aus ≥ 2
+  Videos wechselt erst gegen eine Aussage aus ≥ 2 Videos. Vorher kippte EIN
+  aktueller ganzer Kampf jede Antwort, auch gegen 14 ältere. Highlight-Clips
+  zählen nicht als Wiederholung (`kampfVideos`), sonst kippten zwei Clips
+  einen ganzen Kampf.
+- **Wie oft gesehen:** `AnswerSide.videos` + `texte` (alle Fassungen, jüngste
+  zuerst, Stoff für den Satzschreiber), `AnswerEvidence.gelegenheiten` (in
+  wie vielen zählenden Videos die Frage beantwortbar war — Grundlage für
+  „1 von 15 Videos").
+- **Profilstärke** (Leon JA: „wie stark der Athlet ausgewertet wurde, 100 %
+  fast eine Garantie"): je Frage mit Beleg `min(1, führend/3,0) ×
+  führend/alle Seiten`, Durchschnitt → `evidence.staerke`. 3,0 = drei
+  aktuelle ganze Kämpfe oder fünf Sparrings; Widerspruch senkt (Orthodox 3,
+  Southpaw 2 → 60 %). Ersetzt `evidenceStrengthPct`; commit/flag antworten
+  mit `strength: evidence.staerke`. Die Helix-Kennzahl zeigt noch
+  `dnaCompleteness` („66 % Profilstärke") — Umstellung auf `evidence.staerke`
+  ist Runde 3/4 (Leon: EINE Zahl überall).
+- **Fight-DNA als Zusammenstellung** (`stelleZusammen`): `fightProfile/main`
+  ist keine eigene Rechnung mehr. Gleicher Gewinner in allen Kampfarten →
+  ein Satz, verschiedene → `AnswerEvidence.kampfarten[]` mit Label
+  („MMA: … Sambo: …" bis Claude den Satz schreibt), eine Kampfart allein →
+  ihre Antwort unverändert, Zähler je Technik addiert, Split gewichtet.
+  Analysen ohne Kampfart (Bestand) bilden eine Gruppe ohne Namen.
+  `evidence.kampfarten` (für den Umschalter), `evidence.flaeche` (häufigste
+  Fläche der zählenden Analysen; in der Zusammenstellung nur bei gleicher
+  Fläche aller Kampfarten).
+- **Wirkung je Analyse** (`wirkungDerAnalyse`, Stoff der Kurzinfo): im Profil
+  der Kampfart des Videos VOR und NACH ihm verglichen, Arten `angepasst` ·
+  `abweichend` · `bestaetigt` (≥ 2 Videos) · `erstmals`; höchstens 3 Punkte
+  mit dem Text DIESES Videos, Zahlen erst ab 5 Versuchen, Split-Bewegung ab
+  3 Punkten, Stärke vorher → nachher. `recomputeProfile(…, { wirkungFuer })`
+  schreibt sie in derselben Transaktion an die Analyse (`VideoAnalysis.wirkung`,
+  nur der Server); Rückgabe jetzt `{ profil, wirkung }`.
+- **Steckbrief-Filter in der Rechnung** (abgestimmt mit tidal-athletics-9f):
+  Signale aus `filtereBeobachtung(obs, sport, variante)` über
+  `SIGNALE_JE_GRUPPE` (+ ground-top, ground-bottom, rocked, attacked),
+  `frageGiltFuer` für Befunde, Bestätigungen und Gelegenheiten, Zähler über
+  `filtereTechnikStats`, Split-Fenster über `splitNachSteckbrief` —
+  rückwirkend für den Bestand.
+- **Messung:** `scripts/test-profil-rechnung.mjs` **86/86** (vorher 45),
+  `scripts/check-profil-je-kampfart.mjs` **13/13** gegen Firestore
+  (Zusammenstellung, Kampfarten, Stärke, Wirkung an der Analyse). Im
+  Echtlauf des Fensters „Daten sauber" (17.09. 13:04): commit ohne Fehler,
+  `wirkung` an allen 4 Analysen, `evidence.staerke` geschrieben.
+- **OFFEN (Runden 2–5):** Satzschreiber mit Opus 5 (Satz-Cache je Frage,
+  „Satz offen" + Nachholen, er/du glätten, Käfig-Wörter nur mit Fläche) ·
+  Kurzinfo im Bericht mit Füllstand + EIN „Details anzeigen" (inkl.
+  `verworfen`-Zeile, Zonen über `zonenLabel(sport, flaeche)`) · Umschalter
+  „Fight-DNA · MMA · Sambo" auf /kampfprofil und athleten/[uid] mit
+  `sport`/`mode`/`flaeche` an FightProfileView, Helix-Zahl = Profilstärke,
+  Auslage „laut dir / in deinen Videos" (Leon JA) · Einwilligung mit Leons
+  Wortlaut + Knopf „Einzelne Trainer auswählen" · Offene Leon-Frage: soll
+  auch „beides" 2 Videos brauchen?
+
+### KAMPFART-STECKBRIEFE GEBAUT (17.09.2026, nicht committet)
+
+Spezifikation mit Quellen: `docs/kampfart-steckbriefe.md`. Leon hat alle
+sechs Entscheidungen wie empfohlen beantwortet: `entry-patterns_jab`
+gestrichen · acht Zusatzfragen · zwei Fassungen je Frage (`label` „er",
+`labelDu` „du") · 37 Techniken mit Gruppen `clinch` und `submission` ·
+EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
+
+- **`lib/kampfart-steckbrief.ts` (NEU, rein)** — sechs Steckbriefe
+  (`STECKBRIEFE`: rolle, begriffe, gesperrt, techniken, splitNull, zonen,
+  varianten, anker) und die Abfragen `frageGiltFuer`, `technikErlaubt`,
+  `erlaubteTechniken`, `gesperrteGruppen`, `offeneFragen`, `begriffe`,
+  `zonenLabel`/`zonenPhrase` (BJJ → null), `kategorieLabel`,
+  `varianteFuer`. Dazu die EINE Signal-Tabelle der Rechnung (`Signal`,
+  `SIGNAL_JE_FRAGE` 28 Einträge, `SIGNALE_JE_GRUPPE`) und die Filter
+  `filtereBeobachtung` (Sicht, nie Überschreiben), `filtereTechnikStats`,
+  `splitNachSteckbrief`. Offene Fragen: MMA 66 · Boxen 54 · Kickboxen 56 ·
+  Ringen 56 · Sambo 57 · BJJ 53 (von 67).
+- **REIHENFOLGE DER FILTER:** Gemini beobachtet OHNE Kampfart (Katalogtext
+  mit allen 37 IDs, Gruppen-Regeln, „Abwehr ist keine Aktion") → die
+  Bewertung (lib/server/claude.ts) filtert die Beobachtung, bekommt Rolle,
+  Kampfart-Absatz (Begriffe, erlaubte Techniken, verworfen, Split-Nullen,
+  Prüfsätze), nur offene Fragen in `label`/`labelDu`, Zahlenregel (unter 5
+  keine Quote, 5–9 „3 von 5", ab 10 Prozent, ab 20 Bandbreite) → commit
+  filtert Zähler und Split ein zweites Mal und speichert `variante` und
+  `verworfen[]` → die Rechnung (Etappe 3) bildet Signale aus
+  `filtereBeobachtung(a.observation, a.sport, a.variante)` und prüft
+  `frageGiltFuer` in collectPulls. Weil das Profil immer aus ALLEN Analysen
+  rechnet, wirkt der Steckbrief rückwirkend auf den Bestand.
+- **Daten:** `lib/gegner-dna.ts` 67 Fragen (neue am Ende ihrer Kategorie,
+  Kategorie `cage-space` heißt „Raum & Rand", je Kampfart „Käfig/Ring/Matte
+  & Raum"), `frageLabel(id, mode)`, `dnaCompleteness(answers, fragen?)`.
+  `lib/fight-stats.ts` `ACTION_GROUPS`, `ActionDef.versucht/gelungen`,
+  `CAGE_ZONE_LABEL` neutral (Mitte / Offener Raum / Am Rand),
+  `deriveTendencies(stats, zonenPhrase)`, `deriveSuggestions(split, stats,
+  { zonenPhrase, mitTakedowns })`. `lib/video-analysis.ts` `variante`,
+  `verworfen` (Server setzt), `AnalyzeRequest.sport/variante`,
+  `VideoPreview.variante`, `sportFromText` erkennt Kampf-Sambo als MMA.
+- **Oberfläche:** Umschalter „Kickboxen / Muay Thai" unter der Kampfart auf
+  dem Zuordnungs-Schirm (VideoUploadFlow, nur bei Kickboxen, vom Vorlauf
+  vorbelegt, Hilfstext folgt der Wahl; bei Sambo der Satz „Kampf-Sambo …
+  wählst du als MMA"). FightProfileView/DnaCategoryGrid/FightInsights/
+  FightStatsBlock nehmen `sport` (+ `mode`): Zonen-Wörter, Kartenform
+  (Käfig Achteck · Ring Quadrat · Matte Kreis · BJJ keine Karte), nur
+  gültige Fragen, Du-Fassung beim Athleten, kein Boden-Plan im Boxen.
+- **Messung:** `scripts/test-kampfart-steckbrief.mjs` 65/65 (Daten, Filter,
+  Begriffe), `scripts/test-profil-rechnung.mjs` 80/80 (Etappe 3, inkl.
+  Steckbrief-Fälle), `scripts/mess-steckbrief-chip.mjs` (Umschalter, beide
+  Themes grün), `scripts/mess-e2-schirm.mjs` 20/20 beide Themes. tsc/eslint 0.
+  Mit echter KI bewiesen am 17.09. mittags (unten „Beweislauf").
+  **Leons Testvideo ist MMA-Sparring** (viel Kickboxen, niemand geht zu
+  Boden, bei ~0:20 ein ECHTER Takedown-Versuch) — nicht Kickbox-Sparring;
+  das „Ducken bei 31 s" gehört zu `stresstest 1.mp4`.
+- **Fallen aus dem Bau:** (1) Nach „ im JS-String mit doppelten
+  Anführungszeichen beendet ein ASCII-" den String (TS1005 in claude.ts,
+  SyntaxError im Testskript) — typografisches “ oder Template-Literal. (2)
+  `fight-stats.ts` darf `kampfart-steckbrief.ts` NICHT importieren
+  (Laufzeit-Kreis) — Wörter kommen als Parameter; `video-analysis.ts` ↔
+  Steckbrief nur als Typ in die eine Richtung. (3) Die Rohbeobachtung wird
+  nie gefiltert gespeichert — sonst wäre der Steckbrief nicht rückwirkend
+  und eine falsch gewählte Kampfart unheilbar. (4) Feste Split-Nullen können
+  einen Split leeren (Boxen nur mit Bodenzeit) → null, kein erfundener
+  Split. (5) Rückfall-ID `submission` in Sambo und BJJ bewusst erlaubt
+  (Entwurf 7.5/7.6 zählte nur die feinen IDs). (6) mess-e2-schirm: Der
+  Sheet-Schleier ist durch die Tiefen-Animation größer als das Fenster
+  (x −14, y −10) — Klick per `page.mouse.click(12, 12)`, nicht „position im
+  Element".
+- **Beweislauf mit echter KI (17.09. mittags, gefahren vom Fenster „Daten
+  sauber", Rohdaten `D:\Tidal-Athletics\tmp\beweis-steckbrief-2026-09-17\`):**
+  Lauf 1 fälschlich als Kickboxen (Technikprobe), Lauf 2 als MMA, je ~8,5 min,
+  Claude je Person ~0,56 €. Hart grün: 0 Takedown-/Boden-IDs in allen vier
+  Beobachtungen (5 Bilder/s), `clinch-knee` statt `knee` im Clinch, keine
+  gesperrte Frage, Split-Nullen, Profile ohne gesperrte Frage; Kickboxen
+  verwarf 2 × `clinch-strike` („variante"). Der Vorlauf kippte zwischen den
+  Läufen (mma → kickboxen) — der Trainer bestätigt ohnehin. BEFUNDE: 26–41 ×
+  „Käfig" bei Gym-Sparring auf der Matte, Befunde aus Abwesenheit („0
+  Takedowns → ein Gegner wird dein Grappling angehen"), summary beim
+  Athleten in der 3. Person, rohe Feldnamen („cagePressureSeconds 0") im
+  Text, Brüche unter 5 („2 von 3").
+- **FLÄCHE UND „NUR WAS VORKAM" (Leon 17.09. nach dem Beweislauf, gebaut im
+  Fenster tidal-athletics-3b):** Leons Antworten: „Käfig nur, wenn einer da
+  ist" · „Nur was vorkam" · Szene 0:20 „Ja, Takedown-Versuch" · „Du-Fragen
+  kürzer".
+  - `Flaeche = "kaefig" | "ring" | "matte"` (lib/kampfart-steckbrief.ts,
+    `isFlaeche`, `FLAECHE_LABEL`, `flaecheFromText`). Der Vorlauf
+    (PREVIEW_PROMPT Regel 6) liefert `flaeche`; `VideoPreview`,
+    `AnalyzeRequest`, `VideoAnalysis` tragen sie, commit speichert sie. KEIN
+    Schalter auf dem Schirm (Leon: „der Vorlauf merkt sich").
+  - Die Wörter für Fläche, Mitte, Rand, Zonen und die Kategorie „… & Raum"
+    hängen an der FLÄCHE, nicht mehr an der Kampfart: `begriffe(sport,
+    flaeche?)`, `zonenLabel/zonenPhrase(sport, flaeche?)`,
+    `kategorieLabel(flaeche?)`. OHNE Fläche neutral („Mitte", „Am Rand",
+    „Raum & Rand") — auch bei MMA und Boxen. Der Steckbrief trägt nur noch
+    `hatZonen` (BJJ false) und `KampfartBegriffe` (Phasen, Takedown,
+    Wertung, Fachwörter); Käfig-Fachwörter (Zaun, Wall-Wrestling, Cage
+    Control) kommen nur mit Fläche Käfig. Kartenform folgt der Fläche (Käfig
+    Achteck · Ring Quadrat · Matte Kreis · ohne Fläche Achteck).
+    FightProfileView/FightInsights/FightStatsBlock/DnaCategoryGrid nehmen
+    `flaeche`; die Profil-Fläche (`evidence.flaeche`, häufigste Fläche der
+    zählenden Analysen) rechnet Etappe 3, die Seiten reichen sie durch.
+  - Claude (lib/server/claude.ts): Grundregel NUR WAS VORKAM (kein Befund aus
+    fehlenden Phasen, die summary nennt es einmal), Richtwerte sind nie
+    selbst ein Befund, unter 5 Versuchen auch kein Bruch, keine JSON-
+    Feldnamen; beim Athleten ALLE Texte in Du-Form; Kampfart-Absatz mit
+    Flächen-Satz („Gekämpft wird auf der Matte. „Käfig" … schreibst du hier
+    nie"). `labelDu` ist kurz („Wo bist du angreifbar?"); die Aufzählung der
+    er-Fassung hängt die Bewertung in Klammern an — außer sie enthält „er"
+    oder die Flächen-Aufzählung.
+  - `deriveSuggestions(…, { grappling })`: Ringen/Sambo/BJJ ohne „Distanz
+    halten gegen Takedowns" und ohne Ground & Pound.
+  - `bewertungsPrompt(args)` + `scripts/zeige-bewertungs-prompt.mjs`: den
+    fertigen Prompt an einer gespeicherten Analyse ansehen, OHNE KI-Kosten
+    (`node --experimental-transform-types --import
+    ./scripts/lib/ts-loader-register.mjs …` — gemini.ts nutzt Parameter-
+    Properties, die der reine Strip-Modus nicht kann).
+  - **Nachweis (Leon: „Günstig: 1 Person"):** Vorlauf live → `flaeche:
+    "matte"`, sport mma, 7,2 s. Claude-Bewertung aus der gespeicherten
+    Beobachtung Lauf 2 / Person A, vorher → nachher: Befunde 48 → 27, Käfig-
+    Wörter 26 → 0, Abwesenheits-Sätze 9 → 1, Feldnamen 70 → 0, summary in
+    Du-Form nein → ja, Brüche unter 5 2 → 0, **Claude 0,56 € → 0,32 €**
+    (Ausgabe 20.294 → 10.915 Tokens). Der echte Takedown-Versuch (0:20)
+    bleibt als Befund. Tests: test-kampfart-steckbrief 70/70,
+    test-profil-rechnung 86/86, tsc/eslint 0.
+  - **Fallen:** (7) netstat meldet auf deutschem Windows „ABHÖREN", nicht
+    LISTENING — wer nach „LISTEN" greppt, übersieht einen laufenden
+    Dev-Server und startet einen zweiten (weicht auf 3001 aus). (8) Heredocs
+    im Bash-Werkzeug schlucken Backslashes (`\\b` → `\b` → `b`) —
+    Ersetzungsskripte mit Regex per Write-Werkzeug in den Scratchpad. (9)
+    claude.ts, gemini.ts, video-analysis.ts, VideoUploadFlow.tsx sind CRLF,
+    `grep $'\r'` im Bash-Werkzeug erkennt das NICHT — mit Node prüfen.
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

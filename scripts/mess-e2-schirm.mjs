@@ -168,8 +168,11 @@ async function main() {
     const gesperrt = await page.locator('[role="dialog"][aria-label="Athlet wählen"] button[disabled]').count();
     sagt(gesperrt >= 1, "Auf Karte 1 gewählte Person ist auf Karte 2 grau");
     // Die Hülle schließt über den Schleier (SheetShell kennt kein Escape).
-    // Der Schleier liegt hinter dem Panel — oben links ist er frei.
-    await page.locator('[role="dialog"][aria-label="Athlet wählen"] button[aria-label="Schließen"]').click({ position: { x: 12, y: 12 } });
+    // Der Schleier liegt hinter dem Panel — oben links ist er frei. Klick in
+    // BILDSCHIRM-Koordinaten: Der Schleier ist durch die Tiefen-Animation
+    // etwas größer als das Fenster (gemessen 17.09.: x −14, y −10), ein Klick
+    // „12/12 im Element" landete außerhalb und traf <html>.
+    await page.mouse.click(12, 12);
     await page.waitForTimeout(700);
 
     // Zeitraum wählen → Knopf voll farbig.

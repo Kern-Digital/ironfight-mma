@@ -52,6 +52,15 @@ import {
 } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "./firebase";
 import type { ActionStat, CageZone, DnaSplit } from "./fight-stats";
+import type { AnalyseWirkung } from "./profile-evidence";
+import {
+  isFlaeche,
+  isVariante,
+  isVerworfeneAktion,
+  type Flaeche,
+  type Variante,
+  type VerworfeneAktion,
+} from "./kampfart-steckbrief";
 
 // ─── Eingabe: Modus, Quelle, Kämpfer-Beschreibung ───────────────────────────
 
@@ -217,7 +226,9 @@ export function vorschlagSport(gesehen: Sport | null, zuletzt: Sport | null): Sp
 export function sportFromText(text: string | null | undefined): Sport | null {
   const t = (text ?? "").toLowerCase();
   if (!t.trim()) return null;
-  if (/(mma|mixed|vale tudo|käfig|cage)/.test(t)) return "mma";
+  // Kampf-Sambo (Schläge, Tritte, Würger im Stand) läuft als MMA — Leon
+  // 17.09.2026; das Sambo-Profil bleibt Sport-Sambo und Judo ohne Schläge.
+  if (/(mma|mixed|vale tudo|käfig|cage|kampf-?sambo|combat sambo)/.test(t)) return "mma";
   if (/(sambo|judo|jacke|kurtka|\bgi\b)/.test(t)) return "sambo";
   if (/(bjj|jiu|grappl|no-gi|nogi|submission)/.test(t)) return "bjj";
   if (/(ringen|wrestl|freistil|greco)/.test(t)) return "ringen";
@@ -669,6 +680,27 @@ export interface VideoAnalysis {
    * zählt dann nur ins Gesamtprofil.
    */
   sport: Sport | null;
+  /**
+   * Variante innerhalb der Kampfart (Kampfart-Steckbriefe, Leon 17.09.2026) —
+   * heute nur bei Kickboxen: "kickboxen" | "muay-thai". Öffnet oder sperrt
+   * Ellbogen, Schläge im Clinch und Umwerfen. null = keine Variante (alle
+   * anderen Kampfarten, Bestand).
+   */
+  variante: Variante | null;
+  /**
+   * Worauf im Video gekämpft wird — "kaefig" | "ring" | "matte", erkannt im
+   * Vorlauf (Leon 17.09.2026: „Käfig nur, wenn einer da ist"). Bestimmt die
+   * Wörter für Mitte, Rand und Zonen und die Form der Karte. null = nicht
+   * erkannt oder Bestand → neutrale Wörter.
+   */
+  flaeche: Flaeche | null;
+  /**
+   * Aktionen aus der Beobachtung, die in dieser Kampfart nicht zählen
+   * (Erkennungsfehler oder Foul) — setzt NUR der Server beim commit
+   * (lib/kampfart-steckbrief.ts `filtereBeobachtung`). Beleg für „Details
+   * anzeigen"; leer bei Analysen von vorher.
+   */
+  verworfen: VerworfeneAktion[];
   /** Kampfmonat „JJJJ-MM", falls bekannt (Etappe 2: Datumseinblendung) — sortiert genauer als `recency`. */
   fightMonth: string | null;
   /** Gewicht zum Zeitpunkt des Speicherns, aufgeschlüsselt. Rechnet der Server. */
@@ -683,6 +715,12 @@ export interface VideoAnalysis {
    * gespeichert, zählt aber nicht mehr (ersetzt das Löschen). Umkehrbar.
    */
   wrongFighter: boolean;
+  /**
+   * Was diese Analyse beim Speichern am Profil bewegt hat (Etappe 3, Leon
+   * 17.09.2026) — der Stoff der Kurzinfo. Schreibt NUR der Server beim
+   * commit; null bei Analysen von vorher.
+   */
+  wirkung: AnalyseWirkung | null;
   /**
    * Nur mode=athlete: Trainer hat das Ergebnis für den Athleten freigegeben —
    * der Athlet sieht die Auswertung dann unter „Mein DeepFight".
@@ -707,11 +745,15 @@ export type VideoAnalysisInput = Omit<
   | "weight"
   | "videoType"
   | "sport"
+  | "variante"
+  | "flaeche"
+  | "verworfen"
   | "wrongFighter"
+  | "wirkung"
   | "sharedWithAthlete"
   | "createdBy"
   | "createdByName"
-> & { videoType?: VideoType; sport?: Sport | null };
+> & { videoType?: VideoType; sport?: Sport | null; variante?: Variante | null; flaeche?: Flaeche | null };
 
 /** Rohform in Firestore — auch ältere Dokumente ohne die neuen Felder. */
 export type VideoAnalysisDoc = Partial<Omit<VideoAnalysis, "id" | "createdAt">> & {
@@ -800,6 +842,9 @@ export function decodeVideoAnalysis(id: string, d: VideoAnalysisDoc): VideoAnaly
     recency,
     videoType,
     sport: isSport(d.sport) ? d.sport : null,
+    variante: isVariante(d.variante) ? d.variante : null,
+    flaeche: isFlaeche(d.flaeche) ? d.flaeche : null,
+    verworfen: Array.isArray(d.verworfen) ? d.verworfen.filter(isVerworfeneAktion) : [],
     fightMonth: d.fightMonth ?? null,
     weight,
     models: d.models ?? { gemini: "", claude: "" },
@@ -807,6 +852,7 @@ export function decodeVideoAnalysis(id: string, d: VideoAnalysisDoc): VideoAnaly
     observation,
     evaluation,
     wrongFighter: d.wrongFighter === true,
+    wirkung: d.wirkung ?? null,
     sharedWithAthlete: d.sharedWithAthlete ?? false,
     createdBy: d.createdBy ?? "",
     createdByName: d.createdByName ?? null,
@@ -1211,6 +1257,16 @@ export interface AnalyzeRequest {
   /** Zeitliche Einordnung des Kampfes; bei "unknown" bleibt der Prompt unverändert. */
   recency?: FightRecency;
   /**
+   * Kampfart und Variante des Videos (Zuordnungs-Schirm). Wirken NUR auf die
+   * Bewertung (Stufe 2: Rolle, Begriffe, offene Fragen, gefilterte
+   * Beobachtung) — nie auf die Beobachtung selbst (Versuch 1: eine Vorgabe
+   * dort unterdrückt echte Aktionen, wenn die Kampfart falsch gewählt ist).
+   */
+  sport?: Sport | null;
+  variante?: Variante | null;
+  /** Fläche aus dem Vorlauf — bestimmt nur die Wörter der Bewertung (Käfig, Seile, Matte). */
+  flaeche?: Flaeche | null;
+  /**
    * "Analyse fortsetzen": bereits vorhandene Gemini-Beobachtung aus einem
    * früheren Versuch — die Video-Stufe wird dann übersprungen (spart Token).
    */
@@ -1350,6 +1406,10 @@ export interface VideoPreview {
   fighters: PreviewFighter[];
   videoType: VideoType;
   sport: Sport | null;
+  /** Vorschlag Kickboxen oder Muay Thai — nur bei sport "kickboxen", sonst null. */
+  variante: Variante | null;
+  /** Käfig, Ring oder Matte im Bild — null, wenn nicht erkennbar (Wörter dann neutral). */
+  flaeche: Flaeche | null;
   fightMonth: string | null;
   model: string;
 }

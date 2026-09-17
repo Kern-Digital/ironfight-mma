@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  CAGE_ZONE_LABEL,
-  CAGE_ZONE_PHRASE,
   deriveSuggestions,
   deriveTendencies,
   zoneDistribution,
@@ -12,6 +10,14 @@ import {
   type TendencyTone,
 } from "@/lib/fight-stats";
 import Icon, { type IconName } from "@/components/ui/Icon";
+import {
+  begriffe,
+  gesperrteGruppen,
+  zonenLabel,
+  zonenPhrase,
+  type Flaeche,
+} from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 
 /**
  * ZWEI FARBEN FÜR FÜNF TÖNE (Rollout-Etappe 3a, 04.09.2026).
@@ -77,17 +83,36 @@ export default function FightInsights({
   split,
   stats,
   only,
+  sport = null,
+  flaeche = null,
 }: {
   split: DnaSplit | null | undefined;
   stats: ActionStat[];
+  /**
+   * Kampfart des Profils (Kampfart-Steckbriefe, 17.09.2026): keine Karte im
+   * BJJ, kein Boden-Plan im Boxen. null = Gegnerprofil oder Gesamtprofil.
+   */
+  sport?: Sport | null;
+  /**
+   * Fläche des Profils (Käfig, Ring, Matte — Leon 17.09.2026: „Käfig nur, wenn
+   * einer da ist"): Wörter der Zonen und Form der Karte. null = neutral.
+   */
+  flaeche?: Flaeche | null;
   /** Nur einen Teil rendern: "insights" (§3+§4) bzw. "zones" (§5 Käfig-Karte)
    * — FightProfileView platziert die Käfig-Karte separat als festen Block. */
   only?: "insights" | "zones";
 }) {
-  const tendencies = deriveTendencies(stats);
-  const suggestions = deriveSuggestions(split, stats);
+  // BJJ hat keine Zone (Rand = Neustart) → keine Karte.
+  const label = zonenLabel(sport, flaeche);
+  const phrase = zonenPhrase(sport, flaeche);
+  const tendencies = deriveTendencies(stats, phrase ?? undefined);
+  const suggestions = deriveSuggestions(split, stats, {
+    zonenPhrase: phrase ?? undefined,
+    mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+    grappling: gesperrteGruppen(sport).includes("strike"),
+  });
   const zones = zoneDistribution(stats);
-  const zoneTotal = zones.center + zones.open + zones.cage;
+  const zoneTotal = label ? zones.center + zones.open + zones.cage : 0;
 
   if (tendencies.length === 0 && suggestions.length === 0 && zoneTotal === 0)
     return null;
@@ -229,7 +254,7 @@ export default function FightInsights({
                       color: "var(--text-1)",
                     }}
                   >
-                    {CAGE_ZONE_PHRASE[dom]}
+                    {phrase?.[dom]}
                   </div>
                   <div className="mt-3 flex flex-col gap-1.5">
                     {order.slice(1).map((z, i) => (
@@ -264,13 +289,13 @@ export default function FightInsights({
                             color: "var(--text-3)",
                           }}
                         >
-                          {CAGE_ZONE_LABEL[z]}
+                          {label?.[z]}
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <CageHeatmap zones={zones} total={zoneTotal} />
+                <CageHeatmap zones={zones} total={zoneTotal} seiten={kartenSeiten(flaeche)} flaeche={begriffe(sport, flaeche).flaeche} />
               </div>
             </div>
           );
@@ -281,27 +306,45 @@ export default function FightInsights({
 
 // ─── §5 Käfig-Karte (SVG) ────────────────────────────────────────────────────
 
-/** Punkte eines regelmäßigen Octagons mit Radius r um den Mittelpunkt (50,50). */
-function octagon(r: number): string {
+/**
+ * Form der Karte je Fläche des Videos (Leon 17.09.2026): Käfig = Achteck,
+ * Ring = Quadrat, Matte = Kreis (48 Ecken). Ohne erkannte Fläche bleibt das
+ * Achteck, das Leon als Karte kennt.
+ */
+function kartenSeiten(flaeche: Flaeche | null): number {
+  if (flaeche === "ring") return 4;
+  if (flaeche === "matte") return 48;
+  return 8;
+}
+
+/** Punkte eines regelmäßigen Vielecks (Seite unten waagrecht) mit Radius r um (50,50). */
+function octagon(r: number, seiten = 8): string {
   const pts: string[] = [];
-  for (let k = 0; k < 8; k++) {
-    const a = ((22.5 + k * 45) * Math.PI) / 180;
+  const schritt = 360 / seiten;
+  for (let k = 0; k < seiten; k++) {
+    const a = ((schritt / 2 + k * schritt) * Math.PI) / 180;
     pts.push(`${(50 + r * Math.cos(a)).toFixed(1)},${(50 + r * Math.sin(a)).toFixed(1)}`);
   }
   return pts.join(" ");
 }
 
-/** Octagon als Pfad-Subpath — für Ring-Füllungen (außen minus innen). */
-function octagonPathD(r: number): string {
-  return `M${octagon(r).split(" ").join("L")}Z`;
+/** Vieleck als Pfad-Subpath — für Ring-Füllungen (außen minus innen). */
+function octagonPathD(r: number, seiten = 8): string {
+  return `M${octagon(r, seiten).split(" ").join("L")}Z`;
 }
 
 function CageHeatmap({
   zones,
   total,
+  seiten,
+  flaeche,
 }: {
   zones: Record<CageZone, number>;
   total: number;
+  /** 8 = Käfig, 4 = Ring, 48 = Matte (kartenSeiten). */
+  seiten: number;
+  /** „Käfig", „Ring", „Matte" — für die Bildbeschreibung. */
+  flaeche: string;
 }) {
   // Neon-Look: Deckkraft streng nach RANG — hellster Ring = größter Anteil,
   // zweithellster = zweitgrößter, schwächster = kleinster (0 % bleibt leer).
@@ -380,27 +423,27 @@ function CageHeatmap({
       height="172"
       viewBox="0 0 100 100"
       role="img"
-      aria-label="Käfig-Karte: Verteilung der Aktionen nach Zone"
+      aria-label={`Karte ${flaeche}: Verteilung der Aktionen nach Zone`}
       style={{ overflow: "visible", flexShrink: 0 }}
     >
       {/* Cage-Ring (äußerste Zone) — Ring mit Loch, keine Stapelung */}
       <path
-        d={`${octagonPathD(44)} ${octagonPathD(30)}`}
+        d={`${octagonPathD(44, seiten)} ${octagonPathD(30, seiten)}`}
         fillRule="evenodd"
         style={{ fill: fill("cage") }}
       />
       {/* Open-Ring */}
       <path
-        d={`${octagonPathD(30)} ${octagonPathD(15)}`}
+        d={`${octagonPathD(30, seiten)} ${octagonPathD(15, seiten)}`}
         fillRule="evenodd"
         style={{ fill: fill("open") }}
       />
       {/* Center */}
-      <polygon points={octagon(15)} style={{ fill: fill("center") }} />
+      <polygon points={octagon(15, seiten)} style={{ fill: fill("center") }} />
       {/* Konturen — die dominante Zone glüht */}
-      <polygon points={octagon(44)} style={outline("cage")} />
-      <polygon points={octagon(30)} style={outline("open")} />
-      <polygon points={octagon(15)} style={outline("center")} />
+      <polygon points={octagon(44, seiten)} style={outline("cage")} />
+      <polygon points={octagon(30, seiten)} style={outline("open")} />
+      <polygon points={octagon(15, seiten)} style={outline("center")} />
       {/* Prozente: Cage über dem Ring, Open im Band, Center mittig */}
       {label("cage", 5.8)}
       {label("open", 33.2)}

@@ -161,7 +161,17 @@ export function mergeDnaSplit(
 
 // ─── §2 Action-Stats ─────────────────────────────────────────────────────────
 
-export type ActionGroup = "strike" | "kick" | "takedown" | "ground";
+/**
+ * Sechs Gruppen (Kampfart-Steckbriefe, Leon 17.09.2026). `clinch` = Knie,
+ * kurze Schläge und Fegen im STEHENDEN Griffkontakt — vorher zählte ein
+ * Clinch-Knie als Kick und ein Umwerfen aus dem Thai-Clinch als Takedown.
+ * `submission` = Würger, Armhebel, Beinhebel statt eines Sammeleintrags.
+ * `takedown` heißt überall „Stand → Boden", auch Würfe.
+ */
+export type ActionGroup = "strike" | "kick" | "clinch" | "takedown" | "ground" | "submission";
+
+/** Anzeige-Reihenfolge der Gruppen. */
+export const ACTION_GROUPS: ActionGroup[] = ["strike", "kick", "clinch", "takedown", "ground", "submission"];
 
 export const ACTION_GROUP_META: Record<
   ActionGroup,
@@ -169,8 +179,12 @@ export const ACTION_GROUP_META: Record<
 > = {
   strike: { label: "Schläge", color: FIGHT_FAMILY_COLOR.striking },
   kick: { label: "Kicks", color: FIGHT_FAMILY_COLOR.kicks },
-  takedown: { label: "Takedowns", color: FIGHT_FAMILY_COLOR.wrestling },
+  clinch: { label: "Clinch", color: FIGHT_FAMILY_COLOR.clinch },
+  takedown: { label: "Takedowns & Würfe", color: FIGHT_FAMILY_COLOR.wrestling },
   ground: { label: "Boden", color: FIGHT_FAMILY_COLOR.ground },
+  // Aufgabegriffe gehören zur Boden-Familie (Rubrik = immer dieselbe Farbe);
+  // im Stats-Block stehen die Gruppen untereinander, nie im selben Chart.
+  submission: { label: "Aufgabegriffe", color: FIGHT_FAMILY_COLOR.ground },
 };
 
 export interface ActionDef {
@@ -178,34 +192,66 @@ export interface ActionDef {
   id: string;
   label: string;
   group: ActionGroup;
+  /**
+   * Woran ein VERSUCH im Video sichtbar ist — und woran ein GELUNGENER.
+   * Endzustände statt Momente (ein Jab dauert 0,3 s, ein Takedown hinterlässt
+   * Sekunden): „gelungen" beschreibt den Zustand danach, nie Kraft, Absicht
+   * oder Wertung. Quelle: docs/kampfart-steckbriefe.md 4.3. Der Katalogtext
+   * im Beobachtungs-Prompt (lib/server/gemini.ts) liest beide Felder.
+   */
+  versucht: string;
+  gelungen: string;
 }
 
-/** Technik-Katalog (aus Konzept §4 & §7). */
+/**
+ * Technik-Katalog — 37 Einträge (Stand 17.09.2026). `throw` und `submission`
+ * sind Rückfall-IDs, wenn die Art nicht erkennbar ist. Welche Technik in
+ * welcher Kampfart zählt, steht in lib/kampfart-steckbrief.ts.
+ */
 export const ACTION_CATALOG: ActionDef[] = [
-  // Schläge
-  { id: "jab", label: "Jab", group: "strike" },
-  { id: "cross", label: "Cross", group: "strike" },
-  { id: "hook", label: "Hook", group: "strike" },
-  { id: "uppercut", label: "Uppercut", group: "strike" },
-  { id: "overhand", label: "Overhand", group: "strike" },
-  { id: "elbow", label: "Ellbogen", group: "strike" },
-  // Kicks & Knie
-  { id: "low-kick", label: "Low Kick", group: "kick" },
-  { id: "body-kick", label: "Body Kick", group: "kick" },
-  { id: "high-kick", label: "High Kick", group: "kick" },
-  { id: "front-kick", label: "Front Kick (Teep)", group: "kick" },
-  { id: "knee", label: "Knie", group: "kick" },
-  // Takedowns
-  { id: "single-leg", label: "Single Leg", group: "takedown" },
-  { id: "double-leg", label: "Double Leg", group: "takedown" },
-  { id: "body-lock", label: "Body Lock", group: "takedown" },
-  { id: "trip", label: "Trip / Fußfeger", group: "takedown" },
-  { id: "throw", label: "Wurf (Judo)", group: "takedown" },
-  // Boden
-  { id: "pass", label: "Guard Pass", group: "ground" },
-  { id: "sweep", label: "Sweep", group: "ground" },
-  { id: "submission", label: "Submission-Versuch", group: "ground" },
-  { id: "ground-strikes", label: "Ground & Pound", group: "ground" },
+  // Schläge aus der Distanz
+  { id: "jab", label: "Jab", group: "strike", versucht: "Führhand streckt sich gerade zum Ziel", gelungen: "Kontakt an Kopf oder Rumpf, Kopf oder Rumpf bewegt sich" },
+  { id: "cross", label: "Cross", group: "strike", versucht: "Schlaghand gerade, Hüfte dreht ein", gelungen: "Kontakt an Kopf oder Rumpf, Kopf oder Rumpf bewegt sich" },
+  { id: "hook", label: "Hook", group: "strike", versucht: "gebogener Arm auf seitlicher Bogenbahn", gelungen: "Kontakt, Kopf dreht" },
+  { id: "uppercut", label: "Uppercut", group: "strike", versucht: "Schlagbahn von unten nach oben", gelungen: "Kontakt, Kopf hebt sich" },
+  { id: "overhand", label: "Overhand", group: "strike", versucht: "Bogen über die Deckung (kaum vom Haken zu trennen, sparsam nutzen)", gelungen: "Kontakt" },
+  { id: "elbow", label: "Ellbogen", group: "strike", versucht: "angewinkelter Arm auf kurzer Distanz OHNE Griff", gelungen: "Kontakt, Kopf knickt oder Cut" },
+  { id: "spinning-strike", label: "Drehschlag", group: "strike", versucht: "sichtbare Drehung um mindestens 180° mit Faust oder Ellbogen (Backfist, Spinning Elbow)", gelungen: "Kontakt" },
+  // Tritte und Knie aus der Distanz
+  { id: "low-kick", label: "Low Kick", group: "kick", versucht: "gestrecktes Bein, Schienbein oder Rist Richtung Oberschenkel", gelungen: "Kontakt, Bein knickt oder wandert; gecheckt zählt als abgewehrt" },
+  { id: "body-kick", label: "Body Kick", group: "kick", versucht: "gestrecktes Bein auf Rumpfhöhe", gelungen: "Kontakt, Rumpf oder Arme klappen" },
+  { id: "high-kick", label: "High Kick", group: "kick", versucht: "gestrecktes Bein auf Kopfhöhe", gelungen: "Kontakt, Kopf weicht" },
+  { id: "front-kick", label: "Front Kick (Teep)", group: "kick", versucht: "gerader Stoß mit dem Bein nach vorn", gelungen: "Gegner wird weggeschoben oder geht zurück" },
+  { id: "knee", label: "Knie", group: "kick", versucht: "Knie stößt Richtung Ziel OHNE Griff (Distanz, Sprung)", gelungen: "Kontakt, Rumpf klappt" },
+  { id: "spinning-kick", label: "Drehkick", group: "kick", versucht: "Rotation über mindestens zwei Bilder mit gestrecktem Bein (Back, Hook, Wheel, Axe Kick)", gelungen: "Kontakt" },
+  // Im stehenden Griffkontakt
+  { id: "clinch-knee", label: "Knie im Clinch", group: "clinch", versucht: "Griff an Nacken, Arm oder Körper UND Knie stößt", gelungen: "Kontakt, Rumpf oder Kopf bewegt sich" },
+  { id: "clinch-strike", label: "Schlag im Clinch", group: "clinch", versucht: "Faust oder Ellbogen bei gehaltenem Griff (Dirty Boxing)", gelungen: "Kontakt" },
+  { id: "sweep-dump", label: "Fegen / Umwerfen", group: "clinch", versucht: "Fußfeger, Zug oder Drehung aus dem Griff oder nach gefangenem Bein — danach KEIN Bodenkampf", gelungen: "Gegner berührt mit mehr als den Füßen den Boden, der Ausführende bleibt stehen" },
+  // Takedowns & Würfe: Stand → Boden
+  { id: "single-leg", label: "Single Leg", group: "takedown", versucht: "Niveauwechsel, Hände oder Arme an EINEM Bein unterhalb der Hüfte (auch High Crotch, Ankle Pick)", gelungen: "Gegner mit Rumpf oder Gesäß am Boden (oder Hände, Knie und Kopf) UND Angreifer oben oder hinter ihm, mindestens drei Bilder" },
+  { id: "double-leg", label: "Double Leg", group: "takedown", versucht: "Arme um BEIDE Beine, Kopf seitlich an der Hüfte", gelungen: "Gegner mit Rumpf oder Gesäß am Boden UND Angreifer oben oder hinter ihm, mindestens drei Bilder" },
+  { id: "body-lock", label: "Body-Lock-Takedown", group: "takedown", versucht: "Arme um den Rumpf geschlossen UND sichtbare Hebe-, Kipp- oder Drehbewegung — bloßes Umklammern ist Clinch, kein Versuch", gelungen: "Gegner mit Rumpf oder Gesäß am Boden UND Angreifer oben oder hinter ihm, mindestens drei Bilder" },
+  { id: "trip", label: "Trip / Beintechnik", group: "takedown", versucht: "Bein des Angreifers blockiert, fegt oder hebt das Gegnerbein, Gegner verliert das Gleichgewicht (Trip, Fußfeger, Sichel, Uchi-mata)", gelungen: "Gegner am Boden UND Angreifer oben oder hinter ihm, mindestens drei Bilder" },
+  { id: "throw-hip", label: "Hüftwurf", group: "takedown", versucht: "Eindrehen mit Hüftkontakt, Gegner hebt ab (Koshi-waza, Hüftschwung)", gelungen: "Landung auf Seite oder Rücken unter Griffkontrolle" },
+  { id: "throw-shoulder", label: "Schulterwurf", group: "takedown", versucht: "Eindrehen unter den Arm ohne Hüftblock oder Arm fixiert (Seoi-nage, Tai-otoshi, Achselwurf)", gelungen: "Landung auf Seite oder Rücken unter Griffkontrolle" },
+  { id: "throw-sacrifice", label: "Opferwurf", group: "takedown", versucht: "Angreifer fällt selbst mit auf Rücken oder Seite und hält den Griff (Tomoe-nage, Suplex, Überwurf)", gelungen: "Gegner landet auf Seite oder Rücken" },
+  { id: "throw", label: "Wurf", group: "takedown", versucht: "Gegner verliert beide Füße vom Boden, Wurfart nicht erkennbar", gelungen: "Landung auf Seite oder Rücken" },
+  { id: "go-behind", label: "Go-behind", group: "takedown", versucht: "Richtungswechsel hinter den Gegner aus der Bindung (Armzug, Duck-under, Nackenzug)", gelungen: "Kontrolle von hinten, Gegner mit Händen und Knien am Boden" },
+  { id: "guard-pull", label: "Guard-Pull", group: "takedown", versucht: "Hinsetzen oder Springen MIT Griff", gelungen: "Guard steht, Gegner oben, mindestens drei Bilder" },
+  // Bodenkampf
+  { id: "pass", label: "Guard Pass", group: "ground", versucht: "Oberer greift die Beinlinie des Unteren an", gelungen: "Side Control, North-South, Knee on Belly oder Mount, mindestens drei Bilder" },
+  { id: "sweep", label: "Sweep / Umdrehen von unten", group: "ground", versucht: "Unterer kippt oder hebt den Oberen", gelungen: "Rollentausch, neue Oberlage mindestens drei Bilder" },
+  { id: "back-take", label: "Rücken nehmen", group: "ground", versucht: "Hüfte hinter den Gegner, Hooks oder Body-Triangle", gelungen: "Position mindestens drei Bilder" },
+  { id: "escape", label: "Escape / Aufstehen", group: "ground", versucht: "Unterer verlässt Side Control, Mount oder Back oder steht auf", gelungen: "Guard zurück, Turtle oder beide Füße frei, mindestens drei Bilder" },
+  { id: "turn", label: "Drehen am Boden", group: "ground", versucht: "Oberer dreht den Unteren um die Längsachse (Durchdreher, Beinschraube, Halbnelson)", gelungen: "Unterer rollt über den Rücken; jede Umdrehung zählt einzeln" },
+  { id: "hold-down", label: "Haltegriff", group: "ground", versucht: "Oberer quer auf dem Gegner, dessen Rücken am Boden, Rumpf auf Rumpf", gelungen: "mindestens 5 Sekunden gehalten" },
+  { id: "ground-strikes", label: "Ground & Pound", group: "ground", versucht: "Schlagserie aus der Oberlage", gelungen: "Kontakt, Kopf des Unteren bewegt sich" },
+  { id: "submission", label: "Submission", group: "ground", versucht: "Aufgabegriff geschlossen, Gegner zeigt Abwehrreaktion, Art nicht erkennbar", gelungen: "Abklopfen oder Abbruch" },
+  // Aufgabegriffe
+  { id: "choke", label: "Würger", group: "submission", versucht: "Arm, Revers oder Beine am Hals UND sichtbare Abwehrreaktion (RNC, Guillotine, Triangle)", gelungen: "Abklopfen, Abbruch oder bewusstlos" },
+  { id: "armlock", label: "Armhebel", group: "submission", versucht: "Arm isoliert UND Streck- oder Drehbewegung (Armbar, Kimura, Americana, Omoplata)", gelungen: "Abklopfen oder Abbruch" },
+  { id: "leglock", label: "Beinhebel", group: "submission", versucht: "Bein isoliert UND Streckung oder Drehung (Straight Ankle, Kneebar, Heel Hook)", gelungen: "Abklopfen oder Abbruch" },
 ];
 
 export const ACTION_BY_ID: Map<string, ActionDef> = new Map(
@@ -216,20 +262,27 @@ export function actionLabel(id: string): string {
   return ACTION_BY_ID.get(id)?.label ?? id;
 }
 
-/** Käfig-Zone, in der eine Aktion überwiegend passiert (Konzept §4/§5). */
+/**
+ * Zone, in der eine Aktion überwiegend passiert (Konzept §4/§5). Die
+ * Schlüssel bleiben, die Bedeutung ist seit den Kampfart-Steckbriefen
+ * (17.09.2026) kampfartneutral: cage = am RAND der Kampffläche (Käfig,
+ * Seile oder Mattenrand). Die Wörter je Kampfart liefern zonenLabel() und
+ * zonenPhrase() in lib/kampfart-steckbrief.ts; die Werte hier gelten ohne
+ * Kampfart (Gegnerprofil, Gesamtprofil über mehrere Kampfarten).
+ */
 export type CageZone = "center" | "open" | "cage";
 
 export const CAGE_ZONE_LABEL: Record<CageZone, string> = {
-  center: "Center",
+  center: "Mitte",
   open: "Offener Raum",
-  cage: "Am Cage",
+  cage: "Am Rand",
 };
 
 /** Gebeugte Ortsangabe für Fließtext („… passieren im offenen Raum"). */
 export const CAGE_ZONE_PHRASE: Record<CageZone, string> = {
-  center: "im Center",
+  center: "in der Mitte",
   open: "im offenen Raum",
-  cage: "am Cage",
+  cage: "am Rand",
 };
 
 /** Eine gezählte Aktion, aggregiert über die hochgeladenen Kämpfe. */
@@ -300,8 +353,7 @@ export function actionTotals(stats: ActionStat[]): {
 export function statsByGroup(
   stats: ActionStat[],
 ): { group: ActionGroup; stats: ActionStat[] }[] {
-  const groups: ActionGroup[] = ["strike", "kick", "takedown", "ground"];
-  return groups
+  return ACTION_GROUPS
     .map((group) => ({
       group,
       stats: stats.filter(
@@ -340,7 +392,11 @@ const pct = (r: number) => `${Math.round(r * 100)}%`;
  * Leitet Klartext-Erkenntnisse aus den Action-Stats ab (Konzept §9/§10).
  * Bewusst konservativ: nur Aussagen, die durch genug Versuche gestützt sind.
  */
-export function deriveTendencies(stats: ActionStat[]): Tendency[] {
+export function deriveTendencies(
+  stats: ActionStat[],
+  /** Ortsangaben je Kampfart (zonenPhrase aus lib/kampfart-steckbrief.ts). */
+  zonenPhrase: Record<CageZone, string> = CAGE_ZONE_PHRASE,
+): Tendency[] {
   const active = stats.filter(hasActionData);
   if (active.length === 0) return [];
   const out: Tendency[] = [];
@@ -393,7 +449,7 @@ export function deriveTendencies(stats: ActionStat[]): Tendency[] {
         out.push({
           id: "takedown-zone",
           tone: "zone",
-          text: `${pct(zones[dom] / zTotal)} der Takedowns passieren ${CAGE_ZONE_PHRASE[dom]}.`,
+          text: `${pct(zones[dom] / zTotal)} der Takedowns passieren ${zonenPhrase[dom]}.`,
         });
       }
     }
@@ -440,7 +496,21 @@ export interface Suggestion {
 export function deriveSuggestions(
   split: DnaSplit | undefined | null,
   stats: ActionStat[],
+  opts: {
+    /** Ortsangaben je Kampfart (zonenPhrase aus lib/kampfart-steckbrief.ts). */
+    zonenPhrase?: Record<CageZone, string>;
+    /** false in Kampfarten ohne Takedowns (Boxen, Kickboxen): kein Boden-Plan. */
+    mitTakedowns?: boolean;
+    /**
+     * true in Kampfarten ohne Schläge (Ringen, Sambo, BJJ): Takedowns SIND der
+     * Kampf — kein „Distanz halten gegen Takedowns", kein Ground & Pound.
+     */
+    grappling?: boolean;
+  } = {},
 ): Suggestion[] {
+  const ort = opts.zonenPhrase ?? CAGE_ZONE_PHRASE;
+  const mitTakedowns = opts.mitTakedowns ?? true;
+  const grappling = opts.grappling ?? false;
   const out: Suggestion[] = [];
   const active = stats.filter(hasActionData);
   const norm = split ? normalizeDnaSplit(split) : null;
@@ -452,21 +522,23 @@ export function deriveSuggestions(
   const tdZones = zoneDistribution(takedowns);
   const tdZoneTotal = tdZones.center + tdZones.open + tdZones.cage;
 
-  // Starker Ringer am Cage → Cage-Defense priorisieren.
+  // Starker Ringer am Rand → Takedown-Abwehr priorisieren. Im Ringen, Sambo
+  // und BJJ ist Wrestling-Zeit der Normalfall — dort gibt es den Plan nicht.
   if (
-    (norm && norm.wrestling >= 35) ||
-    (tdTotals.attempted >= 4 && tdTotals.rate >= 0.5)
+    !grappling &&
+    ((norm && norm.wrestling >= 35) ||
+      (tdTotals.attempted >= 4 && tdTotals.rate >= 0.5))
   ) {
     out.push({
       id: "td-defense",
       kind: "gameplan",
-      text: "Takedown-Verteidigung priorisieren: nicht mit dem Rücken zum Cage stehen bleiben, Distanz im Center kontrollieren.",
+      text: `Takedown-Verteidigung zuerst: Distanz ${ort.center} halten und ${ort.cage} sofort seitlich rausdrehen.`,
     });
     if (tdZoneTotal > 0 && tdZones.cage / tdZoneTotal >= 0.5) {
       out.push({
         id: "drill-cage-defense",
         kind: "drill",
-        text: "Drill: Cage-Wrestling — Underhooks, Wall-Walk, Wieder-Aufstehen + Knie-Konter auf den Entry.",
+        text: `Drill: Takedown-Abwehr ${ort.cage} — Underhooks, Rausdrehen, Wieder-Aufstehen und Konter auf den Entry.`,
       });
     }
   }
@@ -495,11 +567,13 @@ export function deriveSuggestions(
   }
 
   // Schwache Bodenlage des Gegners ausnutzen.
-  if (norm && norm.ground <= 15 && norm.wrestling <= 25) {
+  if (mitTakedowns && norm && norm.ground <= 15 && norm.wrestling <= 25) {
     out.push({
       id: "gameplan-ground",
       kind: "gameplan",
-      text: "Bodenlage des Gegners wirkt schwach — eigene Takedowns + Ground & Pound als Sieg-Pfad einplanen.",
+      text: grappling
+        ? "Bodenlage des Gegners wirkt schwach — eigene Würfe und Takedowns mit Kontrolle oben als Sieg-Pfad einplanen."
+        : "Bodenlage des Gegners wirkt schwach — eigene Takedowns + Ground & Pound als Sieg-Pfad einplanen.",
     });
   }
 

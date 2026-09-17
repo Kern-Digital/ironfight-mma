@@ -68,6 +68,7 @@
 
 import { createPortal } from "react-dom";
 import { Collapse, SheetShell, StaggerFlow, FlowItem, useMotionCapability } from "@/components/motion";
+import { STECKBRIEFE, VARIANTE_LABEL, isVariante, type Variante } from "@/lib/kampfart-steckbrief";
 import GooeySearch from "@/components/ui/GooeySearch";
 import Icon from "@/components/ui/Icon";
 import XKnopf from "@/components/ui/XKnopf";
@@ -196,6 +197,8 @@ interface Gespeichert {
   recency: FightRecency | "";
   videoType: VideoType | null;
   sport: Sport | null;
+  /** Nur bei Kickboxen: Kickboxen oder Muay Thai (Kampfart-Steckbriefe). */
+  variante?: Variante | null;
   beobachtungen: Record<string, PendingObservation>;
   pendingSavedAt: number | null;
 }
@@ -468,6 +471,7 @@ export default function VideoUploadFlow({
   const [recency, setRecency] = useState<FightRecency | "">("");
   const [videoType, setVideoType] = useState<VideoType | null>(null);
   const [sport, setSport] = useState<Sport | null>(null);
+  const [variante, setVariante] = useState<Variante | null>(null);
   const [beobachtungen, setBeobachtungen] = useState<Record<string, PendingObservation>>({});
   /** Welche Karte gerade „Athlet / Gegner" zeigt. */
   const [wahl, setWahl] = useState<number | null>(null);
@@ -514,6 +518,7 @@ export default function VideoUploadFlow({
         if (s.recency) setRecency(s.recency);
         if (s.videoType) setVideoType(s.videoType);
         if (isSport(s.sport)) setSport(s.sport);
+        if (isVariante(s.variante)) setVariante(s.variante);
         if (s.beobachtungen) setBeobachtungen(s.beobachtungen);
         if (typeof s.pendingSavedAt === "number") setPendingSavedAt(s.pendingSavedAt);
       }
@@ -553,6 +558,7 @@ export default function VideoUploadFlow({
         recency,
         videoType,
         sport,
+        variante,
         beobachtungen,
         pendingSavedAt,
       };
@@ -574,6 +580,7 @@ export default function VideoUploadFlow({
     recency,
     videoType,
     sport,
+    variante,
     beobachtungen,
     pendingSavedAt,
   ]);
@@ -720,6 +727,7 @@ export default function VideoUploadFlow({
     setRecency("");
     setVideoType(null);
     setSport(null);
+    setVariante(null);
     setBeobachtungen({});
     setWahl(null);
     setSheet(null);
@@ -895,6 +903,7 @@ export default function VideoUploadFlow({
         /* optional */
       }
       setSport(vorschlagSport(vorlauf.sport, zuletzt));
+      setVariante(vorlauf.variante ?? null);
       setPreview(vorlauf);
       progress.complete();
     } catch (err) {
@@ -1025,6 +1034,9 @@ export default function VideoUploadFlow({
 
     const artFinal: VideoType = videoType ?? preview.videoType;
     const sportFinal: Sport = sport ?? vorschlagSport(preview.sport, null);
+    // Die Variante gilt nur bei Kickboxen; ohne Wahl der Vorschlag des Vorlaufs.
+    const varianteFinal: Variante | null =
+      sportFinal === "kickboxen" ? (variante ?? preview.variante ?? "kickboxen") : null;
     const zeitraum: FightRecency = recency;
 
     try {
@@ -1098,6 +1110,11 @@ export default function VideoUploadFlow({
           existingStats,
           profileContext,
           recency: zeitraum,
+          // Kampfart wirkt nur auf die Bewertung (Steckbrief), nie auf die Beobachtung.
+          sport: sportFinal,
+          variante: varianteFinal,
+          // Käfig, Ring oder Matte sieht der Vorlauf — nur die Wörter der Bewertung.
+          flaeche: preview.flaeche ?? null,
           // Die Datei bleibt bei Google, bis die LETZTE Person durch ist —
           // sonst fände die zweite Beobachtung sie nicht mehr (Gemini 403).
           keepFile: true,
@@ -1160,6 +1177,8 @@ export default function VideoUploadFlow({
           recency: zeitraum,
           videoType: artFinal,
           sport: sportFinal,
+          variante: varianteFinal,
+          flaeche: preview.flaeche ?? null,
           fightMonth: preview.fightMonth,
           models: result.models,
           usage: result.usage,
@@ -1763,6 +1782,46 @@ export default function VideoUploadFlow({
                   }}
                   options={SPORT_ORDER.map((s) => ({ value: s, label: SPORT_LABEL[s] }))}
                 />
+                {/* Kampfart-Steckbriefe (Leon 17.09.2026): genau EIN Varianten-
+                    Umschalter, nur bei Kickboxen — Ellbogen, Clinch-Serien und
+                    Umwerfen sind im Muay Thai Kern, in K-1/GLORY Foul. Der
+                    Vorlauf belegt ihn vor. */}
+                <Collapse open={(sport ?? "mma") === "kickboxen"}>
+                  <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Regelwerk">
+                      {(STECKBRIEFE.kickboxen.varianten?.werte ?? []).map((v) => {
+                        const aktiv = (variante ?? preview.variante ?? "kickboxen") === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setVariante(v)}
+                            aria-pressed={aktiv}
+                            className="t-interactive inline-flex min-h-hit items-center rounded-field px-4"
+                            style={{
+                              ...BTN_FONT,
+                              background: aktiv ? "var(--accent)" : "var(--surface-card)",
+                              color: aktiv ? "var(--on-accent)" : "var(--text-2)",
+                              border: `1px solid ${aktiv ? "var(--accent)" : "var(--line)"}`,
+                            }}
+                          >
+                            {VARIANTE_LABEL[v]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                      {(variante ?? preview.variante ?? "kickboxen") === "muay-thai"
+                        ? "Thairegeln: Ellbogen, Knie-Serien im Clinch und Umwerfen zählen mit."
+                        : "K-1, GLORY oder Low Kick: Schläge, Tritte und Knie zählen, Ellbogen und Umwerfen gelten als Foul."}
+                    </p>
+                  </div>
+                </Collapse>
+                <Collapse open={sport === "sambo"}>
+                  <p className="pt-1" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                    Kampf-Sambo mit Schlägen und Tritten wählst du als MMA.
+                  </p>
+                </Collapse>
               </div>
 
               <div className="border-t pt-4" style={{ borderColor: "var(--line)" }}>

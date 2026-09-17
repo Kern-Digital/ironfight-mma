@@ -10,7 +10,15 @@
  * GEMINI_API_KEY (.env.local, niemals NEXT_PUBLIC_*).
  */
 
-import { ACTION_CATALOG } from "../fight-stats";
+import { ACTION_CATALOG, ACTION_GROUPS, type ActionGroup } from "../fight-stats";
+import {
+  STECKBRIEFE,
+  flaecheFromText,
+  isFlaeche,
+  isVariante,
+  type Flaeche,
+  type Variante,
+} from "../kampfart-steckbrief";
 import type {
   CornerColor,
   FighterBox,
@@ -140,16 +148,43 @@ export async function findFileByDisplayName(
 
 // ─── Beobachtungs-Prompt (Abschnitte A + B) ─────────────────────────────────
 
+/**
+ * Die Gruppen-Regeln des Katalogs (docs/kampfart-steckbriefe.md 4.1, 8.1).
+ * KEINE Kampfart: Die Beobachtung sieht, was passiert; welche Technik in
+ * welcher Kampfart zählt, filtert der Server danach (lib/kampfart-steckbrief.ts).
+ * Gemessen im Versuch „Ereignisliste" 17.09. (zwei MMA-Sparrings mit viel
+ * Kickboxen, niemand geht zu Boden): Die Phantom-Takedowns kamen aus dem
+ * MMA-lastigen Schema, und ein Ducken bei 31 s („stresstest 1.mp4") las
+ * Gemini in 4 von 4 Läufen als Kick — daher die Abwehr-Regel.
+ */
+const GRUPPEN_REGEL: Record<ActionGroup, string> = {
+  strike: "SCHLÄGE aus der Distanz (ohne Griff)",
+  kick: "TRITTE UND KNIE aus der Distanz (ohne Griff). Ein Tritt braucht das gestreckte Bein Richtung Ziel — ein angehobenes Knie allein ist kein Tritt",
+  clinch: "IM STEHENDEN GRIFFKONTAKT. Knie und Schläge bei gehaltenem Griff zählen HIER, nicht bei Schlägen oder Tritten. Fegen oder Umwerfen, nach dem KEIN Bodenkampf folgt, ist sweep-dump",
+  takedown: "TAKEDOWNS UND WÜRFE, Stand → Boden. Eine Umklammerung im Stand ist eine Phase (controlTime.clinchSeconds), KEIN Takedown-Versuch. landed nur, wenn der Gegner danach WIRKLICH am Boden liegt. Folgt Bodenkampf, ist ein Fegen trip, kein sweep-dump. throw nur, wenn die Wurfart nicht erkennbar ist",
+  ground: "BODENKAMPF. submission nur, wenn die Art des Aufgabegriffs nicht erkennbar ist",
+  submission: "AUFGABEGRIFFE. versucht nur mit sichtbarer Abwehrreaktion des Gegners — ein Griff ohne Reaktion ist Kontrolle, kein Versuch",
+};
+
+/** Katalogtext: alle 37 IDs mit Gruppen-Regel und sichtbarer Definition. */
+function katalogText(): string {
+  return ACTION_GROUPS.map((g) => {
+    const zeilen = ACTION_CATALOG.filter((a) => a.group === g).map(
+      (a) => `     - "${a.id}" (${a.label}): versucht = ${a.versucht}; gelungen = ${a.gelungen}`,
+    );
+    return `   ${GRUPPEN_REGEL[g]}:\n${zeilen.join("\n")}`;
+  }).join("\n");
+}
+
 function observationPrompt(
   fighter: FighterDescription,
   mode: "opponent" | "athlete",
 ): string {
-  const catalog = ACTION_CATALOG.map((a) => `"${a.id}" (${a.label})`).join(", ");
   const role =
     mode === "opponent"
       ? "einen gegnerischen Kämpfer für das Scouting"
       : "unseren eigenen Athleten für die Leistungsanalyse";
-  return `Du bist ein professioneller Kampfsport-Videoanalyst (MMA, K1, Boxen, Grappling).
+  return `Du bist ein professioneller Kampfsport-Videoanalyst (Boxen, Kickboxen, Muay Thai, MMA, Ringen, Judo, Sambo, BJJ).
 Analysiere in diesem Video ${role}.
 
 ZIELKÄMPFER (nur dieser eine Kämpfer wird ausgewertet):
@@ -169,14 +204,24 @@ REGELN:
 2. Zähle sorgfältig: Gehe das Video chronologisch durch. attempted = Versuche,
    landed = klare Treffer/erfolgreiche Aktionen.
 3. Timestamps immer im Format "mm:ss".
-4. Für Techniken NUR diese Katalog-IDs verwenden: ${catalog}.
-   Techniken außerhalb des Katalogs: id "other" + otherLabel (z. B. "Spinning Back Kick").
-5. damage pro Technik: 0 = wirkungslos, 1 = spürbar, 2 = deutliche Wirkung,
-   3 = Wackler/Cut/Knockdown.
-6. dnaSplit: prozentuale Verteilung der Kampfzeit dieses Kampfes auf
-   boxing/kicking/wrestling/ground/clinch (Summe ~100).
-7. Zonen: "center" (Mitte), "open" (offener Raum), "cage" (am Käfig/Seil).
-8. Antworte auf Deutsch in den Freitextfeldern.
+4. Für Techniken NUR diese Katalog-IDs verwenden, je Gruppe mit ihrer Regel.
+   "versucht" und "gelungen" beschreiben, was im Bild zu sehen sein muss:
+${katalogText()}
+   Techniken außerhalb des Katalogs: id "other" + otherLabel.
+5. ABWEHR IST KEINE AKTION: Ducken, Abtauchen, Slip, Roll, Pendeln, Sprawl,
+   Beinblock und Bein hochnehmen sind Abwehr des Angegriffenen. Sie erzeugen
+   NIE einen Eintrag in actions — sie gehören zu defense.
+6. damage pro Technik: 0 = wirkungslos, 1 = spürbar, 2 = deutliche Wirkung,
+   3 = Wackler/Cut/Knockdown. Bei Würfen statt Wirkung der Landungsgrad:
+   1 = Bauch, Knie oder Gesäß, 2 = Seite, 3 = Rücken.
+7. dnaSplit: Anteil der KAMPFZEIT je Phase (Summe ~100, Pausen und
+   Unterbrechungen zählen nicht): boxing = Distanz, Hände · kicking = Distanz,
+   Beine · clinch = beide stehen im Griffkontakt ohne laufenden Wurfansatz ·
+   wrestling = Takedown- oder Wurfaktion und Scramble am Übergang zum Boden ·
+   ground = mindestens einer am Boden und der andere im Kontakt.
+8. Zonen: "center" (Mitte der Kampffläche), "open" (freier Raum dazwischen),
+   "cage" (am Rand mit Kontakt oder Druck: Käfig, Seile oder Mattenrand).
+9. Antworte auf Deutsch in den Freitextfeldern.
 
 Gib AUSSCHLIESSLICH ein JSON-Objekt mit exakt dieser Struktur zurück
 (keine Kommentare, kein Markdown):
@@ -214,7 +259,7 @@ Gib AUSSCHLIESSLICH ein JSON-Objekt mit exakt dieser Struktur zurück
   "notes": string|null
 }
 
-Zu "meta": ruleset = MMA/K1/Boxen/Grappling/…, result = Ausgang aus Sicht des
+Zu "meta": ruleset = Regelwerk, wie du es siehst (Boxen, Kickboxen, Muay Thai, MMA, Ringen, Judo, Sambo, BJJ, Sparring …), result = Ausgang aus Sicht des
 Zielkämpfers (z. B. "Sieg durch KO, Runde 2"), opponentLevel = Einschätzung des
 damaligen Gegners, coverage = wie viel des Kampfes analysierbar ist
 (Vollkampf/Highlight/Schnitt), representativeness = 0-1 wie repräsentativ das
@@ -228,20 +273,35 @@ type GeminiPart = {
   inlineData?: { mimeType: string; data: string };
   text?: string;
   fileData?: { fileUri: string; mimeType?: string };
-  videoMetadata?: { startOffset?: string; endOffset?: string };
+  videoMetadata?: { startOffset?: string; endOffset?: string; fps?: number };
 };
+
+/**
+ * Bilder je Sekunde für die Beobachtung (Leon 17.09.2026). Ohne Angabe liest
+ * Gemini nur 1 Bild/s — ein Jab (0,2–0,4 s) fällt dann durch. Gemessen an
+ * zwei Handyvideos und einem UFC-Kampf: 1 Bild/s verliert die Hälfte der
+ * Aktionen und ordnet Kicks falsch zu; 10 Bilder/s ist nicht besser, kostet
+ * aber doppelt. Kosten: ~354 statt ~91 Video-Tokens je Sekunde.
+ * Rohdaten: D:\Tidal-Athletics\tmp\versuch-ereignisliste-2026-09-17\
+ */
+const BEOBACHTUNG_FPS = 5;
 
 function sourceParts(source: VideoSource): GeminiPart[] {
   if (source.kind === "upload") {
-    return [{ fileData: { fileUri: source.fileUri, mimeType: source.mimeType } }];
+    return [
+      {
+        fileData: { fileUri: source.fileUri, mimeType: source.mimeType },
+        videoMetadata: { fps: BEOBACHTUNG_FPS },
+      },
+    ];
   }
   const part: GeminiPart = { fileData: { fileUri: source.url } };
-  const metadata: { startOffset?: string; endOffset?: string } = {};
+  const metadata: { startOffset?: string; endOffset?: string; fps: number } = { fps: BEOBACHTUNG_FPS };
   if (source.startSeconds != null && source.startSeconds > 0)
     metadata.startOffset = `${Math.floor(source.startSeconds)}s`;
   if (source.endSeconds != null && source.endSeconds > 0)
     metadata.endOffset = `${Math.floor(source.endSeconds)}s`;
-  if (metadata.startOffset || metadata.endOffset) part.videoMetadata = metadata;
+  part.videoMetadata = metadata;
   return [part];
 }
 
@@ -522,15 +582,19 @@ REGELN:
    description = EIN Satz, an dem ein Trainer ihn sofort wiedererkennt;
    bestSecond = Sekunde ab Videostart (0–120), in der er frei und gut zu sehen ist. Gib sie IMMER an, sobald er irgendwo im Bild ist.
 3. videoType: "full" = ganzer Wettkampf mit Ringrichter oder Anzeige, "excerpt" = Teil eines Wettkampfs, "sparring" = Training oder Sparring ohne Wettkampfrahmen, "highlight" = Zusammenschnitt aus Treffern.
-4. sport nach Regeln und Ausrüstung: Käfig oder MMA-Handschuhe → "mma"; nur Fäuste mit Boxhandschuhen → "boxen"; Tritte oder Knie mit Handschuhen, kein Boden → "kickboxen"; Ringen ohne Jacke, keine Schläge → "ringen"; Jacke (Kurtka/Gi) mit Würfen und Standkampf → "sambo"; Bodenkampf und Aufgabegriffe ohne Schläge (mit oder ohne Gi) → "bjj"; unklar → null. sportSeen = was du siehst, in Worten.
-5. fightMonth "JJJJ-MM" NUR bei sichtbarer Datumseinblendung, sonst null.
-6. Antworte auf Deutsch in den Freitextfeldern.
+4. sport nach Regeln und Ausrüstung: Käfig oder MMA-Handschuhe → "mma"; Jacke (Kurtka) MIT Schlägen oder Tritten (Kampf-Sambo) → "mma"; nur Fäuste mit Boxhandschuhen → "boxen"; Tritte oder Knie mit Handschuhen, kein Boden → "kickboxen"; Ringen ohne Jacke, keine Schläge → "ringen"; Jacke (Kurtka/Gi) mit Würfen und Standkampf, ohne Schläge → "sambo"; Bodenkampf und Aufgabegriffe ohne Schläge (mit oder ohne Gi) → "bjj"; unklar → null. sportSeen = was du siehst, in Worten.
+5. variante NUR bei sport "kickboxen", sonst null: "muay-thai" oder "kickboxen". ${STECKBRIEFE.kickboxen.varianten?.erkennung ?? ""}
+6. flaeche = worauf gekämpft wird, unabhängig von der Kampfart: "kaefig" = Käfig oder Zaun rund um die Kampffläche; "ring" = Ring mit Seilen; "matte" = Matten, Tatami oder Hallenboden ohne Käfig und ohne Ring (typisch für Training und Sparring im Gym); null = nicht erkennbar. Ein MMA-Sparring auf Matten ist "matte", nicht "kaefig".
+7. fightMonth "JJJJ-MM" NUR bei sichtbarer Datumseinblendung, sonst null.
+8. Antworte auf Deutsch in den Freitextfeldern.
 
 Gib AUSSCHLIESSLICH ein JSON-Objekt mit exakt dieser Struktur zurück (keine Kommentare, kein Markdown):
 {
   "fighters": [{ "corner": "red"|"blue"|"unknown", "clothing": string, "features": string, "description": string, "bestSecond": number|null }],
   "videoType": "full"|"excerpt"|"sparring"|"highlight",
   "sport": "mma"|"boxen"|"kickboxen"|"ringen"|"sambo"|"bjj"|null,
+  "variante": "kickboxen"|"muay-thai"|null,
+  "flaeche": "kaefig"|"ring"|"matte"|null,
   "sportSeen": string|null,
   "fightMonth": string|null
 }`;
@@ -542,6 +606,8 @@ function normalizePreview(
     fighters: Partial<PreviewFighter>[];
     videoType: string;
     sport: string | null;
+    variante: string | null;
+    flaeche: string | null;
     sportSeen: string | null;
     fightMonth: string | null;
   }>,
@@ -566,12 +632,23 @@ function normalizePreview(
   const videoType = (VIDEO_TYPES as string[]).includes(p.videoType ?? "")
     ? (p.videoType as VideoType)
     : "excerpt";
-  const sport: Sport | null = isSport(p.sport) ? p.sport : sportFromText(p.sportSeen);
+  // Kampf-Sambo läuft als MMA — auch wenn das Modell „sambo" sagt, aber
+  // Schläge in Worten beschreibt (sportFromText erkennt „Kampf-Sambo").
+  const ausText = sportFromText(p.sportSeen);
+  const sport: Sport | null =
+    ausText === "mma" && p.sport === "sambo" ? "mma" : isSport(p.sport) ? p.sport : ausText;
+  // Die Variante gibt es nur bei Kickboxen; unklar → Kickboxen (der Trainer
+  // sieht den Chip vorbelegt und tippt um).
+  const variante: Variante | null =
+    sport === "kickboxen" ? (isVariante(p.variante) ? p.variante : "kickboxen") : null;
   const fightMonth =
     typeof p.fightMonth === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(p.fightMonth)
       ? p.fightMonth
       : null;
-  return { fighters, videoType, sport, fightMonth, model };
+  // Käfig nur, wenn einer zu sehen ist (Leon 17.09.2026) — sonst null und
+  // neutrale Wörter. Nennt das Modell die Fläche nur in Worten, gilt der Text.
+  const flaeche: Flaeche | null = isFlaeche(p.flaeche) ? p.flaeche : flaecheFromText(p.sportSeen);
+  return { fighters, videoType, sport, variante, flaeche, fightMonth, model };
 }
 
 // ─── Kämpfer auf dem Standbild eingrenzen ────────────────────────────────────

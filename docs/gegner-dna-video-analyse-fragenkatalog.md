@@ -7,6 +7,18 @@
 > Mappt bewusst auf das bestehende Datenmodell:
 > - Qualitative DNA: `lib/gegner-dna.ts` (9 Kategorien, stabile Frage-IDs)
 > - Quantitative Ebene: `lib/fight-stats.ts` (DnaSplit, ActionStat, CageZone)
+>
+> **SEIT 17.09.2026 GILT JE KAMPFART EIN STECKBRIEF** (`lib/kampfart-steckbrief.ts`,
+> Spezifikation mit Quellen `docs/kampfart-steckbriefe.md`, Leons sechs Antworten:
+> alle wie empfohlen). Stand heute: **67 Fragen** (59 bisherige mit neutralerem
+> Wortlaut für Käfig, Ring und Matte, `entry-patterns_jab` gestrichen, acht
+> Zusatzfragen), je Frage `label` (Gegner „er") und `labelDu` (Athlet „du");
+> **37 Techniken** in sechs Gruppen (neu `clinch` und `submission`, vier
+> Wurfgruppen, `throw`/`submission` als Rückfall), jede mit sichtbarer Definition
+> „versucht"/„gelungen"; je Kampfart eine Sperrliste der Fragen, eine
+> Erlaubnisliste der Techniken, feste Split-Nullen und Begriffe; EIN
+> Varianten-Umschalter (Kickboxen/Muay Thai); Kampf-Sambo läuft als MMA. Die
+> Listen unten in B1 und C beschreiben den URSPRUNG — gültig ist der Code.
 
 ---
 
@@ -54,9 +66,11 @@ Diese Fragen bestimmen, **wie stark** das Video die DNA gewichten darf.
 
 ### B1 — Technik-Zähler (`ActionStat[]`, bestehender Katalog)
 
-Pro Technik aus `ACTION_CATALOG` (jab, cross, hook, uppercut, overhand, elbow,
-low-kick, body-kick, high-kick, front-kick, knee, single-leg, double-leg,
-body-lock, trip, throw, pass, sweep, submission, ground-strikes):
+Pro Technik aus `ACTION_CATALOG` (Stand 17.09.2026: 37 Einträge, sechs Gruppen —
+Liste, Definitionen und Geltung je Kampfart in `lib/fight-stats.ts` und
+`lib/kampfart-steckbrief.ts`; ursprünglich 20: jab, cross, hook, uppercut,
+overhand, elbow, low-kick, body-kick, high-kick, front-kick, knee, single-leg,
+double-leg, body-lock, trip, throw, pass, sweep, submission, ground-strikes):
 
 | Feld | Bedeutung | Status |
 |---|---|---|
@@ -127,6 +141,19 @@ Aktivität je Käfig-Zone (`center` / `open` / `cage`) → Heatmap-Daten.
 ---
 
 ## C. Qualitative Befunde — gemappt auf die 9 bestehenden DNA-Kategorien
+
+> **Abgleich der „+ neu"-IDs mit den Steckbriefen (17.09.2026, Entwurf 3.4):**
+> `real-habits_after-rocked` **gebaut** (gilt in MMA, Boxen, Kickboxen) ·
+> `real-habits_in-exchanges` **nicht** — geht in `after-hit`/`after-miss` und
+> `defensive-reactions_pressure` auf · `defensive-reactions_predictable` **nicht** —
+> ist die Trainer-Ableitung `exploits_trap` · `weaknesses_vs-southpaw` **nicht
+> jetzt** — Auslage steht in `movement.stance` · `gameplan_round-2-3` **nicht** —
+> `gameplan_round-1` + `real-habits_when-tired` decken es. Dazu sieben weitere
+> Zusatzfragen aus der Steckbrief-Recherche: `real-habits_ground-top`,
+> `real-habits_ground-bottom`, `preferred-weapons_grip`, `preferred-weapons_clinch`,
+> `preferred-weapons_submission`, `preferred-weapons_guard`,
+> `entry-patterns_throw-direction`. Zurückgestellt: `real-habits_after-restart`
+> (braucht ein Beobachtungsfeld für Unterbrechungen).
 
 Die KI beantwortet die bestehenden Fragen aus `DNA_CATEGORIES` als Freitext
 **mit Evidenz** (Timestamps + Konfidenz). Antworten werden beim Merge nicht

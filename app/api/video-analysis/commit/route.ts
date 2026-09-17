@@ -3,7 +3,7 @@
  * Profil aus ALLEN Analysen neu rechnen (Automatik statt Review, Etappe 1).
  *
  * Body:    { analysis: VideoAnalysisInput }   (lib/video-analysis.ts)
- * Antwort: { analysis: <gespeichertes Dokument mit id>, strength: 0–100 }
+ * Antwort: { analysis: <gespeichertes Dokument mit id und `wirkung`>, strength: 0–100 }
  *
  * WAS DER SERVER SELBST SETZT — und dem Client deshalb nicht glaubt:
  *   • gymId und targetIsStaff aus dem ZIEL (Gegnerprofil bzw. users-Dokument),
@@ -32,11 +32,17 @@ import {
 } from "@/lib/server/member-access";
 import { analysesRef, recomputeProfile } from "@/lib/server/profile-recompute";
 import {
+  filtereBeobachtung,
+  filtereTechnikStats,
+  isFlaeche,
+  splitNachSteckbrief,
+  varianteFuer,
+} from "@/lib/kampfart-steckbrief";
+import {
   bearerToken,
   isTrainerOrAdmin,
   verifyUser,
 } from "@/lib/server/verify-user";
-import { evidenceStrengthPct } from "@/lib/profile-evidence";
 import {
   computeVideoWeight,
   isSport,
@@ -153,6 +159,13 @@ export async function POST(req: Request) {
       typeof c === "string" ? { questionId: c, evidence: [] } : c,
     );
 
+    // Kampfart-Steckbrief (17.09.2026): Zähler und Split gegen die Kampfart,
+    // `verworfen` aus der Rohbeobachtung — der Server glaubt dem Client nicht.
+    const sport = isSport(input.sport) ? input.sport : null;
+    const variante = varianteFuer(sport, input.variante);
+    const { verworfen } = filtereBeobachtung(input.observation, sport, variante);
+    const zaehler = filtereTechnikStats(input.evaluation.actionStats, sport, variante).stats;
+
     const now = new Date();
     const ref = analysesRef(db, input.mode, input.targetId).doc();
     // Firestore verträgt kein undefined — JSON-Roundtrip räumt Reste weg.
@@ -173,7 +186,13 @@ export async function POST(req: Request) {
         videoType,
         // Kampfart des VIDEOS (Etappe 2) — der Trainer hat sie auf dem
         // Zuordnungs-Schirm bestätigt; gültig ist sie oben geprüft.
-        sport: isSport(input.sport) ? input.sport : null,
+        sport,
+        // Nur bei Kickboxen: "kickboxen" | "muay-thai" (sonst null).
+        variante,
+        // Käfig, Ring oder Matte aus dem Vorlauf — Wörter und Kartenform.
+        flaeche: isFlaeche(input.flaeche) ? input.flaeche : null,
+        // Was in der Kampfart nicht zählt — Beleg für „Details anzeigen".
+        verworfen,
         fightMonth: input.fightMonth ?? null,
         weight,
         models: input.models ?? { gemini: "", claude: "" },
@@ -182,6 +201,8 @@ export async function POST(req: Request) {
         evaluation: {
           ...input.evaluation,
           findings,
+          actionStats: zaehler,
+          dnaSplit: splitNachSteckbrief(input.evaluation.dnaSplit, sport),
           merge: {
             confirms,
             contradicts: input.evaluation.merge?.contradicts ?? [],
@@ -196,8 +217,10 @@ export async function POST(req: Request) {
     ) as Record<string, unknown>;
     await ref.set({ ...doc, createdAt: FieldValue.serverTimestamp() });
 
-    // ── Profil neu rechnen ────────────────────────────────────────────────
-    const computed = await recomputeProfile(db, input.mode, input.targetId, user.uid);
+    // ── Profil neu rechnen — und festhalten, was DIESE Analyse bewegt hat ──
+    const { profil, wirkung } = await recomputeProfile(db, input.mode, input.targetId, user.uid, {
+      wirkungFuer: ref.id,
+    });
 
     // ── Kosten buchen (Nebenbuchhaltung) ──────────────────────────────────
     if (input.usage) {
@@ -209,8 +232,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      analysis: { ...doc, id: ref.id, createdAt: now.toISOString() },
-      strength: evidenceStrengthPct(computed.evidence.evidenceTotal),
+      analysis: { ...doc, id: ref.id, createdAt: now.toISOString(), wirkung },
+      strength: profil.evidence.staerke ?? 0,
     });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {

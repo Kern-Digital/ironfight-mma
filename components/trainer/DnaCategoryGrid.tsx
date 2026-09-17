@@ -7,8 +7,11 @@ import {
   answeredCount,
   answeredQuestions,
   totalAnswered,
+  type DnaCategory,
   type GegnerDnaAnswers,
 } from "@/lib/gegner-dna";
+import { frageGiltFuer, kategorieLabel, type Flaeche } from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 import DnaCategoryIcon from "./DnaCategoryIcon";
 
 const META_FONT: React.CSSProperties = {
@@ -48,13 +51,30 @@ const META_FONT: React.CSSProperties = {
  */
 export default function DnaCategoryGrid({
   answers,
+  sport = null,
+  flaeche = null,
+  mode = "opponent",
 }: {
   answers: GegnerDnaAnswers;
+  /**
+   * Kampfart des Profils (Kampfart-Steckbriefe, 17.09.2026): nur die Fragen,
+   * die in ihr gelten. null = alle Fragen (Gegnerprofil, Gesamtprofil).
+   */
+  sport?: Sport | null;
+  /** Fläche des Profils — Label „Käfig & Raum" / „Ring & Raum" / „Matte & Raum"; null = „Raum & Rand". */
+  flaeche?: Flaeche | null;
+  /** Athleten-Profil zeigt die Du-Fassung der Fragen. */
+  mode?: "opponent" | "athlete";
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  const selected = DNA_CATEGORIES.find((c) => c.id === selectedId) ?? null;
+  const kategorien: DnaCategory[] = DNA_CATEGORIES.map((c) => ({
+    ...c,
+    label: c.id === "cage-space" ? kategorieLabel(flaeche) : c.label,
+    questions: c.questions.filter((q) => frageGiltFuer(q.id, sport)),
+  })).filter((c) => c.questions.length > 0);
+  const selected = kategorien.find((c) => c.id === selectedId) ?? null;
 
   useEffect(() => {
     if (selected && panelRef.current) {
@@ -85,7 +105,7 @@ export default function DnaCategoryGrid({
   return (
     <div>
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-        {DNA_CATEGORIES.map((category) => {
+        {kategorien.map((category) => {
           const count = answeredCount(category, answers);
           const total = category.questions.length;
           const first = answeredQuestions(category, answers)[0];
@@ -255,7 +275,7 @@ export default function DnaCategoryGrid({
                         className="t-label"
                         style={{ color: "var(--accent-text)" }}
                       >
-                        {question.label}
+                        {mode === "athlete" ? question.labelDu : question.label}
                       </div>
                       {/* Stand bis 04.09.2026 auf einem Token namens „fg-1" —
                           das es in globals.css nie gab. */}

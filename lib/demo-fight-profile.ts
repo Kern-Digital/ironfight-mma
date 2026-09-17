@@ -54,10 +54,9 @@ export const DEMO_FIGHT_PROFILE: FightProfile = {
       "Wechselt in den Vorwärtsgang und erhöht das Volumen — Präzision fällt, Druck steigt.",
 
     // ── Entry Patterns ─────────────────────────────────────────────────────
+    // entry-patterns_jab ist seit 17.09.2026 in entry-patterns_start aufgegangen.
     "entry-patterns_start":
-      "Doppelter Jab zum Körper als Blende, danach der Level-Change auf das Führbein.",
-    "entry-patterns_jab":
-      "Fast immer der Jab, oft nur angedeutet. Kicks nutzt er nie als Einleitung.",
+      "Doppelter Jab zum Körper als Blende, danach der Level-Change auf das Führbein. Fast immer beginnt er mit dem Jab, oft nur angedeutet.",
     "entry-patterns_clinch":
       "Über den Overhand: Der Schlag geht daneben, der Arm bleibt am Nacken hängen.",
     "entry-patterns_takedown":

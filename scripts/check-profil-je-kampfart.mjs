@@ -63,18 +63,30 @@ const prof = (id) => db.collection("users").doc(uid).collection("fightProfile").
 const Q = "gameplan_seek-distance";
 try {
   await col.doc("mma").set({ ...analyse("mma", "mma", Q, "aussen", "Sucht die Außendistanz."), targetId: uid });
-  await col.doc("sambo").set({ ...analyse("sambo", "sambo", "entry-patterns_clinch", "griff", "Kommt über den Jackengriff in den Clinch."), targetId: uid });
+  // Sambo beantwortet dieselbe Distanz-Frage ANDERS — Stoff für die Zusammenstellung (Etappe 3).
+  const samboDoc = analyse("sambo", "sambo", "entry-patterns_clinch", "griff", "Kommt über den Jackengriff in den Clinch.");
+  samboDoc.evaluation.findings.push({ questionId: Q, categoryId: "gameplan", answer: "Sucht die Griffdistanz.", confidence: 0.8, evidence: ["02:00"], sideKey: "griff" });
+  await col.doc("sambo").set({ ...samboDoc, targetId: uid });
   await col.doc("alt", ).set({ ...analyse("alt", null, "real-habits_when-tired", "rueckwaerts", "Geht rückwärts."), targetId: uid });
 
-  await recomputeProfile(db, "athlete", uid, "test");
+  // Die MMA-Analyse ist „neu" — der Lauf legt ihre Wirkung an die Analyse.
+  const { wirkung } = await recomputeProfile(db, "athlete", uid, "test", { wirkungFuer: "mma" });
   const main = (await prof("main").get()).data();
   const mma = await prof("mma").get();
   const sambo = await prof("sambo").get();
   sagt(!!main && Q in main.dna && "entry-patterns_clinch" in main.dna && "real-habits_when-tired" in main.dna, "main: Antworten aus MMA, Sambo UND Bestand");
-  sagt(mma.exists && Q in mma.data().dna && !("entry-patterns_clinch" in mma.data().dna), "fightProfile/mma: nur die MMA-Antwort");
-  sagt(sambo.exists && "entry-patterns_clinch" in sambo.data().dna && !(Q in sambo.data().dna), "fightProfile/sambo: nur die Sambo-Antwort");
+  sagt(mma.exists && mma.data().dna[Q] === "Sucht die Außendistanz." && !("entry-patterns_clinch" in mma.data().dna), "fightProfile/mma: nur die MMA-Antworten");
+  sagt(sambo.exists && "entry-patterns_clinch" in sambo.data().dna && sambo.data().dna[Q] === "Sucht die Griffdistanz.", "fightProfile/sambo: nur die Sambo-Antworten");
   sagt(!(await prof("boxen").get()).exists, "keine Kampfart ohne Analyse");
   sagt(mma.data().evidence?.countedAnalyses === 1 && main.evidence?.countedAnalyses === 3, `gezählt: main ${main.evidence?.countedAnalyses}, mma ${mma.data().evidence?.countedAnalyses}`);
+  // Etappe 3: Zusammenstellung, Kampfarten, Profilstärke, Wirkung.
+  const distanz = main.evidence?.answers?.[Q];
+  sagt(distanz?.kampfarten?.length === 2 && main.dna[Q].includes("MMA:") && main.dna[Q].includes("Sambo:"), `main: verschiedene Distanz je Kampfart → beide mit Label („${main.dna[Q]}")`);
+  sagt(JSON.stringify(main.evidence?.kampfarten) === JSON.stringify(["mma", "sambo"]), `main.evidence.kampfarten = ${JSON.stringify(main.evidence?.kampfarten)}`);
+  sagt(typeof main.evidence?.staerke === "number" && main.evidence.staerke > 0, `Profilstärke gespeichert: ${main.evidence?.staerke} %`);
+  const gespeicherteWirkung = (await col.doc("mma").get()).data()?.wirkung;
+  sagt(wirkung?.profil === "mma" && gespeicherteWirkung?.profil === "mma" && gespeicherteWirkung.punkte.length >= 1, `Wirkung an der Analyse: ${gespeicherteWirkung?.punkte?.map((p) => p.art).join(", ")}`);
+  sagt(!("wirkung" in ((await col.doc("sambo").get()).data() ?? {})), "andere Analysen bekommen keine Wirkung");
 
   await col.doc("sambo").update({ wrongFighter: true });
   await recomputeProfile(db, "athlete", uid, "test");

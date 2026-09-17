@@ -11,10 +11,15 @@
  */
 
 import {
+  beobachteteSignale,
   computeProfile,
-  evidenceStrengthPct,
+  profilStaerke,
   resolveAnswer,
+  stelleZusammen,
+  wirkungDerAnalyse,
 } from "../lib/profile-evidence.ts";
+import { filtereBeobachtung } from "../lib/kampfart-steckbrief.ts";
+import { sportFromText } from "../lib/video-analysis.ts";
 import { computeVideoWeight } from "../lib/video-analysis.ts";
 
 let fehler = 0;
@@ -39,6 +44,8 @@ function analyse({
   dnaSplit = null,
   createdAgoDays = 0,
   fightMonth = null,
+  sport = null,
+  flaeche = null,
 }) {
   laufnummer += 1;
   const observation = { identification: { idConfidence }, meta: { coverage: null, ruleset: null } };
@@ -48,6 +55,8 @@ function analyse({
     targetId: "t",
     recency,
     videoType,
+    sport,
+    flaeche,
     fightMonth,
     weight: computeVideoWeight({ recency, videoType, observation }),
     wrongFighter,
@@ -188,9 +197,6 @@ console.log("\nSPLIT-FENSTER:");
 }
 
 console.log("\nSTÄRKE:");
-erwarte("3,0 = 100 %", evidenceStrengthPct(3), 100);
-erwarte("1,0 = 33 %", evidenceStrengthPct(1), 33);
-erwarte("0 = 0 %", evidenceStrengthPct(0), 0);
 {
   const p = computeProfile("opponent", [analyse({}), analyse({ videoType: "excerpt" })], { dna: {} });
   erwarte("evidenceTotal 1,7", p.evidence.evidenceTotal, 1.7);
@@ -261,6 +267,167 @@ console.log("\nNUR WAS VORKAM (Etappe 2):");
     null,
   );
   erwarte("völliger Gleichstand → alphabetisch (deterministisch)", e.winner, "a");
+}
+
+// ─── Etappe 3 (Leon 17.09.2026) ─────────────────────────────────────────────
+const orthodox = (text = "Steht Orthodox.") => ({ q: "real-habits_repeats", side: "orthodox", text });
+const southpaw = (text = "Steht Southpaw.") => ({ q: "real-habits_repeats", side: "southpaw", text });
+const RQ = "real-habits_repeats";
+
+console.log("\nWIEDERHOLUNGS-REGEL:");
+{
+  const alte = Array.from({ length: 14 }, (_, i) => analyse({ recency: "mid", findings: [orthodox()], createdAgoDays: 200 + i }));
+  const neu = analyse({ findings: [southpaw()], createdAgoDays: 1 });
+  const p = computeProfile("athlete", [...alte, neu], { dna: {} });
+  erwarte("14 Videos Orthodox + EIN aktueller Kampf Southpaw → bleibt Orthodox", p.evidence.answers[RQ].winner, "orthodox");
+  const neu2 = analyse({ findings: [southpaw("Kämpft wieder Southpaw.")], createdAgoDays: 0 });
+  const p2 = computeProfile("athlete", [...alte, neu, neu2], { dna: {} });
+  erwarte("… das zweite Southpaw-Video → wechselt", p2.evidence.answers[RQ].winner, "southpaw");
+}
+{
+  const kampf = analyse({ findings: [cross()], createdAgoDays: 5 });
+  const clips = [1, 2].map((i) => analyse({ videoType: "highlight", findings: [kick()], createdAgoDays: i }));
+  const p = computeProfile("opponent", [kampf, ...clips], { dna: {} });
+  erwarte("zwei Clips sind keine Wiederholung gegen einen ganzen Kampf", p.evidence.answers[Q].winner, "cross");
+}
+
+console.log("\nWIE OFT GESEHEN:");
+{
+  const a = analyse({ findings: [cross()], createdAgoDays: 3 });
+  const b = analyse({ findings: [cross("Wieder der Cross.")], createdAgoDays: 2 });
+  const c = analyse({ findings: [{ q: "real-habits_when-tired", side: "rueckwaerts", text: "Geht rückwärts." }], createdAgoDays: 1 });
+  const p = computeProfile("athlete", [a, b, c], { dna: {} });
+  erwarte("Cross steht in 2 Videos", p.evidence.answers[Q].sides[0].videos, 2);
+  erwarte("… beantwortbar war die Frage in 3", p.evidence.answers[Q].gelegenheiten, 3);
+  erwarte("… beide Fassungen gehen mit (jüngste zuerst)", p.evidence.answers[Q].sides[0].texte, ["Wieder der Cross.", "Der Cross ist seine häufigste Waffe."]);
+}
+
+console.log("\nPROFILSTÄRKE:");
+{
+  const spar = analyse({ videoType: "sparring", findings: [cross(), { q: "real-habits_when-tired", side: "rueckwaerts", text: "Geht rückwärts." }] });
+  erwarte("ein Sparring, jede Antwort einmal → 20 %", computeProfile("athlete", [spar], { dna: {} }).evidence.staerke, 20);
+  const fuenf = [1, 2, 3, 4, 5].map((i) => analyse({ videoType: "sparring", findings: [cross()], createdAgoDays: i }));
+  erwarte("fünf Sparrings mit derselben Aussage → 100 %", computeProfile("athlete", fuenf, { dna: {} }).evidence.staerke, 100);
+  const sp = [10, 11].map((d) => analyse({ findings: [southpaw()], createdAgoDays: d }));
+  const or = [1, 2, 3].map((d) => analyse({ findings: [orthodox()], createdAgoDays: d }));
+  erwarte("Orthodox in 3 Kämpfen, Southpaw in 2 → 60 %", computeProfile("athlete", [...sp, ...or], { dna: {} }).evidence.staerke, 60);
+  const mitHand = computeProfile("athlete", [spar], { dna: { "weaknesses_bad-distance": "Handtext." } });
+  erwarte("Handtext ohne Video zählt nicht mit", mitHand.evidence.staerke, 20);
+  erwarte("leeres Profil → 0 %", profilStaerke({}), 0);
+}
+
+console.log("\nZUSAMMENSTELLUNG ÜBER KAMPFARTEN:");
+{
+  const D = "gameplan_seek-distance";
+  const mma = analyse({ sport: "mma", findings: [cross(), { q: D, side: "aussen", text: "Sucht die Außendistanz." }], actionStats: [{ id: "double-leg", attempted: 10, landed: 4 }], dnaSplit: { boxing: 100, kicking: 0, wrestling: 0, ground: 0, clinch: 0 }, createdAgoDays: 2 });
+  const sambo = analyse({ sport: "sambo", findings: [cross("Auch hier der Cross."), { q: D, side: "griff", text: "Sucht die Griffdistanz." }], actionStats: [{ id: "double-leg", attempted: 6, landed: 2 }], dnaSplit: { boxing: 0, kicking: 0, wrestling: 100, ground: 0, clinch: 0 }, createdAgoDays: 1 });
+  const gMma = { sport: "mma", profil: computeProfile("athlete", [mma], { dna: {} }) };
+  const gSambo = { sport: "sambo", profil: computeProfile("athlete", [sambo], { dna: {} }) };
+  const nurMma = stelleZusammen([gMma], { dna: {} });
+  erwarte("eine Kampfart → Fight-DNA ist genau dieses Profil", JSON.stringify(nurMma.dna), JSON.stringify(gMma.profil.dna));
+  const g = stelleZusammen([gSambo, gMma], { dna: { "weaknesses_bad-distance": "Handtext." } });
+  erwarte("gleiche Aussage in beiden → EIN Satz ohne Kampfart", /MMA:|Sambo:/.test(g.dna[Q]), false);
+  erwarte("… steht in 2 Videos", g.evidence.answers[Q].sides[0].videos, 2);
+  erwarte("verschiedene Aussagen → beide mit Kampfart", g.evidence.answers[D].kampfarten?.map((k) => k.sport), ["mma", "sambo"]);
+  erwarte("… der Text nennt beide", g.dna[D].includes("MMA:") && g.dna[D].includes("Sambo:"), true);
+  erwarte("Handtext ohne Video bleibt stehen", g.dna["weaknesses_bad-distance"], "Handtext.");
+  erwarte("Zahlen je Technik addiert (Double Leg 16 Versuche)", g.actionStats.find((s) => s.id === "double-leg")?.attempted, 16);
+  erwarte("Split gewichtet gemittelt (50 % Boxen)", g.dnaSplit.boxing, 50);
+  erwarte("Kampfarten in Anzeige-Reihenfolge", g.evidence.kampfarten, ["mma", "sambo"]);
+  erwarte("Gewichte summiert (2,0)", g.evidence.evidenceTotal, 2);
+}
+
+console.log("\nWIRKUNG EINER ANALYSE:");
+{
+  const alt = analyse({ findings: [cross()], createdAgoDays: 10 });
+  const vorherP = computeProfile("athlete", [alt], { dna: {} });
+  const vorher = { evidence: vorherP.evidence, dnaSplit: vorherP.dnaSplit };
+  const neu = analyse({
+    findings: [cross("Wieder der Cross."), { q: "real-habits_after-hit", side: "clinch", text: "Nach einem Treffer geht er in den Clinch." }],
+    actionStats: [{ id: "cross", attempted: 8, landed: 3 }, { id: "jab", attempted: 3, landed: 1 }],
+    createdAgoDays: 1,
+  });
+  const nachher = computeProfile("athlete", [alt, neu], { dna: {} });
+  const w = wirkungDerAnalyse({ analyse: neu, mode: "athlete", profil: "mma", vorher, nachher });
+  erwarte("bestätigt: Cross, jetzt in 2 Videos", w.punkte.find((p) => p.questionId === Q)?.art, "bestaetigt");
+  erwarte("erstmals gesehen: Clinch nach Treffer, 1 Video", w.punkte.find((p) => p.questionId === "real-habits_after-hit")?.art, "erstmals");
+  erwarte("… der Punkt trägt den Text DIESES Videos", w.punkte.find((p) => p.questionId === Q)?.text, "Wieder der Cross.");
+  erwarte("Zahl nur ab 5 Versuchen: Cross 8/3, kein Jab", w.zahlen.filter((z) => z.art === "technik").map((z) => z.id), ["cross"]);
+  erwarte("Stärke vorher → nachher steigt", w.staerkeNachher > w.staerkeVorher, true);
+}
+{
+  // Drei Kämpfe Orthodox (2,7) gegen einen Southpaw (1,0): unter der Hälfte,
+  // also kein „beides" — die Southpaw-Seite steht wirklich nur daneben.
+  const o = [20, 21, 22].map((d) => analyse({ recency: "mid", findings: [orthodox()], createdAgoDays: d }));
+  const s1 = analyse({ findings: [southpaw()], createdAgoDays: 2 });
+  const vorherP = computeProfile("athlete", [...o, s1], { dna: {} });
+  const w1 = wirkungDerAnalyse({ analyse: s1, mode: "athlete", profil: "mma", vorher: null, nachher: vorherP });
+  erwarte("anders als bisher: Southpaw, Profil bleibt Orthodox", w1.punkte[0].art, "abweichend");
+  erwarte("… mit dem, was stehen bleibt (3 Videos)", w1.punkte[0].fuehrend?.videos, 3);
+  const s2 = analyse({ findings: [southpaw("Wieder Southpaw.")], createdAgoDays: 1 });
+  const nachher = computeProfile("athlete", [...o, s1, s2], { dna: {} });
+  const w2 = wirkungDerAnalyse({ analyse: s2, mode: "athlete", profil: "mma", vorher: { evidence: vorherP.evidence, dnaSplit: null }, nachher });
+  erwarte("zweites Southpaw-Video → Profil angepasst", w2.punkte[0].art, "angepasst");
+  const falsch = analyse({ wrongFighter: true, findings: [kick()] });
+  const w3 = wirkungDerAnalyse({ analyse: falsch, mode: "athlete", profil: "mma", vorher: null, nachher: computeProfile("athlete", [falsch], { dna: {} }) });
+  erwarte("markierte Analyse → zählt nicht, keine Punkte", [w3.zaehlt, w3.punkte.length], [false, 0]);
+}
+
+console.log("\nKAMPFART-STECKBRIEFE (Leon 17.09.2026):");
+{
+  // Beobachtung eines Kickbox-Sparrings, in der die KI Takedowns „gesehen" hat.
+  const beob = (extra = {}) => ({
+    identification: { idConfidence: 0.95 }, meta: { coverage: null, ruleset: null },
+    actions: [
+      { id: "cross", otherLabel: null, attempted: 8, landed: 3, zone: "cage", setup: null, damage: 1, timestamps: [] },
+      { id: "double-leg", otherLabel: null, attempted: 2, landed: 1, zone: "center", setup: null, damage: null, timestamps: [] },
+    ],
+    dnaSplit: { boxing: 70, kicking: 10, wrestling: 20, ground: 0, clinch: 0 },
+    combos: [],
+    defense: { takedownsDefended: 2, takedownsAgainst: 2, strikesAvoided: 3, strikesAgainst: 5, hitLocations: null, knockdownsReceived: 0, rockedMoments: [] },
+    controlTime: { clinchSeconds: 0, topSeconds: 0, bottomSeconds: 0, cagePressureSeconds: 12, pressedSeconds: 0 },
+    ...extra,
+  });
+  const q = "defensive-reactions_takedowns";
+  const box = analyse({ sport: "boxen", videoType: "sparring", findings: [{ q, side: "sprawl", text: "Sprawlt sauber." }, cross()] });
+  box.observation = beob();
+  const pBox = computeProfile("athlete", [box], { dna: {} });
+  erwarte("Boxen sperrt die Takedown-Frage", q in pBox.dna, false);
+  erwarte("… die Schlagfrage bleibt", Q in pBox.dna, true);
+
+  erwarte("Kickboxen verwirft den Takedown → kein takedowns-Signal", beobachteteSignale(filtereBeobachtung(beob(), "kickboxen").observation).has("takedowns"), false);
+  erwarte("… ohne Kampfart bleibt das Signal (Bestand)", beobachteteSignale(filtereBeobachtung(beob(), null).observation).has("takedowns"), true);
+  erwarte("BJJ hat keine Zone → kein cage-Signal", beobachteteSignale(filtereBeobachtung(beob(), "bjj").observation).has("cage"), false);
+
+  const kick = analyse({ sport: "kickboxen", actionStats: [{ id: "cross", attempted: 8, landed: 3 }, { id: "double-leg", attempted: 6, landed: 2 }] });
+  kick.observation = beob();
+  const pKick = computeProfile("athlete", [kick], { dna: {} });
+  erwarte("Zähler: Takedown aus dem Kickboxen fällt raus, Cross bleibt", pKick.actionStats.map((s) => s.id), ["cross"]);
+
+  const mma = analyse({ sport: "mma", findings: [{ q, side: "sprawl", text: "Sprawlt sauber." }], createdAgoDays: 2 });
+  mma.observation = beob();
+  const pBeide = computeProfile("athlete", [mma, box], { dna: {} });
+  erwarte("Gelegenheiten zählen die gesperrte Frage nicht (1 statt 2)", pBeide.evidence.answers[q].gelegenheiten, 1);
+
+  erwarte("Kampf-Sambo läuft als MMA", sportFromText("Kampf-Sambo"), "mma");
+}
+
+console.log("\nFLÄCHE DES PROFILS (Leon 17.09.: Käfig-Wörter nur mit Käfig im Video):");
+{
+  const k1 = analyse({ sport: "mma", flaeche: "kaefig", findings: [cross()], createdAgoDays: 3 });
+  const k2 = analyse({ sport: "mma", flaeche: "kaefig", findings: [cross()], createdAgoDays: 2 });
+  const m = analyse({ sport: "mma", flaeche: "matte", findings: [cross()], createdAgoDays: 1 });
+  const ohne = analyse({ sport: "mma", findings: [cross()], createdAgoDays: 0 });
+  erwarte("häufigste Fläche der zählenden Videos (2× Käfig, 1× Matte)", computeProfile("athlete", [k1, k2, m, ohne], { dna: {} }).evidence.flaeche, "kaefig");
+  erwarte("Gleichstand → die jüngere Fläche", computeProfile("athlete", [k1, m], { dna: {} }).evidence.flaeche, "matte");
+  erwarte("ohne jede Angabe → null (neutrale Wörter)", computeProfile("athlete", [ohne], { dna: {} }).evidence.flaeche, null);
+  const markiert = analyse({ sport: "mma", flaeche: "ring", wrongFighter: true, findings: [cross()] });
+  erwarte("markierte Analyse zählt für die Fläche nicht", computeProfile("athlete", [k1, markiert], { dna: {} }).evidence.flaeche, "kaefig");
+  const gMma = { sport: "mma", profil: computeProfile("athlete", [k1, k2], { dna: {} }) };
+  const gSambo = { sport: "sambo", profil: computeProfile("athlete", [analyse({ sport: "sambo", flaeche: "matte", findings: [cross()] })], { dna: {} }) };
+  const gMma2 = { sport: "mma", profil: computeProfile("athlete", [analyse({ sport: "mma", flaeche: "matte", findings: [cross()] })], { dna: {} }) };
+  erwarte("Fight-DNA über Käfig + Matte → keine Fläche", stelleZusammen([gMma, gSambo], { dna: {} }).evidence.flaeche, null);
+  erwarte("Fight-DNA, alle auf der Matte → Matte", stelleZusammen([gMma2, gSambo], { dna: {} }).evidence.flaeche, "matte");
 }
 
 console.log(`\n${geprueft} Prüfungen, ${fehler} fehlgeschlagen ${fehler === 0 ? "✓" : "✗"}`);

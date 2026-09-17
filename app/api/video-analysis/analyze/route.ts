@@ -21,7 +21,8 @@ import {
   isTrainerOrAdmin,
   verifyUser,
 } from "@/lib/server/verify-user";
-import { MAX_VIDEO_SECONDS, type AnalyzeRequest } from "@/lib/video-analysis";
+import { isFlaeche, varianteFuer } from "@/lib/kampfart-steckbrief";
+import { MAX_VIDEO_SECONDS, isSport, type AnalyzeRequest } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
 // Vercel-Limit: Hobby-Plan erlaubt maximal 300s Funktionslaufzeit.
@@ -124,6 +125,12 @@ export async function POST(req: Request) {
           existingStats: body.existingStats ?? [],
           profileContext: body.profileContext ?? "",
           recency: body.recency ?? "unknown",
+          // Kampfart wirkt NUR auf die Bewertung (Steckbrief), nie auf die
+          // Beobachtung oben — dort sieht Gemini, was passiert.
+          sport: isSport(body.sport) ? body.sport : null,
+          variante: varianteFuer(isSport(body.sport) ? body.sport : null, body.variante),
+          // Fläche aus dem Vorlauf: nur die Wörter (Käfig, Seile, Matte).
+          flaeche: isFlaeche(body.flaeche) ? body.flaeche : null,
           onProgress: (chars) => {
             if (chars - lastReported < 250) return;
             lastReported = chars;

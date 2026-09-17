@@ -16,27 +16,39 @@
  * wird das Dokument komplett ersetzt, weil es nur aus Abgeleitetem besteht.
  *
  * PROFIL JE KAMPFART (Etappe 2, Leon 16.09.): Beim Athleten schreibt der
- * Lauf neben `fightProfile/main` (alle Analysen, das Gesamtprofil) je
- * Kampfart ein eigenes Dokument `fightProfile/{sport}` aus NUR den Analysen
- * dieser Kampfart — dieselbe reine Rechnung, gefilterte Liste. So läuft ein
- * Sambo-Video nie in die MMA-Antworten. Kampfarten, zu denen keine zählende
- * Analyse mehr existiert (markiert, gelöscht), verlieren ihr Dokument im
- * selben Lauf. Gegner behalten EIN Profil: Ihr Dokument ist flach, und ein
- * Gegner wird für einen Kampf gescoutet, nicht über Sportarten hinweg.
+ * Lauf je Kampfart ein eigenes Dokument `fightProfile/{sport}` aus NUR den
+ * Analysen dieser Kampfart — dieselbe reine Rechnung, gefilterte Liste. So
+ * läuft ein Sambo-Video nie in die MMA-Antworten. Kampfarten, zu denen keine
+ * zählende Analyse mehr existiert (markiert, gelöscht), verlieren ihr
+ * Dokument im selben Lauf. Gegner behalten EIN Profil: Ihr Dokument ist
+ * flach, und ein Gegner wird für einen Kampf gescoutet, nicht über
+ * Sportarten hinweg.
  *
- * Das Gesamtprofil rechnet bis Etappe 3 weiter über alle Kampfarten — die
- * Gesamtansicht als ZUSAMMENSTELLUNG der Kampfart-Profile ist Sache des
- * Berichts (Etappe 3).
+ * DIE FIGHT-DNA ÜBER ALLE KAMPFARTEN (Etappe 3, Leon 16.09.): `fightProfile/
+ * main` ist keine eigene Rechnung mehr, sondern die ZUSAMMENSTELLUNG der
+ * Kampfart-Profile (`stelleZusammen`). Analysen ohne Kampfart (Bestand vor
+ * Etappe 2) bilden eine Gruppe ohne Namen, die nur ins Gesamtprofil läuft.
+ *
+ * DIE WIRKUNG EINER ANALYSE (Etappe 3, Leon 17.09.): Mit `wirkungFuer`
+ * vergleicht der Lauf das Profil, in das die Analyse lief, VOR und NACH ihr
+ * und legt das Ergebnis an die Analyse (`wirkung`). Das ist der Stoff der
+ * Kurzinfo — gespeichert, weil der Athlet seine Rohanalysen nicht lesen darf
+ * und weil der Bericht den Stand von damals zeigen soll.
  */
 
 import { FieldValue, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { decodeFightProfile, type FightProfileDoc } from "@/lib/fight-profile";
+import type { DnaSplit } from "@/lib/fight-stats";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
 import { decodeOpponent, type OpponentDoc } from "@/lib/opponents";
 import {
   computeProfile,
   MANUAL_SIDE,
+  stelleZusammen,
+  wirkungDerAnalyse,
+  type AnalyseWirkung,
   type ComputedProfile,
+  type KampfartProfil,
   type ProfileEvidence,
 } from "@/lib/profile-evidence";
 import {
@@ -89,6 +101,18 @@ export function profileRef(db: Firestore, mode: AnalysisMode, targetId: string) 
     : db.collection("users").doc(targetId).collection("fightProfile").doc("main");
 }
 
+/** Firestore verträgt kein `undefined` — optionale Felder fallen weg. */
+function ohneUndefined<T>(x: T): T {
+  return JSON.parse(JSON.stringify(x)) as T;
+}
+
+export interface RecomputeResult {
+  /** Das Gesamtprofil (Athlet: die Fight-DNA über alle Kampfarten; Gegner: sein Profil). */
+  profil: ComputedProfile;
+  /** Nur mit `wirkungFuer`: was diese Analyse bewegt hat (liegt jetzt auch an der Analyse). */
+  wirkung: AnalyseWirkung | null;
+}
+
 /**
  * Rechnet das Profil aus allen gespeicherten Analysen neu und schreibt es.
  * Liefert die Rechnung zurück (für die Antwort der Route).
@@ -98,7 +122,8 @@ export async function recomputeProfile(
   mode: AnalysisMode,
   targetId: string,
   updatedBy: string,
-): Promise<ComputedProfile> {
+  opts: { wirkungFuer?: string } = {},
+): Promise<RecomputeResult> {
   return db.runTransaction(async (tx: Transaction) => {
     // Alle Lesezugriffe VOR dem ersten Schreiben (Transaktionsregel).
     const sportCol =
@@ -113,68 +138,115 @@ export async function recomputeProfile(
     const analyses: VideoAnalysis[] = analysesSnap.docs.map((d) =>
       decodeVideoAnalysis(d.id, d.data() as VideoAnalysisDoc),
     );
+    const neue = opts.wirkungFuer ? analyses.find((a) => a.id === opts.wirkungFuer) ?? null : null;
 
-    let existingDna: GegnerDnaAnswers = {};
+    const abgeleitet = (c: ComputedProfile) =>
+      ohneUndefined({
+        dna: c.dna,
+        dnaSplit: c.dnaSplit,
+        dnaSplitWeight: c.dnaSplitWeight,
+        actionStats: c.actionStats,
+        evidence: c.evidence,
+        updatedBy,
+      });
+    const stempel = { updatedAt: FieldValue.serverTimestamp() };
+    const wirkungSchreiben = (w: AnalyseWirkung) => {
+      if (!neue) return;
+      tx.update(analysesRef(db, mode, targetId).doc(neue.id), { wirkung: ohneUndefined(w) });
+    };
+
+    // ── Gegner: EIN Profil ─────────────────────────────────────────────────
     if (mode === "opponent") {
+      let existingDna: GegnerDnaAnswers = {};
+      let vorher: { evidence: ProfileEvidence | null; dnaSplit: DnaSplit | null } | null = null;
       if (profileSnap.exists) {
         const o = decodeOpponent(profileSnap.id, profileSnap.data() as OpponentDoc);
         existingDna = manuellerBestand(o.dna, o.evidence);
+        vorher = { evidence: o.evidence ?? null, dnaSplit: o.dnaSplit ?? null };
       }
-    } else {
-      const p = decodeFightProfile(profileSnap.data() as FightProfileDoc | undefined);
-      existingDna = manuellerBestand(p.dna, p.evidence);
-    }
-
-    const abgeleitet = (c: ComputedProfile) => ({
-      dna: c.dna,
-      dnaSplit: c.dnaSplit,
-      dnaSplitWeight: c.dnaSplitWeight,
-      actionStats: c.actionStats,
-      evidence: c.evidence,
-      updatedBy,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    const computed = computeProfile(mode, analyses, { dna: existingDna });
-
-    if (mode === "opponent") {
+      const computed = computeProfile(mode, analyses, { dna: existingDna });
+      const wirkung = neue
+        ? wirkungDerAnalyse({ analyse: neue, mode, profil: "gegner", vorher, nachher: computed })
+        : null;
       if (!profileSnap.exists) {
         // Gegnerprofil weg (gelöscht, während analysiert wurde) — nichts
         // anlegen, was niemand mehr sieht.
-        return computed;
+        return { profil: computed, wirkung };
       }
       // Nur die abgeleiteten Felder — `update` lässt alles andere stehen.
       // `dna` komplett ersetzen (kein Merge in die Map), sonst blieben
       // verschwundene Antworten als Schlüssel liegen.
-      tx.update(profileSnap.ref, abgeleitet(computed));
-      return computed;
+      tx.update(profileSnap.ref, { ...abgeleitet(computed), ...stempel });
+      if (wirkung) wirkungSchreiben(wirkung);
+      return { profil: computed, wirkung };
     }
 
-    // Das Kampfprofil BESTEHT aus Abgeleitetem — komplett ersetzen.
-    tx.set(profileSnap.ref, abgeleitet(computed));
-
-    // ── Profil je Kampfart ───────────────────────────────────────────────
-    const sportarten = new Set<Sport>();
-    for (const a of analyses) {
-      if (!a.wrongFighter && a.weight.identified && a.weight.value > 0 && isSport(a.sport)) {
-        sportarten.add(a.sport);
-      }
-    }
+    // ── Athlet: je Kampfart ein Profil, darüber die Zusammenstellung ───────
     const vorhanden = new Map<string, FightProfileDoc>();
     for (const d of sportSnap?.docs ?? []) {
       if (d.id !== "main") vorhanden.set(d.id, d.data() as FightProfileDoc);
     }
+    const zaehlt = (a: VideoAnalysis) => !a.wrongFighter && a.weight.identified && a.weight.value > 0;
+
+    const sportarten = new Set<Sport>();
+    let ohneKampfart = false;
+    for (const a of analyses) {
+      if (!zaehlt(a)) continue;
+      if (isSport(a.sport)) sportarten.add(a.sport);
+      else ohneKampfart = true;
+    }
+
+    const gruppen: KampfartProfil[] = [];
     for (const sport of Array.from(sportarten)) {
-      const eigene = analyses.filter((a) => a.sport === sport);
       const alt = decodeFightProfile(vorhanden.get(sport));
-      const c = computeProfile(mode, eigene, { dna: manuellerBestand(alt.dna, alt.evidence) });
-      tx.set(sportCol!.doc(sport), abgeleitet(c));
+      const c = computeProfile(mode, analyses.filter((a) => a.sport === sport), {
+        dna: manuellerBestand(alt.dna, alt.evidence),
+      });
+      gruppen.push({ sport, profil: c });
+      tx.set(sportCol!.doc(sport), { ...abgeleitet(c), ...stempel });
+    }
+    if (ohneKampfart) {
+      gruppen.push({
+        sport: null,
+        profil: computeProfile(mode, analyses.filter((a) => !isSport(a.sport)), { dna: {} }),
+      });
     }
     // Kampfarten ohne zählende Analyse verlieren ihr Dokument — ein Profil,
     // hinter dem nichts mehr steht, wäre eine Aussage ohne Quelle.
     for (const id of Array.from(vorhanden.keys())) {
       if (isSport(id) && !sportarten.has(id)) tx.delete(sportCol!.doc(id));
     }
-    return computed;
+
+    const hauptAlt = decodeFightProfile(profileSnap.data() as FightProfileDoc | undefined);
+    const gesamt = stelleZusammen(gruppen, { dna: manuellerBestand(hauptAlt.dna, hauptAlt.evidence) });
+    // Das Kampfprofil BESTEHT aus Abgeleitetem — komplett ersetzen.
+    tx.set(profileSnap.ref, { ...abgeleitet(gesamt), ...stempel });
+
+    // ── Wirkung: im Profil der Kampfart des Videos, sonst im Gesamtprofil ──
+    let wirkung: AnalyseWirkung | null = null;
+    if (neue) {
+      if (isSport(neue.sport)) {
+        const alt = vorhanden.get(neue.sport);
+        const altProfil = alt ? decodeFightProfile(alt) : null;
+        const nachher = gruppen.find((g) => g.sport === neue.sport)?.profil ?? gesamt;
+        wirkung = wirkungDerAnalyse({
+          analyse: neue,
+          mode,
+          profil: neue.sport,
+          vorher: altProfil ? { evidence: altProfil.evidence, dnaSplit: altProfil.dnaSplit } : null,
+          nachher,
+        });
+      } else {
+        wirkung = wirkungDerAnalyse({
+          analyse: neue,
+          mode,
+          profil: "gesamt",
+          vorher: profileSnap.exists ? { evidence: hauptAlt.evidence, dnaSplit: hauptAlt.dnaSplit } : null,
+          nachher: gesamt,
+        });
+      }
+      wirkungSchreiben(wirkung);
+    }
+    return { profil: gesamt, wirkung };
   });
 }

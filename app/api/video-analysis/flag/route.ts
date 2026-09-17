@@ -29,7 +29,6 @@ import {
   isTrainerOrAdmin,
   verifyUser,
 } from "@/lib/server/verify-user";
-import { evidenceStrengthPct } from "@/lib/profile-evidence";
 import type { AnalysisMode } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
@@ -97,15 +96,12 @@ export async function POST(req: Request) {
 
     if (action === "delete") {
       await ref.delete();
-      const computed = await recomputeProfile(db, mode, targetId, user.uid);
-      return NextResponse.json({
-        ok: true,
-        strength: evidenceStrengthPct(computed.evidence.evidenceTotal),
-      });
+      const { profil } = await recomputeProfile(db, mode, targetId, user.uid);
+      return NextResponse.json({ ok: true, strength: profil.evidence.staerke ?? 0 });
     }
 
     await ref.update({ wrongFighter: body.wrongFighter === true });
-    const computed = await recomputeProfile(db, mode, targetId, user.uid);
+    const { profil } = await recomputeProfile(db, mode, targetId, user.uid);
     const data = (await ref.get()).data() ?? {};
     const createdAt = data.createdAt as { toDate(): Date } | undefined;
     return NextResponse.json({
@@ -114,7 +110,7 @@ export async function POST(req: Request) {
         id: ref.id,
         createdAt: (createdAt?.toDate() ?? new Date()).toISOString(),
       },
-      strength: evidenceStrengthPct(computed.evidence.evidenceTotal),
+      strength: profil.evidence.staerke ?? 0,
     });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {

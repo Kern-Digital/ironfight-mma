@@ -420,7 +420,7 @@ const ANALYSEN = [
     stil: { primaryStyle: "Wrestler mit Boxbasis", approach: "Kontrolliert, sucht die Passage", baseDiscipline: "Ringen" },
     befunde: [
       { questionId: "preferred-weapons_takedown", categoryId: "preferred-weapons", answer: "Double Leg aus der Mitte, eingeleitet mit dem Jab -- 8 von 14 sitzen.", confidence: 0.91, evidence: ["4:02", "11:30"] },
-      { questionId: "entry-patterns_jab", categoryId: "entry-patterns", answer: "Er leitet fast alles mit dem Jab ein, auch den Level Change.", confidence: 0.88, evidence: ["0:41", "4:02"] },
+      { questionId: "entry-patterns_start", categoryId: "entry-patterns", answer: "Er leitet fast alles mit dem Jab ein, auch den Level Change.", confidence: 0.88, evidence: ["0:41", "4:02"] },
       { questionId: "weaknesses_technical", categoryId: "weaknesses", answer: "Der Clinch fehlt: nur 61 Sekunden in fuenf Runden, und er sucht ihn nie aktiv.", confidence: 0.84, evidence: ["3:50", "8:12"] },
       { questionId: "gameplan_priority-techniques", categoryId: "gameplan", answer: "Fuer den Wettkampf: Jab-Level-Change als Hauptweg, Passagen aus der Halbdeckung ausbauen.", confidence: 0.8, evidence: ["4:20", "11:52"] },
       { questionId: "real-habits_when-tired", categoryId: "real-habits", answer: "Bleibt auch in Runde 5 bei seinem Plan, sucht dann vermehrt Submissions statt Schlagabtausch.", confidence: 0.77, evidence: ["12:40"] },
