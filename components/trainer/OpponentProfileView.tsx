@@ -17,6 +17,15 @@ import {
   type ActionStat,
   type DnaSplit,
 } from "@/lib/fight-stats";
+import {
+  filtereTechnikStats,
+  gesperrteGruppen,
+  splitNachSteckbrief,
+  zonenLabel,
+  zonenPhrase,
+  type Flaeche,
+} from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 import DnaCategoryGrid from "./DnaCategoryGrid";
 import FightDnaSplit from "./FightDnaSplit";
 import FightStatsBlock from "./FightStatsBlock";
@@ -105,11 +114,26 @@ export default function OpponentProfileView({
   opponent,
   showBasics = true,
   section = "all",
+  sport = null,
+  flaeche = null,
 }: {
   opponent: OpponentView;
   /** Grunddaten-Kopf anzeigen (in der Wettkampf-Ansicht oft schon vorhanden). */
   showBasics?: boolean;
   section?: OpponentViewSection;
+  /**
+   * Kampfart der Ansicht (17.09.2026): im Wettkampf die des Wettkampfs, im
+   * Gegnerprofil die EINZIGE Kampfart seiner Videos (sonst null). Filtert
+   * Fragen, Zähler und Split nach dem Steckbrief — Techniken außerhalb der
+   * Kampfart sind dort Foul oder Erkennungsfehler.
+   */
+  sport?: Sport | null;
+  /**
+   * Fläche aus den Videos des Gegners (`opponent.evidence.flaeche`, Leon
+   * 17.09.2026: „Käfig nur, wenn einer da ist"): Achteck und „Am Käfig" nur
+   * mit Käfig, Matte rund. null = neutral.
+   */
+  flaeche?: Flaeche | null;
 }) {
   const measures = [
     opponent.heightCm ? `${opponent.heightCm} cm` : null,
@@ -141,14 +165,22 @@ export default function OpponentProfileView({
    * „Fight-DNA · Verteilung der Kampfbereiche" über einer leeren Fläche
    * stehen. Die Prüfungen sind genau die, die die Blöcke selbst anstellen.
    */
-  const stats = opponent.actionStats ?? [];
+  const stats = sport
+    ? filtereTechnikStats(opponent.actionStats ?? [], sport).stats
+    : (opponent.actionStats ?? []);
+  const split = sport ? splitNachSteckbrief(opponent.dnaSplit, sport) : (opponent.dnaSplit ?? null);
   const zonen = zoneDistribution(stats);
-  const hatSplit = !!opponent.dnaSplit && !isDnaSplitEmpty(opponent.dnaSplit);
+  const phrase = zonenPhrase(sport, flaeche) ?? undefined;
+  const hatSplit = !!split && !isDnaSplitEmpty(split);
   const hatStats = stats.some(hasActionData);
   const hatInsights =
-    deriveTendencies(stats).length > 0 ||
-    deriveSuggestions(opponent.dnaSplit, stats).length > 0 ||
-    zonen.center + zonen.open + zonen.cage > 0;
+    deriveTendencies(stats, phrase).length > 0 ||
+    deriveSuggestions(split, stats, {
+      zonenPhrase: phrase,
+      mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+      grappling: gesperrteGruppen(sport).includes("strike"),
+    }).length > 0 ||
+    (zonenLabel(sport, flaeche) ? zonen.center + zonen.open + zonen.cage : 0) > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -223,7 +255,7 @@ export default function OpponentProfileView({
           {mehrereBloecke && (
             <BlockHead title="Fight-DNA" sub="Verteilung der Kampfbereiche" />
           )}
-          <FightDnaSplit split={opponent.dnaSplit} />
+          <FightDnaSplit split={split} />
         </section>
       )}
 
@@ -236,7 +268,7 @@ export default function OpponentProfileView({
               sub="Abgeleitet aus Split und Statistik"
             />
           )}
-          <FightInsights split={opponent.dnaSplit} stats={stats} />
+          <FightInsights split={split} stats={stats} sport={sport} flaeche={flaeche} />
         </section>
       )}
 
@@ -249,7 +281,7 @@ export default function OpponentProfileView({
               sub="Gezählt aus den KI-Video-Analysen"
             />
           )}
-          <FightStatsBlock stats={stats} />
+          <FightStatsBlock stats={stats} sport={sport} flaeche={flaeche} />
         </section>
       )}
 
@@ -261,7 +293,7 @@ export default function OpponentProfileView({
           {mehrereBloecke && (
             <BlockHead title="Kampf-DNA" sub="Beobachtungen in 9 Kategorien" />
           )}
-          <DnaCategoryGrid answers={opponent.dna ?? {}} />
+          <DnaCategoryGrid answers={opponent.dna ?? {}} sport={sport} flaeche={flaeche} />
         </section>
       )}
     </div>

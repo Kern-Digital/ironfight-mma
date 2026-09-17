@@ -7,7 +7,8 @@
  *   • Anzahl Wochen bis zum Kampf
  *
  * Methodisch: Aus der Master-Technik-DB werden Techniken gefiltert nach
- *   • Disziplin = MMA-tauglich (boxing/mma/muay-thai/wrestling/bjj)
+ *   • Kategorie passt zur Kampfart des Wettkampfs (KATEGORIEN_JE_KAMPFART;
+ *     ohne Kampfart wie bisher alle vier — MMA-Mischung)
  *   • TrainingArea passt zur Phase + den Critical Gaps
  *   • Difficulty/Level passt zum Schüler-Level
  *
@@ -35,6 +36,23 @@ import type {
   Category,
   TrainingArea,
 } from "./types";
+import type { Sport } from "./video-analysis";
+
+/**
+ * Welche Technik-Kategorien der App eine Kampfart trainiert (Leon 17.09.2026:
+ * Kampfart am Wettkampf). Vorher mischte JEDER Plan Boxen, Ringen, BJJ und
+ * Muay Thai — ein Boxkampf bekam Takedowns und Submissions in den Plan.
+ */
+export const KATEGORIEN_JE_KAMPFART: Record<Sport, Category[]> = {
+  mma: ["boxing", "wrestling", "bjj", "muay-thai"],
+  boxen: ["boxing"],
+  kickboxen: ["boxing", "muay-thai"],
+  ringen: ["wrestling"],
+  sambo: ["wrestling", "bjj"],
+  bjj: ["bjj"],
+};
+
+const ALLE_KATEGORIEN: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
 
 // ─── Phasen-Charakteristik ─────────────────────────────────────────────────
 
@@ -220,6 +238,8 @@ export interface GeneratePlanInput {
   athleteLevel: AthleteLevel | null | undefined;
   analysis: TrainingHistoryAnalysis;
   opponent: OpponentProfile;
+  /** Kampfart des Wettkampfs; null = alle vier Kategorien (Bestand). */
+  sport?: Sport | null;
 }
 
 /**
@@ -232,8 +252,8 @@ export function generateFightCampPhases(
   const distribution = distributePhaseWeeks(input.weeksTotal);
   const focus = recommendFocus(input.analysis, input.opponent);
 
-  // Kategorien: primär MMA-relevante Kategorien — limitieren auf das, was die App kennt
-  const primaryCats: Category[] = ["boxing", "wrestling", "bjj", "muay-thai"];
+  // Kategorien der Kampfart — ohne Kampfart alle vier, wie vor dem 17.09.2026.
+  const primaryCats: Category[] = input.sport ? KATEGORIEN_JE_KAMPFART[input.sport] : ALLE_KATEGORIEN;
 
   // Schwerpunkt der Phase 2 = Critical Gaps + Style-Areas
   const specificPrepAreas: TrainingArea[] = [
@@ -320,6 +340,7 @@ export function generateFightCamp(input: {
   athleteLevel: AthleteLevel | null | undefined;
   analysis: TrainingHistoryAnalysis;
   opponent: OpponentProfile;
+  sport: Sport | null;
 }): Omit<FightCamp, "id" | "createdAt" | "ownerIsStaff"> {
   const startedAt = input.startedAt ?? new Date();
   const weeksTotal = Math.max(
@@ -336,6 +357,7 @@ export function generateFightCamp(input: {
     athleteLevel: input.athleteLevel,
     analysis: input.analysis,
     opponent: input.opponent,
+    sport: input.sport,
   });
 
   return {
@@ -343,6 +365,7 @@ export function generateFightCamp(input: {
     createdBy: input.createdBy,
     competitionDate: input.competitionDate,
     competitionName: input.competitionName,
+    sport: input.sport,
     weeksTotal,
     startedAt,
     opponent: input.opponent,

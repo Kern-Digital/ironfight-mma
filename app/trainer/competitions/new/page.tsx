@@ -25,9 +25,17 @@
  * KEIN INTRO: Das Match-Intro samt Ton gehört zum ÖFFNEN eines Wettkampfs.
  * Hier steht noch gar keiner — es gäbe nichts anzukündigen, und bei jeder
  * Korrektur liefe es erneut.
+ *
+ * KAMPFART IST PFLICHT (Leon 17.09.2026: „wenn ich einen Wettkampf anlege,
+ * muss ich auch sagen, was für eine Disziplin gekämpft wird"). Sie bestimmt
+ * die Techniken des Plans, das Profil auf der Wettkampfseite und den
+ * Gameplan. Vorbelegt, sobald der gewählte Athlet genau EINE Kampfart im
+ * Profil hat — eine Wahl von Hand bleibt stehen. Nach dem Anlegen stößt die
+ * Seite den Gameplan an (die Route antwortet sofort).
  */
 
 import GooeySearch from "@/components/ui/GooeySearch";
+import Select from "@/components/ui/Select";
 import MultiFilter from "@/components/ui/MultiFilter";
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -71,6 +79,9 @@ import { analyzeTrainingHistory } from "@/lib/fight-camp-analysis";
 import { getRecentWorkouts } from "@/lib/workouts";
 import { getAllProgress } from "@/lib/extensions/technique-progress";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
+import { getFightProfile } from "@/lib/fight-profile";
+import { starteGameplan } from "@/lib/gameplan";
+import { SPORT_KURZ, SPORT_LABEL, SPORT_ORDER, isSport, type Sport } from "@/lib/video-analysis";
 import { dnaCompleteness } from "@/lib/gegner-dna";
 import { ATHLETE_LEVEL_LABEL, type TechniqueProgress } from "@/lib/types";
 
@@ -302,6 +313,9 @@ function NewCompetitionContent() {
     [],
   );
   const [date, setDate] = useState(defaultDate);
+  const [sport, setSport] = useState<Sport | null>(null);
+  // Eine Wahl von Hand überschreibt die Vorbelegung aus dem Profil nie.
+  const [sportVonHand, setSportVonHand] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -471,8 +485,24 @@ function NewCompetitionContent() {
   const selectedOpponent =
     opponents?.find((o) => o.id === selectedOpponentId) ?? null;
 
+  // Vorbelegung: Hat der gewählte Athlet genau EINE Kampfart im Profil, ist sie
+  // gesetzt. Ohne DeepFight-Freigabe bleibt das Feld leer (kein Fehler).
+  useEffect(() => {
+    if (!studentUid || sportVonHand) return;
+    let lebt = true;
+    getFightProfile(studentUid)
+      .then((p) => {
+        const arten = p.evidence?.kampfarten ?? [];
+        if (lebt && arten.length === 1) setSport(arten[0]);
+      })
+      .catch(() => {});
+    return () => {
+      lebt = false;
+    };
+  }, [studentUid, sportVonHand]);
+
   const canSubmit =
-    !!studentUid && !!selectedOpponentId && !!name.trim() && !!date;
+    !!studentUid && !!selectedOpponentId && !!name.trim() && !!date && !!sport;
 
   function waehleAthlet(uid: string) {
     setStudentUid(uid);
@@ -540,6 +570,7 @@ function NewCompetitionContent() {
             ?.level ?? null,
         analysis,
         opponent: snapshot,
+        sport,
       });
       const created = await createFightCamp({
         ...base,
@@ -558,6 +589,9 @@ function NewCompetitionContent() {
         ),
       });
 
+      // Gameplan anstoßen — die Route antwortet sofort, Claude schreibt im
+      // Hintergrund, die Wettkampfseite zeigt den Fortschritt.
+      void starteGameplan(studentUid, created.id).catch(() => {});
       router.push(`/trainer/competitions/${studentUid}/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wettkampf konnte nicht erstellt werden");
@@ -597,7 +631,7 @@ function NewCompetitionContent() {
             {/* Schritt 1: die Eckdaten — das Einzige, was nur hier entsteht */}
             <section>
               <StepHeader n={1} title="Wettkampf" />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="flex flex-col gap-1.5">
                   <span className="t-label">Wettkampf-Name</span>
                   <input
@@ -619,7 +653,25 @@ function NewCompetitionContent() {
                     style={fieldStyle}
                   />
                 </label>
+                <div className="flex flex-col gap-1.5" data-feld="kampfart">
+                  <span className="t-label">Kampfart</span>
+                  <Select
+                    value={sport ?? ""}
+                    onChange={(v) => {
+                      setSport(isSport(v) ? v : null);
+                      setSportVonHand(true);
+                    }}
+                    placeholder="Kampfart wählen"
+                    options={SPORT_ORDER.map((s) => ({ value: s, label: SPORT_LABEL[s] }))}
+                  />
+                </div>
               </div>
+              {/* Der Hilfstext folgt der Wahl (Gedächtnis „hilfstexte-erklaerend"). */}
+              <p className="mt-2" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                {sport
+                  ? `Der Plan nimmt nur Techniken aus ${SPORT_LABEL[sport]}. Der Gameplan liest dazu das ${SPORT_KURZ[sport]}-Profil deines Athleten und das Profil des Gegners.`
+                  : "Die Kampfart bestimmt, welche Techniken im Plan stehen und welches Profil der Gameplan liest."}
+              </p>
             </section>
 
             {/* Schritt 2: das Duell. Silber heißt „fehlt noch", Türkis

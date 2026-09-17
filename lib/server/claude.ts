@@ -11,8 +11,8 @@
  * unser Datenmodell (VideoEvaluation) passt. API-Key: ANTHROPIC_API_KEY.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { GEMINI_MODELS, geminiGenerateJson, parseModelJson } from "./gemini";
+import { hatClaudeSchluessel, rufeClaude } from "./claude-aufruf";
 import { DNA_CATEGORIES } from "../gegner-dna";
 import {
   ACTION_CATALOG,
@@ -52,45 +52,8 @@ import type {
 } from "../video-analysis";
 import type { ActionStat, DnaSplit } from "../fight-stats";
 
-export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-5";
-
-/**
- * Listenpreise in USD pro 1M Token [Input, Output] — für die Guthaben-Anzeige
- * als EUR ≈ 1:1 gerechnet (Schätzung, kein exakter Kontostand).
- */
-function priceFor(model: string): [number, number] {
-  if (model.includes("opus")) return [5, 25];
-  if (model.includes("sonnet")) return [3, 15];
-  if (model.includes("haiku")) return [1, 5];
-  return [0, 0];
-}
-
-function computeUsage(
-  model: string,
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_creation_input_tokens?: number | null;
-    cache_read_input_tokens?: number | null;
-  },
-): AnalysisUsage {
-  const [inRate, outRate] = priceFor(model);
-  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const inputTokens = usage.input_tokens + cacheWrite + cacheRead;
-  const costEur =
-    (usage.input_tokens * inRate +
-      cacheWrite * inRate * 1.25 +
-      cacheRead * inRate * 0.1 +
-      usage.output_tokens * outRate) /
-    1_000_000;
-  return {
-    inputTokens,
-    outputTokens: usage.output_tokens,
-    costEur: Math.round(costEur * 10000) / 10000,
-    model,
-  };
-}
+// Modell, Streaming, Ausweichen bei Überlastung, Fallback bei Ablehnung und
+// die Kostenrechnung stehen seit 17.09.2026 EINMAL in ./claude-aufruf.ts.
 
 // ─── JSON-Schema für Structured Outputs ─────────────────────────────────────
 
@@ -236,7 +199,7 @@ Grundregeln:
 - Antworte auf Deutsch, in klarer Trainersprache. Konkret statt generisch: nenne Techniken, Situationen, Zonen und Runden beim Namen.
 - Befunde ordnest du den vorgegebenen Frage-IDs zu. Nutze nur existierende IDs aus dem Katalog.
 - Jeder Befund trägt einen sideKey: ein kurzer Slug in Kleinbuchstaben (a-z, 0-9, Bindestrich), der die KERNAUSSAGE benennt, nicht den Wortlaut. Geht es um eine Technik, ist der sideKey die Katalog-ID (z. B. "cross", "low-kick", "double-leg"); geht es um ein Verhalten, ein kurzer Begriff (z. B. "clinch-suchen", "rueckwaerts", "konter", "orthodox", "southpaw", "am-cage"). Zwei Videos mit derselben Kernaussage müssen denselben sideKey bekommen. Nennt eine Antwort ZWEI gleichrangige Aussagen, wähle die stärker belegte.
-- ZAHLEN ehrlich nach Menge (Konfidenzintervall): Unter 5 Versuchen nennst du nur die Zählung („3 Versuche, 2 Treffer") — keine Quote, keinen Bruch wie „2 von 3" — und leitest daraus weder Stärke noch Schwäche ab. Von 5 bis 9 Versuchen nur als Bruch („3 von 5"), ohne Prozent. Ab 10 Versuchen Prozent, ab 20 mit Bandbreite („etwa 40–60 %").
+- ZAHLEN ehrlich nach Menge (Konfidenzintervall): Unter 5 Versuchen nennst du nur die Zählung als Tatsache („3 Versuche, 2 Treffer") — keine Quote, keinen Bruch wie „2 von 3" und KEIN Urteil aus Treffern oder Fehlschlägen: nie „2 Versuche ohne Treffer, bringt dir wenig", nie „setz den Teep früher ein (bei 2 Versuchen einmal gestoppt)". Was du an der AUSFÜHRUNG siehst, benennst du auch bei einem einzigen Versuch — mit Zeitstempel und ohne Trefferzahl („Dein Takedown bei 00:20 kam ohne Vorbereitung — übe den Entry."). Stärke, Schwäche, Plan oder Drill stützt du unter 5 Versuchen nur auf so eine beschriebene Szene, nie auf die Zählung. Von 5 bis 9 Versuchen nur als Bruch („3 von 5"), ohne Prozent. Ab 10 Versuchen Prozent, ab 20 mit Bandbreite („etwa 40–60 %").
 - Ein einzelnes Video zeigt eine Tendenz, noch kein Muster — ein Muster braucht mehrere Videos.
 - Scores 0-100 nur vergeben, wenn die Daten sie tragen, sonst null.
 - Schreib nie JSON-Feldnamen (cagePressureSeconds, dnaSplit, takedownsAgainst, zone=center) in Texte oder Evidenz — schreib, was sie bedeuten („0 Sekunden am Rand", „70 % Distanz mit den Händen").
@@ -532,15 +495,14 @@ ${JSON.stringify(EVALUATION_SCHEMA)}`;
 }
 
 /**
- * Führt die Bewertung aus (Stufe 2). Bevorzugt Claude (Streaming + Structured
- * Outputs); ohne ANTHROPIC_API_KEY automatisch der kostenlose Gemini-Fallback.
+ * Führt die Bewertung aus (Stufe 2). Bevorzugt Claude über die gemeinsame
+ * Hülle (./claude-aufruf.ts); ohne ANTHROPIC_API_KEY automatisch der
+ * kostenlose Gemini-Fallback.
  */
 export async function evaluateObservation(
   args: EvaluateArgs,
 ): Promise<{ evaluation: VideoEvaluation; model: string; usage: AnalysisUsage | null }> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return evaluateWithGeminiFallback(args);
-  const client = new Anthropic({ apiKey: key });
+  if (!hatClaudeSchluessel()) return evaluateWithGeminiFallback(args);
 
   // Kein Structured-Outputs-Enforcement: das VideoEvaluation-Schema
   // überschreitet das Grammatik-Limit der API ("compiled grammar is too
@@ -552,82 +514,20 @@ export async function evaluateObservation(
 Gib AUSSCHLIESSLICH ein JSON-Objekt zurück, das exakt diesem JSON-Schema entspricht (keine Kommentare, kein Markdown):
 ${JSON.stringify(EVALUATION_SCHEMA)}`;
 
-  const run = async (model: string): Promise<Anthropic.Message> => {
-    const stream = client.messages.stream({
-      model,
-      max_tokens: 32000,
-      system: systemPrompt(args.sport ?? null),
-      messages: [{ role: "user", content }],
-    });
-    // Echter Fortschritt: die Antwort wächst zeichenweise. Bei einem
-    // Modellwechsel (Überlastung) startet der Zähler neu — die Anzeige beim
-    // Client ist gegen Rückschritte gesichert.
-    if (args.onProgress) {
-      stream.on("text", (_delta, snapshot) => args.onProgress?.(snapshot.length));
-    }
-    return stream.finalMessage();
-  };
-  const isOverloaded = (err: unknown): boolean =>
-    err instanceof Anthropic.APIError &&
-    typeof err.status === "number" &&
-    err.status >= 500;
-  // Verbindungsabbrüche (SDK: „Connection error.", kein Status) sind
-  // vorübergehend wie eine Überlastung — gemessen 16.09. im Browser-Lauf:
-  // die Bewertung brach nach 18 s ab, zehn Minuten vorher lief dieselbe
-  // Route sauber. Die Wortmarke „überlastet" löst im Client den
-  // Auto-Neustart aus; ein Modellwechsel hülfe hier nicht.
-  const isConnection = (err: unknown): boolean =>
-    err instanceof Anthropic.APIConnectionError;
-  const connectionError = () =>
-    new Error(
-      "Claude ist gerade nicht erreichbar (Verbindungsabbruch, wie bei Überlastung — überlastet). Bitte in 1–2 Minuten erneut versuchen.",
-    );
-
-  // Opus 5 zuerst; bei Überlastung (529/5xx nach SDK-Retries) automatisch
-  // auf Sonnet 5 ausweichen — ABER: bei der Detail-Analyse (tier="pro") wird
-  // NIE unter Opus gewechselt (Vorgabe), dann greift stattdessen der
-  // Auto-Neustart im Client über die "überlastet"-Meldung.
-  const overloadedError = () =>
-    new Error(
-      "Claude ist gerade überlastet (hohe Nachfrage bei Anthropic). Bitte in 1–2 Minuten erneut versuchen.",
-    );
-  let usedModel = CLAUDE_MODEL;
-  let message: Anthropic.Message;
-  try {
-    message = await run(usedModel);
-  } catch (err) {
-    if (isConnection(err)) throw connectionError();
-    if (!isOverloaded(err)) throw err;
-    if (args.tier === "pro") throw overloadedError();
-    usedModel = "claude-sonnet-5";
-    try {
-      message = await run(usedModel);
-    } catch (err2) {
-      if (isConnection(err2)) throw connectionError();
-      if (isOverloaded(err2)) throw overloadedError();
-      throw err2;
-    }
-  }
-
-  if (message.stop_reason === "refusal") {
-    throw new Error("Claude hat die Auswertung abgelehnt (Safety-Filter).");
-  }
-  if (message.stop_reason === "max_tokens") {
-    throw new Error("Claude-Antwort wurde abgeschnitten — bitte erneut versuchen.");
-  }
-
-  const text = message.content
-    .filter(
-      (b): b is Extract<typeof b, { type: "text" }> => b.type === "text",
-    )
-    .map((b) => b.text)
-    .join("");
-  if (!text.trim()) throw new Error("Claude lieferte kein Ergebnis");
+  // Bei der Detail-Analyse (tier="pro") wird NIE unter Opus gewechselt
+  // (Vorgabe) — dann greift der Auto-Neustart im Client über „überlastet".
+  const { text, model, usage } = await rufeClaude({
+    system: systemPrompt(args.sport ?? null),
+    user: content,
+    maxTokens: 32000,
+    nurOpus: args.tier === "pro",
+    onProgress: args.onProgress,
+  });
 
   const parsed = parseModelJson<Partial<VideoEvaluation>>(text);
   return {
     evaluation: normalizeEvaluation(parsed, args.sport ?? null, varianteFuer(args.sport, args.variante)),
-    model: usedModel,
-    usage: computeUsage(usedModel, message.usage),
+    model,
+    usage,
   };
 }

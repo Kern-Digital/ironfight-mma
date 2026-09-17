@@ -8,6 +8,7 @@ import Icon from "@/components/ui/Icon";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import OpponentProfileView from "@/components/trainer/OpponentProfileView";
 import { getOpponent, type Opponent } from "@/lib/opponents";
+import { ansichtDesProfils } from "@/lib/kampfart-steckbrief";
 
 /**
  * Read-only Gegnerprofil für Schüler — erreichbar nur, wenn der Trainer das
@@ -74,6 +75,8 @@ function SharedOpponentContent({ id }: { id: string }) {
             </div>
           ) : (
             <OpponentProfileView
+              /* Kampfart nur bei genau einer, Fläche aus seinen Videos. */
+              {...ansichtDesProfils(opponent.evidence)}
               opponent={{
                 name: opponent.name,
                 style: opponent.style,

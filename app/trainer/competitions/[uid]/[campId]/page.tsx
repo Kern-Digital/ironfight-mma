@@ -43,6 +43,19 @@
  * das eine freigegeben sein und das andere nicht. Läuft das Kampfprofil in
  * `permission-denied`, sagt die Athleten-Seite das in einem Satz statt einer
  * roten Box; die Analysen-Zahl bleibt dann leer.
+ *
+ * ─── KAMPFART UND GAMEPLAN (Leon 17.09.2026) ───────────────────────────────
+ *
+ * Der Wettkampf trägt seine Kampfart (`camp.sport`). Die Athleten-Seite zeigt
+ * das Profil DIESER Kampfart (`fightProfile/{sport}`) in der Athletensicht —
+ * ohne Tipps aus Gegnersicht, mit der Fläche aus dem Profil und der
+ * Profilstärke als einziger Prozentzahl. Hat der Athlet in der Kampfart noch
+ * kein Video, steht die Fight-DNA über alle Kampfarten mit einem Satz dazu.
+ * Der Gegner nimmt Fragen und Wörter der Kampfart, die Fläche aus seinen
+ * Videos. Bestehende Wettkämpfe ohne Kampfart wählen sie EINMAL oben im Kopf
+ * („Kampfart einmal auf der Seite wählen"); der Plan bleibt dabei, wie er ist.
+ * Darunter steht der Gameplan (components/trainer/GameplanBlock.tsx), seine
+ * Drills erscheinen in Phase 2 und 3 des Plans.
  */
 
 import PageHead from "@/components/shell/PageHead";
@@ -59,6 +72,8 @@ import FightCampPlanView, {
 } from "@/components/trainer/FightCampPlanView";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import CampNotizen from "@/components/trainer/CampNotizen";
+import GameplanBlock, { useGameplan } from "@/components/trainer/GameplanBlock";
+import Select from "@/components/ui/Select";
 import VersusBanner, {
   type VersusSeite,
 } from "@/components/trainer/VersusBanner";
@@ -79,6 +94,7 @@ import {
   FIGHTER_STANCE_LABEL,
   getFightCamp,
   removeCampNotiz,
+  updateFightCamp,
   type CampNotiz,
   type FightCamp,
   type OpponentProfile,
@@ -98,8 +114,15 @@ import {
   isFightProfileEmpty,
   type FightProfile,
 } from "@/lib/fight-profile";
-import { listVideoAnalyses } from "@/lib/video-analysis";
-import { dnaCompleteness } from "@/lib/gegner-dna";
+import {
+  SPORT_KURZ,
+  SPORT_LABEL,
+  SPORT_ORDER,
+  isSport,
+  listVideoAnalyses,
+  type Sport,
+} from "@/lib/video-analysis";
+import { drillsFuerPhase, starteGameplan } from "@/lib/gameplan";
 import { useAuth } from "@/lib/auth-context";
 import { hasAnyRight } from "@/lib/roles";
 
@@ -143,6 +166,23 @@ const GROUP_LABEL = {
 type Seite = VersusSeite;
 
 /** Eine Kennung für eine Notiz — ohne Abfrage, ohne Server. */
+/**
+ * Das Profil der Athleten-Seite: das der Kampfart des Wettkampfs — und die
+ * Fight-DNA über alle Kampfarten, solange es in der Kampfart noch keins gibt
+ * (`derKampfart: false`, die Seite sagt es in einem Satz).
+ */
+async function ladeAthletenProfil(
+  uid: string,
+  sport: Sport | null,
+): Promise<{ profil: FightProfile; derKampfart: boolean }> {
+  const main = await getFightProfile(uid);
+  if (!sport) return { profil: main, derKampfart: false };
+  const art = await getFightProfile(uid, sport);
+  return isFightProfileEmpty(art)
+    ? { profil: main, derKampfart: false }
+    : { profil: art, derKampfart: true };
+}
+
 function neueId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -171,7 +211,10 @@ function CompetitionDetailContent({
   const [opponent, setOpponent] = useState<Opponent | null>(null);
   // Kampfprofil unseres Athleten — das Merge-Ziel seiner Analysen.
   const [fightProfile, setFightProfile] = useState<FightProfile | null>(null);
+  // true = das Profil der Kampfart des Wettkampfs; false = Fight-DNA über alle.
+  const [profilDerKampfart, setProfilDerKampfart] = useState(false);
   const [profilGesperrt, setProfilGesperrt] = useState(false);
+  const [kampfartSpeichert, setKampfartSpeichert] = useState(false);
   // Wie viele Analysen es je Seite gibt — null heißt „nicht lesbar".
   const [anzahl, setAnzahl] = useState<Record<Seite, number | null>>({
     athlet: null,
@@ -226,9 +269,9 @@ function CompetitionDetailContent({
       // Grund, den Wettkampf nicht zu zeigen.
       const [o, fp, nAthlet, nGegner] = await Promise.all([
         oppId ? getOpponent(oppId).catch(() => null) : Promise.resolve(null),
-        getFightProfile(uid)
-          .then((p) => ({ p, gesperrt: false }))
-          .catch((err) => ({ p: null, gesperrt: isPermissionDenied(err) })),
+        ladeAthletenProfil(uid, c.sport)
+          .then((r) => ({ p: r.profil, derKampfart: r.derKampfart, gesperrt: false }))
+          .catch((err) => ({ p: null, derKampfart: false, gesperrt: isPermissionDenied(err) })),
         listVideoAnalyses("athlete", uid)
           .then((l) => l.length)
           .catch(() => null),
@@ -240,6 +283,7 @@ function CompetitionDetailContent({
       ]);
       setOpponent(o);
       setFightProfile(fp.p);
+      setProfilDerKampfart(fp.derKampfart);
       setProfilGesperrt(fp.gesperrt);
       setAnzahl({ athlet: nAthlet, gegner: nGegner });
     } catch (err) {
@@ -263,14 +307,43 @@ function CompetitionDetailContent({
     }
   }, [camp]);
 
-  /** Stilles Nachladen des Kampfprofils — nach einer Übernahme. */
-  const reloadFightProfile = useCallback(async () => {
+  /** Stilles Nachladen des Kampfprofils — nach einer Analyse oder neuer Kampfart. */
+  const campSport = camp?.sport ?? null;
+  const reloadFightProfile = useCallback(
+    async (sport: Sport | null = campSport) => {
+      try {
+        const r = await ladeAthletenProfil(uid, sport);
+        setFightProfile(r.profil);
+        setProfilDerKampfart(r.derKampfart);
+      } catch {
+        /* Ansicht behält den letzten Stand */
+      }
+    },
+    [uid, campSport],
+  );
+
+  // Der Gameplan — live beobachtet, erst mit Kampfart und Freigabe (Hook VOR
+  // den frühen Returns).
+  const gp = useGameplan(uid, campId, !!campSport && !profilGesperrt);
+
+  /**
+   * Kampfart nachtragen (Bestand, Leon: „einmal auf der Seite wählen"). Der
+   * Plan bleibt, wie er ist; der Gameplan startet sofort.
+   */
+  async function handleKampfart(wert: string) {
+    if (!camp || !isSport(wert) || kampfartSpeichert) return;
+    setKampfartSpeichert(true);
     try {
-      setFightProfile(await getFightProfile(uid));
-    } catch {
-      /* Ansicht behält den letzten Stand */
+      await updateFightCamp(uid, campId, { sport: wert, ...ownerFlag() });
+      setCamp((prev) => (prev ? { ...prev, sport: wert } : prev));
+      await reloadFightProfile(wert);
+      void starteGameplan(uid, campId).catch(() => {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kampfart konnte nicht gespeichert werden");
+    } finally {
+      setKampfartSpeichert(false);
     }
-  }, [uid]);
+  }
 
   /**
    * `ownerIsStaff` bei jedem Speichern mitschreiben (Schritt 2b). Es heilt
@@ -397,13 +470,23 @@ function CompetitionDetailContent({
   ]
     .filter(Boolean)
     .join(" · ");
+  // EINE Zahl überall (Leon 17.09.2026): die Profilstärke des gezeigten
+  // Profils — vorher stand hier „DNA 53 %" (Vollständigkeit).
   const athletMeta = profilGesperrt
     ? "Kampfprofil noch nicht freigegeben"
-    : fightProfile
-      ? `${istSelbst ? "Ich selbst" : "Unser Athlet"} · DNA ${dnaCompleteness(fightProfile.dna)} %`
+    : fightProfile && (fightProfile.evidence?.countedAnalyses ?? 0) > 0
+      ? `${istSelbst ? "Ich selbst" : "Unser Athlet"} · Profilstärke ${fightProfile.evidence?.staerke ?? 0} %`
       : istSelbst
         ? "Ich selbst"
         : "Unser Athlet";
+  // Kampfart für Wörter und Fragen der Karte: die des Wettkampfs, wenn das
+  // Profil aus ihr stammt — sonst die einzige Kampfart der Fight-DNA.
+  const kampfartenGesamt = fightProfile?.evidence?.kampfarten ?? [];
+  const sportFuerKarte: Sport | null = profilDerKampfart
+    ? camp.sport
+    : kampfartenGesamt.length === 1
+      ? kampfartenGesamt[0]
+      : null;
 
   const gezeigterName = seite === "gegner" ? effOpponent.name : studentName;
   const gezeigteMeta = seite === "gegner" ? gegnerMeta : athletMeta;
@@ -466,6 +549,32 @@ function CompetitionDetailContent({
             >
               {GROUP_LABEL[group]}
             </span>
+
+            {/* Kampfart: steht sie fest, ein ruhiger Chip; beim Bestand ohne
+              Kampfart die Wahl — einmal, danach ist es der Chip. */}
+            {camp.sport ? (
+              <span
+                className="inline-flex w-fit rounded-badge px-2 py-1"
+                data-kampfart={camp.sport}
+                style={{
+                  ...META_FONT,
+                  background: "var(--surface-raised)",
+                  border: "1px solid var(--line)",
+                  color: "var(--text-body)",
+                }}
+              >
+                {SPORT_KURZ[camp.sport]}
+              </span>
+            ) : (
+              <div className="w-56" data-feld="kampfart-waehlen">
+                <Select
+                  value=""
+                  onChange={(v) => void handleKampfart(v)}
+                  placeholder={kampfartSpeichert ? "Speichert…" : "Kampfart wählen"}
+                  options={SPORT_ORDER.map((s) => ({ value: s, label: SPORT_LABEL[s] }))}
+                />
+              </div>
+            )}
 
             {/* Der Anker: springt auf die LAUFENDE Phase des Plans, nicht auf
               seine Überschrift — wer hier klickt, will wissen, was diese
@@ -591,7 +700,7 @@ function CompetitionDetailContent({
                   title={
                     gezeigteAnzahl === null
                       ? "Analysen nicht lesbar"
-                      : `${gezeigteAnzahl} ${gezeigteAnzahl === 1 ? "Analyse" : "Analysen"} zu diesem Profil — die DNA wächst erst mit der Übernahme`
+                      : `${gezeigteAnzahl} ${gezeigteAnzahl === 1 ? "Analyse" : "Analysen"} zu diesem Profil — die DNA wächst mit jedem Video`
                   }
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -671,6 +780,10 @@ function CompetitionDetailContent({
 
                     <OpponentProfileView
                       showBasics={false}
+                      /* Fragen und Wörter der Kampfart des Wettkampfs, die
+                         Fläche aus den Videos des Gegners (lebendes Profil). */
+                      sport={camp.sport}
+                      flaeche={opponent?.evidence?.flaeche ?? null}
                       opponent={{
                         name: effOpponent.name,
                         style: effOpponent.style,
@@ -711,15 +824,10 @@ function CompetitionDetailContent({
                     <Skeleton className="h-40 w-full rounded-field" />
                   </div>
                 ) : isFightProfileEmpty(fightProfile) ? (
-                  /* DER WIDERSPRUCH, DEN LEON AM 12.09. GEFUNDEN HAT: Neben
-                     dem Funkeln stand „2", darunter „DNA 0 %" und „Profil ist
-                     noch leer". Beides stimmt — die Zahl zählt die ANALYSEN,
-                     die zu diesem Profil liegen, das Profil selbst füllt sich
-                     aber erst, wenn ein Trainer die Befunde ÜBERNIMMT
-                     (`appliedFindingIds` / `appliedStats`, lib/video-analysis.ts).
-                     Zwei Analysen ohne Übernahme sind also kein Fehler,
-                     sondern offene Arbeit. Nur gesagt hat es niemand — der
-                     Text sagt es jetzt. */
+                  /* Seit der Automatik (16.09.2026) gibt es keine Übernahme
+                     mehr: Jede Analyse rechnet sich ins Profil ein. Liegen
+                     Analysen da und das Profil ist trotzdem leer, zählt keine
+                     davon (falscher Kämpfer markiert oder nicht zugeordnet). */
                   <div className="flex flex-col gap-1.5">
                     <p style={{ font: "var(--type-body-strong)" }}>
                       {istSelbst
@@ -732,34 +840,50 @@ function CompetitionDetailContent({
                         color: "var(--text-2)",
                       }}
                     >
-                      {gezeigteAnzahl && gezeigteAnzahl > 0 ? (
-                        <>
-                          {gezeigteAnzahl === 1
-                            ? "Eine Analyse liegt bereit, aber sie ist noch nicht übernommen."
-                            : `${gezeigteAnzahl} Analysen liegen bereit, aber keine davon ist übernommen.`}{" "}
-                          Öffne &bdquo;+ Analyse&ldquo;, geh die Auswertung
-                          durch und übernimm die Befunde — erst damit wächst
-                          die DNA.
-                        </>
-                      ) : (
-                        <>
-                          Analysier ein Kampf-Video über &bdquo;+ Analyse&ldquo;
-                          und übernimm die Befunde — ab dann wächst das Profil
-                          hier mit jedem Video.
-                        </>
-                      )}
+                      Analysier ein Kampf-Video über &bdquo;+ Analyse&ldquo; —
+                      ab dann wächst das Profil hier mit jedem Video.
                     </p>
                   </div>
                 ) : (
-                  <FightProfileView
-                    dna={fightProfile.dna}
-                    dnaSplit={fightProfile.dnaSplit}
-                    actionStats={fightProfile.actionStats}
-                  />
+                  <div className="flex flex-col gap-3">
+                    {camp.sport && !profilDerKampfart && (
+                      <p
+                        data-hinweis="nur-gesamt"
+                        style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                      >
+                        {istSelbst ? "Du hast" : `${studentName} hat`} noch kein
+                        ausgewertetes {SPORT_KURZ[camp.sport]}-Video — hier
+                        steht die Fight-DNA über alle Kampfarten.
+                      </p>
+                    )}
+                    {/* Athletensicht wie auf /kampfprofil (Leon 17.09.2026:
+                        Tipps aus Gegnersicht im eigenen Profil weglassen). */}
+                    <FightProfileView
+                      dna={fightProfile.dna}
+                      dnaSplit={fightProfile.dnaSplit}
+                      actionStats={fightProfile.actionStats}
+                      sport={sportFuerKarte}
+                      flaeche={fightProfile.evidence?.flaeche ?? null}
+                      mode="athlete"
+                    />
+                  </div>
                 )}
               </MorphSwap>
             </div>
           </section>
+
+          {/* Gameplan — dein Athlet gegen genau diesen Gegner */}
+          <GameplanBlock
+            uid={uid}
+            campId={campId}
+            sport={camp.sport}
+            athletName={studentName}
+            gegnerName={effOpponent.name}
+            profilGesperrt={profilGesperrt}
+            gameplan={gp.gameplan}
+            geladen={gp.geladen}
+            gesperrt={gp.gesperrt}
+          />
 
           {/* Trainingsplan (4 Phasen) */}
           <div
@@ -777,7 +901,11 @@ function CompetitionDetailContent({
             >
               Trainingsplan
             </h2>
-            <FightCampPlanView camp={camp} showOpponent={false} />
+            <FightCampPlanView
+              camp={camp}
+              showOpponent={false}
+              drillsFuer={(phase) => drillsFuerPhase(gp.gameplan, phase)}
+            />
           </div>
 
           {/* Gefahrenzone */}

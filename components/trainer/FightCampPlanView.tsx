@@ -10,6 +10,7 @@ import {
   type FightCamp,
   type FightCampPhase,
 } from "@/lib/fight-camp";
+import type { GameplanDrill } from "@/lib/gameplan";
 import { TRAINING_AREA_LABEL } from "@/lib/types";
 
 function formatDate(d: Date): string {
@@ -92,11 +93,19 @@ export function phaseAnchorId(phase: FightCampPhase): string {
 export default function FightCampPlanView({
   camp,
   showOpponent = true,
+  drillsFuer,
 }: {
   camp: FightCamp;
   /** Gegner-Zusammenfassung anzeigen. Im Wettkampf-Detail aus, da dort die
    *  vollständige Gegner-DNA bereits separat dargestellt wird. */
   showOpponent?: boolean;
+  /**
+   * Drills aus dem Gameplan je Phase (Leon 17.09.2026: „Drills in den Plan",
+   * Phase 2 gegnerspezifisch, Phase 3 Sparring). Sie stehen NICHT im
+   * Camp-Dokument, sondern kommen live aus dem Gameplan — ein neuer Gameplan
+   * ersetzt sie, ohne den Plan anzufassen.
+   */
+  drillsFuer?: (phase: FightCampPhase) => GameplanDrill[];
 }) {
   const progress = fightCampProgress(camp);
 
@@ -318,6 +327,32 @@ export default function FightCampPlanView({
               {phase.focus}
             </p>
 
+            {/* Drills aus dem Gameplan — zuerst, weil sie genau diesem Gegner gelten. */}
+            {(drillsFuer?.(phase.phase) ?? []).length > 0 && (
+              <div className="mt-3" data-gameplan-drills={phase.phase}>
+                <div className="t-label mb-2">Aus dem Gameplan</div>
+                <ul className="flex flex-col gap-2">
+                  {drillsFuer!(phase.phase).map((d, i) => (
+                    <li
+                      key={`${d.titel}-${i}`}
+                      className="rounded-field px-3 py-2.5"
+                      style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
+                    >
+                      <div style={{ font: "var(--type-body-strong)" }}>{d.titel}</div>
+                      <p className="mt-0.5" style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                        {d.text}
+                      </p>
+                      {d.wofuer && (
+                        <div className="mt-1" style={{ ...META_FONT, color: "var(--text-3)" }}>
+                          Zahlt ein auf: {d.wofuer}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Stats */}
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div
@@ -455,8 +490,10 @@ export default function FightCampPlanView({
       {/* Disclaimer */}
       <div style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
         <strong style={{ color: "var(--text-2)" }}>Zur Einordnung:</strong>{" "}
-        Dieser Plan entsteht aus der Trainings-Historie deines Athleten und dem
-        Stil des Gegners — eine Faustregel, kein wissenschaftliches Ergebnis.
+        Dieser Plan entsteht aus der Trainings-Historie deines Athleten, dem
+        Stil des Gegners und der Kampfart des Wettkampfs — eine Faustregel, kein
+        wissenschaftliches Ergebnis. Die Drills &bdquo;Aus dem Gameplan&ldquo; schreibt
+        Claude aus beiden DeepFight-Profilen.
         Geh die Phasen durch, bevor du sie einsetzt, und pass sie an
         Belastbarkeit, Verletzungen und Tagesform an.
       </div>

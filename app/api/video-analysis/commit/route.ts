@@ -23,13 +23,16 @@
  */
 
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
+import { gameplaeneNachAnalyse } from "@/lib/server/gameplan";
 import {
   canAccessMember,
   canAccessOpponent,
   readMember,
 } from "@/lib/server/member-access";
+import { bucheKiKosten } from "@/lib/server/ki-kosten";
 import { analysesRef, recomputeProfile } from "@/lib/server/profile-recompute";
 import {
   filtereBeobachtung,
@@ -46,14 +49,15 @@ import {
 import {
   computeVideoWeight,
   isSport,
-  monthKey,
   sideKeyFromText,
   videoTypeFromObservation,
-  type AnalysisUsage,
   type VideoAnalysisInput,
 } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
+// Der Nachlauf (Gameplans der betroffenen Wettkämpfe) läuft per waitUntil im
+// Budget dieser Funktion — Claude braucht dafür 1–2 Minuten je Wettkampf.
+export const maxDuration = 300;
 
 const RECENCIES = new Set(["recent", "mid", "old", "ancient", "unknown"]);
 const TYPES = new Set(["full", "excerpt", "sparring", "highlight"]);
@@ -69,35 +73,9 @@ function validate(a: VideoAnalysisInput | undefined): string | null {
   return null;
 }
 
-/** Kosten buchen — Gesamt und je Gym mit Monatsverlauf. */
-async function bookUsage(gymId: string, usage: AnalysisUsage, at: Date): Promise<void> {
-  const db = adminDb();
-  const inc = {
-    spentEur: FieldValue.increment(usage.costEur),
-    inputTokens: FieldValue.increment(usage.inputTokens),
-    outputTokens: FieldValue.increment(usage.outputTokens),
-    analysisCount: FieldValue.increment(1),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  const month = monthKey(at);
-  await Promise.all([
-    db.collection("aiUsage").doc("summary").set(inc, { merge: true }),
-    db
-      .collection("aiUsage")
-      .doc(`gym-${gymId}`)
-      .set(
-        {
-          gymId,
-          ...inc,
-          [`months.${month}.spentEur`]: FieldValue.increment(usage.costEur),
-          [`months.${month}.analysisCount`]: FieldValue.increment(1),
-        },
-        { merge: true },
-      ),
-  ]);
-}
-
 export async function POST(req: Request) {
+  // Bis dahin läuft der Nachlauf sicher (maxDuration 300 s minus Puffer).
+  const frist = Date.now() + 280_000;
   const token = bearerToken(req);
   const user = token ? await verifyUser(token) : null;
   if (!user || !isTrainerOrAdmin(user)) {
@@ -223,13 +201,23 @@ export async function POST(req: Request) {
     });
 
     // ── Kosten buchen (Nebenbuchhaltung) ──────────────────────────────────
+    // Seit 17.09.2026 über lib/server/ki-kosten.ts (gemeinsam mit Satz- und
+    // Gameplan-Aufrufen). Die alte `bookUsage` schrieb `set({ "months.JJJJ-MM.x" },
+    // { merge: true })` — das legt WÖRTLICHE Feldnamen mit Punkten an, die
+    // Admin-Seite las für den Monat 0 €. bucheKiKosten schreibt echte Pfade
+    // und hebt die Altfelder beim ersten Buchen um.
     if (input.usage) {
       try {
-        await bookUsage(gymId, input.usage, now);
+        await bucheKiKosten(db, gymId, input.usage, now, "analyse");
       } catch {
         /* darf die Analyse nie scheitern lassen */
       }
     }
+
+    // ── Nachlauf: Gameplans der anstehenden Wettkämpfe neu schreiben ──────
+    // Leon 17.09.2026: „nach jeder neuen Analyse automatisch". Läuft nach der
+    // Antwort weiter und wirft nie (lib/server/gameplan.ts).
+    waitUntil(gameplaeneNachAnalyse(db, { mode: input.mode, targetId: input.targetId, sport, gymId, frist }));
 
     return NextResponse.json({
       analysis: { ...doc, id: ref.id, createdAt: now.toISOString(), wirkung },

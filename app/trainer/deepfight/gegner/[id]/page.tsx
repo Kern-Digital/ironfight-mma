@@ -24,6 +24,7 @@ import {
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { DNA_CATEGORIES, answeredCount, dnaCompleteness } from "@/lib/gegner-dna";
 import { FIGHT_STYLE_LABEL } from "@/lib/fight-camp";
+import { ansichtDesProfils } from "@/lib/kampfart-steckbrief";
 import XKnopf from "@/components/ui/XKnopf";
 
 /**
@@ -559,6 +560,7 @@ function OpponentDetailContent({ id }: { id: string }) {
         {editing ? (
           <>
             <OpponentEditor
+              {...ansichtDesProfils(opponent.evidence)}
               initial={{
                 name: opponent.name,
                 style: opponent.style,
@@ -653,6 +655,8 @@ function OpponentDetailContent({ id }: { id: string }) {
                 tab === "uebersicht" ? "overview" : tab === "dna" ? "dna" : "stats"
               }
               showBasics={false}
+              // Kampfart nur bei genau einer, Fläche aus seinen Videos (17.09.2026).
+              {...ansichtDesProfils(opponent.evidence)}
               opponent={{
                 name: opponent.name,
                 style: opponent.style,

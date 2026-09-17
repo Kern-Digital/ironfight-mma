@@ -1490,6 +1490,100 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
     („sehe nichts") → per `Start-Process <url|bild>` öffnen. (13)
     `scripts/mess-e3-umschalter.mjs` braucht `--import
     ./scripts/lib/ts-loader-register.mjs` (importiert profile-recompute.ts).
+- **KAMPFART AM WETTKAMPF + GAMEPLAN (17.09.2026 abends, Fenster
+  tidal-athletics-2d, abgestimmt mit Etappe 3 / e8):** Aus der Frage „welche
+  Kampfart zeigt die Wettkampfseite?" wurde Leons Auftrag: „wenn ich einen
+  Wettkampf anlege, muss ich auch sagen, was für eine Disziplin gekämpft wird,
+  und anhand der Angabe wird der Gameplan zwischen mir und dem Gegner erstellt".
+  Leons gewählte Optionen: Umfang „Alles zusammen jetzt" · Bestand „Kampfart
+  einmal auf der Seite wählen" · Kleinstmengen „Ausführung ja, Trefferquote
+  nein" · Nachweis Bewertung „Ja, 1 Person" · Gameplan „Claude, nur mit Beleg" ·
+  „Nach jeder neuen Analyse automatisch" · „Drei Blöcke, Drills in den Plan" ·
+  Abnahme „Belege kürzer" · Gegner „Name oder ‚dein Gegner'" · Markieren „Ja,
+  auch beim Markieren" · zweiter KI-Lauf „Nein, so committen".
+  - **Kampfart am Wettkampf:** `FightCamp.sport` (lib/fight-camp.ts; Bestand
+    null). Anlegen: Pflichtfeld „Kampfart" (Select), vorbelegt, wenn der Athlet
+    genau EINE Kampfart im Profil hat; der Hilfstext folgt der Wahl. Der
+    Plan-Generator nimmt nur die Kategorien der Kampfart
+    (`KATEGORIEN_JE_KAMPFART`: Boxen → boxing, Kickboxen → boxing + muay-thai,
+    Ringen → wrestling, Sambo → wrestling + bjj, BJJ → bjj, MMA → alle vier).
+    Vorher mischte JEDER Plan alle vier — ein Boxkampf bekam Takedowns.
+    Bestand: Select „Kampfart wählen" im Kopf der Wettkampfseite, danach Chip;
+    der Plan bleibt, wie er ist, der Gameplan startet.
+  - **Wettkampfseite:** Athleten-Seite zeigt `fightProfile/{camp.sport}` (ohne
+    Video in der Kampfart die Fight-DNA mit Satz dazu), `mode="athlete"` (keine
+    Tipps aus Gegnersicht), `flaeche` aus dem Profil, Meta „Profilstärke x %"
+    statt „DNA x %", Leer-Texte ohne „übernimm". Gegner-Seite: `sport` des
+    Wettkampfs, `flaeche` aus `opponent.evidence` (lebendes Profil).
+    OpponentProfileView/OpponentEditor nehmen `sport`/`flaeche` und filtern
+    Zähler + Split nach dem Steckbrief (gespeichert wird ungefiltert).
+    Gegnerprofil ohne Wettkampf: `ansichtDesProfils(evidence)` in
+    lib/kampfart-steckbrief.ts (Kampfart nur bei genau EINER, Fläche aus den
+    Videos). Gemessen: Gegner-Neuberechnung schreibt `evidence.flaeche` und
+    `kampfarten`.
+  - **Gameplan:** Ablage `users/{uid}/fightProfile/gameplan-{campId}` (NICHT am
+    Camp: er besteht aus dem DeepFight-Profil; die fightProfile-Regel passt —
+    Inhaber + DeepFight-Freigabe lesen, nur Server schreibt, kein Deploy).
+    `lib/gameplan.ts` (Typen, `beobachteGameplan` per onSnapshot,
+    `starteGameplan`, `drillsFuerPhase`, „hängt" nach 6 min),
+    `lib/server/gameplan-prompt.ts` (rein: Voraussetzungen athlet/gegner,
+    Prompt mit Beleg je Antwort „4 von 5 Videos"/„Trainer-Eintrag", Sicht je
+    Profil, Schema, Normalisierung, Fingerabdruck), `lib/server/gameplan.ts`
+    (`schreibeGameplan` mit laufId gegen überholte Läufe und ohne Aufruf bei
+    gleicher Eingabe; `betroffeneWettkaempfe`: Athlet = seine anstehenden
+    Camps DERSELBEN Kampfart, Gegner = collectionGroup über den vorhandenen
+    Index gymId + competitionDate, im Speicher gefiltert;
+    `gameplaeneNachAnalyse(db, { mode, targetId, sport, gymId, frist })`:
+    höchstens 2 je Nachlauf, ≥ 150 s Restzeit je Aufruf, sonst „offen · zeit").
+    Route `POST /api/wettkampf/gameplan` (Tor wettkampf + deepfight + Gegner-
+    Gym, antwortet 202, Arbeit per `waitUntil`). Nachlauf in commit UND flag
+    (e8 setzte flag): `maxDuration = 300`, `frist = Date.now() + 280_000`,
+    `waitUntil(gameplaeneNachAnalyse(…))` nach der Neuberechnung.
+    `components/trainer/GameplanBlock.tsx` (Deine Waffen · Die Gefahren · So
+    kämpfst du, Beleg je Punkt, Zustände schreibt/offen/fehler/hängt, „Neu
+    schreiben"); Drills „Aus dem Gameplan" in Phase 2/3 von FightCampPlanView.
+  - **Gemeinsam mit Etappe 3:** `lib/server/claude-aufruf.ts` `rufeClaude`
+    (Opus 5, Streaming, Beta server-side-fallback-2026-07-01 mit `fallbacks:
+    "default"`, 5xx → Sonnet 5 außer `nurOpus`, Wortmarke „überlastet", Kosten
+    nach `message.model`; Sonnet 5 = 2/10 $), claude.ts nutzt sie.
+    `lib/server/ki-kosten.ts` `bucheKiKosten(db, gymId, usage, at, art)` mit
+    art analyse|satz|gameplan, `analysisCount` nur bei analyse.
+  - **Kleinstmengen (claude.ts Zahlenregel):** unter 5 Versuchen Zählung nur
+    als Tatsache, KEIN Urteil aus Treffern („2 Versuche ohne Treffer, bringt
+    wenig"), Ausführung mit Zeitstempel ja. Nachweis Person B: Urteile 4 → 0,
+    30 Befunde, 0,38 € (vorher 0,43), 146 s — erster Lauf über rufeClaude.
+  - **Gameplan-Nachweis mit echter KI** (Person A gegen B aus dem Leon/Alec-
+    Video): 81 s, 0,23 € (13.123 ein / 6.589 aus), 4/4/4 Punkte mit Beleg,
+    6 Drills in Phase 2/3, 0 Käfig-Wörter, lage nennt „erste Tendenz"; danach
+    Leons Abnahme „Belege kürzer" (Kurzform < 70 Zeichen) und „dein Gegner"
+    statt er/sein (6 Sätze) in den Prompt — NICHT mehr mit KI nachgemessen.
+  - **Messung:** `scripts/test-gameplan.mjs` 42/42 (rein),
+    `scripts/mess-gameplan.mjs` 22/22 dunkel + hell (Firestore ohne KI +
+    Schirme; `GAMEPLAN_JSON=<nachweis>` zeigt einen gespeicherten echten
+    Inhalt), `scripts/zeige-gameplan-prompt.mjs` (Prompt ohne Kosten, ~6.800
+    Tokens), test-kampfart-steckbrief 70/70, test-profil-rechnung 86/86,
+    tsc/eslint 0. Rohdaten + Bilder:
+    `D:\Tidal-Athletics\tmp\beweis-steckbrief-2026-09-17\nachweis-2d\`.
+  - **Fallen:** (14) `set({ "months.2026-09.x": … }, { merge: true })` schreibt
+    einen WÖRTLICHEN Feldnamen mit Punkten (Admin-Seite las 0 € im Monat) —
+    Punkt-Pfade nur in `update`; derselbe Pfad darf in EINEM update nur einmal
+    stehen (Altfeld + Buchung erst addieren). (15) `npm install <paket>` (mit
+    Speichern) entfernt alle per `--no-save` installierten Pakete — Playwright
+    war weg, der laufende Dev-Server lieferte danach auf jeder Seite 500 mit
+    leerem Body; Neustart heilte ihn, Playwright 1.62.1 (passt zu Chromium 1234)
+    mit `--no-save` zurück. Nach jedem gespeicherten Install
+    `Test-Path node_modules\playwright`. (16) Skripte, die lib/server/gameplan.ts
+    oder claude.ts laden, brauchen `--experimental-transform-types` (gemini.ts).
+    (17) In JSX zwischen Label-Span und Text ein ECHTES Leerzeichen (`{" "}`) —
+    ein CSS-Abstand liefert innerText/Screenreader „BelegDu:". (18) Doppelte
+    ASCII-Anführung nach „ in einem "…"-String beendet ihn (Falle 1) — auch in
+    Konstanten-Objekten; Template-Literale nehmen.
+  - **Offen:** Markieren-Nachlauf mit echter KI nicht laufzeit-geprüft ·
+    Gameplan für den Athleten sichtbar machen (Regel lässt den Inhaber schon
+    lesen, inkl. Gegner-Inhalt — Leon entscheiden) · Trainer mit DeepFight-,
+    aber ohne Wettkampf-Freigabe könnte das Gameplan-Dokument lesen (keine
+    UI) · Gegnerprofil-Seite (/trainer/deepfight/gegner/[id]) noch im
+    Alt-Look · Fläche des WETTKAMPFS (Käfig/Ring) unbekannt → Gameplan neutral.
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

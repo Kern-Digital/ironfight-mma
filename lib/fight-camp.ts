@@ -87,6 +87,7 @@ import {
   type ActionStat,
   type DnaSplit,
 } from "./fight-stats";
+import { isSport, type Sport } from "./video-analysis";
 
 // ─── Gegner-Stil ───────────────────────────────────────────────────────────
 
@@ -239,6 +240,15 @@ export interface FightCamp {
   /** Wann der Kampf ist */
   competitionDate: Date;
   competitionName: string;
+  /**
+   * Kampfart des Wettkampfs (Leon 17.09.2026: „wenn ich einen Wettkampf
+   * anlege, muss ich auch sagen, was für eine Disziplin gekämpft wird").
+   * Bestimmt die Techniken des Plans, das Profil des Athleten auf der Seite
+   * (`fightProfile/{sport}`), die Fragen und Wörter beim Gegner und den
+   * Gameplan. Beim Anlegen Pflicht; null = Bestand vor dem 17.09., die Seite
+   * lässt sie einmal wählen.
+   */
+  sport: Sport | null;
   /** Wie viele Wochen Vorbereitung */
   weeksTotal: number;
   /** Wann gestartet wurde (Default: heute) */
@@ -298,6 +308,7 @@ type FightCampDoc = {
   createdAt?: Timestamp;
   competitionDate: Timestamp;
   competitionName: string;
+  sport?: Sport | null;
   weeksTotal: number;
   startedAt: Timestamp;
   opponent: OpponentProfile;
@@ -322,6 +333,7 @@ function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
     createdAt: d.createdAt?.toDate() ?? new Date(),
     competitionDate: d.competitionDate.toDate(),
     competitionName: d.competitionName,
+    sport: isSport(d.sport) ? d.sport : null,
     weeksTotal: d.weeksTotal,
     startedAt: d.startedAt.toDate(),
     opponent: d.opponent,
@@ -412,6 +424,7 @@ function encode(camp: Omit<FightCamp, "id" | "createdAt">): FightCampDoc {
     status: camp.status,
   };
   if (camp.gymId) out.gymId = camp.gymId;
+  if (camp.sport) out.sport = camp.sport;
   if (camp.opponentId) out.opponentId = camp.opponentId;
   if (camp.trainerNotes && camp.trainerNotes.trim())
     out.trainerNotes = camp.trainerNotes.trim();
@@ -450,6 +463,7 @@ export async function updateFightCamp(
     data.competitionDate = Timestamp.fromDate(patch.competitionDate);
   if (patch.competitionName !== undefined)
     data.competitionName = patch.competitionName;
+  if (patch.sport !== undefined) data.sport = patch.sport;
   if (patch.weeksTotal !== undefined) data.weeksTotal = patch.weeksTotal;
   if (patch.startedAt !== undefined)
     data.startedAt = Timestamp.fromDate(patch.startedAt);

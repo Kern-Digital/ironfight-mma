@@ -15,6 +15,15 @@ import {
   type ActionStat,
   type DnaSplit,
 } from "@/lib/fight-stats";
+import {
+  filtereTechnikStats,
+  gesperrteGruppen,
+  splitNachSteckbrief,
+  zonenLabel,
+  zonenPhrase,
+  type Flaeche,
+} from "@/lib/kampfart-steckbrief";
+import type { Sport } from "@/lib/video-analysis";
 import GegnerDnaAccordion from "./GegnerDnaAccordion";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Select from "@/components/ui/Select";
@@ -106,12 +115,22 @@ export default function OpponentEditor({
   submitLabel = "Speichern",
   onSubmit,
   onCancel,
+  sport = null,
+  flaeche = null,
 }: {
   initial?: OpponentEditorInitial;
   busy?: boolean;
   submitLabel?: string;
   onSubmit: (value: OpponentEditorValue) => void | Promise<void>;
   onCancel?: () => void;
+  /**
+   * Kampfart und Fläche der ANZEIGE (17.09.2026, `ansichtDesProfils`): die
+   * einzige Kampfart seiner Videos, die Fläche aus dem Profil. Gespeichert
+   * wird immer der ungefilterte Stand — Split und Zähler reicht der Editor
+   * nur durch.
+   */
+  sport?: Sport | null;
+  flaeche?: Flaeche | null;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [style, setStyle] = useState<FightStyle>(initial?.style ?? "all-rounder");
@@ -147,13 +166,22 @@ export default function OpponentEditor({
   // anderer Felder ihn nicht löscht.
   const actionStats: ActionStat[] = initial?.actionStats ?? [];
 
+  // Anzeige nach dem Steckbrief der Kampfart (gespeichert wird ungefiltert).
+  const zeigeStats = sport ? filtereTechnikStats(actionStats, sport).stats : actionStats;
+  const zeigeSplit = sport ? splitNachSteckbrief(dnaSplit, sport) : dnaSplit;
+  const phrase = zonenPhrase(sport, flaeche) ?? undefined;
+
   // Dieselbe Bedingung, unter der FightInsights etwas rendert — sie steht hier,
   // damit die Überschrift darüber nicht allein stehen bleibt.
-  const zonen = zoneDistribution(actionStats);
+  const zonen = zoneDistribution(zeigeStats);
   const hatInsights =
-    deriveTendencies(actionStats).length > 0 ||
-    deriveSuggestions(dnaSplit, actionStats).length > 0 ||
-    zonen.center + zonen.open + zonen.cage > 0;
+    deriveTendencies(zeigeStats, phrase).length > 0 ||
+    deriveSuggestions(zeigeSplit, zeigeStats, {
+      zonenPhrase: phrase,
+      mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
+      grappling: gesperrteGruppen(sport).includes("strike"),
+    }).length > 0 ||
+    (zonenLabel(sport, flaeche) ? zonen.center + zonen.open + zonen.cage : 0) > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -321,7 +349,7 @@ export default function OpponentEditor({
           Etappe 3b hat den Rest dieser Datei nachgezogen (13.09.). */}
       <div>
         <div className="t-label mb-3">Fight-DNA</div>
-        <FightDnaSplit split={dnaSplit} />
+        <FightDnaSplit split={zeigeSplit} />
         <p
           className="mt-2"
           style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
@@ -334,7 +362,7 @@ export default function OpponentEditor({
       {/* ── §2 Technik-Statistik (nur Anzeige — Quelle ist die Video-Analyse) ── */}
       <div>
         <div className="t-label mb-3">Technik-Statistik</div>
-        <FightStatsBlock stats={actionStats} />
+        <FightStatsBlock stats={zeigeStats} sport={sport} flaeche={flaeche} />
         <p
           className="mt-2"
           style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
@@ -352,7 +380,7 @@ export default function OpponentEditor({
       {hatInsights && (
         <div>
           <div className="t-label mb-3">Auto-Insights</div>
-          <FightInsights split={dnaSplit} stats={actionStats} />
+          <FightInsights split={zeigeSplit} stats={zeigeStats} sport={sport} flaeche={flaeche} />
         </div>
       )}
 

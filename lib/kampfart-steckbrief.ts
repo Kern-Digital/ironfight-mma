@@ -744,6 +744,19 @@ export function zonenPhrase(sport: Sport | null | undefined, flaeche?: Flaeche |
   return mapZonen(zonenVon(sport, flaeche), "phrase");
 }
 
+/**
+ * Kampfart und Fläche einer Profilansicht OHNE Wettkampf (Gegnerprofil,
+ * 17.09.2026): die Kampfart nur, wenn die Videos genau EINE tragen — sonst
+ * neutral —, die Fläche aus dem Profil (häufigste der Videos). Strukturell
+ * getippt, damit der Steckbrief lib/profile-evidence.ts nicht importiert.
+ */
+export function ansichtDesProfils(
+  e: { kampfarten?: Sport[]; flaeche?: Flaeche | null } | null | undefined,
+): { sport: Sport | null; flaeche: Flaeche | null } {
+  const arten = e?.kampfarten ?? [];
+  return { sport: arten.length === 1 ? arten[0] : null, flaeche: isFlaeche(e?.flaeche) ? e!.flaeche! : null };
+}
+
 /** Label der Kategorie `cage-space` je Fläche („Ring & Raum"). */
 export function kategorieLabel(flaeche?: Flaeche | null): string {
   return flaechenWoerter(flaeche).kategorieRaum;
