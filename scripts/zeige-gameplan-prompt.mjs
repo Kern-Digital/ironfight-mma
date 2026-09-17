@@ -30,7 +30,7 @@ const lies = (datei, schluessel) => {
 
 const eingabe = {
   sport,
-  wettkampf: { name: "Probe-Wettkampf", datum: new Date("2026-10-24T18:00:00Z") },
+  wettkampf: { name: "Probe-Wettkampf" },
   athlet: { name: "Person A", profil: lies(athletDatei, sport) },
   gegner: {
     name: "Person B",

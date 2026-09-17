@@ -34,8 +34,10 @@ import FightCampPlanView, { aenderungText } from "@/components/trainer/FightCamp
 import {
   beobachteFightCamp,
   fightCampProgress,
+  kampfdatumText,
   PHASE_LABEL,
   planZuletztGeaendert,
+  wannText,
   type FightCamp,
 } from "@/lib/fight-camp";
 import { drillsFuerPhase, type Gameplan, type GameplanDrillPhase } from "@/lib/gameplan";
@@ -135,6 +137,18 @@ function PlanInhalt({ camp, gameplan }: { camp: FightCamp; gameplan: Gameplan | 
           : `${camp.weeksTotal} Wochen Plan · ${progress.daysRemaining} ${progress.daysRemaining === 1 ? "Tag" : "Tage"} bis zum Kampf`}
         {zuletzt && ` · ${aenderungText(zuletzt)}`}
       </p>
+      {/* Neuer Termin (Stufe 2): Der Athlet soll die Verschiebung SEHEN — der
+          Plan sieht sonst nur anders aus, ohne dass jemand sagt, warum. */}
+      {camp.verschoben && (
+        <p data-athlet-verschoben style={{ font: "var(--type-sub)", color: "var(--text-body)" }}>
+          Dein Kampf ist jetzt am {kampfdatumText(camp.competitionDate)} statt am{" "}
+          {kampfdatumText(new Date(camp.verschoben.von))} —{" "}
+          {camp.verschoben.name
+            ? `${camp.verschoben.name} hat ihn ${wannText(camp.verschoben.at)} verschoben`
+            : `verschoben ${wannText(camp.verschoben.at)}`}
+          . Die Phasen sind darauf verteilt.
+        </p>
+      )}
       <FightCampPlanView
         camp={camp}
         showOpponent={false}

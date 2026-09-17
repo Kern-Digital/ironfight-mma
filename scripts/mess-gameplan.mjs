@@ -40,6 +40,20 @@
  *   • Browser Athlet: Karte mit „Dein Trainingsplan" + „Dein Gameplan", Plan-
  *     Sheet zeigt die Trainer-Änderung, eine Admin-Änderung erscheint LIVE,
  *     Reiter wechselt zum Gameplan; Handy-Breite 390 px ohne Quer-Überlauf.
+ *
+ * Fenster 12 (17.09.2026 nachts) — Kampf verschoben (Stufe 2):
+ *   • Wettkampfseite: „Verschieben" öffnet den Editor, die Vorschau zeigt alle
+ *     vier Phasen mit alter → neuer Länge; vorgezogen von 40 auf 25 Tage →
+ *     Camp trägt Datum, weeksTotal und eine lückenlose Zeitachse, die letzte
+ *     Phase endet auf dem Kampftag, Fokus/Notiz/Einheiten/„Geändert von" der
+ *     bearbeiteten Phase 2 bleiben stehen, Marke im Kopf und am Plan.
+ *   • OHNE Schalter bleibt der Gameplan unberührt (Leon: verschieben kostet
+ *     nichts — das Datum steht nicht mehr im Auftrag an Claude).
+ *   • MIT Schalter („direkt einen neuen erstellen lassen") läuft die Route
+ *     wirklich — geprüft auf einem Wettkampf gegen einen Gegner ohne Daten,
+ *     der ohne Claude bei „offen · gegner" landet.
+ *   • Athlet: „Dein Kampf ist jetzt am … — Mess Trainer 2d hat ihn heute
+ *     verschoben" im Plan-Sheet.
  */
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -306,7 +320,7 @@ async function main() {
     if (BROWSER || process.env.FLAG === "1") await markierenNachweis({ db, athletUid, trainerUid, gegnerIds });
     if (BROWSER) {
       await schirme({
-        athletUid, trainerUid, neuId: neu.id, bestandId: bestand.id, gegnerId: gegner.id, db,
+        athletUid, trainerUid, neuId: neu.id, bestandId: bestand.id, gegnerId: gegner.id, leerId: leer.id, db,
         scoutId: scout.id, scoutCampId: scoutCamp.id,
       });
     }
@@ -422,7 +436,7 @@ async function warteAuf(pruefe, ms = 30000) {
   return null;
 }
 
-async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, db, scoutId, scoutCampId }) {
+async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leerId, db, scoutId, scoutCampId }) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const konsole = [];
@@ -519,6 +533,108 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, db, 
     await page.waitForTimeout(800);
     const taperDoc = (await db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId).get()).data().phases[3];
     sagt((await page.locator("[data-phasen-editor]").count()) === 0 && taperDoc.focus === "Taper." && !taperDoc.geaendert, "Plan: Abbrechen schließt den Editor und speichert nichts");
+
+    // ── Kampf verschoben, Stufe 2 (Fenster 12) ─────────────────────────────
+    // Auf der Wettkampfseite VORGEZOGEN (40 → 25 Tage): Der Wettkampf bleibt
+    // damit der nächste des Athleten, und die Phasen müssen schrumpfen.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('[data-aktion="verschieben-oeffnen"]').click();
+    const vEditor = page.locator("[data-verschieben-editor]");
+    await vEditor.waitFor({ timeout: 15000 });
+    sagt((await vEditor.locator("[data-vorschau-phase]").count()) === 4, "Verschieben: Vorschau zeigt alle vier Phasen");
+    const schalter = vEditor.locator('[data-aktion="gameplan-neu"]');
+    sagt(
+      (await schalter.count()) === 1 && (await vEditor.innerText()).toLowerCase().includes("baut allein auf den beiden deepfight-profilen"),
+      "Verschieben: Schalter „Gameplan gleich neu schreiben“ steht aus, Hilfstext erklärt warum",
+    );
+    const vorgezogen = new Date(Date.now() + 25 * 86_400_000);
+    const feldWert = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    await vEditor.locator('[data-feld="kampfdatum"]').fill(feldWert(vorgezogen));
+    await page.waitForTimeout(600);
+    const vorschauText = (await vEditor.locator("[data-verschieben-vorschau]").innerText()).toLowerCase();
+    sagt(vorschauText.includes("→"), `Verschieben: Vorschau vergleicht alte und neue Länge (${vorschauText.split("\n").find((z) => z.includes("→"))?.trim() ?? "—"})`);
+    await vEditor.screenshot({ path: `${OUT}/mess-12-verschieben-editor-${THEME}.png` });
+    const planVorher = (await db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${neuId}`).get()).data();
+    await vEditor.locator('[data-aktion="verschieben-speichern"]').click();
+    await page.locator("[data-verschoben]").waitFor({ timeout: 20000 });
+    await page.waitForTimeout(1200); // Collapse federt zu
+    const verschobenCamp = await warteAuf(async () => {
+      const d = (await db.collection("users").doc(athletUid).collection("fightCamps").doc(neuId).get()).data();
+      return d?.verschoben ? d : null;
+    }, 15000);
+    const vPhasen = verschobenCamp?.phases ?? [];
+    const spanne = (p) => Math.round((p.endsAt.toDate() - p.startsAt.toDate()) / 86_400_000);
+    sagt(
+      Math.abs(verschobenCamp.competitionDate.toDate() - vorgezogen) < 36 * 3600 * 1000 && verschobenCamp.weeksTotal === 4,
+      `Verschieben: Camp trägt das neue Datum, weeksTotal ${verschobenCamp?.weeksTotal}`,
+    );
+    sagt(
+      vPhasen.length === 4 &&
+        vPhasen[0].startsAt.toDate().getTime() === verschobenCamp.startedAt.toDate().getTime() &&
+        Math.abs(vPhasen[3].endsAt.toDate() - verschobenCamp.competitionDate.toDate()) < 1000 &&
+        vPhasen.every((p, i) => i === 0 || p.startsAt.toDate().getTime() === vPhasen[i - 1].endsAt.toDate().getTime()),
+      `Verschieben: Zeitachse ohne Lücke, letzte Phase endet auf dem Kampftag (${vPhasen.map(spanne).join("/")} Tage)`,
+    );
+    sagt(
+      vPhasen[1].focus === "Takedown-Abwehr am Zaun" && vPhasen[1].notes === "Sparring nur mit Kopfschutz" &&
+        vPhasen[1].sessionsPerWeek === 3 && vPhasen[1].sparringRatio === 0.25 && vPhasen[1].geaendert?.name === "Mess Trainer 2d",
+      "Verschieben: Fokus, Notiz, Einheiten, Sparring und „Geändert von“ bleiben in Phase 2 stehen",
+    );
+    sagt(
+      verschobenCamp.verschoben?.name === "Mess Trainer 2d" && verschobenCamp.verschoben?.uid === trainerUid &&
+        Math.abs(verschobenCamp.verschoben.auf - verschobenCamp.competitionDate.toDate().getTime()) < 1000,
+      "Verschieben: Marke trägt Autor, alten und neuen Termin",
+    );
+    const kopfText = (await page.locator("[data-verschoben]").innerText()).toLowerCase();
+    sagt(kopfText.startsWith("verschoben vom") && kopfText.endsWith("heute"), `Verschieben: Kopf zeigt „${kopfText}“`);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${OUT}/mess-12-verschoben-kopf-${THEME}.png`, fullPage: false });
+    await page.locator("#trainingsplan").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    sagt((await page.locator("[data-plan-verschoben]").count()) === 1, "Verschieben: der Trainingsplan nennt die Verschiebung ebenfalls");
+    await page.screenshot({ path: `${OUT}/mess-12-verschoben-plan-${THEME}.png`, fullPage: false });
+    const planNachVerschieben = (await db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${neuId}`).get()).data();
+    sagt(
+      planNachVerschieben?.status === "fertig" && planNachVerschieben?.eingabeSchluessel === planVorher?.eingabeSchluessel &&
+        !planNachVerschieben?.gestartetAt && !planNachVerschieben?.usage,
+      "Verschieben ohne Schalter: der Gameplan bleibt unberührt — kein Claude-Aufruf, keine Kosten",
+    );
+
+    // Schalter AN auf einem Wettkampf, dessen Gegner keine Daten hat: Die Route
+    // läuft wirklich los, kommt aber ohne Claude bis „offen · gegner".
+    const vCamp = db.collection("users").doc(athletUid).collection("fightCamps").doc();
+    await vCamp.set(camp(athletUid, trainerUid, { name: "Mess Verschieben 12", sport: "mma", opponentId: leerId, opponentName: "Mess Gegner Leer", tage: 80 }));
+    const vPlanRef = db.collection("users").doc(athletUid).collection("fightProfile").doc(`gameplan-${vCamp.id}`);
+    await vPlanRef.set({
+      campId: vCamp.id, sport: "mma", status: "fertig",
+      inhalt: { lage: "Stand vor dem Verschieben.", waffen: [{ titel: "Vorher", text: "Stand vor dem Verschieben.", beleg: "Scouting-Notiz" }], gefahren: [], soKaempfstDu: [], drills: [] },
+      stand: null, geschriebenAt: new Date().toISOString(), gestartetAt: null, offen: null, fehler: null, model: "mess", usage: null, laufId: null, eingabeSchluessel: "mess",
+    });
+    await page.goto(`${BASE}/trainer/competitions/${athletUid}/${vCamp.id}`, { waitUntil: "domcontentloaded" });
+    await page.locator('[data-aktion="verschieben-oeffnen"]').waitFor({ timeout: 60000 });
+    await page.waitForTimeout(3500);
+    await page.locator('[data-aktion="verschieben-oeffnen"]').click();
+    const vEditor2 = page.locator("[data-verschieben-editor]");
+    await vEditor2.waitFor({ timeout: 15000 });
+    await vEditor2.locator('[data-feld="kampfdatum"]').fill(feldWert(new Date(Date.now() + 94 * 86_400_000)));
+    await vEditor2.locator('[data-aktion="gameplan-neu"]').click();
+    await page.waitForTimeout(400);
+    sagt(
+      (await vEditor2.innerText()).toLowerCase().includes("claude schreibt den gameplan nach dem speichern neu"),
+      "Verschieben: Schalter an → der Hilfstext folgt der Wahl",
+    );
+    await vEditor2.locator('[data-aktion="verschieben-speichern"]').click();
+    const vPlanNachher = await warteAuf(async () => {
+      const d = (await vPlanRef.get()).data();
+      return d?.status === "offen" ? d : null;
+    }, 45000);
+    const vCampNachher = (await vCamp.get()).data();
+    sagt(vCampNachher?.weeksTotal === 14 && !!vCampNachher?.verschoben, `Verschieben: zwei Wochen später → ${vCampNachher?.weeksTotal} Wochen Plan`);
+    sagt(
+      vPlanNachher?.offen === "gegner" && vPlanNachher?.inhalt?.lage === "Stand vor dem Verschieben." && !vPlanNachher?.usage,
+      `Verschieben mit Schalter: die Route läuft (→ „offen · ${vPlanNachher?.offen}“), Inhalt bleibt, kein Claude-Aufruf (Gegner ohne Daten)`,
+    );
 
     // Bestand ohne Kampfart
     await page.goto(`${BASE}/trainer/competitions/${athletUid}/${bestandId}`, { waitUntil: "domcontentloaded" });
@@ -620,6 +736,12 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, db, 
       "Athlet: Plan-Sheet zeigt Fokus und Notiz des Trainers",
     );
     sagt(pText.includes("geändert von mess trainer 2d · heute") && pText.includes("mma · käfig · gegen mess gegner käfig"), "Athlet: „Geändert von … · heute“ + Kopf „MMA · Käfig · gegen …“");
+    const vZeile = planSheet.locator("[data-athlet-verschoben]");
+    const vZeileText = (await vZeile.count()) ? (await vZeile.innerText()).toLowerCase() : "";
+    sagt(
+      vZeileText.includes("dein kampf ist jetzt am") && vZeileText.includes("mess trainer 2d hat ihn heute verschoben"),
+      `Athlet: Verschiebung im Sheet („${vZeileText.replace(/\s+/g, " ").slice(0, 80)}…“)`,
+    );
     sagt(
       (await planSheet.locator('[data-aktion="phase-bearbeiten"]').count()) === 0 && (await planSheet.locator("[data-reiter]").count()) === 2,
       "Athlet: nur lesen (kein „Bearbeiten“), zwei Reiter",

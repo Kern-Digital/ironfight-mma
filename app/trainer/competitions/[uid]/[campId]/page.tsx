@@ -81,6 +81,7 @@ import FightCampPlanView, {
 } from "@/components/trainer/FightCampPlanView";
 import VideoAnalysisSection from "@/components/trainer/VideoAnalysisSection";
 import CampNotizen from "@/components/trainer/CampNotizen";
+import KampfVerschieben from "@/components/trainer/KampfVerschieben";
 import GameplanBlock, { useGameplan } from "@/components/trainer/GameplanBlock";
 import Select from "@/components/ui/Select";
 import VersusBanner, {
@@ -105,6 +106,8 @@ import {
   removeCampNotiz,
   updateFightCamp,
   updateFightCampPhase,
+  verschiebeKampf,
+  verschiebungText,
   type CampNotiz,
   type FightCamp,
   type FightCampPhase,
@@ -234,6 +237,8 @@ function CompetitionDetailContent({
   const [profilGesperrt, setProfilGesperrt] = useState(false);
   const [kampfartSpeichert, setKampfartSpeichert] = useState(false);
   const [flaecheSpeichert, setFlaecheSpeichert] = useState(false);
+  // Der Editor für „Kampf verschoben" (Stufe 2) — immer nur auf Wunsch offen.
+  const [verschiebenOffen, setVerschiebenOffen] = useState(false);
   // Wie viele Analysen es je Seite gibt — null heißt „nicht lesbar".
   const [anzahl, setAnzahl] = useState<Record<Seite, number | null>>({
     athlet: null,
@@ -469,6 +474,28 @@ function CompetitionDetailContent({
     );
   }
 
+  // ── Kampf verschieben (Leon 17.09.2026: „Stufe 2: Kampf verschoben") ──────
+
+  /**
+   * Neues Kampfdatum: Datum, Wochenzahl und alle vier Phasen in EINER
+   * Transaktion (`verschiebeKampf`); die Inhalte der Phasen bleiben stehen.
+   * Der Gameplan schreibt NUR auf Wunsch neu — sein Auftrag an Claude kennt das
+   * Datum nicht mehr, verschieben allein kostet also nichts.
+   */
+  async function handleVerschieben(neuesDatum: Date, neuSchreiben: boolean) {
+    if (!user) throw new Error("Nicht angemeldet.");
+    const neu = await verschiebeKampf(
+      uid,
+      campId,
+      neuesDatum,
+      { uid: user.uid, name: autorName() },
+      ownerFlag(),
+    );
+    setCamp((prev) => (prev ? { ...prev, ...neu } : prev));
+    setVerschiebenOffen(false);
+    if (neuSchreiben) void starteGameplan(uid, campId, true).catch(() => {});
+  }
+
   // ── Anker auf die laufende Phase ──────────────────────────────────────────
 
   function springeZumPlan(
@@ -578,11 +605,37 @@ function CompetitionDetailContent({
           description={
             /* Nur Datum und Countdown, etwas größer (Leon 12.09.): Wer
                kämpft, steht groß im Vs.-Banner direkt darunter — die Zeile
-               „Leon · vs Paul" wiederholte es nur. */
-            <span style={{ font: "var(--type-h3)", color: "var(--text-2)" }}>
-              {formatDate(camp.competitionDate)}
-              {progress.daysRemaining > 0 && group === "upcoming" && (
-                <> · noch {progress.daysRemaining} Tage</>
+               „Leon · vs Paul" wiederholte es nur.
+               Daneben „Verschieben" (Stufe 2): Der Knopf gehört an den
+               TERMIN, nicht in die Chip-Reihe darunter — dort stehen
+               Kampfart und Fläche, also Eigenschaften des Wettkampfs. */
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span style={{ font: "var(--type-h3)", color: "var(--text-2)" }}>
+                {formatDate(camp.competitionDate)}
+                {progress.daysRemaining > 0 && group === "upcoming" && (
+                  <> · noch {progress.daysRemaining} Tage</>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVerschiebenOffen((v) => !v)}
+                aria-expanded={verschiebenOffen}
+                data-press
+                data-aktion="verschieben-oeffnen"
+                className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-pill px-3.5"
+                style={{
+                  ...META_FONT,
+                  border: "1px solid var(--line)",
+                  color: "var(--text-body)",
+                }}
+              >
+                <Icon name="calendar" size={16} strokeWidth={2.2} />
+                {verschiebenOffen ? "Verschieben abbrechen" : "Verschieben"}
+              </button>
+              {camp.verschoben && (
+                <span data-verschoben style={{ ...META_FONT, color: "var(--text-3)" }}>
+                  {verschiebungText(camp.verschoben)}
+                </span>
               )}
             </span>
           }
@@ -676,6 +729,17 @@ function CompetitionDetailContent({
               Trainingsplan
             </a>
           </div>
+
+          {/* Kampf verschieben (Stufe 2) — im Kopf, direkt unter dem Termin,
+              den er ändert; zu klappt er ohne Spur weg. */}
+          <Collapse open={verschiebenOffen}>
+            <KampfVerschieben
+              camp={camp}
+              gameplanDa={!!gp.gameplan?.inhalt}
+              onSpeichern={handleVerschieben}
+              onAbbrechen={() => setVerschiebenOffen(false)}
+            />
+          </Collapse>
         </PageHead>
       </div>
 

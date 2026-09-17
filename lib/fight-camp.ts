@@ -268,6 +268,22 @@ export function saeubereAenderung(phase: FightCampPhase, a: PhasenAenderung): Ph
   };
 }
 
+/**
+ * Die letzte Verschiebung des Kampfs (Leon 17.09.2026: „Stufe 2: Kampf
+ * verschoben"). Nur die JÜNGSTE — wer zweimal verschiebt, sieht „vom 11. Nov.",
+ * nicht mehr den ersten Termin. Name DENORMALISIERT wie bei `PlanAenderung`.
+ */
+export interface KampfVerschiebung {
+  /** Bisheriges Kampfdatum, Millisekunden seit Epoche. */
+  von: number;
+  /** Neues Kampfdatum, Millisekunden seit Epoche. */
+  auf: number;
+  uid: string;
+  name: string;
+  /** Wann verschoben wurde, Millisekunden seit Epoche. */
+  at: number;
+}
+
 /** Die jüngste Hand-Änderung am ganzen Plan — für „zuletzt geändert". */
 export function planZuletztGeaendert(camp: Pick<FightCamp, "phases">): PlanAenderung | null {
   let juengste: PlanAenderung | null = null;
@@ -320,6 +336,8 @@ export interface FightCamp {
   startedAt: Date;
   opponent: OpponentProfile;
   phases: FightCampPhaseBlock[];
+  /** Die letzte Verschiebung des Kampfs — null = Termin wie beim Anlegen. */
+  verschoben?: KampfVerschiebung | null;
   /** Status — aktiv / abgeschlossen / archiviert */
   status: "active" | "completed" | "archived";
   /** Gesamt-Notizen vom Trainer */
@@ -383,8 +401,23 @@ type FightCampDoc = {
   status: "active" | "completed" | "archived";
   trainerNotes?: string;
   notizen?: CampNotiz[];
+  verschoben?: KampfVerschiebung | null;
   isDemo?: boolean;
 };
+
+function decodeVerschiebung(v: unknown): KampfVerschiebung | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const zahl = (x: unknown) => typeof x === "number" && Number.isFinite(x);
+  if (!zahl(o.von) || !zahl(o.auf) || !zahl(o.at)) return null;
+  return {
+    von: o.von as number,
+    auf: o.auf as number,
+    at: o.at as number,
+    uid: typeof o.uid === "string" ? o.uid : "",
+    name: typeof o.name === "string" ? o.name : "",
+  };
+}
 
 function decodePhase(p: PhaseDoc): FightCampPhaseBlock {
   return {
@@ -427,6 +460,7 @@ function decode(snap: { id: string; data: () => FightCampDoc }): FightCamp {
     status: d.status,
     trainerNotes: d.trainerNotes,
     notizen: Array.isArray(d.notizen) ? d.notizen : [],
+    verschoben: decodeVerschiebung(d.verschoben),
     isDemo: d.isDemo,
   };
 }
@@ -504,6 +538,7 @@ function encode(camp: Omit<FightCamp, "id" | "createdAt">): FightCampDoc {
   if (camp.trainerNotes && camp.trainerNotes.trim())
     out.trainerNotes = camp.trainerNotes.trim();
   if (camp.notizen.length > 0) out.notizen = camp.notizen;
+  if (camp.verschoben) out.verschoben = camp.verschoben;
   if (camp.isDemo) out.isDemo = camp.isDemo;
   return out;
 }
@@ -551,6 +586,7 @@ export async function updateFightCamp(
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.trainerNotes !== undefined) data.trainerNotes = patch.trainerNotes;
   if (patch.notizen !== undefined) data.notizen = patch.notizen;
+  if (patch.verschoben !== undefined) data.verschoben = patch.verschoben ?? null;
   if (patch.isDemo !== undefined) data.isDemo = patch.isDemo;
   // updateDoc statt setDoc(merge): ersetzt das `opponent`-Feld komplett, damit
   // gelöschte Gegner-DNA-Antworten nicht durch Deep-Merge erhalten bleiben.
@@ -599,6 +635,65 @@ export async function updateFightCampPhase(
       ...(extra.ownerIsStaff !== undefined ? { ownerIsStaff: extra.ownerIsStaff } : {}),
     });
     return decodePhase(neu);
+  });
+}
+
+/** Was eine Verschiebung am Camp ändert — die Seite übernimmt es in ihren Zustand. */
+export type VerschiebungErgebnis = Pick<
+  FightCamp,
+  "competitionDate" | "weeksTotal" | "phases" | "verschoben"
+>;
+
+/**
+ * DEN KAMPF VERSCHIEBEN (Leon 17.09.2026: „Stufe 2: Kampf verschoben", Phasen
+ * „wie beim Anlegen neu verteilen"). Kampfdatum, Wochenzahl und die Zeiten
+ * ALLER Phasen wandern in EINER Transaktion — ein halb verschobener Plan wäre
+ * ein Plan mit Löchern. Gelesen wird der Stand im Dokument, nicht der der
+ * Seite: Ein Kollege kann zwischendurch eine Phase gespeichert haben.
+ *
+ * Die Inhalte bleiben in ihren Phasen (`phasenNachVerschiebung`), und die
+ * Marke `verschoben` hält fest, von wann auf wann und durch wen. Keine neue
+ * Regel — es ist dasselbe Camp-Dokument wie bei jedem anderen Speichern,
+ * `ownerIsStaff` muss darum mit (Kopfkommentar).
+ */
+export async function verschiebeKampf(
+  uid: string,
+  campId: string,
+  neuesDatum: Date,
+  autor: { uid: string; name: string },
+  extra: { ownerIsStaff?: boolean } = {},
+): Promise<VerschiebungErgebnis> {
+  const ref = fightCampDoc(uid, campId);
+  return runTransaction(getFirestoreDb(), async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Wettkampf nicht gefunden.");
+    const d = snap.data() as FightCampDoc;
+    const startedAt = d.startedAt.toDate();
+    const alt = d.competitionDate.toDate();
+    const fehler = pruefeKampfdatum({ startedAt, competitionDate: alt }, neuesDatum);
+    if (fehler) throw new Error(fehler);
+
+    const phases = phasenNachVerschiebung(
+      d.phases.map(decodePhase),
+      startedAt,
+      neuesDatum,
+    );
+    const verschoben: KampfVerschiebung = {
+      von: alt.getTime(),
+      auf: neuesDatum.getTime(),
+      uid: autor.uid,
+      name: autor.name,
+      at: Date.now(),
+    };
+    const weeksTotal = planWochen(startedAt, neuesDatum);
+    tx.update(ref, {
+      competitionDate: Timestamp.fromDate(neuesDatum),
+      weeksTotal,
+      phases: phases.map(encodePhase),
+      verschoben,
+      ...(extra.ownerIsStaff !== undefined ? { ownerIsStaff: extra.ownerIsStaff } : {}),
+    });
+    return { competitionDate: neuesDatum, weeksTotal, phases, verschoben };
   });
 }
 
@@ -794,6 +889,172 @@ export function distributePhaseWeeks(weeksTotal: number): Record<
     "sparring-simulation": sparring,
     taper,
   };
+}
+
+const TAG_MS = 24 * 3600 * 1000;
+const WOCHE_MS = 7 * TAG_MS;
+
+/** Die vier Phasen in ihrer Reihenfolge — Aufbau → Schwerpunkt → Sparring → Taper. */
+export const PHASEN_REIHENFOLGE: FightCampPhase[] = [
+  "foundation",
+  "specific-prep",
+  "sparring-simulation",
+  "taper",
+];
+
+/** Kürzester Plan: vier Tage, einer je Phase. */
+export const PLAN_MIN_TAGE = 4;
+/** Weiter voraus als ein Jahr plant niemand — die Grenze fängt Tippfehler im Jahr ab. */
+export const PLAN_MAX_TAGE = 365;
+
+/** Wie viele Wochen zwischen Start und Kampf liegen (angebrochene Woche zählt). */
+export function planWochen(startedAt: Date, competitionDate: Date): number {
+  return Math.max(
+    1,
+    Math.ceil((competitionDate.getTime() - startedAt.getTime()) / WOCHE_MS),
+  );
+}
+
+/** Eine Phase auf der Zeitachse — ohne Inhalte, nur Lage und Länge. */
+export interface PhasenZeit {
+  phase: FightCampPhase;
+  startsAt: Date;
+  endsAt: Date;
+  weeks: number;
+}
+
+/**
+ * Die Zeitachse der vier Phasen von `startedAt` bis zum Kampf — EINE Rechnung
+ * für beide Wege: Der Generator legt damit einen neuen Plan an, und eine
+ * Verschiebung verteilt damit neu (Leon 17.09.2026: „Wie beim Anlegen neu
+ * verteilen"). Deshalb steht sie hier und nicht im Generator: `fight-camp.ts`
+ * kennt keinen Techniken-Katalog, `verschiebeKampf` braucht aber genau diese
+ * Verteilung.
+ *
+ * Die Wochen je Phase kommen aus `distributePhaseWeeks`. Der Plan füllt die
+ * Spanne danach GENAU: Eine angebrochene Woche kürzt den Aufbau — Sparring und
+ * Taper behalten ihre Länge, weil sie am Kampf hängen. Bleibt dem Aufbau dabei
+ * weniger als eine Woche (Pläne bis vier Wochen), schrumpfen alle vier im
+ * selben Verhältnis. Vorher kürzte der Generator den TAPER auf Resttage, und
+ * bei sehr kurzen Camps lagen die letzten zwei Phasen übereinander.
+ */
+export function phasenZeitachse(
+  startedAt: Date,
+  competitionDate: Date,
+): PhasenZeit[] {
+  const start = startedAt.getTime();
+  const spanne = Math.max(TAG_MS, competitionDate.getTime() - start);
+  const verteilung = distributePhaseWeeks(planWochen(startedAt, competitionDate));
+  let laengen = PHASEN_REIHENFOLGE.map((p) => verteilung[p] * WOCHE_MS);
+  const summe = laengen.reduce((a, b) => a + b, 0);
+  const ueberstand = summe - spanne;
+  if (ueberstand !== 0) {
+    laengen =
+      laengen[0] - ueberstand >= WOCHE_MS
+        ? laengen.map((l, i) => (i === 0 ? l - ueberstand : l))
+        : laengen.map((l) => Math.round((l * spanne) / summe));
+  }
+
+  let cursor = start;
+  return PHASEN_REIHENFOLGE.map((phase, i) => {
+    const startsAt = new Date(cursor);
+    // Die letzte Phase endet auf dem Kampftag — kein Rundungsrest davor.
+    cursor = i === PHASEN_REIHENFOLGE.length - 1 ? competitionDate.getTime() : cursor + laengen[i];
+    const endsAt = new Date(cursor);
+    return {
+      phase,
+      startsAt,
+      endsAt,
+      weeks: Math.max(1, Math.round((endsAt.getTime() - startsAt.getTime()) / WOCHE_MS)),
+    };
+  });
+}
+
+/**
+ * Die Phasen eines bestehenden Plans auf ein neues Kampfdatum legen. INHALTE
+ * BLEIBEN: Fokus, Einheiten, Sparring, Notiz, Techniken und die Marke
+ * `geaendert` gehören der Phase, nicht dem Termin (Leon: „deine Änderungen
+ * bleiben stehen"). Eine Phase, die der Plan nicht kennt, bleibt unberührt.
+ */
+export function phasenNachVerschiebung(
+  phases: FightCampPhaseBlock[],
+  startedAt: Date,
+  competitionDate: Date,
+): FightCampPhaseBlock[] {
+  const achse = new Map(
+    phasenZeitachse(startedAt, competitionDate).map((z) => [z.phase, z]),
+  );
+  return phases.map((p) => {
+    const z = achse.get(p.phase);
+    return z ? { ...p, startsAt: z.startsAt, endsAt: z.endsAt, weeks: z.weeks } : p;
+  });
+}
+
+/**
+ * Frühestes Kampfdatum, das der Plan noch tragen kann: heute, und mindestens
+ * `PLAN_MIN_TAGE` nach dem Start. Als UTC-Mitternacht, weil das Feld
+ * `<input type="date">` genau so rechnet (`new Date("2026-11-11")`).
+ */
+export function fruehestesKampfdatum(startedAt: Date, jetzt = new Date()): Date {
+  const heute = Date.UTC(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+  const nachStart = startedAt.getTime() + PLAN_MIN_TAGE * TAG_MS;
+  const tagNachStart = Date.UTC(
+    new Date(nachStart).getUTCFullYear(),
+    new Date(nachStart).getUTCMonth(),
+    new Date(nachStart).getUTCDate(),
+  );
+  // Aufrunden: Ein Start am Mittag braucht den NÄCHSTEN Tag, nicht denselben.
+  const frueh = tagNachStart < nachStart ? tagNachStart + TAG_MS : tagNachStart;
+  return new Date(Math.max(heute, frueh));
+}
+
+/** Spätestes Kampfdatum — ein Jahr voraus (UTC-Mitternacht wie oben). */
+export function spaetestesKampfdatum(jetzt = new Date()): Date {
+  return new Date(
+    Date.UTC(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate()) + PLAN_MAX_TAGE * TAG_MS,
+  );
+}
+
+/** Ein Datum als „11. Nov. 2026" — für Grenz-Meldungen und Marken. */
+export function kampfdatumText(d: Date): string {
+  return d.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** „heute", „gestern" oder „14. Sep." — wann eine Marke am Plan entstand. */
+export function wannText(at: number, jetzt = new Date()): string {
+  const d = new Date(at);
+  const tag = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const tage = Math.round((tag(jetzt) - tag(d)) / TAG_MS);
+  if (tage === 0) return "heute";
+  if (tage === 1) return "gestern";
+  return d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+}
+
+/** „Verschoben vom 28. Okt. 2026 · Leon · heute". */
+export function verschiebungText(v: KampfVerschiebung, jetzt = new Date()): string {
+  return [`Verschoben vom ${kampfdatumText(new Date(v.von))}`, v.name, wannText(v.at, jetzt)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * Prüft ein neues Kampfdatum. Liefert den Satz, der im Editor steht — oder
+ * null, wenn das Datum passt. Dieselbe Prüfung im Client und beim Speichern.
+ */
+export function pruefeKampfdatum(
+  camp: Pick<FightCamp, "startedAt" | "competitionDate">,
+  neu: Date,
+  jetzt = new Date(),
+): string | null {
+  if (!(neu instanceof Date) || Number.isNaN(neu.getTime())) return "Wähl ein Kampfdatum.";
+  if (neu.getTime() === camp.competitionDate.getTime()) return "Das ist der Termin, der schon steht.";
+  const frueh = fruehestesKampfdatum(camp.startedAt, jetzt);
+  if (neu.getTime() < frueh.getTime())
+    return `Der Plan startet am ${kampfdatumText(camp.startedAt)} und braucht mindestens ${PLAN_MIN_TAGE} Tage. Wähl ein Datum ab dem ${kampfdatumText(frueh)}.`;
+  const spaet = spaetestesKampfdatum(jetzt);
+  if (neu.getTime() > spaet.getTime())
+    return `So weit voraus plant der Camp nicht — wähl ein Datum bis zum ${kampfdatumText(spaet)}.`;
+  return null;
 }
 
 /**

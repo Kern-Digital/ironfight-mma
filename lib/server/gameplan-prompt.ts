@@ -54,7 +54,15 @@ export interface GameplanEingabe {
    * `flaecheDesWettkampfs`). Fehlt sie, schreibt der Gameplan neutral.
    */
   flaeche?: Flaeche | null;
-  wettkampf: { name: string; datum: Date };
+  /**
+   * OHNE DATUM (Leon 17.09.2026, Stufe 2 „Kampf verschoben"): Der Gameplan
+   * baut auf beiden Profilen auf — Waffen, Gefahren und „So kämpfst du" lesen
+   * sich am Kampftag wie vier Wochen davor. Stand das Datum im Auftrag,
+   * änderte jede Verschiebung den Fingerabdruck und der nächste Anlass kostete
+   * einen Claude-Lauf. Leon: „nein, aber eine Option einfügen, dass man direkt
+   * einen neuen erstellen lassen kann" — den Knopf trägt die Wettkampfseite.
+   */
+  wettkampf: { name: string };
   athlet: { name: string; profil: GameplanProfil | null };
   gegner: {
     name: string;
@@ -265,8 +273,7 @@ ${REGELN}`;
     g.notizen?.trim() ? `Notiz des Trainers: „${g.notizen.trim()}"` : "",
   ].filter(Boolean);
 
-  const datum = e.wettkampf.datum.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
-  const user = `WETTKAMPF: „${e.wettkampf.name}" am ${datum}.
+  const user = `WETTKAMPF: „${e.wettkampf.name}".
 ${kampfartText(e, e.flaeche ?? null)}
 
 ATHLET — ${e.athlet.name} (Profil der Kampfart ${SPORT_LABEL[e.sport]}):
@@ -281,7 +288,9 @@ Schreib jetzt den Gameplan als JSON gemäß Schema.`;
 
 /**
  * Fingerabdruck der Eingabe: Gleiche Profile und gleicher Wettkampf ergeben
- * denselben Schlüssel — dann spart der Nachlauf den Aufruf.
+ * denselben Schlüssel — dann spart der Nachlauf den Aufruf. Das KAMPFDATUM
+ * steckt bewusst nicht darin (siehe `GameplanEingabe.wettkampf`): Verschieben
+ * soll nichts kosten.
  */
 export function gameplanSchluessel(p: { system: string; user: string }): string {
   return createHash("sha256").update(p.system).update("\n").update(p.user).digest("hex").slice(0, 32);

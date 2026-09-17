@@ -17,14 +17,18 @@
  * Kein KI-System, sondern eine erklärbare Heuristik. Trainer darf den Plan
  * danach frei editieren (im UI) — seit 17.09.2026 Stufe 1: Fokus, Einheiten,
  * Sparring-Anteil und Notiz je Phase (components/trainer/PhasenEditor.tsx,
- * lib/fight-camp.ts `updateFightCampPhase`). Techniken-Auswahl, Kampfdatum
- * und Phasenlängen folgen in späteren Stufen.
+ * lib/fight-camp.ts `updateFightCampPhase`); Stufe 2: Kampf verschieben, die
+ * Phasen verteilen sich neu (`verschiebeKampf`). Die Zeitachse rechnet für
+ * BEIDE Wege `phasenZeitachse` (lib/fight-camp.ts) — Leons Ansage „wie beim
+ * Anlegen neu verteilen" hält nur, solange es EINE Verteilung gibt.
+ * Techniken-Auswahl und eigene Phasenlängen folgen in späteren Stufen.
  */
 
 import { ALL_TECHNIQUES } from "./techniques";
 import { EXERCISES } from "./exercises";
 import {
-  distributePhaseWeeks,
+  phasenZeitachse,
+  planWochen,
   type FightCamp,
   type FightCampPhase,
   type FightCampPhaseBlock,
@@ -235,7 +239,12 @@ function pickExercises(
 // ─── Plan-Generator ────────────────────────────────────────────────────────
 
 export interface GeneratePlanInput {
-  weeksTotal: number;
+  /**
+   * Nur noch Beiwerk: Die Zeitachse rechnet `phasenZeitachse` aus `startedAt`
+   * und `competitionDate` (lib/fight-camp.ts) — dieselbe Verteilung, die eine
+   * Verschiebung benutzt (Leon 17.09.2026: „wie beim Anlegen neu verteilen").
+   */
+  weeksTotal?: number;
   startedAt?: Date;
   competitionDate: Date;
   athleteLevel: AthleteLevel | null | undefined;
@@ -252,7 +261,7 @@ export function generateFightCampPhases(
   input: GeneratePlanInput,
 ): FightCampPhaseBlock[] {
   const startedAt = input.startedAt ?? new Date();
-  const distribution = distributePhaseWeeks(input.weeksTotal);
+  const achse = phasenZeitachse(startedAt, input.competitionDate);
   const focus = recommendFocus(input.analysis, input.opponent);
 
   // Kategorien der Kampfart — ohne Kampfart alle vier, wie vor dem 17.09.2026.
@@ -265,21 +274,8 @@ export function generateFightCampPhases(
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   const phases: FightCampPhaseBlock[] = [];
-  let cursor = new Date(startedAt);
 
-  const phaseOrder: FightCampPhase[] = [
-    "foundation",
-    "specific-prep",
-    "sparring-simulation",
-    "taper",
-  ];
-
-  for (const phase of phaseOrder) {
-    const weeks = distribution[phase];
-    const startsAt = new Date(cursor);
-    const endsAt = new Date(cursor.getTime() + weeks * 7 * 24 * 3600 * 1000);
-    cursor = endsAt;
-
+  for (const { phase, startsAt, endsAt, weeks } of achse) {
     const spec = PHASE_SPECS[phase];
     const preferredAreas: TrainingArea[] =
       phase === "specific-prep" ? specificPrepAreas : spec.preferredAreas;
@@ -312,15 +308,7 @@ export function generateFightCampPhases(
     });
   }
 
-  // Letzte Phase auf das Kampfdatum schieben — falls Distribution leicht abweicht
-  if (phases.length > 0) {
-    const last = phases[phases.length - 1];
-    last.endsAt = new Date(input.competitionDate);
-    if (last.endsAt.getTime() < last.startsAt.getTime()) {
-      last.startsAt = new Date(last.endsAt.getTime() - 7 * 24 * 3600 * 1000);
-    }
-  }
-
+  // Die letzte Phase endet auf dem Kampftag — das erledigt `phasenZeitachse`.
   return phases;
 }
 
@@ -346,13 +334,7 @@ export function generateFightCamp(input: {
   sport: Sport | null;
 }): Omit<FightCamp, "id" | "createdAt" | "ownerIsStaff"> {
   const startedAt = input.startedAt ?? new Date();
-  const weeksTotal = Math.max(
-    1,
-    Math.ceil(
-      (input.competitionDate.getTime() - startedAt.getTime()) /
-        (7 * 24 * 3600 * 1000),
-    ),
-  );
+  const weeksTotal = planWochen(startedAt, input.competitionDate);
   const phases = generateFightCampPhases({
     weeksTotal,
     startedAt,

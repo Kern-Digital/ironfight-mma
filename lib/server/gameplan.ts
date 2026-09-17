@@ -127,7 +127,7 @@ async function leseEingabe(db: Firestore, camp: CampRoh, sport: Sport): Promise<
   const eingabe: GameplanEingabe = {
     sport,
     flaeche: flaecheDesWettkampfs({ sport, flaeche: camp.flaeche }),
-    wettkampf: { name: camp.competitionName, datum: camp.competitionDate },
+    wettkampf: { name: camp.competitionName },
     athlet: {
       name: athletName,
       profil: athlet ? { dna: athlet.dna, dnaSplit: athlet.dnaSplit, actionStats: athlet.actionStats, evidence: athlet.evidence } : null,

@@ -8,6 +8,8 @@ import {
   FIGHT_STYLE_LABEL,
   FIGHTER_STANCE_LABEL,
   PHASE_LABEL,
+  verschiebungText,
+  wannText,
   type FightCamp,
   type FightCampPhase,
   type PhasenAenderung,
@@ -29,16 +31,28 @@ function formatDate(d: Date): string {
 
 /** „Geändert von Leon · heute" — für die Phase und den Kopf des Athleten-Sheets. */
 export function aenderungText(g: PlanAenderung, jetzt = new Date()): string {
-  const d = new Date(g.at);
-  const tag = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const tage = Math.round((tag(jetzt) - tag(d)) / 86_400_000);
-  const wann =
-    tage === 0
-      ? "heute"
-      : tage === 1
-        ? "gestern"
-        : d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-  return `Geändert von ${g.name} · ${wann}`;
+  return `Geändert von ${g.name} · ${wannText(g.at, jetzt)}`;
+}
+
+/**
+ * „Woche 1–4 · 4 Wochen" aus den DATEN der Phase, nicht aus `weeks`: Nach einer
+ * Verschiebung (Stufe 2) stimmen die Wochen nur, wenn sie aus startsAt/endsAt
+ * kommen — und eine angebrochene Phase heißt dann „5 Tage" statt „1 Woche".
+ */
+function phasenSpanne(
+  phase: FightCamp["phases"][number],
+  startedAt: Date,
+): string {
+  const tage = Math.max(1, Math.round((phase.endsAt.getTime() - phase.startsAt.getTime()) / 86_400_000));
+  // Unter einer Woche sagt die Wochen-Spanne nichts mehr („Woche 1–2 · 6 Tage")
+  // — dann steht nur die Dauer, das Datum daneben sagt den Rest.
+  if (tage < 7) return `${tage} ${tage === 1 ? "Tag" : "Tage"}`;
+  const dauer = `${Math.round(tage / 7)} ${Math.round(tage / 7) === 1 ? "Woche" : "Wochen"}`;
+  const woche = (d: Date) =>
+    Math.max(1, Math.floor((d.getTime() - startedAt.getTime()) / (7 * 86_400_000)) + 1);
+  const von = woche(phase.startsAt);
+  const bis = Math.max(von, woche(new Date(phase.endsAt.getTime() - 86_400_000)));
+  return `Woche ${von === bis ? von : `${von}–${bis}`} · ${dauer}`;
 }
 
 const TECH_BY_ID = new Map(ALL_TECHNIQUES.map((t) => [t.id, t]));
@@ -172,6 +186,15 @@ export default function FightCampPlanView({
                 : "Kampftag erreicht"}{" "}
               · {camp.weeksTotal} Wochen Plan
             </div>
+            {camp.verschoben && (
+              <div
+                className="mt-1"
+                data-plan-verschoben
+                style={{ ...META_FONT, color: "var(--text-3)" }}
+              >
+                {verschiebungText(camp.verschoben)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -335,9 +358,8 @@ export default function FightCampPlanView({
                     {PHASE_LABEL[phase.phase]}
                   </h3>
                   <div style={{ ...META_FONT, color: "var(--text-3)" }}>
-                    Woche {idx === 0 ? 1 : "…"} · {phase.weeks}{" "}
-                    {phase.weeks === 1 ? "Woche" : "Wochen"} ·{" "}
-                    {formatDate(phase.startsAt)} → {formatDate(phase.endsAt)}
+                    {phasenSpanne(phase, camp.startedAt)} · {formatDate(phase.startsAt)} →{" "}
+                    {formatDate(phase.endsAt)}
                   </div>
                 </div>
               </div>

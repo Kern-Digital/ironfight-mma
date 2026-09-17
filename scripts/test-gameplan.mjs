@@ -30,7 +30,20 @@ import {
 import { ALL_TECHNIQUES } from "../lib/techniques";
 import { buchungsZuwachs, altfelder } from "../lib/server/ki-kosten.ts";
 import { GAMEPLAN_AUFRUF_MS, SCOUTING_AUFSCHUB_MS } from "../lib/server/gameplan.ts";
-import { PHASE_FOCUS, PHASE_GRENZEN, planZuletztGeaendert, saeubereAenderung } from "../lib/fight-camp.ts";
+import {
+  PHASE_FOCUS,
+  PHASE_GRENZEN,
+  PLAN_MIN_TAGE,
+  fruehestesKampfdatum,
+  phasenNachVerschiebung,
+  phasenZeitachse,
+  planWochen,
+  planZuletztGeaendert,
+  pruefeKampfdatum,
+  saeubereAenderung,
+  verschiebungText,
+  wannText,
+} from "../lib/fight-camp.ts";
 import { preisJeMillion, kostenAusUsage } from "../lib/server/claude-aufruf.ts";
 
 let fehler = 0;
@@ -67,7 +80,7 @@ const belegt = (videos, gelegenheiten, text) => ({
 function eingabe(over = {}) {
   return {
     sport: "mma",
-    wettkampf: { name: "Night of Champions", datum: new Date("2026-10-24T18:00:00Z") },
+    wettkampf: { name: "Night of Champions" },
     athlet: {
       name: "Leon",
       profil: {
@@ -156,6 +169,10 @@ sagt(gameplanSchluessel(kaefig) !== gameplanSchluessel(gameplanPrompt(eingabe({ 
 
 console.log("── Schlüssel, Stand");
 sagt(gameplanSchluessel(p) === gameplanSchluessel(gameplanPrompt(eingabe())), "gleiche Eingabe → gleicher Schlüssel");
+// Stufe 2 (Leon 17.09.: verschieben kostet nichts): Das Kampfdatum steht nicht
+// mehr im Auftrag — also auch nicht im Fingerabdruck.
+sagt(p.user.startsWith(`WETTKAMPF: „Night of Champions".`), "Auftrag nennt den Wettkampf ohne Datum");
+sagt(!/\b(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\b/.test(p.user), "kein Kampfdatum im ganzen Auftrag");
 const anders = eingabe();
 anders.athlet.profil.actionStats[0].attempted = 14;
 sagt(gameplanSchluessel(p) !== gameplanSchluessel(gameplanPrompt(anders)), "ein Versuch mehr → neuer Schlüssel");
@@ -214,6 +231,88 @@ const zuletzt = planZuletztGeaendert({
 });
 sagt(zuletzt?.name === "Leon", "zuletzt geändert = jüngste Phase");
 sagt(planZuletztGeaendert({ phases: [{}, { geaendert: null }] }) === null, "unberührter Plan → null");
+
+console.log("── Kampf verschoben, Stufe 2 (Fenster 12)");
+const TAG = 86_400_000;
+const start = new Date("2026-09-02T00:00:00Z");
+const tage = (a, b) => Math.round((b.getTime() - a.getTime()) / TAG);
+const luecken = (achse) =>
+  achse.every((z, i) => (i === 0 ? true : z.startsAt.getTime() === achse[i - 1].endsAt.getTime()));
+const achse8 = phasenZeitachse(start, new Date("2026-10-28T00:00:00Z"));
+sagt(
+  achse8.map((z) => z.weeks).join("/") === "3/2/2/1" && planWochen(start, new Date("2026-10-28T00:00:00Z")) === 8,
+  "8 Wochen: Aufbau 3 · Schwerpunkt 2 · Sparring 2 · Taper 1",
+);
+sagt(
+  achse8[0].startsAt.getTime() === start.getTime() &&
+    achse8[3].endsAt.toISOString() === "2026-10-28T00:00:00.000Z" &&
+    luecken(achse8),
+  "Zeitachse beginnt am Start, endet auf dem Kampftag, ohne Lücke",
+);
+const achse10 = phasenZeitachse(start, new Date("2026-11-11T00:00:00Z"));
+sagt(
+  achse10.map((z) => z.weeks).join("/") === "4/3/2/1",
+  "zwei Wochen später (11.11.): Aufbau 4 · Schwerpunkt 3 · Sparring 2 · Taper 1 (wie beim Anlegen)",
+);
+const angebrochen = phasenZeitachse(start, new Date("2026-10-31T00:00:00Z"));
+sagt(
+  tage(angebrochen[3].startsAt, angebrochen[3].endsAt) === 7 &&
+    tage(angebrochen[0].startsAt, angebrochen[0].endsAt) === 17 &&
+    tage(start, angebrochen[3].endsAt) === 59,
+  "angebrochene Woche kürzt den Aufbau (17 Tage), Taper behält seine Woche",
+);
+const kurz2 = phasenZeitachse(start, new Date("2026-09-16T00:00:00Z"));
+sagt(
+  luecken(kurz2) && kurz2[3].endsAt.toISOString() === "2026-09-16T00:00:00.000Z" && kurz2.every((z) => z.endsAt > z.startsAt),
+  "Plan über zwei Wochen: vier Phasen schrumpfen gleichmäßig, keine überlappt (alte Falle des Generators)",
+);
+const altePhasen = [
+  { phase: "foundation", startsAt: start, endsAt: new Date("2026-09-23T00:00:00Z"), weeks: 3, focus: "Mein Fokus", techniqueIds: ["jab"], exerciseIds: [], trainingAreas: [], categories: [], sessionsPerWeek: 5, sparringRatio: 0.1, notes: "Kopfschutz", geaendert: { uid: "u", name: "Leon", at: 1000 } },
+  { phase: "specific-prep", startsAt: new Date("2026-09-23T00:00:00Z"), endsAt: new Date("2026-10-07T00:00:00Z"), weeks: 2, focus: "F2", techniqueIds: [], exerciseIds: [], trainingAreas: [], categories: [], sessionsPerWeek: 5, sparringRatio: 0.25 },
+  { phase: "sparring-simulation", startsAt: new Date("2026-10-07T00:00:00Z"), endsAt: new Date("2026-10-21T00:00:00Z"), weeks: 2, focus: "F3", techniqueIds: [], exerciseIds: [], trainingAreas: [], categories: [], sessionsPerWeek: 5, sparringRatio: 0.5 },
+  { phase: "taper", startsAt: new Date("2026-10-21T00:00:00Z"), endsAt: new Date("2026-10-28T00:00:00Z"), weeks: 1, focus: "F4", techniqueIds: [], exerciseIds: [], trainingAreas: [], categories: [], sessionsPerWeek: 3, sparringRatio: 0.05 },
+];
+const neuePhasen = phasenNachVerschiebung(altePhasen, start, new Date("2026-11-11T00:00:00Z"));
+sagt(
+  neuePhasen[0].focus === "Mein Fokus" &&
+    neuePhasen[0].notes === "Kopfschutz" &&
+    neuePhasen[0].geaendert?.name === "Leon" &&
+    neuePhasen[0].techniqueIds.join() === "jab" &&
+    neuePhasen[0].sessionsPerWeek === 5,
+  `Verschieben lässt Fokus, Notiz, Techniken, Einheiten und die Marke „geändert von" stehen`,
+);
+sagt(
+  neuePhasen.map((p) => p.weeks).join("/") === "4/3/2/1" && neuePhasen[3].endsAt.toISOString() === "2026-11-11T00:00:00.000Z",
+  "Verschieben legt die Phasen auf die neue Zeitachse",
+);
+sagt(altePhasen[0].endsAt.toISOString() === "2026-09-23T00:00:00.000Z", "die alten Phasen bleiben unberührt (reine Rechnung)");
+const campStand = { startedAt: start, competitionDate: new Date("2026-10-28T00:00:00Z") };
+const jetzt = new Date("2026-09-17T21:00:00Z");
+sagt(pruefeKampfdatum(campStand, new Date("2026-11-11T00:00:00Z"), jetzt) === null, "11.11. ist erlaubt");
+sagt(/Termin, der schon steht/.test(pruefeKampfdatum(campStand, new Date("2026-10-28T00:00:00Z"), jetzt) ?? ""), "derselbe Termin → kein Speichern");
+sagt(/mindestens 4 Tage/.test(pruefeKampfdatum(campStand, new Date("2026-09-03T00:00:00Z"), jetzt) ?? ""), "in der Vergangenheit → Grenze mit Datum im Satz");
+sagt(/bis zum/.test(pruefeKampfdatum(campStand, new Date("2028-01-01T00:00:00Z"), jetzt) ?? ""), "mehr als ein Jahr voraus → Grenze");
+sagt(
+  fruehestesKampfdatum(new Date("2026-09-30T12:00:00Z"), jetzt).toISOString() === "2026-10-05T00:00:00.000Z",
+  `Start am Mittag: frühester Kampf ${PLAN_MIN_TAGE} Tage später, aufgerundet auf den nächsten Tag`,
+);
+sagt(
+  fruehestesKampfdatum(start, jetzt).toISOString() === "2026-09-17T00:00:00.000Z",
+  "alter Start: frühestens heute",
+);
+sagt(
+  verschiebungText({ von: new Date("2026-10-28T00:00:00Z").getTime(), auf: 0, uid: "u", name: "Leon", at: jetzt.getTime() }, jetzt) ===
+    "Verschoben vom 28. Okt. 2026 · Leon · heute",
+  `Marke: „Verschoben vom 28. Okt. 2026 · Leon · heute"`,
+);
+// Der Monatsname kommt von Intl („Sept." in neueren ICU-Daten, „Sep." in alten)
+// — geprüft wird die Regel, nicht die Abkürzung.
+const vorFuenf = new Date(jetzt.getTime() - 5 * TAG);
+sagt(
+  wannText(jetzt.getTime() - TAG, jetzt) === "gestern" &&
+    wannText(vorFuenf.getTime(), jetzt) === vorFuenf.toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+  "wannText: gestern, sonst Tag und Monat",
+);
 
 console.log("── Kampfart am Wettkampf: Plan-Kategorien");
 sagt(KATEGORIEN_JE_KAMPFART.boxen.join() === "boxing", "Boxen → nur boxing");

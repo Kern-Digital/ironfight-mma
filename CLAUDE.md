@@ -1690,7 +1690,14 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       aiUsage erst beim nächsten echten Lauf über die Route prüfbar (der
       Nachweis lief als Skript ohne Firestore).
   - **RUNDE 3: GAMEPLAN FOLGT DEM SCOUTING + TRAININGSPLAN BEARBEITEN, STUFE 1
-    (17.09.2026 abends, Fenster tidal-athletics-d5, abgestimmt mit e8).**
+    (17.09.2026 abends, Fenster tidal-athletics-d5, abgestimmt mit e8,
+    COMMITTET + GEPUSHT 8b55331..c45a410, Vercel success).** Produktion nach
+    c45a410: /login 200, POST ohne Token an /api/wettkampf/gameplan/scouting,
+    /api/wettkampf/gameplan, commit, flag → 403, GET commit 405, /, /dashboard,
+    /trainer/competitions, /trainer/deepfight/gegner → 307, Chunks 200,
+    `vercel logs … --status-code 500 --since 20m` leer. Kein Rules-/Index-Deploy
+    (collectionGroup gymId + competitionDate besteht). Push: Leon „Ja, pushen
+    (Empfohlen)".
     Leons Antworten (wörtlich): Scouting „Ja, mit Aufschub (Empfohlen)" · Plan
     „Ja, Stufe 1 jetzt (Empfohlen)" · KI-Lauf „Ja, ein Lauf ca. 0,30 €
     (Empfohlen)" · Abnahme der Schirme (inkl. Drills doppelt im Sheet) „Passt
@@ -1764,8 +1771,9 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       und kostet nichts (Muster aus nachweis-gameplan.mjs übernehmen).
       (26) Screenshot direkt nach einer Hinweiszeile über einem MorphSwap zeigt
       die Layout-Feder mittendrin (Zeile und Knopf überlappen) — 1 s warten.
-    - **Roadmap** (Artifact Version 24): Station DF Schritt 7 „Gameplan folgt
-      dem Scouting" und NEU 8 „Trainingsplan bearbeiten, Stufe 1" = Gebaut,
+    - **Roadmap** (Artifact Version 24 gebaut, **Version 25 live** nach dem
+      Push, Balken 84 %): Station DF Schritt 7 „Gameplan folgt dem Scouting"
+      und NEU 8 „Trainingsplan bearbeiten, Stufe 1" = Fertig,
       9 „Stufen 2–4" + 10 „Kampfart über den Kurs" offen; „Wettkampf-Plan
       bearbeiten" aus dem Becken auf die Route (17 Ideen); die zwei alten
       Kreuzungen geheilt (rubriken 25,5/40, termine 69,5/59 am Hub, gesucht mit
@@ -1776,6 +1784,86 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       Techniken-/Übungs-Picker, Phasenlängen) · Gegnerseite im Alt-Look ·
       jwks-rsa-Override. Drills doppelt im Wettkampf-Sheet (Plan UND Gameplan)
       bleiben so (Leon: „Passt so").
+  - **STUFE 2: KAMPF VERSCHOBEN (17.09.2026 nachts, Fenster
+    tidal-athletics-12, abgestimmt mit e8).** Leons Antworten (wörtlich):
+    „Stufe 2: Kampf verschoben (Empfohlen)" · Gameplan danach (FREITEXT) „nein
+    aber eine option einfügen das man direkt einen neuen erstellen lassen
+    kann" · Phasen „Wie beim Anlegen neu verteilen" (NICHT die Empfehlung
+    „laufende Phase fängt es auf") · Abnahme „Passt so (Empfohlen)" ·
+    KI-Nachweis „Nein, so committen (Empfohlen)" · „Ja, committen und pushen
+    (Empfohlen)".
+    - **EINE Zeitachse für beide Wege** (`phasenZeitachse(startedAt,
+      competitionDate)` in lib/fight-camp.ts): Wochen je Phase aus
+      `distributePhaseWeeks(planWochen(...))`, danach füllt der Plan die Spanne
+      GENAU — eine angebrochene Woche kürzt den AUFBAU, Sparring und Taper
+      behalten ihre Länge (sie hängen am Kampf); bliebe dem Aufbau weniger als
+      eine Woche (Pläne bis vier Wochen), schrumpfen alle vier im selben
+      Verhältnis. Der Generator (`generateFightCampPhases`) rechnet jetzt
+      dieselbe Achse — ohne das hielte Leons „wie beim Anlegen" nicht. Damit
+      sind zwei Altlasten weg: Der Generator kürzte den TAPER auf die Resttage,
+      und bei Camps unter fünf Wochen lagen die letzten zwei Phasen übereinander
+      (`weeksTotal` ist im Generator-Input nur noch Beiwerk).
+    - **Verschieben:** `verschiebeKampf(uid, campId, neuesDatum, autor, extra)`
+      — TRANSAKTION über `competitionDate`, `weeksTotal`, ALLE Phasen und die
+      Marke `verschoben` ({ von, auf, uid, name, at }); `ownerIsStaff` muss mit
+      (wie bei jedem Camp-Schreibvorgang). `phasenNachVerschiebung` ist rein und
+      lässt Fokus, Einheiten, Sparring, Notiz, Techniken und `geaendert` in
+      ihren Phasen stehen. Grenzen in `pruefeKampfdatum`: nicht in der
+      Vergangenheit, mindestens `PLAN_MIN_TAGE` (4) nach dem Start, höchstens
+      `PLAN_MAX_TAGE` (365) voraus, derselbe Termin ist kein Speichern; die
+      Meldung nennt immer das erlaubte Datum. `fruehestesKampfdatum` rundet auf
+      den nächsten Tag AUF (Start am Mittag). KEINE Regeländerung, kein Deploy.
+    - **Oberfläche:** `components/trainer/KampfVerschieben.tsx` (neu) — Feld
+      `<input type="date">` mit min/max, VORSCHAU aller vier Phasen mit „2
+      Wochen → 6 Tage", Hinweis wenn die LAUFENDE Phase wechselt (bei „wie beim
+      Anlegen" kann ein Kampf den Athleten aus dem Schwerpunkt zurück in den
+      Aufbau schicken), Schalter „Gameplan gleich neu schreiben" (aus,
+      Hilfstext folgt der Wahl) nur mit fertigem Gameplan. Sitzt im Kopf der
+      Wettkampfseite, der Knopf „Verschieben" steht NEBEN dem Termin (die
+      Chip-Reihe darunter trägt Eigenschaften, nicht Termine). Marke im Kopf
+      (`data-verschoben`) und in der Plan-Kopfkarte (`data-plan-verschoben`);
+      der Athlet liest im Plan-Sheet „Dein Kampf ist jetzt am … statt am … —
+      Mess Trainer 2d hat ihn heute verschoben" (`data-athlet-verschoben`).
+      Die Phasenzeile zeigt jetzt „Woche 4–5 · 2 Wochen" AUS DEN DATEN (vorher
+      „Woche … · {weeks} Wochen"); unter einer Woche nur die Dauer.
+    - **Gameplan:** `GameplanEingabe.wettkampf` ist nur noch `{ name }` — das
+      Kampfdatum ist aus dem Prompt und damit aus dem Fingerabdruck
+      (`gameplanSchluessel`) heraus. Verschieben kostet also nichts, und der
+      nächste Anlass zahlt nicht für ein geändertes Datum. Folge: Jeder
+      bestehende Gameplan schreibt sich beim nächsten Anlass EINMAL neu (Prompt
+      anders) — dieselbe Lage wie nach der 5b-Schärfung. `starteGameplan(…,
+      true)` läuft nur, wenn der Trainer den Schalter setzt.
+    - **Messung:** tsc/eslint 0 · test-gameplan **82/82** (neuer Abschnitt
+      „Kampf verschoben": 8 Wochen → 3/2/2/1, zwei Wochen später → 4/3/2/1,
+      angebrochene Woche kürzt den Aufbau auf 17 Tage bei vollem Taper,
+      Zwei-Wochen-Plan ohne Überlappung, Inhalte bleiben, Grenzen, Marke) ·
+      test-kampfart-steckbrief 70/70 · test-profil-rechnung 86/86 ·
+      `scripts/mess-gameplan.mjs` **74/74 dunkel + hell** (Konsole 0,
+      aufgeräumt 7 Auth / 37 users): Vorschau, Vorziehen von 40 auf 25 Tage →
+      weeksTotal 4, lückenlose Achse 6/6/6/6 Tage, letzte Phase endet auf dem
+      Kampftag, Phase 2 behält Fokus/Notiz/3×/25 %/„Geändert von", Marke im
+      Kopf und am Plan, **Gameplan-Dokument unberührt (kein Claude)**; Schalter
+      AN auf einem Wettkampf gegen einen Gegner ohne Daten → Route läuft echt
+      und landet ohne Claude bei „offen · gegner"; Athlet sieht die
+      Verschiebung im Sheet. Bilder + Logs
+      `D:\Tidal-Athletics\tmp\beweis-steckbrief-2026-09-17\nachweis-12\`.
+      Echter Claude-Lauf für den Schalter: Leon „Nein, so committen".
+    - **Fallen:** (27) `Start-Process -FilePath npm -ArgumentList run,dev` hat
+      den Dev-Server NICHT gestartet, sondern ein Notepad geöffnet (npm ist
+      keine .exe; Windows suchte sich ein Programm für die Datei). Dev-Server
+      über das Bash-Werkzeug im Hintergrund starten
+      (`NODE_OPTIONS=--no-experimental-require-module npm run dev`) und danach
+      mit einer Abfrage auf `/login` belegen, dass er wirklich läuft.
+      (28) `toLocaleDateString("de-DE", { month: "short" })` liefert je
+      ICU-Datenstand „Sep." ODER „Sept." — in Tests nie die Abkürzung
+      festschreiben, sondern gegen dieselbe Intl-Ausgabe prüfen.
+      (29) Das Datumsfeld rechnet UTC (`new Date("2026-11-11")`), die Seite
+      zeigt örtlich — der Feldwert muss aus den ÖRTLICHEN Feldern kommen
+      (`datumFeldWert`), sonst steht im Feld ein anderer Tag als im Kopf.
+    - **Offen:** Stufe 3 (Techniken-/Übungs-Picker) · Stufe 4 (Phasenlängen von
+      Hand) · Gegnerseite im Alt-Look · jwks-rsa-Override. Der Schalter
+      „Gameplan gleich neu schreiben" ist noch nicht mit echtem Claude
+      gemessen (derselbe Weg wie „Neu schreiben", das seit Runde 1 läuft).
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)
