@@ -2,8 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
+import { SheetShell } from "@/components/motion";
+import AppSuche from "@/components/shell/AppSuche";
+import XKnopf from "@/components/ui/XKnopf";
 import { useTheme } from "@/lib/theme-context";
+
+/** Beschriftung eines Platzes — dieselbe für Links und Knöpfe der Leiste. */
+const TAB_LABEL: React.CSSProperties = {
+  fontFamily: "var(--font-archivo), system-ui, sans-serif",
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+};
 
 /**
  * Bottom-Tab-Bar für die Schüler-Kernbereiche (DESIGN-BRIEF §1.8:
@@ -33,6 +45,13 @@ export default function AthleteTabBar({
 } = {}) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  // DIE SUCHE DER GANZEN APP (Leon 19.09.2026: „ein permanentes
+  // Suchsymbol"). Reine Athleten haben auf den umgebauten Seiten keinen Kopf
+  // und keine Schublade — ihr einziger immer erreichbarer Ort ist diese
+  // Leiste. Stab-Rollen finden die Suche in der Schublade (Menü), deshalb
+  // steht der Platz nur ohne `onOpenMenu`.
+  const [sucheOffen, setSucheOffen] = useState(false);
+  useEffect(() => setSucheOffen(false), [pathname]);
 
   return (
     <nav
@@ -82,6 +101,22 @@ export default function AthleteTabBar({
             </Link>
           );
         })}
+        {!onOpenMenu && (
+          <button
+            type="button"
+            onClick={() => setSucheOffen(true)}
+            aria-label="In der App suchen"
+            aria-expanded={sucheOffen}
+            data-aktion="app-suche"
+            className="t-interactive flex min-h-[56px] flex-1 flex-col items-center justify-center gap-[3px] rounded-card lg:min-h-[64px] lg:gap-1 lg:[&_svg]:h-[22px] lg:[&_svg]:w-[22px]"
+            style={{ color: sucheOffen ? "var(--accent-text)" : "var(--text-3)" }}
+          >
+            <Icon name="search" size={20} strokeWidth={2} />
+            <span className="text-[9px] leading-[1.2] lg:text-[11px]" style={TAB_LABEL}>
+              Suche
+            </span>
+          </button>
+        )}
         {onOpenMenu && (
           <button
             type="button"
@@ -118,6 +153,29 @@ export default function AthleteTabBar({
           <Icon name={theme === "dark" ? "sun" : "moon"} size={20} strokeWidth={2} />
         </button>
       </div>
+
+      {/* Das Sheet der Suche: oben das offene Feld, darunter die Treffer —
+          EIN Scrollbereich (Popup-Regel, Leon 04.09.). */}
+      <SheetShell
+        open={sucheOffen}
+        onClose={() => setSucheOffen(false)}
+        label="In der App suchen"
+        panelClassName="t-card relative flex max-h-[85dvh] w-full flex-col gap-3 rounded-t-card p-4 sm:max-w-xl sm:rounded-card sm:p-5"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="t-label">In der App suchen</span>
+          <XKnopf
+            onClick={() => setSucheOffen(false)}
+            ariaLabel="Suche schließen"
+            wort="Schließen"
+            drehung="roll"
+            style={{ color: "var(--text-2)" }}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <AppSuche darstellung="liste" offenStart onGehen={() => setSucheOffen(false)} />
+        </div>
+      </SheetShell>
     </nav>
   );
 }

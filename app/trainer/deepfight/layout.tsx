@@ -37,6 +37,11 @@ import {
   useDeepFightModus,
 } from "@/components/deepfight/deepfight-modus";
 import Synthesis from "@/components/ui/Synthesis";
+import {
+  KopfNavigation,
+  KopfSegmente,
+  type KopfSegment,
+} from "@/components/shell/KopfNavigation";
 import { usePathname } from "next/navigation";
 
 /**
@@ -58,6 +63,32 @@ const HAUPTROUTEN = new Set([
   "/trainer/deepfight/analyse",
 ]);
 
+/**
+ * DIE SEGMENTE IM KOPF DER HÜLLE (Leon 18.09.2026): „auf der DeepFight-Seite
+ * oben drei Buttons — DeepFight, das zur Standardseite führt, dann Athleten
+ * … und Gegner". Auf einer Detailseite (ein Gegner, ein Athlet) trägt das
+ * gewählte Segment einen Pfeil — es IST dort der Weg zurück zur Liste, wie
+ * Leons „zurück ‚Gegner‘ oben drinnen".
+ *
+ * Die Analyse gehört zu ihrem Ziel: `/analyse?modus=gegner` steht unter
+ * „Gegner", `modus=leute` unter „Athleten" — der Modus kommt aus demselben
+ * Kontext, der auch die Schicht färbt.
+ */
+function segmenteFuer(pathname: string, modus: "leute" | "gegner"): KopfSegment[] {
+  const LANDUNG = "/trainer/deepfight";
+  const ATHLETEN = "/trainer/deepfight/athleten";
+  const GEGNER = "/trainer/deepfight/gegner";
+  const analyse = pathname.startsWith("/trainer/deepfight/analyse");
+  const unter = (basis: string) => pathname === basis || pathname.startsWith(`${basis}/`);
+  const athletenAktiv = unter(ATHLETEN) || (analyse && modus === "leute");
+  const gegnerAktiv = unter(GEGNER) || (analyse && modus === "gegner");
+  return [
+    { href: LANDUNG, label: "DeepFight", aktiv: pathname === LANDUNG, wortmarke: true },
+    { href: ATHLETEN, label: "Athleten", aktiv: athletenAktiv, zurueck: athletenAktiv && pathname !== ATHLETEN },
+    { href: GEGNER, label: "Gegner", aktiv: gegnerAktiv, zurueck: gegnerAktiv && pathname !== GEGNER },
+  ];
+}
+
 function Bereich({ children }: { children: React.ReactNode }) {
   const { modus } = useDeepFightModus();
   const pathname = usePathname();
@@ -72,11 +103,16 @@ function Bereich({ children }: { children: React.ReactNode }) {
         <Synthesis modus={modus} />
       </div>
 
+      {/* Ab lg stehen die Segmente im Kopf der Hülle (unten) — die
+          Glas-Leiste bleibt nur für das Handy, dort gibt es keinen Kopf. */}
       {mitLeiste && (
-        <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:pt-1">
+        <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:hidden">
           <DeepFightLeiste />
         </div>
       )}
+      <KopfNavigation rang={2}>
+        <KopfSegmente label="DeepFight-Bereich" segmente={segmenteFuer(pathname, modus)} />
+      </KopfNavigation>
       {children}
     </div>
   );

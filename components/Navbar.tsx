@@ -9,6 +9,7 @@ import { useAuth, useFighterName, useRights } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Icon from "@/components/ui/Icon";
+import AppSuche from "@/components/shell/AppSuche";
 
 /* ─── Symbole ────────────────────────────────────────────────────────────────
  * Hier standen zehn von Hand gemalte SVG-Pfade (rund 95 Zeilen). Sie sind
@@ -488,6 +489,8 @@ export default function Navbar() {
 
           {/* Auth Controls — Desktop */}
           <div className="hidden items-center gap-3 md:flex">
+            {/* Die Suche der ganzen App (Leon 19.09.2026) — nur angemeldet. */}
+            {user && <AppSuche />}
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -558,6 +561,13 @@ export default function Navbar() {
               </>
             )}
           </div>
+
+          {/* Handy: dieselbe Lupe links neben dem Menü-Knopf. */}
+          {user && (
+            <div className="ml-auto mr-2 md:hidden">
+              <AppSuche />
+            </div>
+          )}
 
           {/* Mobile Hamburger */}
           <button

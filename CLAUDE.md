@@ -1946,6 +1946,195 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       jwks-rsa-Override. Der Deckel 12 greift nur beim Hinzufügen; ein
       Bestandsplan mit mehr Einträgen (gibt es heute nicht, der Generator
       schreibt höchstens 12) würde beim Speichern gekappt.
+  - **GEGNERSEITE NEU + KOPFBALKEN MIT NAVIGATION (18.09.2026, Fenster
+    tidal-athletics-e0, alleiniger Baum — a0/b2 meldeten „frei", e8/b4 zu).**
+    Leons Antworten (wörtlich): „Gegnerseite neuer Look (Empfohlen)" · Stufe 4
+    „Ist egal, kein Stufe 4" · Live-Blick „ich will ein paar dinge ändern" →
+    zweite Runde (Freitext, siehe unten) · Athleten „Nur mit Analyse, beim
+    Start alle (Empfohlen)" · Kopfbalken „Zurück-Knöpfe nach oben
+    (Empfohlen)" · Löschen „Nur beim Bearbeiten, oben rechts (Empfohlen)".
+    - **Gegnerseite im Token-Look** (`app/trainer/deepfight/gegner/[id]`,
+      Rest von Etappe 3b): Kopf = Glas-Karte (kein PageHead — im Bereich sitzt
+      Text immer auf einer Karte), Name `--type-display` OHNE Versalien, Zeile
+      „Stil · Auslage · Maße" wie auf der Wettkampfseite, darunter „3 von 9
+      Kategorien gescoutet · Profilstärke 67 %" (EINE Zahl, `evidence.staerke`,
+      statt „DNA 6 %"). Ring ab sm links vom Namen (72 px), auf dem Handy klein
+      (40 px) in der Standzeile — zwei Instanzen, weil der Ring seine Größe als
+      Zahl bekommt. Wege: „Video analysieren" (Akzent) · Bearbeiten · Wettkampf
+      anlegen · Freigabe (Zähler-Pille); Handy = Raster 2 Spalten. Reiter
+      „Übersicht · Kampf-DNA · Statistik" (vorher „Übersicht · DeepFight ·
+      Stats") im Muster der Sheet-Reiter (`aria-pressed`, `data-reiter`),
+      KLEBEN per `.df-reiter` (globals.css: lg `top: calc(var(--shell-gap) * 2 +
+      var(--hd-h))` = 12 px unter dem Kopf der Hülle, mobil 8 px + Notch).
+      Übersicht und Statistik je EINE Glas-Karte, Kampf-DNA ohne Rahmen (Kacheln
+      sind Flächen, Leerzustand eigene `.t-card` → sonst Glas in Glas).
+      „Auf einen Blick" mit + / − / ★ in `--positive/--negative/--warning`
+      (vorher Cyan/Pink/#9D7BFA). Freigabe-Text nennt das Kampfprofil (das alte
+      „Mein DeepFight" gibt es nicht mehr). 0 Alt-Token, 0 rohe Farben.
+    - **Leons zweite Runde (Freitext):** „den Balken oben … mehr nutzen. das
+      trainer deepfight kann weg … die interaktion … soll sich je nach offener
+      seite verändern und auffällige oder ‚große' navigation anbieten" ·
+      „DeepFight / Gegner oben drinnen … klickbar" · beim Bearbeiten „erstmal
+      nur das Gegnerprofil … Dinge wie die Fight-DNA sollen nicht beim
+      bearbeiten stehen, jedoch wieder die Bereiche von DeepFight … die
+      schreibfelder größer angepasster an den nötigen platz" · „das profil
+      löschen button soll generell oben rechts stehen" · „der speicher &
+      abbrechen button soll weg da automatisch gespeichert werden soll" ·
+      Freigabe „eine suche … und die anzeige auf 20 schüler ca. und der rest
+      scrollbar" · „wettkampf anlegen … oben in dem Balken … ein button mit
+      Gegnerprofil" · „auf der DeepFight seite oben drei Buttons, Deepfight …
+      athleten wo dann alle athleten die schon eine Deepfight analyse bekommen
+      haben und gegner".
+    - **Kopfbalken = Slot** (`components/shell/KopfNavigation.tsx`, NEU): der
+      Pfad aus `shellBreadcrumb` ist raus (`lib/shell-nav.ts` exportiert ihn
+      noch, ohne Leser). `KopfNavigationProvider` in StaffShell um Kopf +
+      Inhalt, `KopfSlot` im StaffHeader (leer = `display:none`, gefüllt mit
+      Trennstrich per `::before`), `<KopfNavigation rang>` legt Inhalt per
+      PORTAL hinein (Meldung nur beim Einhängen: Kennung + Rang — JSX im
+      Kontext-Zustand wäre eine Render-Schleife). Es zeigt GENAU EINE Meldung:
+      höchster Rang, bei Gleichstand die jüngste. Rang 1 = Rückweg eines
+      `PageHead` (`back` → `SeitenZurueck`: in der Seite `lg:hidden`, im Kopf
+      `KopfZurueck` = 44-px-Knopf), Rang 2 = Bereich (DeepFight-Layout), Rang 3
+      = Seite mit eigener Absicht. `useHatKopf()` sagt, ob es einen Kopf gibt
+      (außerhalb der Stab-Hülle bleibt der Rückweg in der Seite). Ab `lg`; auf
+      dem Handy gibt es keinen Kopf, dort bleibt alles in der Seite.
+    - **DeepFight-Segmente** (app/trainer/deepfight/layout.tsx,
+      `segmenteFuer`): „DeepFight (Wortmarke) · Athleten · Gegner" auf allen
+      DeepFight-Seiten; auf Detailseiten trägt das gewählte Segment einen Pfeil
+      und `aria-current="location"` — es IST der Weg zurück. `/analyse` hängt
+      am Modus (gegner → Gegner, leute → Athleten). Die Glas-Leiste
+      (`DeepFightLeiste`) steht nur noch unter `lg`.
+      **FORM DER EINTRÄGE — drei Fassungen, Leon hat zweimal nachgesteuert:**
+      (1) Segment-Leiste mit Fläche, Kante und Akzentfüllung → Leon: „sieht
+      aus wie eine Leiste mit drei Buttons in die Navbar eingepresst … man soll
+      sie gar nicht als Buttons wahrnehmen". (2) Reine Schrift
+      (`--type-nav-active`, `.kopf-link`, `data-press="quiet"`, keine
+      Hover-Fläche) mit gleitendem Akzent-Strich darunter → Leon: „der Strich
+      gefällt mir noch nicht, etwas wie links in der Navbar, aber dezenter,
+      nicht genau gleich". (3) HEUTE: Schrift + GLAS-KAPSEL `.kopf-lupe` hinter
+      dem gewählten Eintrag — Material der Sidebar-Lupe (`.sb-loupe`), aber
+      Kapsel statt Zeilen-Radius, kein Glühen, kein Zoom, kein eigener
+      backdrop-filter; nach „noch dezenter" Ring 8 % Akzent (Sidebar 28 %),
+      Fläche 18 %, Lichtkante gedämpft. Die Kapsel misst den gewählten LINK
+      (ResizeObserver + `document.fonts.ready`), setzt sich beim ersten Mal
+      ohne Übergang und GLEITET danach (transform/width/height 380 ms,
+      reduzierte Bewegung ohne). Aktiver Eintrag: `--accent-text`.
+      `KopfZurueck` (Rückweg eines PageHead) ist dieselbe Schrift mit Pfeil,
+      der unter dem Zeiger 3 px nach links rückt — keine Kapsel.
+    - **Athleten-Bibliothek nur mit Analyse** (`app/trainer/deepfight/
+      athleten/page.tsx`): ohne `?fuer=analyse` nur Personen mit ≥ 1 Analyse
+      (aus `ladeAlleAnalysen`, EIN Lauf je Sitzung, geteilt mit der Landung),
+      Leerzustand mit Knopf „Athlet analysieren" → `?fuer=analyse`; über
+      „Analyse starten" weiter ALLE, die man sehen darf. Die Freigabe-Hinweise
+      der Gruppen erscheinen damit praktisch nur noch in der Auswahl.
+    - **Bearbeiten speichert von selbst:** `OpponentEditor` hat zwei Arten —
+      `onSubmit` (Anlegen, Knöpfe) oder `onChange` (Bearbeiten, KEINE Knöpfe,
+      jede Änderung sofort, Name ungekürzt auch leer). Split, Statistik und
+      Auto-Insights sind aus dem Editor RAUS (auch beim Anlegen — dort waren sie
+      leer); `sport`/`flaeche`-Props gestrichen. Alle Textfelder sind
+      `components/ui/WachsendesFeld.tsx` (NEU: Höhe = scrollHeight + 2 px Rand,
+      nachgemessen bei neuem Wert UND neuer Breite per ResizeObserver; `resize`
+      des Aufrufers wird überstimmt) — auch die Antworten im
+      GegnerDnaAccordion (min. 2 Zeilen). Die Seite speichert 900 ms nach dem
+      letzten Tastendruck (`speichernJetzt`: höchstens EIN Schreibvorgang,
+      Versionszähler, wer währenddessen tippt, bekommt einen zweiten), beim
+      Verlassen sofort („Fertig", Aushängen, Tab weg per visibilitychange).
+      Leerer Name = alter Name bleibt, alles andere speichert („Ohne Namen
+      bleibt der alte"). Die Meldung an den Gameplan (`meldeScoutingAenderung`)
+      geht 5 s nach dem letzten Speichern bzw. sofort bei „Fertig" — nicht bei
+      jedem Tastendruck. Statuszeile `data-speicherstand` (ruhig · wartet ·
+      speichert · gespeichert · fehler mit „Nochmal"); bei Fehler bleibt der
+      Editor auf. `updateOpponent` schreibt Split/Zähler ohnehin nicht (gehören
+      der Profilrechnung) — das Autospeichern kann nichts aus den Analysen
+      überschreiben. „Profil löschen" nur beim Bearbeiten, oben rechts in der
+      Kopfkarte, Rückfrage als `role="alertdialog"`-Streifen; nach dem Löschen
+      schreibt nichts mehr (`geloescht`).
+    - **Freigabe:** GooeySearch (Name + E-Mail), Zähler „3 von 32
+      freigegeben", Liste `max-h-[min(33rem,60vh)]` = ~20 Namen, Rest scrollt.
+    - **Wettkampf anlegen** mit `?opponent=`: PageHead-Rückweg „Gegnerprofil"
+      → im Kopf „← Gegnerprofil".
+    - **DIE SUCHE DER GANZEN APP (Leon 19.09.2026: „ein permanentes
+      Suchsymbol, das soweit die Berechtigung des Benutzers langt immer
+      app-weit sucht"; Antwort „Gleich in dieser Runde").**
+      `lib/app-suche.ts` (NEU) + `components/shell/AppSuche.tsx` (NEU).
+      - Quellen je Rolle, JEDE mit dem Leser ihrer Seite (keine neue Abfrage,
+        keine Regeländerung): alle — Seiten aus `shellNavGroups(rights)` +
+        `SHELL_ACCOUNT_ITEMS`, Techniken (`ALL_TECHNIQUES` → `/techniques/{id}`),
+        Kurse (`TRAINING_BLOCKS` → `/schedule`), Pläne des Gyms + eigene;
+        Trainer/Admin — Athleten (`listAllStudents`, ohne Ghost →
+        `/trainer/athleten/{uid}`), Gegner (`listOpponentsForGym`), Wettkämpfe
+        (`listAllFightCamps` mit derselben `wettkampf`-Freigabe der Kollegen
+        wie der Wettkampfbereich, Zusatz „Athlet gegen Gegner · Datum"),
+        Analysen (`ladeAlleAnalysen`, derselbe Fächer/Cache wie die
+        DeepFight-Landung, Link wie dort `/analyse?…&analyse=`), Trainer-Pläne;
+        Athlet — eigene Wettkämpfe (`listFightCamps` → `/dashboard`, dort liest
+        er sie im Sheet), freigegebene Gegner (`listOpponentsSharedWith` →
+        `/deepfight/opponents/{id}`), für ihn freigegebene Trainer-Pläne; reine
+        Verwaltung — Mitglieder → `/verwaltung/mitglieder`.
+      - Laden: erst mit dem ERSTEN Buchstaben, je Quelle ein Promise, 5 min
+        Speicher je Konto + Rechte (`suchQuellen`); jede Gruppe erscheint,
+        sobald sie da ist, eine Zeile „kommen gleich dazu" solange eine lädt.
+        Eine abgewiesene Quelle fällt still auf „nichts" zurück.
+      - Treffer: `schlicht()` (nur a–z, 0–9, äöüß — Falle 31/32), alle
+        Wörter müssen vorkommen (Titel, Zusatz oder `auch`), Rang Titelanfang >
+        Wortanfang > irgendwo; höchstens 5 je Gruppe + „und N weitere — tipp
+        genauer".
+      - Orte: Desktop-Kopf der Stab-Hülle rechts (`GooeySearch nurSymbol`,
+        44 px Lupe, Breite per matchMedia, siehe unten),
+        Treffer als Karte darüber, Klick daneben/Escape/Seitenwechsel
+        schließt. Der KURS BLEIBT SICHTBAR, auch bei offener Suche (Leon
+        19.09.: „der Kurs rechts soll weiterhin sichtbar bleiben") — er ist
+        das Einzige im Kopf, das schrumpft (Name mit „…"); der Slot ist
+        `shrink-0`, das Feld geht ab 1440 px auf 300, darunter auf 220 px auf,
+        und unter 1440 px steht vom Gym nur das Kürzel (sonst blieb bei 1280
+        vom Kurs nur „M."). Unter xl fehlt der Kurs ganz. Handy (Stab): oben in
+        der Schublade, Treffer im Fluss über dem Menü. Athleten: Platz
+        „Suche" in der `AthleteTabBar` (nur ohne `onOpenMenu`) → SheetShell
+        mit offenem, fokussiertem Feld (`GooeySearch offenStart`, NEU) und EINEM
+        Scrollbereich; auf alten Seiten mit Navbar zusätzlich die Lupe dort
+        (Desktop in den Kontrollen, Handy links vom Menü-Knopf; unter sm liegt
+        die Trefferkarte fest am Fensterrand).
+      - Gemessen im Blick-Skript: „kick" → Pläne 2 · Techniken 5 (13) · Kurse
+        4; „mess gegner" → Gegner 1 · Analysen 2; „jab" → Techniken 4; 1440 und
+        1100 px ohne Überlauf; Handy-Schublade.
+    - **Messung:** tsc/eslint 0 · `scripts/mess-gameplan.mjs` erweitert
+      (Gegnerseite neu: Alt-Token 0, Glas-Kopf, Name ohne Versalien, jeder Text
+      der Übersicht/Statistik auf einer Karte, Reiter kleben 12 px unter dem
+      Kopf, Kopf-Segmente + „Gegner" als Rückweg, „Wettkampf anlegen" → „←
+      Gegnerprofil" → zurück, Athleten-Bibliothek nur mit Analyse / Auswahl
+      mit allen, Freigabe ~20 + Scroll + Suche + Speichern, 390 px ohne
+      Überlauf; Bearbeiten auf dem Prüf-Gegner OHNE Daten: keine Fight-DNA,
+      kein Speichern/Abbrechen, Löschen oben rechts, speichert von selbst,
+      „Fertig" → Scouting-Hinweis; Suche als Trainer: Gegner, Wettkämpfe, Analysen, „jab" → Techniken, Escape schließt; Suche als Athlet: Feld sofort fokussiert, eigene Wettkämpfe, KEINE Athleten/Analysen, der nicht freigegebene Gegner bleibt unsichtbar). **109/109 dunkel + hell** (Konsole 0, aufgeräumt 7 Auth / 37 users). Prüfkopie (git worktree auf HEAD + NUR diese Dateien, ohne die parallelen Workout-Plan-Änderungen von Fenster 04): tsc 0, `next build` grün (152 Seiten).
+    - **Fallen:** (33) Die Bearbeiten-Prüfung MUSS auf einem Gegner ohne Daten
+      laufen: Jede gespeicherte Änderung meldet das Scouting, und auf dem
+      Käfig-Gegner (Gameplan mit Inhalt) schriebe der Nachlauf nach 90 s mit
+      ECHTEM Claude neu (~0,12–0,30 €). (34) `GooeySearch` ist eingeklappt eine
+      Pille (`role="button"`, `aria-label` = label) — Playwright muss sie erst
+      antippen, bevor es ein `input` gibt. (35) Der Dev-Server läuft ohne
+      `--use-system-ca`: Die Token-Prüfung einer Admin-SDK-Route holt Googles
+      Zertifikate über HTTPS — Kaspersky kann das verzögern (gemessen 13,8 s
+      und 403 beim ersten Aufruf nach dem Kaltstart, danach 202 in 1,7 s).
+      Der zweite Lauf auf dem warmen Server war grün. (36) Heredocs im Bash-Werkzeug über ~8 KB brechen
+      ab („unexpected EOF") — große Textblöcke per Write-Werkzeug; und in
+      `node -e '…'` mit Template-Literalen werden `\\/` und `\\n` still
+      verschluckt → Regex-Zeilen danach mit dem Edit-Werkzeug nachziehen.
+      (37) ZWEI FENSTER IM SELBEN BAUM (19.09., Fenster 04 baute parallel die
+      Kurs-Zuordnung der Workout-Pläne): Der Dev-Server schickt einen
+      Kompilierfehler aus IRGENDEINER Datei an ALLE offenen Seiten — ein
+      fremder Zwischenstand landet als Konsolenfehler im eigenen Messlauf
+      (dann abstimmen und wiederholen). Ein Aufräum-Skript darf nur die
+      EIGENEN Prüfkonten löschen (mess-kz@ von 04 fiel sonst mit). Vor dem
+      Commit mit fremden Änderungen im Baum: git worktree auf HEAD, nur die
+      eigenen Dateien hineinkopieren, node_modules als Junction, tsc +
+      `next build` — so baut es auch Vercel.
+    - **Offen:** `ErrorState` (15 Aufrufer) steht noch im alten Look
+      (`blood`, `rounded-sm`) — Waise, nicht in diesem Fenster · Kopfbalken auf
+      Seiten OHNE PageHead-Rückweg bleibt leer (nur Gym + Kurs) — weitere
+      Seiten können `KopfNavigation` nutzen · `MatchupBlock` (Athletenprofil,
+      33 Alt-Token) und `athleten/[uid]` (e8) im Alt-Look · der aktive
+      Kopf-Knopf trägt den Gym-Akzent auch im Gegner-Modus (der Kopf liegt
+      außerhalb von `[data-area]`).
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)

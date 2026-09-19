@@ -134,6 +134,7 @@ export default function GooeySearch({
   breiteZu = 116,
   breiteAuf = 240,
   nurSymbol = false,
+  offenStart = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -169,8 +170,15 @@ export default function GooeySearch({
    * Sinnvoll nur mit einer kreisrunden Breite (`breiteZu` = Höhe).
    */
   nurSymbol?: boolean;
+  /**
+   * Schon geöffnet und fokussiert einhängen (Leon 19.09.2026, die Suche der
+   * ganzen App im Sheet der Athleten-Leiste): Wer „Suche" antippt, will
+   * tippen, nicht noch einmal die Pille öffnen. Der Fokus-Effekt unten
+   * läuft beim Einhängen mit `open = true` und setzt ihn.
+   */
+  offenStart?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(offenStart);
   /** Läuft der Übergang gerade? Nur dann liegt der Goo-Filter an. */
   const [verschmilzt, setVerschmilzt] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

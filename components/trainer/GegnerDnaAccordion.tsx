@@ -29,6 +29,7 @@
 
 import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
+import WachsendesFeld from "@/components/ui/WachsendesFeld";
 import { useState } from "react";
 import {
   DNA_CATEGORIES,
@@ -239,7 +240,10 @@ export default function GegnerDnaAccordion({
                         >
                           {question.label}
                         </span>
-                        <textarea
+                        {/* Wächst mit der Antwort (Leon 18.09.2026: „die
+                            Schreibfelder größer, angepasster an den nötigen
+                            Platz vom Text"). */}
+                        <WachsendesFeld
                           value={answers[question.id] ?? ""}
                           onChange={(e) =>
                             setAnswer(question.id, e.target.value)
@@ -247,8 +251,8 @@ export default function GegnerDnaAccordion({
                           placeholder={
                             question.placeholder ?? "Nur ausfüllen, wenn bekannt…"
                           }
-                          rows={2}
-                          className="rounded-field px-3 py-2"
+                          minZeilen={2}
+                          className="rounded-field px-3 py-2.5"
                           style={FELD_STYLE}
                         />
                       </label>

@@ -436,6 +436,206 @@ async function warteAuf(pruefe, ms = 30000) {
   return null;
 }
 
+/**
+ * DIE GEGNERSEITE IM TOKEN-LOOK (Fenster e0, 18.09.2026, Leon: „Gegnerseite in
+ * den neuen Look"). Prüft auf dem Gegner mit zwei Käfig-Analysen:
+ *   • keine Alt-Token mehr (`--ink-*`, `--fg-*`, `--ta-*`, Mono-/Display-
+ *     Klassen, carbon, rohe Hex/rgba im Inline-Stil),
+ *   • der Kopf ist eine Glas-Karte, der Name steht OHNE Versalien,
+ *   • jeder sichtbare Text in Übersicht und Statistik sitzt auf einer Karte
+ *     (Regel des DeepFight-Bereichs),
+ *   • drei Reiter, die Reiter kleben 12 px unter dem Kopf der Hülle,
+ *   • Freigabe: Athlet anhaken → speichern → sharedWith im Dokument, Zähler
+ *     am Knopf (danach per Admin-SDK zurückgesetzt),
+ *   • 390 px ohne Quer-Überlauf.
+ */
+async function gegnerseiteImNeuenLook(page, { db, gegnerId, athletUid }) {
+  const blick = () =>
+    page.evaluate(() => {
+      const kopf = document.querySelector('[data-block="kopf"]');
+      const main = kopf.closest("main");
+      const alt = main.querySelectorAll(
+        '[style*="--ink-"], [style*="--fg-"], [style*="--ta-"], .font-mono-ta, .font-display-ta, [class*="carbon"], .card-glass',
+      ).length;
+      const roh = Array.from(main.querySelectorAll("[style]")).filter((e) =>
+        /#[0-9a-f]{3,8}\b|rgba?\(/i.test(e.getAttribute("style") ?? ""),
+      ).length;
+      const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+      let frei = 0;
+      const beispiele = [];
+      while (walker.nextNode()) {
+        const n = walker.currentNode;
+        if (!n.textContent.trim()) continue;
+        const el = n.parentElement;
+        if (!el || el.closest(".sr-only")) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        if (!el.closest(".t-card")) {
+          frei += 1;
+          if (beispiele.length < 3) beispiele.push(n.textContent.trim().slice(0, 30));
+        }
+      }
+      const h1 = kopf.querySelector("h1");
+      return {
+        alt, roh, frei, beispiele,
+        kopfKarte: kopf.classList.contains("t-card"),
+        versalien: h1 ? getComputedStyle(h1).textTransform : null,
+        reiter: document.querySelectorAll("[data-reiter]").length,
+        an: document.querySelector('[data-reiter][aria-pressed="true"]')?.getAttribute("data-reiter") ?? null,
+      };
+    });
+
+  const b = await blick();
+  sagt(b.alt === 0 && b.roh === 0, `Gegnerseite neu: 0 Alt-Token, 0 rohe Farben im Inline-Stil (${b.alt} / ${b.roh})`);
+  sagt(b.kopfKarte && b.versalien === "none", `Gegnerseite neu: Kopf ist eine Glas-Karte, Name ohne Versalien (${b.versalien})`);
+  sagt(b.reiter === 3 && b.an === "uebersicht", `Gegnerseite neu: drei Reiter, „Übersicht" gewählt (${b.reiter}, ${b.an})`);
+  sagt(b.frei === 0, `Gegnerseite neu: jeder Text der Übersicht sitzt auf einer Karte (${b.frei} frei${b.beispiele.length ? `: ${b.beispiele.join(" | ")}` : ""})`);
+
+  // Kleben: nach dem Scrollen steht die Leiste 12 px unter dem Kopf der Hülle.
+  await page.evaluate(() => window.scrollTo(0, 700));
+  await page.waitForTimeout(600);
+  const lage = await page.evaluate(() => ({
+    reiter: Math.round(document.querySelector(".df-reiter").getBoundingClientRect().top),
+    kopf: Math.round(document.querySelector("header").getBoundingClientRect().bottom),
+  }));
+  sagt(lage.reiter - lage.kopf === 12, `Gegnerseite neu: Reiter kleben 12 px unter dem Kopf der Hülle (Kopf ${lage.kopf}, Reiter ${lage.reiter})`);
+  await page.screenshot({ path: `${OUT}/mess-e0-gegner-kleben-${THEME}.png`, fullPage: false });
+
+  await page.locator('[data-reiter="dna"]').click();
+  await page.waitForTimeout(900);
+  const dnaText = (await page.locator("main").last().innerText()).toLowerCase();
+  sagt(
+    (await page.locator('[data-reiter="dna"][aria-pressed="true"]').count()) === 1 && dnaText.includes("preferred weapons"),
+    "Gegnerseite neu: Reiter „Kampf-DNA“ zeigt den Kategorien-Rost",
+  );
+  await page.locator('[data-reiter="stats"]').click();
+  await page.waitForTimeout(900);
+  const stats = await blick();
+  const statsText = (await page.locator('[data-block="statistik"]').innerText()).toLowerCase();
+  sagt(stats.an === "stats" && statsText.includes("double leg") && stats.frei === 0, `Gegnerseite neu: „Statistik“ auf Glas mit Double Leg (${stats.frei} frei)`);
+  await page.locator('[data-reiter="uebersicht"]').click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  // Freigabe: den Prüf-Athleten anhaken und speichern.
+  await page.locator('[data-aktion="freigabe"]').click();
+  const panel = page.locator('[data-block="freigabe"]');
+  await panel.waitFor({ timeout: 15000 });
+  await panel.locator("[data-freigabe-liste] button").first().waitFor({ timeout: 20000 });
+  await page.waitForTimeout(600);
+  const liste = await panel.locator("[data-freigabe-liste]").evaluate((el) => ({
+    hoch: el.clientHeight,
+    inhalt: el.scrollHeight,
+    zeilen: el.querySelectorAll("button").length,
+  }));
+  sagt(
+    liste.hoch <= 530 && (liste.zeilen <= 20 || liste.inhalt > liste.hoch),
+    `Freigabe neu: Liste zeigt ~20, der Rest scrollt (${liste.zeilen} Namen, ${liste.hoch}/${liste.inhalt} px)`,
+  );
+  // Suche: Gooey-Pille antippen, tippen — die Liste schrumpft auf die Treffer.
+  await panel.locator('[role="button"][aria-label="Athlet suchen"]').click();
+  await panel.locator("input").first().fill("Mess Athlet");
+  await page.waitForTimeout(700);
+  const treffer = await panel.locator("[data-freigabe-liste] button").count();
+  sagt(treffer >= 1 && treffer < liste.zeilen, `Freigabe neu: Suche „Mess Athlet“ → ${treffer} Treffer`);
+  const zeile = panel.getByRole("button", { name: "Mess Athlet 2d" });
+  await zeile.waitFor({ timeout: 20000 });
+  await zeile.click();
+  sagt((await zeile.getAttribute("aria-pressed")) === "true", "Freigabe neu: Tipp hakt den Athleten an (aria-pressed)");
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${OUT}/mess-e0-gegner-freigabe-${THEME}.png`, fullPage: false });
+  await panel.getByRole("button", { name: "Freigabe speichern" }).click();
+  await panel.waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+  const geteilt = (await db.collection("opponents").doc(gegnerId).get()).data()?.sharedWith ?? [];
+  const zaehler = (await page.locator('[data-aktion="freigabe"]').innerText()).replace(/\s+/g, " ").trim();
+  sagt(
+    geteilt.includes(athletUid) && /1$/.test(zaehler) && (await panel.count()) === 0,
+    `Freigabe neu: gespeichert (sharedWith ${geteilt.length}), Panel zu, Knopf „${zaehler}“`,
+  );
+  await db.collection("opponents").doc(gegnerId).update({ sharedWith: [] });
+
+  // Kopf der Hülle (Leon 18.09.2026): drei Segmente, „Gegner" gewählt mit Pfeil.
+  const kopf = await page.evaluate(() => {
+    const slot = document.querySelector("[data-kopf-slot]");
+    const segs = Array.from(slot?.querySelectorAll("[data-kopf-segment]") ?? []);
+    return {
+      namen: segs.map((a) => a.getAttribute("data-kopf-segment")).join(","),
+      gegner: slot?.querySelector('[data-kopf-segment="Gegner"]')?.getAttribute("aria-current") ?? null,
+    };
+  });
+  sagt(
+    kopf.namen === "DeepFight,Athleten,Gegner" && kopf.gegner === "location",
+    `Kopf neu: Segmente ${kopf.namen}, „Gegner“ ist der Weg zurück (aria-current ${kopf.gegner})`,
+  );
+
+  // Die Suche der ganzen App im Kopf (Leon 19.09.2026): Lupe → Feld → Treffer
+  // aus mehreren Quellen, Escape schließt.
+  const zaehleGruppen = (wurzel) =>
+    page.evaluate((sel) => {
+      const raus = {};
+      for (const g of document.querySelectorAll(`${sel} [data-such-gruppe]`)) {
+        raus[g.getAttribute("data-such-gruppe")] = g.querySelectorAll("[data-such-treffer]").length;
+      }
+      return raus;
+    }, wurzel);
+  await page.locator('header [role="button"][aria-label="In der App suchen"]').click();
+  const kopfFeld = page.locator("header input").first();
+  await kopfFeld.fill("mess gegner käfig");
+  await page.locator("header [data-such-gruppe=\"wettkaempfe\"]").waitFor({ timeout: 45000 });
+  await page.waitForFunction(() => !document.querySelector("header [data-such-laedt]"), null, { timeout: 45000 });
+  const tSuche = await zaehleGruppen("header");
+  await kopfFeld.fill("jab");
+  await page.waitForTimeout(700);
+  const tJab = await zaehleGruppen("header");
+  await page.screenshot({ path: `${OUT}/mess-e0-suche-kopf-${THEME}.png`, fullPage: false });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(500);
+  const nachEscape = await page.locator("header [data-such-treffer-liste]").count();
+  sagt(
+    (tSuche.gegner ?? 0) >= 1 && (tSuche.wettkaempfe ?? 0) >= 1 && (tSuche.analysen ?? 0) >= 1 && (tJab.techniken ?? 0) >= 1 && nachEscape === 0,
+    `Suche (Trainer): Gegner ${tSuche.gegner}, Wettkämpfe ${tSuche.wettkaempfe}, Analysen ${tSuche.analysen}; „jab“ → Techniken ${tJab.techniken}; Escape schließt`,
+  );
+
+  // „Wettkampf anlegen" → oben „← Gegnerprofil" → zurück aufs Profil.
+  await page.locator('[data-block="kopf"] a[href*="/trainer/competitions/new?opponent="]').click();
+  await page.waitForURL((u) => u.pathname === "/trainer/competitions/new" && u.searchParams.has("opponent"), { timeout: 30000 });
+  const zurueck = page.locator("[data-kopf-slot] [data-kopf-zurueck]");
+  await zurueck.waitFor({ timeout: 20000 });
+  const zurueckText = (await zurueck.innerText()).trim();
+  await zurueck.click();
+  await page.waitForURL(new RegExp(`/trainer/deepfight/gegner/${gegnerId}$`), { timeout: 30000 });
+  sagt(zurueckText === "Gegnerprofil", `Wettkampf anlegen: Kopf zeigt „${zurueckText}“ und führt zurück aufs Profil`);
+
+  // „Athleten" im Kopf: nur wer schon eine Analyse hat; beim Start alle.
+  await page.locator('[data-kopf-slot] [data-kopf-segment="Athleten"]').click();
+  await page.waitForURL((u) => u.pathname === "/trainer/deepfight/athleten" && !u.search, { timeout: 30000 });
+  await page.getByText("Mess Athlet 2d").first().waitFor({ timeout: 45000 });
+  await page.waitForTimeout(800);
+  const bib = (await page.locator("main").last().innerText()).toLowerCase();
+  await page.goto(`${BASE}/trainer/deepfight/athleten?fuer=analyse`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Ich selbst").first().waitFor({ timeout: 30000 });
+  sagt(
+    bib.includes("mess athlet 2d") && !bib.includes("ich selbst"),
+    "Athleten neu: Bibliothek zeigt den analysierten Athleten, nicht das Prüfkonto ohne Analyse; „Analyse starten“ zeigt alle",
+  );
+  await page.goto(`${BASE}/trainer/deepfight/gegner/${gegnerId}`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-block="kopf"] h1').waitFor({ timeout: 30000 });
+
+  // Handy: kein Quer-Überlauf, Hauptweg über die volle Breite.
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator('[data-block="kopf"] h1').waitFor({ timeout: 30000 });
+  await page.waitForTimeout(2000);
+  const handy = await page.evaluate(() => {
+    const kopf = document.querySelector('[data-block="kopf"]');
+    const haupt = kopf.querySelector('a[href*="/trainer/deepfight/analyse"]').getBoundingClientRect();
+    const raster = kopf.querySelector('a[href*="/trainer/deepfight/analyse"]').parentElement.getBoundingClientRect();
+    return { breite: document.documentElement.scrollWidth, haupt: Math.round(haupt.width), raster: Math.round(raster.width) };
+  });
+  sagt(handy.breite <= 390 && handy.haupt === handy.raster, `Gegnerseite neu, 390 px: kein Quer-Überlauf (${handy.breite}), „Video analysieren“ volle Breite (${handy.haupt}/${handy.raster})`);
+  await page.screenshot({ path: `${OUT}/mess-e0-gegner-handy-${THEME}.png`, fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+}
+
 async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leerId, db, scoutId, scoutCampId }) {
   const { chromium } = await import("playwright");
   // Der Schalter erlaubt Ton ohne Nutzergeste — sonst sperrt Chromium den
@@ -758,18 +958,49 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     sagt(!!planNachher && !planNachher.usage, `Bestand: Route schreibt „offen · ${planNachher?.offen}“ ohne Claude-Aufruf`);
     await page.screenshot({ path: `${OUT}/mess-5b-bestand-flaeche-${THEME}.png`, fullPage: false });
 
-    // Gegnerprofil
+    // Gegnerprofil — seit Fenster e0 (18.09.2026) im Token-Look
     await page.goto(`${BASE}/trainer/deepfight/gegner/${gegnerId}`, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(6000);
+    await page.locator('[data-block="kopf"] h1').waitFor({ timeout: 30000 });
+    await page.waitForTimeout(3000);
     const profText = (await page.locator("main").last().innerText()).toLowerCase();
     sagt(profText.includes("käfig"), "Gegnerprofil: Käfig-Wörter (eine Kampfart, Fläche Käfig)");
     await page.screenshot({ path: `${OUT}/mess-2d-gegnerprofil-${THEME}.png`, fullPage: false });
+    await gegnerseiteImNeuenLook(page, { db, gegnerId, athletUid });
 
     // ── Gameplan folgt dem Scouting zur Laufzeit (Fenster d5, echte Route) ──
+    // Seit Fenster e0 (18.09.2026) speichert Bearbeiten VON SELBST: Größe
+    // eintragen → „Gespeichert" → „Fertig" schickt die Meldung sofort. Die
+    // Prüfungen des neuen Editors laufen HIER, auf dem Prüf-Gegner ohne
+    // Daten — auf dem Käfig-Gegner stieße die Meldung einen ECHTEN
+    // Claude-Lauf an (Gameplan mit Inhalt, ~0,12–0,30 €).
     await page.goto(`${BASE}/trainer/deepfight/gegner/${scoutId}`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "Bearbeiten" }).first().click();
+    await page.locator('[data-aktion="bearbeiten"]').click();
+    const gEditor = page.locator('[data-block="editor"]');
+    await gEditor.waitFor({ timeout: 15000 });
+    await page.waitForTimeout(900);
+    const editorText = (await gEditor.innerText()).toLowerCase();
+    sagt(
+      !editorText.includes("fight-dna") && !editorText.includes("technik-statistik") && editorText.includes("real habits"),
+      "Bearbeiten neu: nur Gegnerprofil + DeepFight-Kategorien, keine Fight-DNA/Statistik",
+    );
+    sagt(
+      (await gEditor.getByRole("button", { name: /^(Speichern|Abbrechen)$/i }).count()) === 0 &&
+        (await page.locator('[data-block="kopf"] [data-aktion="profil-loeschen"]').count()) === 1,
+      "Bearbeiten neu: kein Speichern/Abbrechen, „Profil löschen“ steht im Kopf",
+    );
+    const loeschBox = await page.locator('[data-aktion="profil-loeschen"]').boundingBox();
+    const kopfBox = await page.locator('[data-block="kopf"]').boundingBox();
+    sagt(
+      !!loeschBox && !!kopfBox && kopfBox.x + kopfBox.width - (loeschBox.x + loeschBox.width) < 40 && loeschBox.y - kopfBox.y < 40,
+      `Bearbeiten neu: „Profil löschen“ oben rechts (Abstand rechts ${Math.round(kopfBox.x + kopfBox.width - loeschBox.x - loeschBox.width)} px, oben ${Math.round(loeschBox.y - kopfBox.y)} px)`,
+    );
     await page.getByLabel("Größe cm").fill("181");
-    await page.getByRole("button", { name: "Speichern" }).first().click();
+    const tAuto = Date.now();
+    await page.locator('[data-speicherstand="gespeichert"]').waitFor({ timeout: 15000 });
+    const nachAuto = (await db.collection("opponents").doc(scoutId).get()).data();
+    sagt(nachAuto?.heightCm === 181, `Bearbeiten neu: speichert von selbst (${Date.now() - tAuto} ms, heightCm ${nachAuto?.heightCm})`);
+    await page.screenshot({ path: `${OUT}/mess-e0-bearbeiten-${THEME}.png`, fullPage: false });
+    await page.locator('[data-aktion="bearbeiten-fertig"]').click();
     tSpeichern = Date.now();
     const hinweis = page.locator('[data-gameplan-nachzug="1"]');
     await hinweis.waitFor({ timeout: 30000 });
@@ -816,6 +1047,34 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     await apage.waitForTimeout(1500);
     sagt((await planKnopf.count()) === 1, "Athlet: Wettkampf-Karte zeigt „Dein Trainingsplan“ und „Dein Gameplan“");
     await apage.screenshot({ path: `${OUT}/mess-d5-athlet-karte-${THEME}.png`, fullPage: false });
+
+    // Die Suche der ganzen App beim ATHLETEN (Leon 19.09.2026): Platz „Suche"
+    // in der Leiste → Sheet mit offenem Feld. Er findet seine Wettkämpfe —
+    // und den Gegner NICHT, weil der ihm nicht freigegeben ist.
+    await apage.locator('[data-aktion="app-suche"]').click();
+    const sucheSheet = apage.getByRole("dialog", { name: "In der App suchen" });
+    await sucheSheet.waitFor({ timeout: 15000 });
+    await apage.waitForTimeout(600);
+    const aFeld = sucheSheet.locator("input").first();
+    const fokussiert = await aFeld.evaluate((el) => el === document.activeElement);
+    await aFeld.fill("mess");
+    await apage.waitForFunction(() => !document.querySelector('[role="dialog"] [data-such-laedt]'), null, { timeout: 45000 });
+    await apage.waitForTimeout(500);
+    const aMess = await apage.evaluate(() => {
+      const raus = {};
+      for (const g of document.querySelectorAll('[role="dialog"] [data-such-gruppe]')) raus[g.getAttribute("data-such-gruppe")] = g.querySelectorAll("[data-such-treffer]").length;
+      return raus;
+    });
+    await aFeld.fill("mess gegner käfig");
+    await apage.waitForTimeout(700);
+    const aGegner = await apage.locator('[role="dialog"] [data-such-gruppe="gegner"]').count();
+    await apage.screenshot({ path: `${OUT}/mess-e0-suche-athlet-${THEME}.png`, fullPage: false });
+    sagt(
+      fokussiert && (aMess.wettkaempfe ?? 0) >= 1 && !aMess.athleten && !aMess.analysen && aGegner === 0,
+      `Suche (Athlet): Feld sofort fokussiert, eigene Wettkämpfe ${aMess.wettkaempfe}, keine Athleten/Analysen, nicht freigegebener Gegner unsichtbar`,
+    );
+    await sucheSheet.getByRole("button", { name: "Suche schließen" }).click();
+    await apage.waitForTimeout(600);
 
     // Trainingsplan im Sheet (Fenster d5)
     await planKnopf.click();

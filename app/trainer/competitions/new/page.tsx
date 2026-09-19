@@ -361,6 +361,9 @@ function NewCompetitionContent() {
     load();
   }, [load]);
 
+  // Vom Gegnerprofil gekommen? Dann führt der Weg zurück dorthin (PageHead).
+  const vomGegner = searchParams.get("opponent");
+
   // Vorauswahl aus Query-Parametern (?student= / ?opponent=)
   useEffect(() => {
     const s = searchParams.get("student");
@@ -628,9 +631,17 @@ function NewCompetitionContent() {
       className="min-h-screen"
       style={{ background: "var(--surface-page)", color: "var(--text-body)" }}
     >
+      {/* Wer vom Gegnerprofil kommt (`?opponent=`), geht dorthin zurück —
+          im Kopf der Hülle als „← Gegnerprofil" (Leon 18.09.2026: „ein Button
+          mit Gegnerprofil, der mich einfach wieder zurück zu dem Profil
+          bringt"). Sonst zurück in den Wettkampfbereich. */}
       <PageHead
         lane="standard"
-        back={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}
+        back={
+          vomGegner
+            ? { href: `/trainer/deepfight/gegner/${vomGegner}`, label: "Gegnerprofil" }
+            : { href: "/trainer/competitions", label: "Wettkampfbereich" }
+        }
         title="Neuer Wettkampf"
       />
 

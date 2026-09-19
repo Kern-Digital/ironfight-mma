@@ -25,12 +25,12 @@
  */
 
 import Icon from "@/components/ui/Icon";
-import { useAuth, useRights } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { getGymName, gymInitials, resolveGymId } from "@/lib/gym";
 import { getCurrentBlock, type CurrentBlock } from "@/lib/schedule";
-import { shellBreadcrumb } from "@/lib/shell-nav";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import AppSuche from "./AppSuche";
+import { KopfSlot } from "./KopfNavigation";
 import { useEffect, useMemo, useState } from "react";
 
 const LABEL: React.CSSProperties = {
@@ -92,7 +92,7 @@ function CourseChip() {
   return (
     <Link data-press="surface"
       href="/schedule"
-      className="t-interactive flex min-w-0 shrink-0 items-center gap-2.5 px-3 py-1.5"
+      className="t-interactive flex min-w-0 items-center gap-2.5 px-3 py-1.5"
       style={{ borderRadius: "var(--r-nav)", textDecoration: "none" }}
     >
       <span
@@ -120,9 +120,7 @@ function CourseChip() {
 }
 
 export default function StaffHeader() {
-  const pathname = usePathname();
   const { profile } = useAuth();
-  const rights = useRights();
 
   const gymId = resolveGymId(profile);
   const [gymName, setGymName] = useState<string | null>(null);
@@ -136,10 +134,6 @@ export default function StaffHeader() {
     };
   }, [gymId]);
 
-  const crumbs = useMemo(
-    () => shellBreadcrumb(pathname, rights),
-    [pathname, rights],
-  );
 
   return (
     <header
@@ -176,65 +170,36 @@ export default function StaffHeader() {
         >
           {gymInitials(gymName ?? "Tidal Athletics")}
         </span>
-        <span className="truncate" style={LABEL}>
+        {/* Unter 1440 px nur das Kürzel: Neben Gym, Navigation der Seite,
+            Lupe und Kurs reicht die Breite des Kopfs dort nicht — und der Kurs
+            soll auch bei offener Suche lesbar bleiben (gemessen 19.09.: bei
+            1280 px blieb von ihm sonst nur „M."). */}
+        <span className="hidden truncate min-[1440px]:inline" style={LABEL}>
           {gymName ?? ""}
         </span>
       </span>
 
-      {crumbs.length > 0 && (
-        <span
-          aria-hidden
-          className="h-4 w-px shrink-0"
-          style={{ background: "var(--line)" }}
-        />
-      )}
+      {/* Die Navigation der offenen Seite (Leon 18.09.2026: „das ‚Trainer ›
+          DeepFight‘ kann weg, stattdessen möchte ich es interaktiver
+          nutzen"). Bis dahin stand hier der Pfad aus `shellBreadcrumb`.
+          Was hineinkommt, bestimmt die Seite — Mechanik und Rangfolge in
+          components/shell/KopfNavigation.tsx. */}
+      <KopfSlot />
 
-      {/* Pfad — letztes Glied ist Text, davor Links. Eine Gruppe wie
-          „Coach" ist keine Adresse und deshalb nie ein Link. */}
-      <nav aria-label="Pfad" className="flex min-w-0 flex-1 items-center gap-1.5">
-        {crumbs.map((crumb, i) => {
-          const last = i === crumbs.length - 1;
-          return (
-            <span key={`${crumb.label}-${i}`} className="flex min-w-0 items-center gap-1.5">
-              {i > 0 && (
-                <span
-                  aria-hidden
-                  className="flex shrink-0 items-center"
-                  style={{ color: "var(--text-3)", transform: "rotate(-90deg)" }}
-                >
-                  <Icon name="chevron-down" size={14} strokeWidth={2} />
-                </span>
-              )}
-              {crumb.href && !last ? (
-                <Link
-                  href={crumb.href}
-                  className="truncate"
-                  style={{
-                    font: "var(--type-nav)",
-                    color: "var(--text-3)",
-                    textDecoration: "none",
-                  }}
-                >
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span
-                  className="truncate"
-                  style={{
-                    font: last ? "var(--type-nav-active)" : "var(--type-nav)",
-                    color: last ? "var(--text-body)" : "var(--text-3)",
-                  }}
-                  aria-current={last ? "page" : undefined}
-                >
-                  {crumb.label}
-                </span>
-              )}
-            </span>
-          );
-        })}
-      </nav>
-
-      <CourseChip />
+      {/* Rechts: die Lupe der ganzen App (Leon 19.09.2026, components/shell/
+          AppSuche.tsx) und der Kurs — beide bleiben rechts, auch wenn der
+          Slot leer ist. Der Kurs darf schrumpfen, die Lupe nicht. */}
+      <span className="ml-auto flex min-w-0 items-center gap-2">
+        <AppSuche />
+        {/* Der Kurs bleibt sichtbar, auch wenn die Suche offen ist (Leon
+            19.09.2026: „der Kurs rechts soll weiterhin sichtbar bleiben") —
+            er ist das Einzige im Kopf, das SCHRUMPFEN darf: Sein Name kürzt
+            sich mit „…", Navigation und Lupe behalten ihre Breite. Unter xl
+            fehlt er ganz, dort reicht der Platz auch geschlossen nicht. */}
+        <span className="kopf-kurs hidden min-w-0 xl:flex">
+          <CourseChip />
+        </span>
+      </span>
     </header>
   );
 }

@@ -28,6 +28,7 @@
 
 import AthleteTabBar from "@/components/AthleteTabBar";
 import StaffHeader from "@/components/shell/StaffHeader";
+import { KopfNavigationProvider } from "@/components/shell/KopfNavigation";
 import StaffSidebar from "@/components/shell/StaffSidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -111,6 +112,9 @@ export default function StaffShell({ children }: { children: React.ReactNode }) 
           Fenstergrund stehen. Für die Lage des Inhalts ändert das nichts: Er
           zentriert sich in seiner Spalte, und ein Abstand, der links und
           rechts gleich groß ist, verschiebt eine Mitte nicht. */}
+      {/* Kopf und Inhalt teilen sich EINEN Kontext: Die Seite legt ihre
+          Navigation in den Kopf (components/shell/KopfNavigation.tsx). */}
+      <KopfNavigationProvider>
       <div className="flex min-w-0 flex-1 flex-col">
         <StaffHeader />
         {/* `staff-content` schaltet den deckenden Grund des Kindes ab — in der
@@ -119,6 +123,7 @@ export default function StaffShell({ children }: { children: React.ReactNode }) 
           {children}
         </main>
       </div>
+      </KopfNavigationProvider>
 
       {/* Handy: Schublade von links */}
       <div className="lg:hidden">

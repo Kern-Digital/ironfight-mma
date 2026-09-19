@@ -29,7 +29,7 @@
  */
 
 import Icon, { type IconName } from "@/components/ui/Icon";
-import Link from "next/link";
+import { SeitenZurueck } from "./KopfNavigation";
 
 /**
  * Die Lesespur. Drei benannte Werte statt freier Klassen — sonst driften die
@@ -109,22 +109,9 @@ export default function PageHead({
         className={`relative mx-auto flex w-full flex-col gap-4 px-4 pb-5 pt-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8 lg:px-6 lg:pb-7 lg:pt-7 ${LANES[lane]}`}
       >
         <div className="flex min-w-0 flex-col gap-1 lg:flex-1">
-          {back && (
-            <Link data-press
-              href={back.href}
-              className="t-interactive -ml-2 mb-1 inline-flex w-fit items-center gap-1.5 rounded-field px-2 py-1"
-              style={{
-                font: "var(--type-meta)",
-                letterSpacing: "var(--ls-label)",
-                textTransform: "uppercase",
-                color: "var(--text-3)",
-                textDecoration: "none",
-              }}
-            >
-              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
-              {back.label}
-            </Link>
-          )}
+          {/* Der Weg zurück: in der Seite UND ab lg groß im Kopf der Hülle
+              (Leon 18.09.2026, components/shell/KopfNavigation.tsx). */}
+          {back && <SeitenZurueck href={back.href} label={back.label} />}
 
           {eyebrow && (
             <span

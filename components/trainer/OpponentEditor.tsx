@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FIGHTER_STANCE_LABEL,
   FIGHT_STYLE_LABEL,
@@ -8,28 +8,11 @@ import {
   type FightStyle,
 } from "@/lib/fight-camp";
 import type { GegnerDnaAnswers } from "@/lib/gegner-dna";
-import {
-  deriveSuggestions,
-  deriveTendencies,
-  zoneDistribution,
-  type ActionStat,
-  type DnaSplit,
-} from "@/lib/fight-stats";
-import {
-  filtereTechnikStats,
-  gesperrteGruppen,
-  splitNachSteckbrief,
-  zonenLabel,
-  zonenPhrase,
-  type Flaeche,
-} from "@/lib/kampfart-steckbrief";
-import type { Sport } from "@/lib/video-analysis";
+import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
 import GegnerDnaAccordion from "./GegnerDnaAccordion";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Select from "@/components/ui/Select";
-import FightDnaSplit from "./FightDnaSplit";
-import FightStatsBlock from "./FightStatsBlock";
-import FightInsights from "./FightInsights";
+import WachsendesFeld from "@/components/ui/WachsendesFeld";
 
 export interface OpponentEditorValue {
   name: string;
@@ -106,8 +89,31 @@ const BTN_FONT: React.CSSProperties = {
 };
 
 /**
- * Vollständiger Gegner-DNA-Editor: Gegnerprofil-Grunddaten + ausklappbare
- * Gegner-DNA. Wird beim Anlegen UND Bearbeiten eines Gegnerprofils genutzt.
+ * Der Gegnerprofil-Editor: Grunddaten + die DeepFight-Kategorien zum
+ * Ausfüllen. Wird beim Anlegen (Bibliothek, „Neuer Wettkampf") UND beim
+ * Bearbeiten eines Gegnerprofils genutzt.
+ *
+ * ZWEI ARTEN ZU SPEICHERN — die Frage ist, ob es das Dokument schon gibt:
+ *   · `onSubmit` (Anlegen): Knöpfe am Fuß, gespeichert wird auf Druck. Vor
+ *     dem ersten Speichern gibt es nichts, wohin ein Tastendruck gehen könnte.
+ *   · `onChange` (Bearbeiten, Leon 18.09.2026: „der Speichern- und
+ *     Abbrechen-Button soll weg, da automatisch gespeichert werden soll"):
+ *     KEINE Knöpfe — jede Änderung geht sofort an den Aufrufer, und der
+ *     speichert mit kurzem Aufschub. Den Namen gibt der Editor dabei
+ *     ungekürzt weiter, auch leer: Ob ein leeres Feld „Unbekannter Gegner"
+ *     heißen soll, entscheidet beim Anlegen das Formular — beim Bearbeiten
+ *     wartet der Aufrufer, bis wieder ein Name dasteht.
+ *
+ * WAS HIER NICHT MEHR STEHT (Leon 18.09.2026: „Dinge wie die Fight-DNA sollen
+ * nicht beim Bearbeiten stehen"): Split, Technik-Statistik und Auto-Insights.
+ * Sie kommen allein aus den Video-Analysen, niemand kann sie hier ändern —
+ * zwischen den Feldern waren sie Lesestoff, der das Formular doppelt so lang
+ * machte. Beim Anlegen waren sie ohnehin leer. Split und Zähler reicht der
+ * Editor weiter unverändert durch (`OpponentEditorValue`), geschrieben werden
+ * sie von `updateOpponent` nicht (sie gehören der Profilrechnung).
+ *
+ * Alle Textfelder WACHSEN mit ihrem Inhalt (`WachsendesFeld`) — Leon: „die
+ * Schreibfelder größer, angepasster an den nötigen Platz vom Text".
  */
 export default function OpponentEditor({
   initial,
@@ -115,22 +121,16 @@ export default function OpponentEditor({
   submitLabel = "Speichern",
   onSubmit,
   onCancel,
-  sport = null,
-  flaeche = null,
+  onChange,
 }: {
   initial?: OpponentEditorInitial;
   busy?: boolean;
   submitLabel?: string;
-  onSubmit: (value: OpponentEditorValue) => void | Promise<void>;
+  /** Anlegen: gespeichert wird auf Druck. */
+  onSubmit?: (value: OpponentEditorValue) => void | Promise<void>;
   onCancel?: () => void;
-  /**
-   * Kampfart und Fläche der ANZEIGE (17.09.2026, `ansichtDesProfils`): die
-   * einzige Kampfart seiner Videos, die Fläche aus dem Profil. Gespeichert
-   * wird immer der ungefilterte Stand — Split und Zähler reicht der Editor
-   * nur durch.
-   */
-  sport?: Sport | null;
-  flaeche?: Flaeche | null;
+  /** Bearbeiten: jede Änderung sofort — der Aufrufer speichert selbst. */
+  onChange?: (value: OpponentEditorValue) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [style, setStyle] = useState<FightStyle>(initial?.style ?? "all-rounder");
@@ -157,49 +157,48 @@ export default function OpponentEditor({
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [dna, setDna] = useState<GegnerDnaAnswers>(initial?.dna ?? {});
-  // Split ist NICHT editierbar — einzige Quelle ist die Video-Analyse
-  // (gewichteter Merge). Der Wert wird nur durchgereicht, damit Speichern
-  // anderer Felder ihn nicht löscht.
+  // Split und Stats sind NICHT editierbar — einzige Quelle ist die
+  // Video-Analyse. Sie werden nur durchgereicht (siehe Kopf).
   const dnaSplit: DnaSplit | null = initial?.dnaSplit ?? null;
-  // Stats sind NICHT editierbar — einzige Quelle ist die Video-Analyse
-  // (Summen beim Übernehmen). Wert wird nur durchgereicht, damit Speichern
-  // anderer Felder ihn nicht löscht.
   const actionStats: ActionStat[] = initial?.actionStats ?? [];
 
-  // Anzeige nach dem Steckbrief der Kampfart (gespeichert wird ungefiltert).
-  const zeigeStats = sport ? filtereTechnikStats(actionStats, sport).stats : actionStats;
-  const zeigeSplit = sport ? splitNachSteckbrief(dnaSplit, sport) : dnaSplit;
-  const phrase = zonenPhrase(sport, flaeche) ?? undefined;
+  const wert = (): OpponentEditorValue => ({
+    name: name.trim(),
+    style,
+    stance,
+    heightCm: height ? Number(height) : null,
+    weightKg: weight ? Number(weight) : null,
+    reachCm: reach ? Number(reach) : null,
+    strengths: parseTags(strengths),
+    weaknesses: parseTags(weaknesses),
+    favoriteAttacks: parseTags(favorites),
+    notes: notes.trim() || null,
+    dna,
+    dnaSplit,
+    actionStats,
+  });
 
-  // Dieselbe Bedingung, unter der FightInsights etwas rendert — sie steht hier,
-  // damit die Überschrift darüber nicht allein stehen bleibt.
-  const zonen = zoneDistribution(zeigeStats);
-  const hatInsights =
-    deriveTendencies(zeigeStats, phrase).length > 0 ||
-    deriveSuggestions(zeigeSplit, zeigeStats, {
-      zonenPhrase: phrase,
-      mitTakedowns: !gesperrteGruppen(sport).includes("takedown"),
-      grappling: gesperrteGruppen(sport).includes("strike"),
-    }).length > 0 ||
-    (zonenLabel(sport, flaeche) ? zonen.center + zonen.open + zonen.cage : 0) > 0;
+  // Live-Modus: jede Änderung an den Aufrufer — außer beim Einhängen, da hat
+  // sich noch nichts geändert. Der Aufrufer steht im Ref, damit ein neuer
+  // Handler je Rendern keine Meldung auslöst.
+  const meldeRef = useRef(onChange);
+  meldeRef.current = onChange;
+  const erstesMal = useRef(true);
+  useEffect(() => {
+    if (erstesMal.current) {
+      erstesMal.current = false;
+      return;
+    }
+    meldeRef.current?.(wert());
+    // `wert` liest genau diese Felder — sie sind die Abhängigkeiten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, style, stance, height, weight, reach, strengths, weaknesses, favorites, notes, dna]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onSubmit({
-      name: name.trim() || "Unbekannter Gegner",
-      style,
-      stance,
-      heightCm: height ? Number(height) : null,
-      weightKg: weight ? Number(weight) : null,
-      reachCm: reach ? Number(reach) : null,
-      strengths: parseTags(strengths),
-      weaknesses: parseTags(weaknesses),
-      favoriteAttacks: parseTags(favorites),
-      notes: notes.trim() || null,
-      dna,
-      dnaSplit,
-      actionStats,
-    });
+    if (!onSubmit) return;
+    const v = wert();
+    onSubmit({ ...v, name: v.name || "Unbekannter Gegner" });
   }
 
   return (
@@ -288,16 +287,18 @@ export default function OpponentEditor({
           </div>
         </div>
 
+        {/* Die drei Listen wachsen mit — ein langes „Stärken" verschwand
+            vorher rechts aus dem einzeiligen Feld. Komma, Semikolon und
+            Zeilenumbruch trennen gleichermaßen (`parseTags`). */}
         <label className="mt-3 flex flex-col gap-1.5">
           <span className="t-label">
             Stärken (kommagetrennt)
           </span>
-          <input
-            type="text"
+          <WachsendesFeld
             value={strengths}
             onChange={(e) => setStrengths(e.target.value)}
             placeholder="z.B. harter Cross, gutes Footwork, Konter"
-            className="min-h-hit rounded-field px-3"
+            className="rounded-field px-3 py-2.5"
             style={fieldStyle}
           />
         </label>
@@ -305,12 +306,11 @@ export default function OpponentEditor({
           <span className="t-label">
             Schwächen (kommagetrennt)
           </span>
-          <input
-            type="text"
+          <WachsendesFeld
             value={weaknesses}
             onChange={(e) => setWeaknesses(e.target.value)}
             placeholder="z.B. Bodenlage schwach, lässt Kicks zu"
-            className="min-h-hit rounded-field px-3"
+            className="rounded-field px-3 py-2.5"
             style={fieldStyle}
           />
         </label>
@@ -318,12 +318,11 @@ export default function OpponentEditor({
           <span className="t-label">
             Bevorzugte Angriffe
           </span>
-          <input
-            type="text"
+          <WachsendesFeld
             value={favorites}
             onChange={(e) => setFavorites(e.target.value)}
             placeholder="z.B. Jab-Cross, Double-Leg, Roundhouse"
-            className="min-h-hit rounded-field px-3"
+            className="rounded-field px-3 py-2.5"
             style={fieldStyle}
           />
         </label>
@@ -331,58 +330,16 @@ export default function OpponentEditor({
           <span className="t-label">
             Notizen
           </span>
-          <textarea
+          <WachsendesFeld
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Frei-Text, Video-Notes, weitere Beobachtungen…"
+            minZeilen={3}
             className="rounded-field px-3 py-2.5"
-            style={{ ...fieldStyle, minHeight: "84px", resize: "vertical" }}
+            style={fieldStyle}
           />
         </label>
       </div>
-
-      {/* ── §1 Fight-DNA-Split (nur Anzeige — Quelle ist die Video-Analyse) ──
-          DIE ÜBERSCHRIFTEN STEHEN SEIT ETAPPE 3a HIER: Die drei Blöcke brachten
-          sie bis dahin selbst mit, solange sie ohne `frameless` gerendert
-          wurden. Das Prop ist weg, die Blöcke sind reine Anzeige — wer sie
-          platziert, benennt sie (Begründung im Kopf von FightDnaSplit.tsx).
-          Etappe 3b hat den Rest dieser Datei nachgezogen (13.09.). */}
-      <div>
-        <div className="t-label mb-3">Fight-DNA</div>
-        <FightDnaSplit split={zeigeSplit} />
-        <p
-          className="mt-2"
-          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
-        >
-          Der Fight-DNA-Split kommt aus der KI-Video-Analyse — ein gewichteter
-          Mittelwert, der mit jedem Video schärfer wird.
-        </p>
-      </div>
-
-      {/* ── §2 Technik-Statistik (nur Anzeige — Quelle ist die Video-Analyse) ── */}
-      <div>
-        <div className="t-label mb-3">Technik-Statistik</div>
-        <FightStatsBlock stats={zeigeStats} sport={sport} flaeche={flaeche} />
-        <p
-          className="mt-2"
-          style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
-        >
-          Versuche, Treffer, Zone und Setup zählt die KI-Video-Analyse mit —
-          jedes weitere Video macht das Bild vollständiger.
-        </p>
-      </div>
-
-      {/* ── §3/§4/§5 Auswertung der gespeicherten Zahlen ──
-          Anders als die beiden Blöcke darüber steht hier KEIN Erklärsatz, der
-          die Überschrift auch ohne Daten trägt — deshalb dieselbe Bedingung,
-          unter der FightInsights überhaupt etwas rendert. Bei einem frisch
-          angelegten Gegner ist der ganze Abschnitt sonst nur ein Wort. */}
-      {hatInsights && (
-        <div>
-          <div className="t-label mb-3">Auto-Insights</div>
-          <FightInsights split={zeigeSplit} stats={zeigeStats} sport={sport} flaeche={flaeche} />
-        </div>
-      )}
 
       {/* ── DeepFight-Analyse (ausklappbare Kategorien) ── */}
       <div>
@@ -399,41 +356,43 @@ export default function OpponentEditor({
         <GegnerDnaAccordion answers={dna} mode="edit" onChange={setDna} />
       </div>
 
-      {/* ── Aktionen ── */}
+      {/* ── Aktionen — nur beim Anlegen ── */}
       {/* Dieselben zwei Knöpfe wie am Fuß von „Neuer Wettkampf": der eine
           trägt den Akzent, der andere nur eine Kante. */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          data-press
-          className="t-interactive min-h-hit rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            ...BTN_FONT,
-            background: "var(--accent)",
-            color: "var(--on-accent)",
-            boxShadow: "var(--accent-glow)",
-          }}
-        >
-          {busy ? "Speichere…" : submitLabel}
-        </button>
-        {onCancel && (
+      {onSubmit && (
+        <div className="flex flex-wrap gap-2">
           <button
-            type="button"
-            onClick={onCancel}
+            type="submit"
             disabled={busy}
             data-press
             className="t-interactive min-h-hit rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               ...BTN_FONT,
-              border: "1px solid var(--line)",
-              color: "var(--text-body)",
+              background: "var(--accent)",
+              color: "var(--on-accent)",
+              boxShadow: "var(--accent-glow)",
             }}
           >
-            Abbrechen
+            {busy ? "Speichere…" : submitLabel}
           </button>
-        )}
-      </div>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              data-press
+              className="t-interactive min-h-hit rounded-field px-5 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                ...BTN_FONT,
+                border: "1px solid var(--line)",
+                color: "var(--text-body)",
+              }}
+            >
+              Abbrechen
+            </button>
+          )}
+        </div>
+      )}
     </form>
   );
 }

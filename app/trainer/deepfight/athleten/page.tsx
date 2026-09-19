@@ -50,6 +50,17 @@
  * etwas anderes. Ohne den Parameter bleibt alles wie beschrieben — ein
  * Lesezeichen auf die Bibliothek verhält sich weiter wie eine Bibliothek.
  *
+ * ─── DIE BIBLIOTHEK ZEIGT NUR, WER SCHON ANALYSIERT IST (Leon 18.09.2026) ───
+ *
+ * Leon: „Athleten, wo dann alle Athleten stehen, die schon eine
+ * DeepFight-Analyse bekommen haben" — erreichbar über das Segment im Kopf der
+ * Hülle. Ohne `?fuer=analyse` stehen hier deshalb nur Personen mit
+ * mindestens einer Analyse; über „Analyse starten" (`?fuer=analyse`) stehen
+ * weiter ALLE, die man sehen darf — sonst bekäme nie jemand seine erste
+ * (Leon: „Nur mit Analyse, beim Start alle"). Woher die Seite weiß, wer
+ * analysiert ist: aus `ladeAlleAnalysen` (lib/deepfight-analysen.ts) — EIN
+ * Lauf je Sitzung, geteilt mit der Suche und den Feldern der Landung.
+ *
  * Gruppiert wie „Neuer Wettkampf": Ich selbst · Trainer & Coaches · Athleten.
  * Trainer sind auch Athleten (CLAUDE.md), deshalb liest die Seite
  * `listAllMembers` und nicht `listAllStudents`.
@@ -70,6 +81,8 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import { darfSehen } from "@/lib/profile-sharing";
+import { ladeAlleAnalysen } from "@/lib/deepfight-analysen";
+import { listOpponentsForGym } from "@/lib/opponents";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -216,6 +229,8 @@ function AthletenAuswahlInhalt() {
    */
   const fuerAnalyse = searchParams.get("fuer") === "analyse";
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
+  // Wer schon eine Analyse hat — nur in der Bibliothek gebraucht; null = lädt.
+  const [analysiert, setAnalysiert] = useState<Set<string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -233,6 +248,25 @@ function AthletenAuswahlInhalt() {
     load();
   }, [load]);
 
+  // Der Lauf braucht die Gegnerliste nur für die Namen der Einträge — er ist
+  // derselbe, den die Landung startet, und liegt danach im Speicher.
+  useEffect(() => {
+    if (fuerAnalyse || !members || !eigeneUid) return;
+    let aktiv = true;
+    listOpponentsForGym(gymId)
+      .catch(() => [])
+      .then((opponents) => ladeAlleAnalysen(gymId, eigeneUid, members, opponents))
+      .then((liste) => {
+        if (aktiv) setAnalysiert(new Set(liste.filter((e) => e.modus === "leute").map((e) => e.zielId)));
+      })
+      .catch(() => {
+        if (aktiv) setAnalysiert(new Set());
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [fuerAnalyse, members, eigeneUid, gymId]);
+
   /**
    * Wer hier steht: ich selbst, Kollegen UND Athleten nur mit Freigabe im
    * Bereich `deepfight` (namentlich oder über mein Gym) — und keine
@@ -248,9 +282,10 @@ function AthletenAuswahlInhalt() {
     const q = search.trim().toLowerCase();
     const alle = (members ?? []).filter(
       (s) =>
-        !q ||
-        labelOf(s).toLowerCase().includes(q) ||
-        (s.email ?? "").toLowerCase().includes(q),
+        (fuerAnalyse || !analysiert || analysiert.has(s.uid)) &&
+        (!q ||
+          labelOf(s).toLowerCase().includes(q) ||
+          (s.email ?? "").toLowerCase().includes(q)),
     );
     const self = alle.find((s) => s.uid === eigeneUid) ?? null;
     const kollegen = alle.filter(
@@ -270,8 +305,18 @@ function AthletenAuswahlInhalt() {
       students,
       studentsGesamt: athleten.length,
     };
-  }, [members, search, eigeneUid, gymId]);
+  }, [members, search, eigeneUid, gymId, fuerAnalyse, analysiert]);
 
+  // Die Bibliothek wartet auf die Analysen — sonst stünde kurz jeder da.
+  const laedt = members === null || (!fuerAnalyse && analysiert === null);
+  // Bibliothek ohne einen einzigen Analysierten (ohne Suche).
+  const nochNiemand =
+    !laedt &&
+    !fuerAnalyse &&
+    !search.trim() &&
+    gruppen.self === null &&
+    gruppen.staff.length === 0 &&
+    gruppen.students.length === 0;
   const leer =
     members !== null &&
     gruppen.self === null &&
@@ -294,11 +339,11 @@ function AthletenAuswahlInhalt() {
             selbst wertest du jederzeit aus.
           </TrainerHint>
         ) : (
-          <TrainerHint id="deepfight-athletes" title="Eigene Leute auswerten">
+          <TrainerHint id="deepfight-athletes-analysiert" title="Deine analysierten Leute">
+            Hier steht jeder, der schon mindestens eine DeepFight-Analyse hat.
             Tipp auf einen Namen und du siehst sein Kampfprofil; der Knopf
-            daneben startet mit ihm als Ziel eine neue Analyse. Deine Kollegen
-            entscheiden selbst, wer ihr Kampfprofil sieht — sobald dich jemand
-            freischaltet, steht er hier. Dich selbst wertest du jederzeit aus.
+            daneben startet eine neue Analyse. Wen du zum ersten Mal
+            auswertest, findest du über &bdquo;Analyse starten&ldquo;.
           </TrainerHint>
         )}
 
@@ -322,7 +367,7 @@ function AthletenAuswahlInhalt() {
             label="Suchen"
             placeholder="Athlet suchen…"
           />
-          {members !== null && (
+          {!laedt && (
             <span
               className="ml-auto hidden pr-1 sm:inline"
               style={{ ...META_FONT, color: "var(--text-3)" }}
@@ -335,11 +380,40 @@ function AthletenAuswahlInhalt() {
           )}
         </div>
 
-        {members === null ? (
+        {laedt ? (
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} className="h-[74px] w-full rounded-card" />
             ))}
+          </div>
+        ) : nochNiemand ? (
+          // Die Bibliothek ist leer, weil noch niemand analysiert ist — nicht,
+          // weil niemand da wäre. Der Weg zur ersten Analyse steht gleich hier.
+          <div className="t-card flex flex-col items-center gap-3 p-10 text-center" data-leer="niemand-analysiert">
+            <p style={{ font: "var(--type-body-strong)" }}>
+              Noch niemand hat eine DeepFight-Analyse.
+            </p>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+              Wähl einen Athleten und leg sein erstes Kampf-Video ab — ab dann
+              steht er hier.
+            </p>
+            <Link
+              href="/trainer/deepfight/athleten?fuer=analyse"
+              data-press
+              className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
+              style={{
+                font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                background: "var(--accent)",
+                color: "var(--on-accent)",
+                boxShadow: "var(--accent-glow)",
+                textDecoration: "none",
+              }}
+            >
+              <Icon name="spark" size={13} strokeWidth={2.4} />
+              Athlet analysieren
+            </Link>
           </div>
         ) : leer ? (
           <div className="t-card p-10 text-center">

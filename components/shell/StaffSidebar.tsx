@@ -76,6 +76,7 @@ import { useTheme } from "@/lib/theme-context";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import AppSuche from "./AppSuche";
 
 /** Zeilenbild aller Menüpunkte — Maße ausschließlich aus den Tokens.
     Ränder und Polsterung stehen mit in der Transition, weil das AKTIVE Feld
@@ -731,6 +732,16 @@ export default function StaffSidebar({
       style={{ padding: "var(--sb-pad)" }}
     >
       <AccountBlock onNavigate={onNavigate} onLogout={handleLogout} />
+
+      {/* NUR IN DER SCHUBLADE (Handy): die Suche der ganzen App (Leon
+          19.09.2026). Am Desktop sitzt sie als Lupe im Kopf der Hülle —
+          die Schublade ist auf dem Handy der einzige Ort, der immer
+          erreichbar ist. Die Treffer stehen hier im Fluss über dem Menü. */}
+      {onNavigate && (
+        <div className="mb-4">
+          <AppSuche darstellung="liste" onGehen={onNavigate} />
+        </div>
+      )}
 
       {/* Menü — eigener Scroller, Balken versteckt (Vorlage) */}
       <nav
