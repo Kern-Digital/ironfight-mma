@@ -394,6 +394,22 @@ class GeminiHttpError extends Error {
 }
 
 /**
+ * Token-Verbrauch EINES Gemini-Aufrufs aus `usageMetadata` der Antwort
+ * (Schritt 0 des Geschäftsplans, 20.09.2026). Bis dahin warf die App diese
+ * Zahlen weg — jede Kostenauswertung war reine Claude-Rechnung.
+ * `modelVersion` ist das Modell, das WIRKLICH geantwortet hat (hinter
+ * `gemini-flash-latest` steht ein konkreter Stand) und damit der Schlüssel
+ * für den Preis in gemini-kosten.ts.
+ */
+export interface GeminiUsage {
+  promptTokens: number;
+  outputTokens: number;
+  /** Denk-Tokens der Thinking-Modelle — Google rechnet sie wie Ausgabe ab. */
+  thoughtTokens: number;
+  modelVersion: string;
+}
+
+/**
  * Ein einzelner generateContent-Aufruf; liefert den Text der Antwort.
  *
  * `timeoutMs` (Etappe 2): Ein überlastetes Modell meldet nicht immer sofort
@@ -406,7 +422,7 @@ async function generateContentOnce(
   model: string,
   body: Record<string, unknown>,
   timeoutMs?: number,
-): Promise<string> {
+): Promise<{ text: string; usage: GeminiUsage }> {
   const ctrl = timeoutMs ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   let res: Response;
@@ -434,15 +450,30 @@ async function generateContentOnce(
       content?: { parts?: { text?: string }[] };
       finishReason?: string;
     }[];
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      thoughtsTokenCount?: number;
+    };
+    modelVersion?: string;
   };
   const text = (data.candidates?.[0]?.content?.parts ?? [])
     .map((p) => p.text ?? "")
     .join("");
   if (!text.trim()) {
+    // Auch eine leere Antwort hat Video-Token gekostet — die gehen hier
+    // verloren, genau wie bei einem abgebrochenen Versuch. Bekannte Lücke.
     const reason = data.candidates?.[0]?.finishReason ?? "leere Antwort";
     throw new GeminiHttpError(502, `kein Ergebnis (${reason})`);
   }
-  return text;
+  const um = data.usageMetadata ?? {};
+  const usage: GeminiUsage = {
+    promptTokens: um.promptTokenCount ?? 0,
+    outputTokens: um.candidatesTokenCount ?? 0,
+    thoughtTokens: um.thoughtsTokenCount ?? 0,
+    modelVersion: data.modelVersion || model,
+  };
+  return { text, usage };
 }
 
 /**
@@ -453,12 +484,13 @@ async function generateContentResilient(
   chain: string[],
   body: Record<string, unknown>,
   timeoutMs?: number,
-): Promise<{ text: string; model: string }> {
+): Promise<{ text: string; model: string; usage: GeminiUsage }> {
   let lastError: unknown = null;
   for (const model of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        return { text: await generateContentOnce(model, body, timeoutMs), model };
+        const { text, usage } = await generateContentOnce(model, body, timeoutMs);
+        return { text, model, usage };
       } catch (err) {
         lastError = err;
         if (err instanceof GeminiHttpError) {
@@ -513,9 +545,9 @@ export async function observeVideo(args: {
   fighter: FighterDescription;
   tier: GeminiTier;
   mode: "opponent" | "athlete";
-}): Promise<{ observation: VideoObservation; model: string }> {
+}): Promise<{ observation: VideoObservation; model: string; usage: GeminiUsage }> {
   const chain = args.tier === "pro" ? PRO_CHAIN : FLASH_CHAIN;
-  const { text, model } = await generateContentResilient(chain, {
+  const { text, model, usage } = await generateContentResilient(chain, {
     contents: [
       {
         role: "user",
@@ -532,7 +564,7 @@ export async function observeVideo(args: {
     },
   });
   const parsed = parseModelJson<Partial<VideoObservation>>(text);
-  return { observation: normalizeObservation(parsed), model };
+  return { observation: normalizeObservation(parsed), model, usage };
 }
 
 // ─── Der Vorlauf (Etappe 2, 16.09.2026) ─────────────────────────────────────
@@ -683,8 +715,8 @@ Gib AUSSCHLIESSLICH dieses JSON zurück, in der Reihenfolge der Nummern:
 export async function locateFighters(
   imageBase64: string,
   fighters: { description: string; clothing: string; features: string }[],
-): Promise<(FighterBox | null)[]> {
-  const { text } = await generateContentResilient(
+): Promise<{ boxes: (FighterBox | null)[]; usage: GeminiUsage }> {
+  const { text, usage } = await generateContentResilient(
     FLASH_CHAIN,
     {
       contents: [
@@ -702,7 +734,7 @@ export async function locateFighters(
   );
   const roh = parseModelJson(text) as { boxes?: unknown[] };
   const boxes = Array.isArray(roh?.boxes) ? roh.boxes : [];
-  return fighters.map((_, i) => boxFromGemini(boxes[i]));
+  return { boxes: fighters.map((_, i) => boxFromGemini(boxes[i])), usage };
 }
 
 /**
@@ -710,8 +742,10 @@ export async function locateFighters(
  * Auflösung — billig und schnell. Immer die Flash-Kette, unabhängig von der
  * Analyse-Stufe: Es geht ums Finden, nicht ums Zählen.
  */
-export async function previewVideo(source: VideoSource): Promise<VideoPreview> {
-  const { text, model } = await generateContentResilient(
+export async function previewVideo(
+  source: VideoSource,
+): Promise<{ preview: VideoPreview; usage: GeminiUsage }> {
+  const { text, model, usage } = await generateContentResilient(
     FLASH_CHAIN,
     {
       contents: [
@@ -729,5 +763,5 @@ export async function previewVideo(source: VideoSource): Promise<VideoPreview> {
     },
     PREVIEW_TIMEOUT_MS,
   );
-  return normalizePreview(parseModelJson(text), model);
+  return { preview: normalizePreview(parseModelJson(text), model), usage };
 }

@@ -13,7 +13,9 @@
 
 import { NextResponse } from "next/server";
 import { locateFighters } from "@/lib/server/gemini";
-import { bearerToken, isTrainerOrAdmin, verifyUser } from "@/lib/server/verify-user";
+import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { adminDb } from "@/lib/server/firebase-admin";
+import { bearerToken, isTrainerOrAdmin, userGymId, verifyUser } from "@/lib/server/verify-user";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,7 +27,7 @@ const MAX_BASE64 = 2_800_000;
 export async function POST(req: Request) {
   const token = bearerToken(req);
   const user = token ? await verifyUser(token) : null;
-  if (!isTrainerOrAdmin(user)) {
+  if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
 
@@ -52,7 +54,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    return NextResponse.json({ boxes: await locateFighters(data, fighters) });
+    const { boxes, usage } = await locateFighters(data, fighters);
+    // Ein Standbild kostet wenig, aber nicht nichts — seit 20.09.2026 gebucht.
+    await bucheGeminiKosten(adminDb, userGymId(user), usage);
+    return NextResponse.json({ boxes });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Rahmen-Suche fehlgeschlagen";
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -96,21 +96,50 @@ Mechanismus, der die Trennung überhaupt herstellt.
 
 ## 6. Abrechnung & KI-Kontingent (DeepFight-Kosten)
 
-Beschlossenes Modell: **Fixbetrag + Kontingent + Nachkauf.**
-- Monatsbeitrag pro Gym enthält Kontingent von X Analysen. X aus echten
-  `aiUsage`-Daten kalkulieren: (Beitrag − Marge) ÷ Ø-Kosten pro Analyse, mit
-  Puffer für Ausreißer. Fixbetrag fließt VOR Verbrauch → nie Minus.
-- Kontingent leer → Verwaltung kauft aktiv Nachkauf-Pakete (prepaid). Keine
-  stille Verbrauchsrechnung am Monatsende (kein Rechnungsschock).
-- **Abrechnungseinheit ist die ANALYSE, nicht Tokens** (verständlich für
-  Kunden; intern weiter Token/Cent-Tracking).
-- **Gemeinsamer Gym-Pool**, keine Pro-Kopf-Budgets zum Start (nur Trainer
-  analysieren). Verwaltung bekommt Verbrauchs-Dashboard (Kontingent-Stand,
-  Nutzung je Trainer). Pro-Kopf später nachrüstbar.
-- Kontingent-Prüfung passiert SERVERSEITIG in der Analyse-API, bevor
-  Gemini/Claude starten. Der Guthaben-Ring im Client ist nur Anzeige.
-- Verworfen: unbegrenzte Nutzung mit reiner Verbrauchsabrechnung
-  (Vorschussrisiko für Tidal, Rechnungsschock fürs Gym, Missbrauchsfläche).
+**Beschluss vom 20.09.2026 (Leon; ersetzt das Abo-Modell „Fixbetrag +
+Kontingent + Nachkauf" vom August):** Die Verwaltung ist GRATIS, ohne
+Mitgliedergrenze. Bezahlt wird allein DeepFight — in vorausbezahlten Paketen,
+gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
+(Fassung 2), Recherche aus vier Agenten-Läufen am 20.09.2026.
+- **Gratis, ohne Mitgliedergrenze:** Mitglieder, Kursplan, Anwesenheit,
+  Trainer ohne Limit, Trainingspläne, Techniken, Basis-Berichte, manueller
+  Mail-Versand, App in der Tidal-Marke. Das ist der Mindeststandard des
+  Marktes (bei 4–7 von 7 Gratis-Anbietern frei). KEINE Mitgliederkappe — sie
+  bremst das KI-Modul ausgerechnet bei den großen Gyms.
+- **Drei DeepFight-Analysen je Gym gratis** — einmalig, vollständig, ohne
+  Ablauf, ohne Karte, je Gym (nicht je Trainer). Keine monatliche Gratismenge.
+- **Pakete (Startwerte, netto):** 10 / 25 / 60 / 150 Analysen zu 39 / 89 /
+  195 / 429 € (3,90 → 2,86 € je Analyse); ab 400 auf Anfrage. Der Regler
+  startet auf 60 — gerastert, logarithmisch, mit Zahlenfeld und Stepper, nie
+  frei. Eine Analyse = EINE ausgewertete Person samt der Gameplans, die danach
+  automatisch entstehen. Nach sechs Monaten mit echten Verbrauchszahlen
+  nachziehen.
+- **Zählung beim START** der Analyse (serverseitig in der Analyse-API, vor
+  Gemini), nicht beim Übernehmen. Ein Fehler der App gibt die Analyse zurück.
+- **Verfall nach 24 Monaten** (Leon 20.09., gegen die Empfehlung „ohne
+  Ablauf" — begrenzt das Preisrisiko steigender Modellpreise). Die Frist
+  braucht in den AGB einen sachlichen Grund: Anwalt (§ 307 BGB; das OLG
+  München hält bei Gutscheinen schon ein Jahr für zu kurz).
+- **Gemeinsamer Gym-Pool**, keine Pro-Kopf-Budgets. Verwaltung sieht Stand
+  und Nutzung je Trainer; der Trainer sieht die Zahl VOR dem Klick.
+- **Deckel:** höchstens drei Einreichungen je Gym und Tag (Hudl-Muster),
+  Videolänge (15 min) und Auflösung — die einzigen echten Kostenhebel.
+- **Zahlung:** Stripe Checkout als Einmalkauf, Karte beim Erstkauf (SEPA erst
+  für Bestandskunden), Analysenzähler in der eigenen Datenbank. USt-IdNr. im
+  Anmeldefluss Pflicht mit BZSt-Prüfung; Reverse Charge bei EU-Ausland.
+  Nicht Paddle (kein SEPA), nicht Lemon Squeezy (läuft aus).
+- **Zweites Bein (Phase 4):** App mit Gym-Logo (Branding-Kit, §8) und
+  Automatisierungen als bezahlte Stufe — der Markt nimmt dafür einstimmig
+  81–349 €/Monat, und es kostet keinen Token. Erst, wenn zehn Gyms DeepFight
+  mit echtem Geld gekauft haben.
+- **Kosten-Wahrheit:** Bis 20.09.2026 buchte die App NUR Claude; Gemini wird
+  seit Schritt 0 als Art `gemini` gebucht (lib/server/gemini-kosten.ts).
+  Rechengröße 0,70 € je Person heute, ~1,20 € nach Googles angekündigter
+  Verdopplung (Gemini 3.8 Flash, 01.01.2027).
+- **Verworfen:** reine Verbrauchsabrechnung (Zahlungsgebühr 0,25–0,35 € je
+  Vorgang frisst die Marge eines Einzellaufs; Rechnungsschock; Vorleistung),
+  Tokens oder „Credits" als Einheit, Köderstufen, aufgeteilte Preise,
+  Mitgliedergrenzen, ein dauerhaft wiederkehrendes Gratiskontingent.
 
 ## 7. Wochenplan (Mehrplan-Modell)
 
@@ -187,7 +216,12 @@ Beschlossenes Modell: **Fixbetrag + Kontingent + Nachkauf.**
    (Rollen-Set-Claims + Umzug nach `/verwaltung`) sind gebaut — Stand
    2026-09-01. Das Verwaltungs-Dashboard (Kennzahlen, Kontingent) hängt an
    Phase 3.
-5. **Phase 3** — Betrieb: Wochenplan-Mehrplan-Modell, Pro-Gym-KI-Kontingent,
-   Admin-Konsole (Gyms anlegen/sperren, gym-übergreifende Kennzahlen).
-6. **Phase 4** — Monetarisierung: Stripe pro Gym (Fixbetrag + Nachkauf),
-   Branding-Kit (§8).
+5. **Phase 3** — Betrieb (Beschluss 20.09.2026, in dieser Reihenfolge):
+   (0) Gemini-Kosten buchen → (1) Selbstanmeldung eines Gyms mit Freigabe
+   durch den Plattform-Admin, Stilllegen = „lesen ja, ändern nein" →
+   (2) DeepFight-Guthaben mit Schranke (drei frei, Zählung beim Start, Deckel,
+   Messgrößen ab Tag eins) → (3) Werbeseite hinter dem DeepFight-Eintrag mit
+   gerastertem Regler und Stripe-Einmalkauf. Wochenplan-Mehrplan-Modell:
+   später (Leon 20.09.).
+6. **Phase 4** — Zweites Bein: Branding-Kit / App mit Gym-Logo (§8) und
+   Automatisierungen als bezahlte Stufe; Vertex AI (EU-Region) prüfen.

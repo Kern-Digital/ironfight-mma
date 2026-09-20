@@ -2330,6 +2330,53 @@ entstand (heute: Transaktion im Server).
   Was Leon im Admin-Bereich zusätzlich will — Monatskosten, welches Gym am
   meisten verursacht — steht im Backlog („KI-Kosten je Gym"); heute ist es
   nicht rechenbar.
+- **GEMINI WIRD GEBUCHT — SCHRITT 0 DES GESCHÄFTSPLANS (20.09.2026, Fenster
+  tidal-athletics-f1).** Bis dahin buchte die App NUR Claude: `preisJeMillion`
+  in claude-aufruf.ts kannte keine Gemini-Modelle (→ `[0, 0]`), und
+  `generateContentOnce` las `usageMetadata` gar nicht erst aus. Jede „Ø-Kosten
+  je Analyse" war damit eine Untergrenze; seit dem Bezahltarif (16.09.) fehlte
+  echtes Geld in jeder Auswertung. Die Routen `preview` und `rahmen` buchten
+  nichts, abgebrochene Versuche auch nicht. Gefunden bei der Preisfindung für
+  DeepFight (vier Agenten-Recherchen, Plan-Artifact „Das zweite Gym").
+  - **`lib/server/gemini-kosten.ts` (NEU):** `preisJeMillionGemini` mit
+    Listenpreisen Stand 16.09.2026 (3.8 Flash 0,75/3,75 → **datierte
+    Umschaltung auf 1,50/7,50 am 01.01.2027 im Code**; 3.5 Flash 1,5/9;
+    3.5 Flash-Lite 0,3/2,5; 3.1 Pro 2/12 bis 200 Tsd.). Unbekanntes Modell →
+    teuerster Flash-Satz UND eine Warnung je Modell und Prozess — lieber zu
+    hoch als still zu niedrig. `kostenAusGeminiUsage` liefert dieselbe Form
+    wie Claude (`AnalysisUsage`); Denk-Tokens zählen als Ausgabe, Video als
+    Eingabe, Audio NICHT gesondert (kein eigener Satz auf der Preisseite).
+    `bucheGeminiKosten(adminDb, gymId, usage)` wirft nie und nimmt `adminDb`
+    als FUNKTION, damit auch ein fehlendes Admin-SDK gefangen ist.
+  - **`gemini.ts`:** `GeminiUsage` (promptTokens, outputTokens, thoughtTokens,
+    `modelVersion` = das Modell, das WIRKLICH geantwortet hat — hinter
+    `gemini-flash-latest` steckt ein konkreter Stand, und der ist der
+    Preisschlüssel). `generateContentOnce`/`Resilient`/`observeVideo` geben
+    `usage` mit; **`locateFighters` → `{ boxes, usage }`, `previewVideo` →
+    `{ preview, usage }`** (Signaturen geändert, einzige Aufrufer sind die
+    Routen). `ki-kosten.ts`: Art **`"gemini"`** — die wahren Kosten einer
+    Analyse sind seither `analyse + gemini (+ gameplan)`.
+  - **Routen `analyze`, `preview`, `rahmen`:** buchen SOFORT nach dem
+    Gemini-Aufruf aufs Gym des AUFRUFERS (`userGymId(user)`), nicht erst beim
+    Übernehmen — die Kosten sind da, sobald das Modell geantwortet hat. Der
+    Rollen-Check heißt jetzt `if (!user || !isTrainerOrAdmin(user))`.
+    `/admin` zeigt je Gym „· davon Google x €" (`AiUsageByGym.spentEurJeArt`).
+  - **Gemessen:** tsc 0, eslint 0 (eigene Dateien). Offline-Probe
+    `scripts/tmp-gemini-kosten-probe.mjs`: 5 min Video auf 3.8 Flash
+    **0,10 € heute, 0,20 € ab 2027**; 15 min 0,26/0,52 €; Vorlauf 0,01 €.
+    Live-Beweis `scripts/tmp-beweis-gemini-kosten.mjs` (Vorlauf am Testvideo
+    Leon/Alec, eigenes Prüfkonto mess-f1k, danach gelöscht): 11.634 Token ein,
+    918 aus, **0,0122 €**, 8/8 — Gym-Dokument, Monatsverlauf, Summe und je Art
+    gestiegen, `analysisCount` unverändert. Rechengröße je Person damit eher
+    **~0,80 €** statt 0,70 €.
+  - **Restlücken (bekannt, nicht gebaut):** leere Antwort und abgebrochener
+    Versuch buchen nichts (Token trotzdem verbraucht); Claude-Retries buchen
+    nichts; `geminiGenerateJson`-Fallback ohne Claude-Key bucht nichts; die
+    echte Google-Rechnung eines Monats gegen die Buchung halten.
+  - **Falle 42:** `netstat | grep LISTENING` findet auf deutschem Windows
+    NICHTS — dort steht „ABHÖREN". Der Dev-Server lief, mein `next build`
+    überschrieb `.next` (CSS 404, Falle „Build überschreibt Dev-Server"). Port
+    prüfen NUR mit `Get-NetTCPConnection -LocalPort 3000 -State Listen`.
 
 ### Der gespeicherte Formularzustand — eine Falle, teuer gemessen (08.09.2026)
 `ta-video-analysis-form:{mode}:{targetId}` wird von zwei Effekten bedient:

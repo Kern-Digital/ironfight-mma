@@ -597,6 +597,11 @@ export interface AiUsageByGym {
   analysisCount: number;
   /** Schlüssel „JJJJ-MM" → Kosten und Zahl der Analysen in diesem Monat. */
   months: Record<string, { spentEur: number; analysisCount: number }>;
+  /**
+   * Kosten je Art (`analyse`, `satz`, `gameplan`, seit 20.09.2026 auch
+   * `gemini`) — damit die Admin-Seite zeigen kann, wie viel davon Google ist.
+   */
+  spentEurJeArt: Record<string, number>;
 }
 
 /** Monatsschlüssel „JJJJ-MM" für die Kosten-Buchung. */
@@ -632,6 +637,7 @@ export async function listAiUsageByGym(): Promise<AiUsageByGym[]> {
       spentEur: data.spentEur ?? 0,
       analysisCount: data.analysisCount ?? 0,
       months: data.months ?? {},
+      spentEurJeArt: data.spentEurJeArt ?? {},
     });
   }
   return out.sort((a, b) => b.spentEur - a.spentEur);

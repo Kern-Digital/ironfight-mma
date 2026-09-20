@@ -17,9 +17,12 @@
 
 import { NextResponse } from "next/server";
 import { previewVideo } from "@/lib/server/gemini";
+import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { adminDb } from "@/lib/server/firebase-admin";
 import {
   bearerToken,
   isTrainerOrAdmin,
+  userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
 import { MAX_VIDEO_SECONDS, type VideoSource } from "@/lib/video-analysis";
@@ -49,7 +52,7 @@ function validate(src: VideoSource | undefined): string | null {
 export async function POST(req: Request) {
   const token = bearerToken(req);
   const user = token ? await verifyUser(token) : null;
-  if (!isTrainerOrAdmin(user)) {
+  if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
 
@@ -63,7 +66,9 @@ export async function POST(req: Request) {
   if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
   try {
-    const preview = await previewVideo(body.source!);
+    const { preview, usage } = await previewVideo(body.source!);
+    // Der Vorlauf kostet Video-Token — seit 20.09.2026 gebucht (Schritt 0).
+    await bucheGeminiKosten(adminDb, userGymId(user), usage);
     return NextResponse.json({ preview });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Vorlauf fehlgeschlagen";

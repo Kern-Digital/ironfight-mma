@@ -896,6 +896,9 @@ function PlattformDashboard() {
                               {formatEur(monat?.spentEur ?? 0)} /{" "}
                               {formatEur(g.spentEur)} · {g.analysisCount}{" "}
                               {g.analysisCount === 1 ? "Analyse" : "Analysen"}
+                              {(g.spentEurJeArt.gemini ?? 0) > 0
+                                ? ` · davon Google ${formatEur(g.spentEurJeArt.gemini)}`
+                                : null}
                             </span>
                           </li>
                         );

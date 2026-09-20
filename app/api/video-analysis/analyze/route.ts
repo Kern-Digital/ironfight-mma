@@ -15,10 +15,13 @@
  */
 
 import { deleteFile, observeVideo } from "@/lib/server/gemini";
+import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { adminDb } from "@/lib/server/firebase-admin";
 import { evaluateObservation } from "@/lib/server/claude";
 import {
   bearerToken,
   isTrainerOrAdmin,
+  userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
 import { isFlaeche, varianteFuer } from "@/lib/kampfart-steckbrief";
@@ -61,7 +64,7 @@ function validate(body: AnalyzeRequest): string | null {
 export async function POST(req: Request) {
   const token = bearerToken(req);
   const user = token ? await verifyUser(token) : null;
-  if (!isTrainerOrAdmin(user)) {
+  if (!user || !isTrainerOrAdmin(user)) {
     return Response.json(
       { error: "Nur für Trainer/Admins verfügbar." },
       { status: 403 },
@@ -101,6 +104,10 @@ export async function POST(req: Request) {
           });
           observation = result.observation;
           geminiModel = result.model;
+          // Gemini-Kosten SOFORT buchen (Schritt 0, 20.09.2026): Sie sind da,
+          // sobald das Modell geantwortet hat — egal, ob der Trainer das
+          // Ergebnis später übernimmt. Gebucht aufs Gym des Aufrufers.
+          await bucheGeminiKosten(adminDb, userGymId(user), result.usage);
           // Beobachtung sofort an den Client geben — falls die Claude-Stufe
           // oder die Verbindung scheitert, kann ohne Gemini fortgesetzt werden.
           send({ type: "observation", observation, model: geminiModel });

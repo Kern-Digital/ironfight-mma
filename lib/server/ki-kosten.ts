@@ -30,7 +30,14 @@
 import { FieldPath, FieldValue, type Firestore } from "firebase-admin/firestore";
 import { monthKey, type AnalysisUsage } from "../video-analysis";
 
-export type KiKostenArt = "analyse" | "satz" | "gameplan";
+/**
+ * „gemini" seit 20.09.2026 (Schritt 0 des Geschäftsplans): jeder Aufruf der
+ * Beobachtungsstufe, des Vorlaufs und der Rahmen-Suche — gebucht SOFORT beim
+ * Aufruf, nicht erst beim Übernehmen. Die drei Claude-Arten bleiben, wie sie
+ * sind. Die wahren Kosten einer Analyse sind damit analyse + gemini
+ * (+ gameplan), nicht mehr nur der Claude-Anteil.
+ */
+export type KiKostenArt = "analyse" | "satz" | "gameplan" | "gemini";
 
 /** Pfad → Betrag, der hochgezählt wird. */
 type Zuwachs = Map<string, number>;
