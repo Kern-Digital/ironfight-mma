@@ -23,6 +23,7 @@
  * Klartext.
  */
 
+import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
 import { StaggerList } from "@/components/motion";
 import { useAuth, useRights } from "@/lib/auth-context";
@@ -39,14 +40,7 @@ import {
   writeNewsSeen,
   type AuditEntry,
 } from "@/lib/audit";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-const BTN_FONT: React.CSSProperties = {
-  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-};
 
 const META_BASE: React.CSSProperties = {
   fontFamily: "var(--font-archivo), system-ui, sans-serif",
@@ -142,18 +136,9 @@ export default function TrainerNewsPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link data-press
-              href="/trainer"
-              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
-              style={{
-                ...BTN_FONT,
-                color: "var(--text-3)",
-                textDecoration: "none",
-              }}
-            >
-              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
-              Trainer
-            </Link>
+            {/* Zurück in die Verwaltung (siehe mitglieder/page.tsx) — ab `lg`
+                im Kopf der Hülle. */}
+            <SeitenZurueck href="/verwaltung" label="Verwaltung" />
             <h1
               style={{
                 font: "var(--type-display)",

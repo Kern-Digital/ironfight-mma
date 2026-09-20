@@ -14,6 +14,10 @@
  * Mitgliederliste, die die Freigaben trägt.
  */
 
+import {
+  KopfNavigation,
+  KopfSprungmarken,
+} from "@/components/shell/KopfNavigation";
 import PageHead from "@/components/shell/PageHead";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -53,16 +57,19 @@ function studentLabelOf(entry: StudentEntry | undefined): string {
 // ─── Gruppen-Sektion ─────────────────────────────────────────────────────────
 
 function Section({
+  id,
   title,
   accent,
   children,
 }: {
+  /** Ziel der Sprungmarke im Kopf (siehe KopfSprungmarken). */
+  id: string;
   title: string;
   accent: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2.5">
+    <section id={id} className="flex flex-col gap-2.5">
       {/* Die Gruppen-Überschrift trägt die Farbe der Gruppe — bei „Vergangen"
           und „Archiviert" ist das derselbe neutrale Ton (Begründung in
           CompetitionCard). */}
@@ -182,6 +189,21 @@ function CompetitionsHubContent() {
         description="Jeder Wettkampf verbindet einen Athleten mit einem Gegner — von der Planung über das Camp bis zum Rückblick."
       />
 
+      {/* Die Gruppen als Sprungmarken im Kopf (Leon 19.09.2026). Sie zeigen
+          sich nur, wo es sie GIBT: Ein Gym ohne Archiv sieht die Marke nicht,
+          und bei einer einzigen Gruppe bleibt der Kopf leer
+          (components/shell/KopfNavigation.tsx). */}
+      <KopfNavigation rang={3}>
+        <KopfSprungmarken
+          label="Wettkämpfe"
+          marken={[
+            { id: "wettkaempfe-geplant", label: "Geplant" },
+            { id: "wettkaempfe-vergangen", label: "Vergangene" },
+            { id: "wettkaempfe-archiv", label: "Archiviert" },
+          ]}
+        />
+      </KopfNavigation>
+
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-1 sm:px-6">
         <TrainerHint id="competitions-hub" title="Wettkampfbereich">
           Hier legst du Wettkämpfe an und verfolgst sie — jeder Wettkampf
@@ -248,21 +270,21 @@ function CompetitionsHubContent() {
           <StaggerFlow className="flex flex-col gap-6 pb-4">
             {grouped.upcoming.length > 0 && (
               <FlowItem key="upcoming">
-                <Section title="Geplant / Aktiv" accent={GROUP_ACCENT.upcoming}>
+                <Section id="wettkaempfe-geplant" title="Geplant / Aktiv" accent={GROUP_ACCENT.upcoming}>
                   {grouped.upcoming.map(karte)}
                 </Section>
               </FlowItem>
             )}
             {grouped.past.length > 0 && (
               <FlowItem key="past">
-                <Section title="Vergangene Wettkämpfe" accent={GROUP_ACCENT.past}>
+                <Section id="wettkaempfe-vergangen" title="Vergangene Wettkämpfe" accent={GROUP_ACCENT.past}>
                   {grouped.past.map(karte)}
                 </Section>
               </FlowItem>
             )}
             {grouped.archived.length > 0 && (
               <FlowItem key="archived">
-                <Section title="Archiviert" accent={GROUP_ACCENT.archived}>
+                <Section id="wettkaempfe-archiv" title="Archiviert" accent={GROUP_ACCENT.archived}>
                   {grouped.archived.map(karte)}
                 </Section>
               </FlowItem>

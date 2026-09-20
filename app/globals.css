@@ -886,6 +886,39 @@
   margin-right: 4px;
   background: var(--line);
 }
+/* Dieselbe Haarlinie noch einmal INNERHALB des Slots: Sie trennt den Weg
+   hinaus („← Wettkampfbereich") von der Navigation innerhalb der Seite
+   („Duell · Gameplan · Trainingsplan"), damit die beiden nicht als eine Reihe
+   gelesen werden (`KopfZeile`). */
+.kopf-trenner {
+  flex-shrink: 0;
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+/* WENN DER PLATZ NICHT REICHT, TRITT DIE ZWEITE NAVIGATION ZURÜCK, NICHT DER
+ * RÜCKWEG. Der Slot schrumpft nicht (sonst bräche die Schrift um), und der
+ * Kurs rechts ist schon auf sein Kürzel zusammengezogen — bleibt nur, den
+ * Zusatz wegzulassen. Gemessen 19.09.2026 auf der Wettkampfseite:
+ * „← Wettkampfbereich │ Duell · Gameplan · Trainingsplan" braucht 535 px; bei
+ * 1280 px mit offener Suche standen 380 px zur Verfügung, der Kopf lief 71 px
+ * über die Seite hinaus. Zwei Fälle, beide ohne JavaScript:
+ *   · unter 1280 px (xl) — dort fehlt auch der Kurs,
+ *   · sobald die Lupe im Kopf aufgeht (`[data-open]` an der GooeySearch):
+ *     Das Feld wächst dann auf 220–300 px.
+ * `display: contents` im Ruhezustand: Trenner und Leiste bleiben damit
+ * direkte Flex-Kinder des Slots, der Wrapper selbst ist im Layout unsichtbar. */
+.kopf-neben {
+  display: contents;
+}
+@media (max-width: 1279.98px) {
+  .kopf-neben {
+    display: none;
+  }
+}
+header:has([data-app-suche="kopf"] [data-open]) .kopf-neben {
+  display: none;
+}
 
 /* DIE NAVIGATION IM SLOT IST SCHRIFT, KEIN BEDIENFELD (Leon 18.09.2026:
  * „die drei ‚Buttons' sollen sich in die Navbar smooth einfügen, man soll sie
@@ -911,11 +944,16 @@
   text-decoration: none;
   white-space: nowrap;
   transition: color var(--dur-fast) var(--ease-out);
+  /* Umschalter und Sprungmarken sind Knöpfe bzw. Anker — sie bringen eigene
+     Browser-Optik mit, die hier nichts zu suchen hat. */
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 .kopf-link:hover {
   color: var(--text-1);
 }
-.kopf-link[aria-current] {
+.kopf-link[data-kopf-gewaehlt] {
   color: var(--accent-text);
 }
 .kopf-link--zurueck {

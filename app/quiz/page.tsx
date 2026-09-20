@@ -1,6 +1,11 @@
 "use client";
 
 import PageHeader from "@/components/PageHeader";
+import {
+  KopfNavigation,
+  KopfUmschalter,
+  useHatKopf,
+} from "@/components/shell/KopfNavigation";
 import Link from "next/link";
 import { useState } from "react";
 import { SPORT_QUIZZES } from "@/lib/quiz-data";
@@ -8,6 +13,7 @@ import Icon from "@/components/ui/Icon";
 import { Quiz } from "@/components/Quiz";
 
 export default function QuizPage() {
+  const hatKopf = useHatKopf();
   const [activeSport, setActiveSport] = useState("mma");
   const sport = SPORT_QUIZZES.find((s) => s.id === activeSport)!;
 
@@ -19,9 +25,19 @@ export default function QuizPage() {
         description="Teste dein Regelwerk-Wissen in MMA, BJJ und Boxen. Wähle eine Disziplin und beantworte alle Fragen."
       />
 
+      {/* Die Disziplin wechselt das ganze Quiz — ab `lg` steht die Wahl im
+          Kopf der Hülle (siehe app/regeln/page.tsx). */}
+      <KopfNavigation rang={3}>
+        <KopfUmschalter
+          label="Quiz"
+          wahlen={SPORT_QUIZZES.map((s) => ({ id: s.id, label: s.name, aktiv: activeSport === s.id }))}
+          onWahl={setActiveSport}
+        />
+      </KopfNavigation>
+
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
         {/* Sport-Auswahl */}
-        <div className="mb-8 flex flex-wrap gap-2">
+        <div className={`mb-8 flex flex-wrap gap-2 ${hatKopf ? "lg:hidden" : ""}`}>
           {SPORT_QUIZZES.map((s) => (
             <button
               key={s.id}

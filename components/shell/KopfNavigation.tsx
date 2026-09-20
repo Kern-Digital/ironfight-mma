@@ -184,6 +184,37 @@ export function KopfZurueck({ href, label }: { href: string; label: string }) {
   );
 }
 
+/**
+ * Zwei Wege nebeneinander: der Rückweg und die Navigation der Seite.
+ *
+ * Sonst zeigt der Slot immer nur EINE Meldung (siehe oben) — eine Seite mit
+ * Abschnitten hätte damit die Wahl zwischen „← Wettkampfbereich" und
+ * „Duell · Gameplan · Trainingsplan". Hier gehören beide zusammen: links der
+ * Weg hinaus, rechts der Weg innerhalb der Seite, getrennt von derselben
+ * Haarlinie, die den Slot vom Gym trennt.
+ */
+export function KopfZeile({
+  zurueck,
+  children,
+}: {
+  zurueck: { href: string; label: string };
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <KopfZurueck href={zurueck.href} label={zurueck.label} />
+      {/* DER RÜCKWEG HAT VORRANG. Wird der Kopf eng (schmaler Bildschirm oder
+          offene Suche), tritt alles in `.kopf-neben` zurück — der Weg hinaus
+          bleibt. Warum das nötig ist, steht in globals.css bei `.kopf-neben`;
+          `display: contents` hält die Kinder derweil im Fluss des Slots. */}
+      <span className="kopf-neben">
+        <span aria-hidden className="kopf-trenner" />
+        {children}
+      </span>
+    </>
+  );
+}
+
 export interface KopfSegment {
   href: string;
   label: string;
@@ -201,38 +232,50 @@ export interface KopfSegment {
 // Auf dem Server gibt es kein Layout — dort genügt der normale Effekt.
 const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+type Lupe = { x: number; y: number; w: number; h: number } | null;
+
 /**
- * Die Einträge eines Bereichs als Textnavigation mit gleitender Glas-Kapsel.
+ * Die gleitende Glas-Kapsel einer Leiste.
  *
- * Die Kapsel misst den LINK des gewählten Eintrags (samt Innenabstand — sie
- * ist die Fläche, auf der das Wort steht). Nachgemessen wird bei jedem
- * Wechsel, bei jeder neuen Breite der Leiste (ResizeObserver) und wenn die
- * Schrift fertig geladen ist. Die ERSTE Messung setzt sie ohne Übergang an
+ * Sie misst den gewählten EINTRAG (samt Innenabstand — sie ist die Fläche, auf
+ * der das Wort steht), erkennbar an `data-kopf-gewaehlt`. Nachgemessen wird bei
+ * jedem Wechsel, bei jeder neuen Breite der Leiste (ResizeObserver) und wenn
+ * die Schrift fertig geladen ist. Die ERSTE Messung setzt sie ohne Übergang an
  * ihren Platz; erst danach gleitet sie — sonst flöge sie beim Laden von links
  * herein.
+ *
+ * Sie sitzt hier und nicht in jeder Leiste, weil alle drei Leisten (Segmente
+ * eines Bereichs, Umschalter einer Seite, Sprungmarken) dieselbe Kapsel
+ * tragen — Leons Markierung gilt für jede Auswahl im Kopf.
  */
-export function KopfSegmente({ label, segmente }: { label: string; segmente: KopfSegment[] }) {
-  const leiste = useRef<HTMLDivElement>(null);
-  const [lupe, setLupe] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+function useLupe(leiste: React.RefObject<HTMLDivElement | null>, schluessel: string): {
+  lupe: Lupe;
+  gleitet: boolean;
+} {
+  const [lupe, setLupe] = useState<Lupe>(null);
   const [gleitet, setGleitet] = useState(false);
-  const schluessel = segmente.map((s) => `${s.href}:${s.aktiv ? 1 : 0}:${s.zurueck ? 1 : 0}`).join("|");
 
   useLayout(() => {
     const el = leiste.current;
     if (!el) return;
     const messen = () => {
-      const link = el.querySelector<HTMLElement>("[aria-current]");
-      if (!link) {
+      const eintrag = el.querySelector<HTMLElement>("[data-kopf-gewaehlt]");
+      if (!eintrag) {
         setLupe(null);
         return;
       }
-      const r = link.getBoundingClientRect();
+      const r = eintrag.getBoundingClientRect();
       const b = el.getBoundingClientRect();
-      setLupe({
-        x: Math.round(r.left - b.left),
-        y: Math.round(r.top - b.top),
-        w: Math.round(r.width),
-        h: Math.round(r.height),
+      setLupe((alt) => {
+        const neu = {
+          x: Math.round(r.left - b.left),
+          y: Math.round(r.top - b.top),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        };
+        return alt && alt.x === neu.x && alt.y === neu.y && alt.w === neu.w && alt.h === neu.h
+          ? alt
+          : neu;
       });
     };
     messen();
@@ -254,28 +297,42 @@ export function KopfSegmente({ label, segmente }: { label: string; segmente: Kop
     return () => cancelAnimationFrame(id);
   }, [lupe, gleitet]);
 
+  return { lupe, gleitet };
+}
+
+/** Die Kapsel selbst — liegt HINTER den Einträgen, sonst fräße ihr Glas die Schrift. */
+function LupenKapsel({ lupe, gleitet }: { lupe: Lupe; gleitet: boolean }) {
+  if (!lupe) return null;
+  return (
+    <span
+      aria-hidden
+      className="kopf-lupe"
+      data-gleitet={gleitet || undefined}
+      style={{
+        transform: `translate(${lupe.x}px, ${lupe.y}px)`,
+        width: `${lupe.w}px`,
+        height: `${lupe.h}px`,
+      }}
+    />
+  );
+}
+
+/** Die Einträge eines Bereichs als Textnavigation mit gleitender Glas-Kapsel. */
+export function KopfSegmente({ label, segmente }: { label: string; segmente: KopfSegment[] }) {
+  const leiste = useRef<HTMLDivElement>(null);
+  const schluessel = segmente.map((s) => `${s.href}:${s.aktiv ? 1 : 0}:${s.zurueck ? 1 : 0}`).join("|");
+  const { lupe, gleitet } = useLupe(leiste, schluessel);
+
   return (
     <div ref={leiste} role="group" aria-label={label} className="kopf-leiste">
-      {/* Die Kapsel liegt HINTER den Einträgen (erstes Kind, z-index der
-          Links darüber) — sonst fräße ihr Glas die Schrift. */}
-      {lupe && (
-        <span
-          aria-hidden
-          className="kopf-lupe"
-          data-gleitet={gleitet || undefined}
-          style={{
-            transform: `translate(${lupe.x}px, ${lupe.y}px)`,
-            width: `${lupe.w}px`,
-            height: `${lupe.h}px`,
-          }}
-        />
-      )}
+      <LupenKapsel lupe={lupe} gleitet={gleitet} />
       {segmente.map((s) => (
         <Link
           key={s.href}
           href={s.href}
           data-press="quiet"
           data-kopf-segment={s.label}
+          data-kopf-gewaehlt={s.aktiv || undefined}
           aria-current={s.aktiv ? (s.zurueck ? "location" : "page") : undefined}
           aria-label={s.aktiv && s.zurueck ? `${s.label} – zurück zur Liste` : undefined}
           className="kopf-link"
@@ -294,6 +351,183 @@ export function KopfSegmente({ label, segmente }: { label: string; segmente: Kop
   );
 }
 
+export interface KopfWahl {
+  /** Derselbe Schlüssel, den die Seite für ihren Zustand benutzt. */
+  id: string;
+  label: string;
+  aktiv: boolean;
+}
+
+/**
+ * DER UMSCHALTER EINER SEITE IM KOPF (Leon 19.09.2026: Reiter, die die ganze
+ * Seite wechseln, gehören nach oben — „MMA · BJJ · Boxen", „Für Trainer · Für
+ * Athleten").
+ *
+ * Er FÜHRT NICHT WOANDERS HIN, deshalb sind es Knöpfe mit `aria-pressed` und
+ * keine Links — dieselbe Auszeichnung, die die Reiter in der Seite schon
+ * tragen. Den Zustand hält weiterhin die SEITE: Oben und unten zeigen
+ * denselben Wert, und unter `lg` (kein Kopf) bleibt die Leiste in der Seite.
+ */
+export function KopfUmschalter({
+  label,
+  wahlen,
+  onWahl,
+}: {
+  label: string;
+  wahlen: KopfWahl[];
+  onWahl: (id: string) => void;
+}) {
+  const leiste = useRef<HTMLDivElement>(null);
+  const schluessel = wahlen.map((w) => `${w.id}:${w.aktiv ? 1 : 0}`).join("|");
+  const { lupe, gleitet } = useLupe(leiste, schluessel);
+
+  return (
+    <div ref={leiste} role="group" aria-label={label} className="kopf-leiste">
+      <LupenKapsel lupe={lupe} gleitet={gleitet} />
+      {wahlen.map((w) => (
+        <button
+          key={w.id}
+          type="button"
+          onClick={() => onWahl(w.id)}
+          data-press="quiet"
+          data-kopf-wahl={w.id}
+          data-kopf-gewaehlt={w.aktiv || undefined}
+          aria-pressed={w.aktiv}
+          className="kopf-link"
+        >
+          <span data-kopf-text>{w.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export interface KopfMarke {
+  /** Die `id` des Abschnitts in der Seite. */
+  id: string;
+  label: string;
+}
+
+const wenigerBewegung = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * DIE ABSCHNITTE EINER LANGEN SEITE IM KOPF (Leon 19.09.2026: „Sprungmarken",
+ * die Kapsel wandert beim Blättern mit).
+ *
+ * DREI DINGE, DIE SIE VON EINER NORMALEN LEISTE UNTERSCHEIDEN:
+ *
+ *  1. SIE ZEIGT NUR, WAS ES GIBT. Abschnitte erscheinen erst mit ihren Daten
+ *     (der Gameplan-Block nach dem Laden, „Wettkämpfe" nur, wenn welche da
+ *     sind). Die Leiste sucht ihre Ziele deshalb immer wieder und lässt weg,
+ *     was gerade nicht im Dokument steht — eine Marke ins Leere wäre ein
+ *     Sprung, der nichts tut.
+ *  2. SIE ZÄHLT VOM KOPF AUS. Der Kopf der Hülle ist Glas und klebt; ein Ziel,
+ *     das genau an die Fensterkante springt, läge darunter. Gemessen wird
+ *     gegen seine Unterkante, plus Luft — und exakt derselbe Abstand gilt für
+ *     den Sprung und für die Frage, welcher Abschnitt gerade dran ist.
+ *  3. NACH EINEM KLICK SCHWEIGT DER SPION. Beim weichen Blättern zieht das
+ *     Fenster durch alle Abschnitte dazwischen; ohne Sperre flackerte die
+ *     Kapsel über die ganze Leiste, statt zum Ziel zu gleiten.
+ */
+export function KopfSprungmarken({ label, marken }: { label: string; marken: KopfMarke[] }) {
+  const leiste = useRef<HTMLDivElement>(null);
+  const gesperrtBis = useRef(0);
+  const [vorhanden, setVorhanden] = useState<string[]>([]);
+  const [aktiv, setAktiv] = useState<string | null>(null);
+  const schluesselMarken = marken.map((m) => m.id).join("|");
+
+  /** Unterkante des Kopfs plus Luft — Sprungweite UND Messlinie. */
+  const abstand = useCallback(() => {
+    const kopf = leiste.current?.closest("header");
+    const unten = kopf?.getBoundingClientRect().bottom ?? 0;
+    return Math.round(unten + 16);
+  }, []);
+
+  useEffect(() => {
+    let frame = 0;
+    const messen = () => {
+      frame = 0;
+      const da = marken.filter((m) => document.getElementById(m.id));
+      const ids = da.map((m) => m.id);
+      setVorhanden((alt) => (alt.join("|") === ids.join("|") ? alt : ids));
+      if (Date.now() < gesperrtBis.current) return;
+      const linie = abstand() + 24;
+      let treffer = ids[0] ?? null;
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= linie) treffer = id;
+      }
+      // Am Fuß der Seite gewinnt der letzte Abschnitt, auch wenn er kurz ist
+      // und seine Oberkante nie über die Linie kommt.
+      const amFuss =
+        window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      if (amFuss && ids.length) treffer = ids[ids.length - 1];
+      setAktiv((alt) => (alt === treffer ? alt : treffer));
+    };
+    const planen = () => {
+      if (!frame) frame = requestAnimationFrame(messen);
+    };
+    messen();
+    window.addEventListener("scroll", planen, { passive: true });
+    window.addEventListener("resize", planen);
+    // Die Abschnitte kommen mit den Daten in die Seite, nicht beim ersten
+    // Rendern — ohne Beobachter bliebe die Leiste auf dem ersten Stand.
+    const beobachter = new MutationObserver(planen);
+    beobachter.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", planen);
+      window.removeEventListener("resize", planen);
+      beobachter.disconnect();
+    };
+  }, [schluesselMarken, marken, abstand]);
+
+  const gezeigt = marken.filter((m) => vorhanden.includes(m.id));
+  const { lupe, gleitet } = useLupe(
+    leiste,
+    gezeigt.map((m) => `${m.id}:${m.id === aktiv ? 1 : 0}`).join("|"),
+  );
+
+  const springe = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (!el) return;
+    gesperrtBis.current = Date.now() + 900;
+    setAktiv(id);
+    const ziel = el.getBoundingClientRect().top + window.scrollY - abstand();
+    window.scrollTo({ top: Math.max(0, ziel), behavior: wenigerBewegung() ? "auto" : "smooth" });
+    // Wer mit der Tastatur springt, soll danach IM Abschnitt weiterlesen.
+    el.setAttribute("tabindex", "-1");
+    el.focus({ preventScroll: true });
+  };
+
+  // EINE Marke ist keine Navigation, sondern ein Wort im Kopf: Wo nur ein
+  // Abschnitt steht (Wettkampfliste mit einer einzigen Gruppe), bleibt der
+  // Slot leer.
+  if (gezeigt.length < 2) return null;
+  return (
+    <div ref={leiste} role="group" aria-label={label} className="kopf-leiste">
+      <LupenKapsel lupe={lupe} gleitet={gleitet} />
+      {gezeigt.map((m) => (
+        <a
+          key={m.id}
+          href={`#${m.id}`}
+          onClick={(e) => springe(e, m.id)}
+          data-press="quiet"
+          data-kopf-marke={m.id}
+          data-kopf-gewaehlt={m.id === aktiv || undefined}
+          aria-current={m.id === aktiv ? "location" : undefined}
+          className="kopf-link"
+        >
+          <span data-kopf-text>{m.label}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Der Rückweg eines `PageHead` — IN der Seite UND im Kopf. Ab `lg` steht er
  * nur noch im Kopf, groß (`KopfZurueck`); darunter gibt es keinen Kopf, dort
@@ -306,8 +540,11 @@ export function SeitenZurueck({ href, label }: { href: string; label: string }) 
     <>
       <Link
         data-press
+        data-seiten-zurueck={label}
         href={href}
-        className={`t-interactive -ml-2 mb-1 inline-flex w-fit items-center gap-1.5 rounded-field px-2 py-1 ${hatKopf ? "lg:hidden" : ""}`}
+        // `min-h-hit`: Auf dem Handy IST diese Zeile der Weg zurück — sie muss
+        // so groß sein wie jedes andere Tippziel (44 px).
+        className={`t-interactive -ml-2 mb-1 inline-flex w-fit min-h-hit items-center gap-1.5 rounded-field px-2 ${hatKopf ? "lg:hidden" : ""}`}
         style={{
           font: "var(--type-meta)",
           letterSpacing: "var(--ls-label)",

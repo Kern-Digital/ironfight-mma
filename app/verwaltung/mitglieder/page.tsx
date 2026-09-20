@@ -19,6 +19,7 @@
 
 import GooeySearch from "@/components/ui/GooeySearch";
 import MemberRoleSheet from "@/components/MemberRoleSheet";
+import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
 import { StaggerList } from "@/components/motion";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
@@ -141,18 +142,16 @@ export default function TrainerMembersPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link data-press
-              href="/trainer"
-              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
-              style={{
-                ...BTN_FONT,
-                color: "var(--text-3)",
-                textDecoration: "none",
-              }}
-            >
-              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
-              Trainer
-            </Link>
+            {/* Zurück in die VERWALTUNG, nicht in den Trainerbereich: Diese
+                Seite gehört dem Gym, und wer nur Verwaltungsrechte hat, kommt
+                auf /trainer gar nicht hinein. Ab `lg` steht der Weg im Kopf
+                der Hülle (Leon: „Zurück-Knöpfe nach oben").
+                KEINE SPRUNGMARKEN auf die drei Gruppen (Leon 19.09.2026,
+                nachdem er sie gesehen hat: „Gruppen weglassen"): Die erste
+                Gruppe heißt „Verwaltung" wie der Weg zurück — das Wort stand
+                zweimal nebeneinander im Kopf. Wer jemanden sucht, nimmt
+                ohnehin die Suche. */}
+            <SeitenZurueck href="/verwaltung" label="Verwaltung" />
             <h1
               style={{
                 font: "var(--type-display)",

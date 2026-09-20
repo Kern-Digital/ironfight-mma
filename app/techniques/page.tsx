@@ -19,6 +19,7 @@
 
 import GooeySearch from "@/components/ui/GooeySearch";
 import AthleteTabBar from "@/components/AthleteTabBar";
+import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
 import Select from "@/components/ui/Select";
 import { useHasStaffShell } from "@/lib/auth-context";
@@ -244,14 +245,8 @@ export default function TechniquesPage() {
         </div>
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
-            <Link data-press
-              href="/dashboard"
-              className="t-interactive -ml-2 mb-1 inline-flex min-h-hit items-center gap-1.5 self-start rounded-field px-2"
-              style={{ ...BTN_FONT, color: "var(--text-3)", textDecoration: "none" }}
-            >
-              <Icon name="arrow-left" size={14} strokeWidth={2.2} />
-              Training
-            </Link>
+            {/* Ab `lg` steht der Weg zurück im Kopf der Hülle, darunter hier. */}
+            <SeitenZurueck href="/dashboard" label="Training" />
             <h1
               style={{
                 font: "var(--type-display)",

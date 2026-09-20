@@ -2,6 +2,11 @@
 
 import { Collapse } from "@/components/motion";
 import PageHeader from "@/components/PageHeader";
+import {
+  KopfNavigation,
+  KopfUmschalter,
+  useHatKopf,
+} from "@/components/shell/KopfNavigation";
 import { useState } from "react";
 import { SPORT_QUIZZES } from "@/lib/quiz-data";
 import Icon from "@/components/ui/Icon";
@@ -236,6 +241,7 @@ const SPORTS: Sport[] = [
 // ─── Haupt-Seite ──────────────────────────────────────────────────────────────
 
 export default function RegelnPage() {
+  const hatKopf = useHatKopf();
   const [activeTab, setActiveTab] = useState("mma");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [showQuiz, setShowQuiz] = useState(false);
@@ -266,10 +272,22 @@ export default function RegelnPage() {
         description="Die Regeln für MMA, Brazilian Jiu-Jitsu und Boxen — verständlich erklärt. Teste dein Wissen mit dem Quiz."
       />
 
+      {/* Die Wahl der Disziplin wechselt die ganze Seite — ab `lg` steht sie
+          deshalb im Kopf der Hülle (Leon 19.09.2026: Umschalter nach oben).
+          Den Zustand hält weiterhin diese Seite; unten bleibt dieselbe
+          Auswahl für alle, die keinen Kopf haben (Athleten, Handy). */}
+      <KopfNavigation rang={3}>
+        <KopfUmschalter
+          label="Regelwerk"
+          wahlen={SPORTS.map((s) => ({ id: s.id, label: s.name, aktiv: activeTab === s.id }))}
+          onWahl={switchTab}
+        />
+      </KopfNavigation>
+
       <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 sm:px-6">
 
         {/* ── Tab-Auswahl ── */}
-        <div className="mb-8 flex gap-2 flex-wrap">
+        <div className={`mb-8 flex gap-2 flex-wrap ${hatKopf ? "lg:hidden" : ""}`}>
           {SPORTS.map((s) => (
             <button
               key={s.id}

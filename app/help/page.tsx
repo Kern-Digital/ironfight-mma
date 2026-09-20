@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
+import {
+  KopfNavigation,
+  KopfUmschalter,
+  useHatKopf,
+} from "@/components/shell/KopfNavigation";
 import { useAuth, useRights } from "@/lib/auth-context";
 
 // ─── Inhalts-Definitionen ──────────────────────────────────────────────────
@@ -193,6 +198,7 @@ function HelpItemCard({ item }: { item: HelpItem }) {
 export default function HelpPage() {
   const { profileLoading } = useAuth();
   const isTrainer = useRights().trainer;
+  const hatKopf = useHatKopf();
 
   // Trainer sehen ihre Sektion zuerst, können aber auch die Athleten-Sicht ansehen.
   const [tab, setTab] = useState<"trainer" | "student">(
@@ -213,10 +219,26 @@ export default function HelpPage() {
         }
       />
 
+      {/* Trainer schalten zwischen beiden Sichten um — ab `lg` im Kopf der
+          Hülle (siehe app/regeln/page.tsx). Athleten haben nur eine Sicht und
+          bekommen deshalb gar keine Wahl. */}
+      {isTrainer && (
+        <KopfNavigation rang={3}>
+          <KopfUmschalter
+            label="Hilfe"
+            wahlen={[
+              { id: "trainer", label: "Für Trainer", aktiv: tab === "trainer" },
+              { id: "student", label: "Für Athleten", aktiv: tab === "student" },
+            ]}
+            onWahl={(id) => setTab(id as "trainer" | "student")}
+          />
+        </KopfNavigation>
+      )}
+
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
         {/* Rollen-Tabs nur für Trainer */}
         {isTrainer && (
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className={`mb-6 flex flex-wrap gap-2 ${hatKopf ? "lg:hidden" : ""}`}>
             <button
               onClick={() => setTab("trainer")}
               className="rounded-xl px-4 py-2 text-xs font-bold uppercase transition-colors"

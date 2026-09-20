@@ -67,6 +67,11 @@
  * demselben Dokument (components/GameplanSheet.tsx).
  */
 
+import {
+  KopfNavigation,
+  KopfSprungmarken,
+  KopfZeile,
+} from "@/components/shell/KopfNavigation";
 import PageHead from "@/components/shell/PageHead";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -752,7 +757,10 @@ function CompetitionDetailContent({
 
         {/* ── Vs. ─────────────────────────────────────────────────────────
             Das Banner nach Leons Vorlage. Die gewählte Seite entscheidet,
-            wessen DeepFight darunter steht. */}
+            wessen DeepFight darunter steht.
+            `id="duell"`: Ziel der ersten Sprungmarke im Kopf — von hier fängt
+            die Seite an. */}
+        <div id="duell">
         <VersusBanner
           athletName={studentName}
           athletRolle={istSelbst ? "Ich selbst" : "Unser Athlet"}
@@ -762,6 +770,24 @@ function CompetitionDetailContent({
           introKey={camp.id}
           onIntroAusklang={() => setSeiteSichtbar(true)}
         />
+        </div>
+
+        {/* Die drei Abschnitte der Seite im Kopf der Hülle, mit dem Weg
+            zurück davor (Leon 19.09.2026: Sprungmarken). Rang 3 schlägt den
+            Rückweg des PageHead — der steht hier in derselben Zeile, sonst
+            müsste man sich zwischen beidem entscheiden. */}
+        <KopfNavigation rang={3}>
+          <KopfZeile zurueck={{ href: "/trainer/competitions", label: "Wettkampfbereich" }}>
+            <KopfSprungmarken
+              label="Wettkampf"
+              marken={[
+                { id: "duell", label: "Duell" },
+                { id: "gameplan", label: "Gameplan" },
+                { id: "trainingsplan", label: "Trainingsplan" },
+              ]}
+            />
+          </KopfZeile>
+        </KopfNavigation>
 
         <div aria-hidden={!seiteSichtbar} style={einblenden}>
           {/* ── DeepFight — rahmenlos ────────────────────────────────────── */}

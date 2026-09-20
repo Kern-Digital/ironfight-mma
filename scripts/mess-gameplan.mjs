@@ -636,6 +636,115 @@ async function gegnerseiteImNeuenLook(page, { db, gegnerId, athletUid }) {
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
 
+/**
+ * DER KOPFBALKEN AUF DEN ÜBRIGEN SEITEN (Fenster 69, 19.09.2026, Leon:
+ * „Balken oben überall" → Sprungmarken und Umschalter der Seite).
+ *
+ * Geprüft wird mit den Rechten des Prüf-TRAINERS, also nur auf Seiten, die er
+ * sehen darf (die Verwaltungsseiten gehören der Verwaltung):
+ *   · Wettkampfseite: Rückweg UND die drei Abschnitte in einer Zeile, der
+ *     Sprung landet unter dem Kopf, die Kapsel wandert beim Blättern mit,
+ *     und bei offener Suche tritt die Abschnitts-Leiste zurück (sonst lief
+ *     der Kopf über — gemessen 71 px bei 1280).
+ *   · Regeln: der Umschalter der Seite steht oben, die alten Reiter in der
+ *     Seite sind am Desktop weg, und ein Klick oben wechselt den Inhalt.
+ *   · Timer: der Weg zurück steht oben statt in der Seite.
+ */
+async function kopfUeberall({ browser, athletUid, neuId }) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: THEME });
+  const page = await ctx.newPage();
+  try {
+    await anmelden(page, TRAINER);
+    await page.evaluate((t) => localStorage.setItem("ta-theme", t), THEME);
+
+    // ── Wettkampfseite: Rückweg + Abschnitte ───────────────────────────────
+    await page.goto(`${BASE}/trainer/competitions/${athletUid}/${neuId}`, { waitUntil: "domcontentloaded" });
+    await page.locator("section#gameplan").waitFor({ timeout: 60000 });
+    await page.waitForTimeout(4000);
+    const slot = () => page.locator("[data-kopf-slot]").innerText();
+    const kopfText = (await slot()).replace(/\s+/g, " ").trim();
+    sagt(
+      kopfText.includes("Wettkampfbereich") && kopfText.includes("Duell") &&
+        kopfText.includes("Gameplan") && kopfText.includes("Trainingsplan"),
+      `Kopf der Wettkampfseite: „${kopfText}"`,
+    );
+
+    const lageNach = async (id) =>
+      page.evaluate((ziel) => {
+        const el = document.getElementById(ziel);
+        const kopf = document.querySelector("header");
+        return {
+          abstand: Math.round(el.getBoundingClientRect().top - kopf.getBoundingClientRect().bottom),
+          gewaehlt: document.querySelector("[data-kopf-marke][data-kopf-gewaehlt]")?.getAttribute("data-kopf-marke") ?? null,
+        };
+      }, id);
+    await page.locator('[data-kopf-marke="trainingsplan"]').click();
+    await page.waitForTimeout(1500);
+    const sprung = await lageNach("trainingsplan");
+    sagt(
+      sprung.abstand > 0 && sprung.abstand < 40 && sprung.gewaehlt === "trainingsplan",
+      `Sprungmarke „Trainingsplan": Abschnitt ${sprung.abstand} px unter dem Kopf, Kapsel auf ${sprung.gewaehlt}`,
+    );
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.waitForTimeout(900);
+    const obenMarke = await page.evaluate(() => document.querySelector("[data-kopf-marke][data-kopf-gewaehlt]")?.getAttribute("data-kopf-marke") ?? null);
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+    await page.waitForTimeout(900);
+    const untenMarke = await page.evaluate(() => document.querySelector("[data-kopf-marke][data-kopf-gewaehlt]")?.getAttribute("data-kopf-marke") ?? null);
+    sagt(obenMarke === "duell" && untenMarke === "trainingsplan", `Kapsel folgt dem Blättern (oben ${obenMarke}, unten ${untenMarke})`);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.waitForTimeout(600);
+
+    const kopf = page.locator("header").first();
+    await kopf.locator('[role="button"][aria-label="In der App suchen"]').click();
+    await page.waitForTimeout(900);
+    const eng = await page.evaluate(() => ({
+      marken: document.querySelectorAll("[data-kopf-marke]").length,
+      markenSichtbar: Array.from(document.querySelectorAll("[data-kopf-marke]")).filter((e) => e.getBoundingClientRect().height > 0).length,
+      zurueck: (document.querySelector("[data-kopf-zurueck]")?.getBoundingClientRect().height ?? 0) > 0,
+      ueberlauf: document.documentElement.scrollWidth - window.innerWidth,
+    }));
+    sagt(
+      eng.markenSichtbar === 0 && eng.zurueck && eng.ueberlauf <= 0,
+      `Suche auf: Abschnitte treten zurück (${eng.markenSichtbar} von ${eng.marken} sichtbar), Rückweg bleibt, Überlauf ${eng.ueberlauf}`,
+    );
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/mess-69-kopf-wettkampf-${THEME}.png`, clip: { x: 0, y: 0, width: 1440, height: 260 } });
+
+    // ── Regeln: Umschalter der Seite ───────────────────────────────────────
+    await page.goto(`${BASE}/regeln`, { waitUntil: "domcontentloaded" });
+    await page.locator('[data-kopf-wahl="mma"]').waitFor({ timeout: 60000 });
+    await page.waitForTimeout(1200);
+    const reiterInSeite = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("main button, main + div button")).filter((b) => b.textContent.trim() === "Boxen" && b.getBoundingClientRect().height > 0).length,
+    );
+    await page.locator('[data-kopf-wahl="boxing"]').click();
+    await page.waitForTimeout(1200);
+    const inhalt = await page.evaluate(() => ({
+      ueberschrift: document.querySelector("h2")?.textContent?.trim() ?? "",
+      gewaehlt: document.querySelector("[data-kopf-wahl][data-kopf-gewaehlt]")?.getAttribute("data-kopf-wahl") ?? null,
+    }));
+    sagt(
+      inhalt.ueberschrift.startsWith("Boxen") && inhalt.gewaehlt === "boxing" && reiterInSeite === 0,
+      `Regeln: Umschalter oben wechselt auf „${inhalt.ueberschrift}", Kapsel auf ${inhalt.gewaehlt}, keine Reiter mehr in der Seite (${reiterInSeite})`,
+    );
+    await page.screenshot({ path: `${OUT}/mess-69-kopf-regeln-${THEME}.png`, clip: { x: 0, y: 0, width: 1440, height: 260 } });
+
+    // ── Timer: der Weg zurück ist nach oben gewandert ──────────────────────
+    await page.goto(`${BASE}/timer`, { waitUntil: "domcontentloaded" });
+    await page.locator("[data-kopf-zurueck]").waitFor({ timeout: 60000 });
+    await page.waitForTimeout(800);
+    const timer = await page.evaluate(() => ({
+      oben: document.querySelector("[data-kopf-zurueck]")?.innerText.trim() ?? null,
+      inSeite: (document.querySelector("[data-seiten-zurueck]")?.getBoundingClientRect().height ?? 0) > 0,
+    }));
+    sagt(timer.oben === "Training" && !timer.inSeite, `Timer: „← ${timer.oben}" oben, in der Seite nicht mehr (${timer.inSeite})`);
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leerId, db, scoutId, scoutCampId }) {
   const { chromium } = await import("playwright");
   // Der Schalter erlaubt Ton ohne Nutzergeste — sonst sperrt Chromium den
@@ -1121,6 +1230,8 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     await apage.screenshot({ path: `${OUT}/mess-5b-athlet-sheet-${THEME}.png`, fullPage: false });
     await actx.close();
 
+    await kopfUeberall({ browser, athletUid, neuId });
+
     // Handy-Breite 390 px (bisher nicht gemessen)
     const hctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: THEME, hasTouch: true, isMobile: true });
     const hpage = await hctx.newPage();
@@ -1147,6 +1258,30 @@ async function schirme({ athletUid, trainerUid, neuId, bestandId, gegnerId, leer
     await hpage.locator('[data-reiter="gameplan"]').click();
     await hpage.waitForTimeout(1200);
     await hpage.screenshot({ path: `${OUT}/mess-d5-handy-gameplan-${THEME}.png`, fullPage: false });
+
+    // Auf dem Handy gibt es keinen Kopf — was dort oben steht, muss IN der
+    // Seite bleiben (Fenster 69): die Reiter der Regeln, der Weg zurück.
+    await hpage.goto(`${BASE}/regeln`, { waitUntil: "domcontentloaded" });
+    await hpage.waitForTimeout(2500);
+    const handyRegeln = await hpage.evaluate(() => ({
+      kopf: (document.querySelector("header [data-kopf-slot]")?.getBoundingClientRect().height ?? 0) > 0,
+      reiter: Array.from(document.querySelectorAll("button")).filter((b) => ["MMA", "BJJ", "Boxen"].includes(b.textContent.trim()) && b.getBoundingClientRect().height > 0).length,
+      ueberlauf: document.documentElement.scrollWidth - window.innerWidth,
+    }));
+    sagt(
+      !handyRegeln.kopf && handyRegeln.reiter === 3 && handyRegeln.ueberlauf <= 0,
+      `Handy 390 px: kein Kopf, die drei Reiter stehen in der Seite (${handyRegeln.reiter}), Überlauf ${handyRegeln.ueberlauf}`,
+    );
+    await hpage.goto(`${BASE}/library`, { waitUntil: "domcontentloaded" });
+    await hpage.waitForTimeout(2000);
+    const handyZurueck = await hpage.evaluate(() => {
+      const el = document.querySelector("[data-seiten-zurueck]");
+      return { label: el?.getAttribute("data-seiten-zurueck") ?? null, hoch: Math.round(el?.getBoundingClientRect().height ?? 0) };
+    });
+    sagt(
+      handyZurueck.label === "Techniken" && handyZurueck.hoch >= 44,
+      `Handy 390 px: „← ${handyZurueck.label}" in der Seite, ${handyZurueck.hoch} px hoch (Tippziel)`,
+    );
     await hctx.close();
 
     // Scouting-Nachlauf fertig? Frühestens 90 s nach dem Speichern.
