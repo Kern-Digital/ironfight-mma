@@ -4,19 +4,19 @@
  * Trainer-Plan-Detail (Workout-Pläne AUSBAU Stufe 1) — derselbe Editor wie
  * überall (PlanView), aber mit EXPLIZITEM Speichern/Verwerfen statt
  * Auto-Save: freigegebene Athleten sehen den Live-Stand, ein Auto-Save
- * würde halbfertige Tipp-Stände an alle pushen. Dazu die Freigabe-Karte
- * (öffnet PlanAudienceSheet — Kurse belegen die Schüler-Checkliste vor,
- * materialisiert wird IMMER die explizite Schüler-Auswahl als audienceUids)
+ * würde halbfertige Tipp-Stände an alle pushen. Die Freigabe hängt am
+ * großen Symbol VOR dem Plannamen (Leon 20.09.: Wort wächst beim Hovern
+ * heraus, Klick öffnet PlanAudienceSheet — ganze Kurse und/oder Einzelne;
+ * die Leseliste audienceUids rechnet lib/workout-plans.ts daraus aus)
  * und „Plan löschen" mit Inline-Bestätigung. Persönliche Kopien der
  * Athleten bleiben Snapshots — Löschen/Ändern fasst sie nie an.
  */
 
 import PlanAudienceSheet from "@/components/PlanAudienceSheet";
+import WortKnopf from "@/components/ui/WortKnopf";
 import Icon from "@/components/ui/Icon";
-import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
-import { TRAINING_BLOCKS, WEEKDAY_SHORT } from "@/lib/schedule";
 import {
   deleteTrainerWorkoutPlan,
   getTrainerWorkoutPlan,
@@ -31,7 +31,7 @@ import {
   upsertTrainerWorkoutPlan,
   type TrainerWorkoutPlan,
 } from "@/lib/workout-plans";
-import type { Difficulty, Discipline } from "@/lib/types";
+import type { Discipline } from "@/lib/types";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -53,29 +53,28 @@ function clonePlan(plan: TrainerWorkoutPlan): TrainerWorkoutPlan {
     ...(plan.restOverrides ? { restOverrides: { ...plan.restOverrides } } : {}),
     audienceUids: [...plan.audienceUids],
     audienceCourseIds: [...plan.audienceCourseIds],
+    audienceIndividualUids: plan.audienceIndividualUids
+      ? [...plan.audienceIndividualUids]
+      : null,
+    courseIds: [...plan.courseIds],
   };
 }
 
 /** Inhalts-Diff ohne Freigabe-Felder — nur er zählt für Speichern/Verwerfen. */
 function contentOf(plan: TrainerWorkoutPlan) {
-  // Die drei Felder werden bewusst herausdestrukturiert, um sie AUS dem
+  // Die Felder werden bewusst herausdestrukturiert, um sie AUS dem
   // Vergleich zu nehmen — sie heißen nur deshalb hier, damit `content` sie
   // nicht enthält.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { audienceUids, audienceCourseIds, updatedAt, ...content } = plan;
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const {
+    audienceUids,
+    audienceCourseIds,
+    audienceIndividualUids,
+    updatedAt,
+    ...content
+  } = plan;
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   return JSON.stringify(content);
-}
-
-function memberLabel(s: StudentEntry): string {
-  return s.displayName ?? s.authProviderName ?? s.email ?? "Mitglied";
-}
-
-/** Kurs-Anzeige „Mo · MMA Advanced" — unbekannte IDs fallen still raus. */
-function courseLabels(courseIds: string[]): string[] {
-  return courseIds
-    .map((id) => TRAINING_BLOCKS.find((b) => b.id === id))
-    .filter((b): b is (typeof TRAINING_BLOCKS)[number] => Boolean(b))
-    .map((b) => `${WEEKDAY_SHORT[b.weekday]} · ${b.title}`);
 }
 
 export default function TrainerPlanDetailPage() {
@@ -97,9 +96,9 @@ export default function TrainerPlanDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Mitglieder für die Namensauflösung der Freigabe (Leon 30.08.: Kurse
-  // und Personen namentlich anzeigen, nicht nur zählen)
-  const [members, setMembers] = useState<StudentEntry[] | null>(null);
+  // Mitglieder und Kurs-Abos lädt der Freigabe-Dialog selbst, erst beim
+  // Öffnen — die Seite braucht sie nicht mehr (Leon 20.09.: Freigabe steckt
+  // im Symbol vor dem Namen). Spart pro Seitenaufruf eine Abfrage je Mitglied.
 
   const gymId = resolveGymId(profile);
 
@@ -123,22 +122,6 @@ export default function TrainerPlanDetailPage() {
     // profile nur für die gymId — Neuladen bei User/Plan-Wechsel reicht
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profileLoading, planId]);
-
-  useEffect(() => {
-    if (!user || profileLoading) return;
-    let cancelled = false;
-    listAllMembers(resolveGymId(profile))
-      .then((list) => {
-        if (!cancelled) setMembers(list);
-      })
-      .catch(() => {
-        if (!cancelled) setMembers([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, profileLoading]);
 
   const dirty =
     saved !== null && draft !== null && contentOf(draft) !== contentOf(saved);
@@ -174,14 +157,23 @@ export default function TrainerPlanDetailPage() {
     setError(null);
   }
 
-  async function handleAudienceSave(uids: string[], courseIds: string[]) {
-    await updateTrainerPlanAudience(gymId, planId, uids, courseIds);
-    setSaved((p) =>
-      p ? { ...p, audienceUids: uids, audienceCourseIds: courseIds } : p,
+  async function handleAudienceSave(
+    courseIds: string[],
+    individualUids: string[],
+  ) {
+    const uids = await updateTrainerPlanAudience(
+      gymId,
+      planId,
+      courseIds,
+      individualUids,
     );
-    setDraft((p) =>
-      p ? { ...p, audienceUids: uids, audienceCourseIds: courseIds } : p,
-    );
+    const freigabe = {
+      audienceUids: uids,
+      audienceCourseIds: courseIds,
+      audienceIndividualUids: individualUids,
+    };
+    setSaved((p) => (p ? { ...p, ...freigabe } : p));
+    setDraft((p) => (p ? { ...p, ...freigabe } : p));
   }
 
   async function handleDelete() {
@@ -237,6 +229,12 @@ export default function TrainerPlanDetailPage() {
     );
   }
 
+  // Sieht den Plan überhaupt jemand? Kurse zählen mit — sie gelten auch für
+  // Mitglieder, die den Kurs erst später buchen.
+  const freigegeben =
+    (saved?.audienceCourseIds.length ?? 0) > 0 ||
+    (saved?.audienceUids.length ?? 0) > 0;
+
   if (!draft || !saved) {
     return (
       <main
@@ -246,26 +244,33 @@ export default function TrainerPlanDetailPage() {
     );
   }
 
-  const audienceCount = saved.audienceUids.length;
-  const courses = courseLabels(saved.audienceCourseIds);
-  // Namen statt Zahlen (Leon 30.08.) — solange die Mitglieder laden,
-  // steht die Zählung als Platzhalter da
-  const memberMap = members
-    ? new Map(members.map((m) => [m.uid, m] as const))
-    : null;
-  const personNames = memberMap
-    ? saved.audienceUids.map((uid) => {
-        const m = memberMap.get(uid);
-        return m ? memberLabel(m) : "Ehemaliges Mitglied";
-      })
-    : null;
-
   return (
     <>
       <PlanView
         plan={draft}
         backHref="/trainer/plans"
         backLabel="Workout-Pläne"
+        titleLeading={
+          // Freigabe: großes Symbol VOR dem Plannamen, beim Hovern wächst das
+          // Wort heraus, Klick öffnet den Dialog (Leon 20.09.). Die Farbe sagt
+          // den Zustand: Akzent = freigegeben, still = niemand sieht ihn.
+          <WortKnopf
+            icon="users"
+            wort="Freigeben"
+            // So groß wie die Überschrift daneben (Leon 20.09.)
+            size={44}
+            strokeWidth={1.7}
+            ariaLabel={
+              freigegeben
+                ? `Freigabe von „${saved.name || "Unbenannter Plan"}" ändern`
+                : `„${saved.name || "Unbenannter Plan"}" freigeben`
+            }
+            onClick={() => setAudienceOpen(true)}
+            style={{
+              color: freigegeben ? "var(--accent-text)" : "var(--text-3)",
+            }}
+          />
+        }
         startBelowBlocks
         editHeadBelowStats
         editing={{
@@ -311,11 +316,14 @@ export default function TrainerPlanDetailPage() {
             update((p) => planWithMovedBlock(p, from, to)),
           meta: {
             discipline: draft.discipline,
-            difficulty: draft.difficulty,
             onDisciplineChange: (discipline: Discipline) =>
               update((p) => ({ ...p, discipline })),
-            onDifficultyChange: (difficulty: Difficulty) =>
-              update((p) => ({ ...p, difficulty })),
+            // Zuordnung ist Inhalt: sie läuft über Speichern/Verwerfen wie
+            // Name und Blöcke, nicht über die Freigabe
+            courses: {
+              ids: draft.courseIds,
+              onChange: (courseIds) => update((p) => ({ ...p, courseIds })),
+            },
           },
           save: {
             dirty,
@@ -326,69 +334,6 @@ export default function TrainerPlanDetailPage() {
           },
           error,
         }}
-        belowStats={
-          <>
-            {/* ── Freigabe — RAHMENLOS (Leon 30.08.): links das große
-                Symbol (öffnet den Dialog), rechts Kurse + Personen
-                namentlich in gut lesbarer Größe. Sichtbarkeit erzwingen
-                die Firestore-Regeln (audienceUids). ── */}
-            <section className="-mt-2 flex items-start gap-4">
-              <button
-                type="button"
-                onClick={() => setAudienceOpen(true)}
-                aria-label={
-                  audienceCount > 0 ? "Freigabe bearbeiten" : "Plan freigeben"
-                }
-                className="t-interactive flex h-14 w-14 shrink-0 items-center justify-center rounded-field"
-                style={{ color: "var(--accent-text)" }}
-              >
-                <Icon name="users" size={38} strokeWidth={1.8} />
-              </button>
-              <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
-                {audienceCount === 0 ? (
-                  <p
-                    style={{
-                      font: "var(--type-body)",
-                      color: "var(--text-3)",
-                    }}
-                  >
-                    Noch nicht freigegeben — nur Trainer sehen diesen Plan.
-                    Tippe das Symbol, um ihn freizugeben.
-                  </p>
-                ) : (
-                  <>
-                    {courses.length > 0 && (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="t-label">Kurse</span>
-                        <p
-                          style={{
-                            font: "var(--type-body-strong)",
-                            color: "var(--text-body)",
-                          }}
-                        >
-                          {courses.join("  ·  ")}
-                        </p>
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-0.5">
-                      <span className="t-label">Personen</span>
-                      <p
-                        style={{
-                          font: "var(--type-body-strong)",
-                          color: "var(--text-body)",
-                        }}
-                      >
-                        {personNames
-                          ? personNames.join(", ")
-                          : `${audienceCount} ausgewählt`}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-          </>
-        }
         belowBlocks={
           <>
             {/* ── Löschen — Inline-Bestätigung statt Popup, ganz unten ──
@@ -463,6 +408,7 @@ export default function TrainerPlanDetailPage() {
         planName={saved.name || "Unbenannter Plan"}
         initialUids={saved.audienceUids}
         initialCourseIds={saved.audienceCourseIds}
+        initialIndividualUids={saved.audienceIndividualUids}
         onSave={handleAudienceSave}
         onClose={() => setAudienceOpen(false)}
       />

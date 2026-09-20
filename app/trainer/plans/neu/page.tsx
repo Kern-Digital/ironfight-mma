@@ -3,10 +3,16 @@
 /**
  * Neuer Trainer-Plan (Workout-Pläne AUSBAU Stufe 1) — derselbe Editor wie
  * bei den persönlichen Plänen (PlanView, Listen-Gesten, ExercisePicker),
- * zusätzlich Disziplin/Level-Selects (nötig für die Disziplin→Level-
- * Navigation der Athleten). Lokaler Entwurf, EXPLIZITER Speichern-Knopf
+ * zusätzlich der Disziplin-Select (nötig für die Disziplin-Navigation der
+ * Athleten). Lokaler Entwurf, EXPLIZITER Speichern-Knopf
  * (Muster /workout/eigene/neu); freigegeben wird danach auf der
  * Detailseite — ein frisch angelegter Plan ist für niemanden sichtbar.
+ *
+ * KURS-ZUORDNUNG (Leon 19.09.): Der Plan lässt sich hier schon Kursen
+ * zuordnen. Kommt der Trainer über das „+" eines Kurses in der Ansicht
+ * „Nach Kursen" (`?kurs=<Kursname>`), ist dieser Kurs vorgewählt und die
+ * Disziplin folgt seiner Rubrik, falls er eine hat. Freigegeben ist damit
+ * trotzdem nichts — Zuordnung ordnet nur.
  */
 
 import { useAuth } from "@/lib/auth-context";
@@ -23,18 +29,26 @@ import {
   upsertTrainerWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
-import type { Difficulty, Discipline } from "@/lib/types";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { blocksForCourse } from "@/lib/schedule";
+import type { Discipline } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import PlanView from "../../../workout/plans/[slug]/PlanView";
 
-function emptyPlan(): WorkoutPlan {
+type NeuerPlan = WorkoutPlan & { courseIds: string[] };
+
+/** Leerer Entwurf — mit `kurs` diesem Kurs zugeordnet (alle Termine). */
+function emptyPlan(kurs: string | null): NeuerPlan {
+  const termine = kurs ? blocksForCourse(kurs) : [];
+  // Rubrik des Kurses als Disziplin, sofern er eine trägt (MMA-Kurse
+  // haben keine — dann bleibt der Standard)
+  const rubrik = termine.find((b) => b.category)?.category;
   return {
     id: "",
     slug: "",
     gymId: "",
-    discipline: "boxing",
-    difficulty: "anfaenger",
+    courseIds: termine.map((b) => b.id),
+    discipline: rubrik ?? "boxing",
     name: "",
     short: "",
     description: "",
@@ -62,14 +76,26 @@ function emptyPlan(): WorkoutPlan {
 }
 
 export default function NewTrainerPlanPage() {
+  // useSearchParams braucht eine Suspense-Grenze (sonst bricht der Build)
+  return (
+    <Suspense fallback={null}>
+      <NewTrainerPlanContent />
+    </Suspense>
+  );
+}
+
+function NewTrainerPlanContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, profile } = useAuth();
 
-  const [plan, setPlan] = useState<WorkoutPlan>(emptyPlan());
+  const [plan, setPlan] = useState<NeuerPlan>(() =>
+    emptyPlan(searchParams.get("kurs")),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function update(patch: (p: WorkoutPlan) => WorkoutPlan) {
+  function update(patch: (p: NeuerPlan) => NeuerPlan) {
     setPlan((p) => patch(p));
   }
 
@@ -141,11 +167,12 @@ export default function NewTrainerPlanPage() {
           update((p) => planWithMovedBlock(p, from, to)),
         meta: {
           discipline: plan.discipline,
-          difficulty: plan.difficulty,
           onDisciplineChange: (discipline: Discipline) =>
             update((p) => ({ ...p, discipline })),
-          onDifficultyChange: (difficulty: Difficulty) =>
-            update((p) => ({ ...p, difficulty })),
+          courses: {
+            ids: plan.courseIds,
+            onChange: (courseIds) => update((p) => ({ ...p, courseIds })),
+          },
         },
         create: {
           onSave: () => void handleSave(),

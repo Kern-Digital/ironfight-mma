@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Client-Ansicht der Disziplin-Seite (Ebene 2 des Training-Tabs):
- * Level-Segment (Anfänger/Fortgeschritten/Pro) + Planliste mit Dauer,
- * Übungszahl und Equipment. Kopf mit Rubrik-Schein in der abgenommenen
+ * Client-Ansicht der Disziplin-Seite (Ebene 2 des Training-Tabs): EINE
+ * Planliste mit Dauer, Übungszahl und Equipment — leicht → schwer über
+ * sortOrder. (Das Level-Segment Anfänger/Fortgeschritten/Pro davor hat Leon
+ * am 19.09. restlos gestrichen.) Kopf mit Rubrik-Schein in der abgenommenen
  * Optik der Plan-Detail-Seite (Maske, Schein läuft nach unten aus).
  *
  * Datenquelle sind seit dem Seeding (Etappen-Schritt 5) die Gym-Pläne aus
@@ -18,6 +19,7 @@ import { useTheme } from "@/lib/theme-context";
 import { DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import { EQUIPMENT } from "@/lib/equipment";
 import { resolveGymId } from "@/lib/gym";
+import { syncMyPlanAccess } from "@/lib/plan-access";
 import { type WorkoutDisciplineInfo } from "@/lib/workout-plan-defaults";
 import {
   listSharedTrainerPlans,
@@ -28,11 +30,8 @@ import {
   type TrainerWorkoutPlan,
   type WorkoutPlan,
 } from "@/lib/workout-plans";
-import { DIFFICULTY_LABEL, type Difficulty } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-
-const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
 
 const BTN_FONT: React.CSSProperties = {
   font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
@@ -68,13 +67,11 @@ export default function DisciplineView({
   // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
   const hasStaffShell = useHasStaffShell();
 
-  const [difficulty, setDifficulty] = useState<Difficulty>("anfaenger");
-
   // null = lädt noch (kein Leer-Blitz). gymId kommt aus dem Profil
   // (Spiegel des Token-Claims) — erst laden, wenn es aufgelöst ist.
   const [allPlans, setAllPlans] = useState<WorkoutPlan[] | null>(null);
   // Für MICH freigegebene Trainer-Pläne (AUSBAU Stufe 1) — erscheinen
-  // OBEN in der Level-Liste mit „Vom Trainer"-Chip.
+  // OBEN in der Liste mit „Von X"-Chip.
   const [sharedPlans, setSharedPlans] = useState<TrainerWorkoutPlan[] | null>(
     null,
   );
@@ -90,7 +87,9 @@ export default function DisciplineView({
       .catch(() => {
         if (!cancelled) setAllPlans([]);
       });
-    listSharedTrainerPlans(resolveGymId(profile), user.uid)
+    // Kurs-Freigaben erst nachführen (lib/plan-access.ts)
+    syncMyPlanAccess()
+      .then(() => listSharedTrainerPlans(resolveGymId(profile), user.uid))
       .then((all) => {
         if (!cancelled) {
           setSharedPlans(all.filter((p) => p.discipline === info.discipline));
@@ -104,10 +103,8 @@ export default function DisciplineView({
     };
   }, [user, profile, profileLoading, info.discipline]);
 
-  const trainerPlans = (sharedPlans ?? []).filter(
-    (p) => p.difficulty === difficulty,
-  );
-  const plans = (allPlans ?? []).filter((p) => p.difficulty === difficulty);
+  const trainerPlans = sharedPlans ?? [];
+  const plans = allPlans ?? [];
 
   return (
     <main
@@ -116,6 +113,10 @@ export default function DisciplineView({
     >
       {/* Kopfbereich — gleiche Sprache wie die Plan-Detail-Seite */}
       <section className="relative">
+        {/* Schein NUR ohne Stab-Hülle — in der Hülle stand er mit harter
+            Oberkante als Streifen unter dem Kopf (Leons Befund 19.09.,
+            gleicher Fix wie in PlanView) */}
+        {!hasStaffShell && (
         <div
           className="absolute inset-0 overflow-hidden"
           aria-hidden
@@ -140,6 +141,7 @@ export default function DisciplineView({
             />
           </div>
         </div>
+        )}
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
             <Link data-press
@@ -182,34 +184,9 @@ export default function DisciplineView({
       </section>
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
-        {/* Level-Segment */}
-        <div className="flex flex-wrap gap-2">
-          {DIFFICULTIES.map((d) => {
-            const active = difficulty === d;
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDifficulty(d)}
-                aria-pressed={active}
-                className="t-interactive min-h-hit flex-1 whitespace-nowrap rounded-field px-3"
-                style={{
-                  ...BTN_FONT,
-                  background: active ? "var(--accent-subtle)" : "var(--surface-raised)",
-                  border: "1px solid",
-                  borderColor: active ? "var(--accent)" : "var(--line)",
-                  color: active ? "var(--accent-text)" : "var(--text-2)",
-                }}
-              >
-                {DIFFICULTY_LABEL[d]}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Planliste — erst mit dem Ladeergebnis (kein „keine Pläne"-Blitz).
             Freigegebene Trainer-Pläne stehen OBEN, markiert per Chip
-            (Level nie farbcodiert — der Chip ist Text im Akzent). */}
+            (Text im Akzent, keine Farbcodierung). */}
         {allPlans === null || sharedPlans === null ? null : trainerPlans.length +
             plans.length ===
           0 ? (
@@ -217,7 +194,7 @@ export default function DisciplineView({
             className="py-8 text-center"
             style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
           >
-            Für dieses Level gibt es noch keine Pläne.
+            Für diese Disziplin gibt es noch keine Pläne.
           </p>
         ) : (
           <div className="flex flex-col gap-3">

@@ -336,7 +336,6 @@ interface GeneratedData {
 interface WorkoutDocData {
   label: string;
   category: Category;
-  difficulty: "anfaenger" | "fortgeschritten" | "pro";
   rounds: number;
   workSeconds: number;
   restSeconds: number;
@@ -507,27 +506,6 @@ function generateForPersona(persona: DemoPersona): GeneratedData {
       const restSeconds = pick(rng, [30, 45, 60, 60, 90]);
       const aborted = chance(rng, cfg.abortedRate);
 
-      // Schwierigkeit korreliert mit Level + Zeit
-      const progress = week / Math.max(1, totalWeeks);
-      const difficulty: WorkoutDocData["difficulty"] =
-        persona === "beginner"
-          ? progress < 0.5
-            ? "anfaenger"
-            : chance(rng, 0.6)
-              ? "anfaenger"
-              : "fortgeschritten"
-          : persona === "intermediate"
-            ? chance(rng, 0.55)
-              ? "fortgeschritten"
-              : chance(rng, 0.5)
-                ? "anfaenger"
-                : "pro"
-            : chance(rng, 0.5)
-              ? "fortgeschritten"
-              : chance(rng, 0.7)
-                ? "pro"
-                : "anfaenger";
-
       const techniqueIds = pickTechniquesForCategory(
         rng,
         category,
@@ -553,7 +531,6 @@ function generateForPersona(persona: DemoPersona): GeneratedData {
       workouts.push({
         label,
         category,
-        difficulty,
         rounds,
         workSeconds,
         restSeconds,
@@ -894,7 +871,6 @@ export async function seedDemoStudent(
       b.set(ref, {
         label: w.label,
         category: w.category,
-        difficulty: w.difficulty,
         rounds: w.rounds,
         workSeconds: w.workSeconds,
         restSeconds: w.restSeconds,

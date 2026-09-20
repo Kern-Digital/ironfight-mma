@@ -46,6 +46,43 @@ export const WEEKDAY_LABELS = [
 
 export const WEEKDAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
+// ─── Kurse = Kursnamen ──────────────────────────────────────────────────────
+// Ein KURS ist ein Kursname, nicht ein Termin: „MMA Teens" steht viermal im
+// Plan (Mi 2×, Fr 2×) und ist trotzdem ein Kurs — dieselbe Regel wie der
+// Kurs-Filter der Athletenliste (lib/student-courses.ts). Gespeichert werden
+// trotzdem die Termin-IDs: sie sind stabil, ein Titel ist es nicht.
+
+const BLOCK_BY_ID = new Map(TRAINING_BLOCKS.map((b) => [b.id, b]));
+
+/** Alle Kursnamen in der Reihenfolge des Kursplans (erster Termin zählt). */
+export function courseTitles(): string[] {
+  return Array.from(new Set(TRAINING_BLOCKS.map((b) => b.title)));
+}
+
+/** Die Termine eines Kursnamens (leer, wenn es ihn nicht gibt). */
+export function blocksForCourse(title: string): TrainingBlock[] {
+  return TRAINING_BLOCKS.filter((b) => b.title === title);
+}
+
+/**
+ * Kursnamen zu gespeicherten Termin-IDs — in Kursplan-Reihenfolge, jeder
+ * einmal. Unbekannte IDs (Kurs aus dem Plan genommen) fallen still raus.
+ */
+export function courseTitlesOf(blockIds: string[]): string[] {
+  const titel = new Set(
+    blockIds.flatMap((id) => {
+      const b = BLOCK_BY_ID.get(id);
+      return b ? [b.title] : [];
+    }),
+  );
+  return courseTitles().filter((t) => titel.has(t));
+}
+
+/** Termin-ID → Termin (undefined für unbekannte IDs). */
+export function blockById(id: string): TrainingBlock | undefined {
+  return BLOCK_BY_ID.get(id);
+}
+
 /** ISO-Wochenkennung — nur intern, nie im UI anzeigen. Bsp: "2026-W19" */
 export function getWeekIdentifier(date: Date = new Date()): string {
   const d = new Date(date);

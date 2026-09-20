@@ -43,6 +43,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
+import { syncMyPlanAccess } from "./plan-access";
 import { TRAINING_BLOCKS, getWeekIdentifier } from "./schedule";
 import type { BlockSubscription, LibraryEntry, TrainingSession } from "./types";
 
@@ -359,6 +360,9 @@ export async function subscribeToBlock(
     startTime: block.startTime,
     subscribedAt: serverTimestamp(),
   });
+  // Kurs-Freigaben der Trainer-Pläne sofort nachziehen — an diesen Kurs
+  // freigegebene Pläne gelten jetzt auch für mich (Leon 19.09.)
+  void syncMyPlanAccess({ force: true });
 }
 
 /** Hebt das Abo eines Kurses auf. */
@@ -367,6 +371,8 @@ export async function unsubscribeFromBlock(
   blockId: string,
 ): Promise<void> {
   await deleteDoc(subscriptionDocRef(uid, blockId));
+  // … und wieder heraus, wo nur dieser Kurs mich hineingebracht hatte
+  void syncMyPlanAccess({ force: true });
 }
 
 /** Prüft ob der User einen Kurs abonniert hat. */

@@ -2,15 +2,14 @@
  * Eingebaute Start-Pläne — Fallback, solange ein Gym noch keine eigenen
  * Workout-Pläne in Firestore hat (gyms/{gymId}/workoutPlans).
  *
- * Seit Etappen-Schritt 5 (Teil 1): ZWEI Pläne pro Disziplin × Level, damit
- * jede Planliste von Anfang an als Liste erlebbar ist. Struktur folgt dem
- * klassischen Session-Aufbau Aufwärmen → Technik → Konditionierung →
- * Cooldown (jeder Plan schließt mit einem Cooldown). Die Level trennen sich
- * über Übungsauswahl, Blockdichte und Pausenlänge — Anfänger-Pläne nutzen
- * NUR Übungen mit difficulty anfaenger/any, Pro heißt kurze Pausen und hohe
- * Dichte, nicht zwingend mehr Länge. Innerhalb einer Zelle unterscheiden
- * sich die beiden Pläne über den Fokus (Gerätetraining vs. bodyweight,
- * Angriff vs. Verteidigung, Technik vs. Kondition). Alle Dauer-/Runden-/
+ * SECHS Pläne pro Disziplin, sortOrder 1–6 von leicht nach schwer. Bis
+ * 19.09. trugen sie ein Level (je zwei Anfänger/Fortgeschritten/Pro) — Leon
+ * hat das Level restlos gestrichen, die Pläne selbst sind geblieben: 1–2
+ * nutzen NUR Übungen mit difficulty anfaenger/any, 5–6 kurze Pausen und hohe
+ * Dichte. Struktur folgt dem klassischen Session-Aufbau Aufwärmen → Technik
+ * → Konditionierung → Cooldown (jeder Plan schließt mit einem Cooldown).
+ * Benachbarte Pläne unterscheiden sich über den Fokus (Gerätetraining vs.
+ * bodyweight, Angriff vs. Verteidigung, Technik vs. Kondition). Alle Dauer-/Runden-/
  * Equipment-Werte kommen aus der Übungs-DB (lib/exercises) — die Pläne
  * referenzieren nur IDs.
  *
@@ -72,7 +71,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-fundament",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "anfaenger",
     name: "Fundament",
     short: "Saubere Basics am Sack und an den Pratzen.",
     description:
@@ -114,7 +112,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-shadow-footwork",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "anfaenger",
     name: "Shadow & Footwork",
     short: "Komplett ohne Geräte — überall machbar.",
     description:
@@ -152,7 +149,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-power-kombis",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "fortgeschritten",
     name: "Power & Kombis",
     short: "Dreier-Kombinationen mit Schlagkraft-Arbeit.",
     description:
@@ -194,7 +190,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-defensiv-konter",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "fortgeschritten",
     name: "Defensiv & Konter",
     short: "Kopfbewegung, Distanz und Konter-Timing.",
     description:
@@ -236,7 +231,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-fight-camp",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "pro",
     name: "Fight-Camp-Runde",
     short: "Hohe Dichte, kurze Pausen — Wettkampf-Rhythmus.",
     description:
@@ -278,7 +272,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "boxing-sack-marathon",
     gymId: DEFAULT_GYM_ID,
     discipline: "boxing",
-    difficulty: "pro",
     name: "Sack-Marathon",
     short: "Volumen-Runden am schweren Sack.",
     description:
@@ -322,7 +315,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-takedown-basics",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "anfaenger",
     name: "Takedown-Basics",
     short: "Stand, Penetration Step, erster Single Leg.",
     description:
@@ -364,7 +356,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-sprawl-schule",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "anfaenger",
     name: "Sprawl-Schule",
     short: "Takedown-Verteidigung von Grund auf.",
     description:
@@ -402,7 +393,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-takedowns-sprawls",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "fortgeschritten",
     name: "Takedowns & Sprawls",
     short: "Single, Double und Sprawl in hoher Schlagzahl.",
     description:
@@ -444,7 +434,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-chain-wrestling",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "fortgeschritten",
     name: "Chain-Wrestling",
     short: "Takedown-Ketten plus Explosivkraft.",
     description:
@@ -486,7 +475,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-matten-motor",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "pro",
     name: "Matten-Motor",
     short: "Takedown-Ketten plus schwerer Kraft-Zirkel.",
     description:
@@ -532,7 +520,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "wrestling-gas-tank",
     gymId: DEFAULT_GYM_ID,
     discipline: "wrestling",
-    difficulty: "pro",
     name: "Gas Tank",
     short: "Kondition unter Ermüdung — der letzte Gang.",
     description:
@@ -572,7 +559,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-grundlinie-boden",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "anfaenger",
     name: "Grundlinie Boden",
     short: "Solo-Movements und erstes Positions-Sparring.",
     description:
@@ -610,7 +596,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-hueft-schule",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "anfaenger",
     name: "Hüft-Schule",
     short: "Hüftflucht und Escapes im Fokus.",
     description:
@@ -648,7 +633,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-submission-kette",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "fortgeschritten",
     name: "Submission-Kette",
     short: "Armbar und Triangle in Wiederholung, dann Sparring.",
     description:
@@ -686,7 +670,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-guard-attacke",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "fortgeschritten",
     name: "Guard-Attacke",
     short: "Angriffszirkel aus der Guard plus Kondition.",
     description:
@@ -724,7 +707,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-rolling-intensiv",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "pro",
     name: "Rolling Intensiv",
     short: "Submission-Ketten und Sparring mit Minimal-Pausen.",
     description:
@@ -768,7 +750,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "bjj-comp-day",
     gymId: DEFAULT_GYM_ID,
     discipline: "bjj",
-    difficulty: "pro",
     name: "Comp-Day Boden",
     short: "Wettkampf-Simulation: erst Sparring, dann Technik.",
     description:
@@ -814,7 +795,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-acht-waffen",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "anfaenger",
     name: "Acht Waffen",
     short: "Teep, Kicks und Knie — die Grundschule.",
     description:
@@ -856,7 +836,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-kick-fundament",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "anfaenger",
     name: "Kick-Fundament",
     short: "Standbein, Balance und der erste harte Kick.",
     description:
@@ -898,7 +877,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-pratzen-power",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "fortgeschritten",
     name: "Pratzen & Power",
     short: "Kick-Volumen am Sack plus Explosiv-Arbeit.",
     description:
@@ -936,7 +914,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-knie-clinch",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "fortgeschritten",
     name: "Knie & Clinch",
     short: "Nahdistanz: Knie, Clinch-Kontrolle, Teep.",
     description:
@@ -978,7 +955,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-clinch-druck",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "pro",
     name: "Clinch & Druck",
     short: "Volles Technik-Volumen mit Minimal-Pausen.",
     description:
@@ -1021,7 +997,6 @@ export const DEFAULT_WORKOUT_PLANS: WorkoutPlan[] = [
     slug: "muay-thai-kick-volumen",
     gymId: DEFAULT_GYM_ID,
     discipline: "muay-thai",
-    difficulty: "pro",
     name: "Kick-Volumen",
     short: "Kicks im Akkord — Beine, die nicht müde werden.",
     description:

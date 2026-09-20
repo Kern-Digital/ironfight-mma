@@ -30,13 +30,17 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { listAllMembers } from "./admin";
 import { getFirestoreDb } from "./firebase";
+import {
+  loadCourseMemberships,
+  type CourseMemberships,
+} from "./student-courses";
 import { getExerciseById } from "./exercises";
 import { setWorkoutSavedPlan, type WorkoutSession } from "./workouts";
 import { DIFFICULTY_LABEL, DISCIPLINE_LABEL } from "./types";
 import type {
   Category,
-  Difficulty,
   Discipline,
   EquipmentId,
   Exercise,
@@ -68,7 +72,6 @@ export interface WorkoutPlan {
   slug: string;
   gymId: string;
   discipline: Discipline;
-  difficulty: Difficulty;
   name: string;
   /** Eine Zeile für Karten/Listen */
   short: string;
@@ -79,7 +82,10 @@ export interface WorkoutPlan {
       überlebt Verschieben/Duplizieren; taucht dieselbe Übung mehrfach auf,
       teilt sie sich die Pause. */
   restOverrides?: Record<string, number>;
-  /** Sortierung innerhalb Disziplin+Level — Client sortiert, fehlt = ans Ende */
+  /** Sortierung innerhalb der Disziplin — Client sortiert, fehlt = ans Ende.
+      (Ein Level Anfänger/Fortgeschritten/Pro gab es bis 19.09. — Leon hat es
+      restlos gestrichen; die Start-Pläne stehen seitdem in EINER Liste,
+      sortOrder 1–6 hält die alte Reihenfolge leicht → schwer.) */
   sortOrder?: number;
 }
 
@@ -109,13 +115,28 @@ export interface PersonalWorkoutPlan extends WorkoutPlan {
  * Freigeben materialisiert, KEIN Client-Filter.
  */
 export interface TrainerWorkoutPlan extends WorkoutPlan {
-  /** SICHERHEITSWIRKSAM: uids, für die der Plan freigegeben ist (Rules-Read
-      via array-contains). Leer = Entwurf, nur Trainer/Admin sehen ihn. */
+  /** SICHERHEITSWIRKSAM: uids, die den Plan lesen dürfen (Rules-Read via
+      array-contains). Leer = Entwurf, nur Trainer/Admin sehen ihn.
+      ABGELEITET, nie von Hand gepflegt: Mitglieder der Freigabe-Kurse ∪
+      einzeln Freigegebene. Beim Speichern der Freigabe rechnet der Trainer-
+      Client sie aus; danach hält /api/workout-plans/sync-access sie aktuell,
+      wenn Athleten Kurse buchen oder abbestellen (Leon 19.09.: „immer der
+      ganze Kurs" — vorher war die Kurs-Wahl ein einmaliger Schnappschuss). */
   audienceUids: string[];
-  /** Nur Anzeige: beim Freigeben gewählte Kurse (TRAINING_BLOCKS-IDs).
-      Die Auswahl ist ein SNAPSHOT — wer den Kurs später abonniert, kommt
-      nicht automatisch dazu (echte Mitgliedschaft erst Multi-Gym Phase 2). */
+  /** Freigabe an KURSE (TRAINING_BLOCKS-IDs): jedes Mitglied dieser Kurse
+      sieht den Plan, auch wer den Kurs später bucht. */
   audienceCourseIds: string[];
+  /** Freigabe an EINZELNE — unabhängig von Kursen. null = Altbestand von vor
+      dem 19.09.: dort ist nicht mehr zu trennen, wer über einen Kurs und wer
+      einzeln drin ist; die Sync-Route nimmt dann niemanden heraus. */
+  audienceIndividualUids: string[] | null;
+  /** KURS-ZUORDNUNG (Leon 19.09.) — reine Ordnung, KEINE Sichtbarkeit: der
+      Trainer ordnet den Plan einem oder mehreren Kursen zu, sehen können ihn
+      Athleten erst über die Freigabe oben (die an ganz andere Kurse gehen
+      darf). Termin-IDs aus TRAINING_BLOCKS, alle Termine eines Kursnamens.
+      Fällt ein Kurs aus dem Kursplan, bleibt der Plan bestehen — die ID
+      löst sich nicht mehr auf, und er steht unter „Ohne Kurs". */
+  courseIds: string[];
   createdBy: string;
   /** Anzeigename des Erstellers, BEIM ANLEGEN mitgeschrieben — Athleten
       dürfen fremde users-Dokumente nicht lesen (Rules), könnten die uid
@@ -350,7 +371,6 @@ export function workoutSessionToPlan(session: WorkoutSession): WorkoutPlan {
     gymId: "personal",
     // Category ist Teilmenge von Discipline (gleiche Slugs)
     discipline: session.plan?.discipline ?? session.category ?? "boxing",
-    difficulty: session.difficulty ?? "anfaenger",
     name: session.label ?? "Workout",
     short: "",
     description: "Als Favorit gespeichertes Workout.",
@@ -418,7 +438,6 @@ export function workoutDefinitionToPlan(def: WorkoutDefinition): WorkoutPlan {
     gymId: "generated",
     // Category ist Teilmenge von Discipline (gleiche Slugs)
     discipline: def.category,
-    difficulty: def.difficulty,
     name: def.label,
     short: "",
     description: `Auto-generiertes Workout — ${DIFFICULTY_LABEL[def.difficulty]} · ${DISCIPLINE_LABEL[def.category]}`,
@@ -469,7 +488,6 @@ export function parseSessionPayload(payload: string | null): WorkoutPlan | null 
 type WorkoutPlanDoc = {
   gymId: string;
   discipline: Discipline;
-  difficulty: Difficulty;
   name: string;
   short: string;
   description: string;
@@ -479,6 +497,8 @@ type WorkoutPlanDoc = {
   sourcePlanId?: string | null;
   audienceUids?: string[];
   audienceCourseIds?: string[];
+  audienceIndividualUids?: string[];
+  courseIds?: string[];
   createdBy?: string;
   createdByName?: string;
   createdAt?: Timestamp | null;
@@ -509,7 +529,6 @@ function docToPlan(id: string, data: WorkoutPlanDoc): WorkoutPlan {
     slug: id,
     gymId: data.gymId,
     discipline: data.discipline,
-    difficulty: data.difficulty,
     name: data.name,
     short: data.short ?? "",
     description: data.description ?? "",
@@ -524,7 +543,6 @@ function planPayload(gymId: string, plan: WorkoutPlan) {
   return {
     gymId,
     discipline: plan.discipline,
-    difficulty: plan.difficulty,
     name: plan.name,
     short: plan.short,
     description: plan.description,
@@ -651,6 +669,11 @@ function docToTrainerPlan(id: string, data: WorkoutPlanDoc): TrainerWorkoutPlan 
     ...docToPlan(id, data),
     audienceUids: data.audienceUids ?? [],
     audienceCourseIds: data.audienceCourseIds ?? [],
+    audienceIndividualUids: data.audienceIndividualUids ?? null,
+    // Pläne von vor der Zuordnung (19.09.) tragen das Feld nicht — sie
+    // starten mit den Kursen ihrer Freigabe. Beim ersten Speichern schreibt
+    // der Editor die Zuordnung ausdrücklich, ab dann gilt nur noch sie.
+    courseIds: data.courseIds ?? data.audienceCourseIds ?? [],
     createdBy: data.createdBy ?? "",
     createdByName: data.createdByName ?? "",
     updatedAt: data.updatedAt?.toDate() ?? null,
@@ -698,10 +721,12 @@ export async function getTrainerWorkoutPlan(
  * Trainer-Plan anlegen/aktualisieren (Inhalt — Name, Blöcke, Pausen, …).
  * Die Freigabe-Felder werden hier bewusst NICHT angefasst (merge), dafür
  * gibt es updateTrainerPlanAudience; beim Anlegen starten sie leer.
+ * Die Kurs-ZUORDNUNG (`courseIds`) ist Inhalt und wird mitgeschrieben,
+ * sobald der Aufrufer sie mitgibt — sie schaltet keine Sichtbarkeit frei.
  */
 export async function upsertTrainerWorkoutPlan(
   gymId: string,
-  plan: WorkoutPlan,
+  plan: WorkoutPlan & { courseIds?: string[] },
   updatedBy: string,
   updatedByName = "",
   options: { isCreator?: boolean } = {},
@@ -713,6 +738,7 @@ export async function upsertTrainerWorkoutPlan(
     ref,
     {
       ...planPayload(gymId, plan),
+      ...(plan.courseIds ? { courseIds: plan.courseIds } : {}),
       updatedAt: serverTimestamp(),
       updatedBy,
       // Speichert der ERSTELLER, wird sein Anzeigename aufgefrischt —
@@ -729,6 +755,10 @@ export async function upsertTrainerWorkoutPlan(
             // festgeschrieben (Name denormalisiert — s. createdByName)
             audienceUids: [],
             audienceCourseIds: [],
+            audienceIndividualUids: [],
+            // Immer ausdrücklich — sonst griffe beim Lesen der Rückfall auf
+            // die Freigabe-Kurse (docToTrainerPlan)
+            courseIds: plan.courseIds ?? [],
             createdBy: updatedBy,
             createdByName: updatedByName,
             createdAt: serverTimestamp(),
@@ -759,22 +789,48 @@ export async function copyAsOwnTrainerPlan(
   );
 }
 
+/** Wer ist in mindestens einem dieser Kurse? (Kurs-Abos je Mitglied) */
+export function courseMemberUids(
+  courseIds: string[],
+  memberships: CourseMemberships,
+): string[] {
+  if (courseIds.length === 0) return [];
+  const uids: string[] = [];
+  memberships.forEach((abos, uid) => {
+    if (courseIds.some((c) => abos.has(c))) uids.push(uid);
+  });
+  return uids;
+}
+
 /**
- * Freigabe MATERIALISIEREN: die explizite Schüler-Auswahl wird als
- * audienceUids geschrieben (Kurse sind nur Anzeige-Info). Snapshot-Semantik —
- * erneutes Speichern aktualisiert die Liste.
+ * Freigabe speichern (Leon 19.09.: „immer der ganze Kurs"). Gespeichert wird,
+ * WEM freigegeben ist — Kurse und Einzelne getrennt —, und daraus
+ * abgeleitet die Leseliste `audienceUids` = heutige Kursmitglieder ∪
+ * Einzelne. Wer den Kurs später bucht oder abbestellt, zieht die Route
+ * /api/workout-plans/sync-access nach. Rückgabe: die neue Leseliste.
  */
 export async function updateTrainerPlanAudience(
   gymId: string,
   planId: string,
-  audienceUids: string[],
   audienceCourseIds: string[],
-): Promise<void> {
+  audienceIndividualUids: string[],
+): Promise<string[]> {
+  let viaKurs: string[] = [];
+  if (audienceCourseIds.length > 0) {
+    const members = await listAllMembers(gymId);
+    const memberships = await loadCourseMemberships(members.map((m) => m.uid));
+    viaKurs = courseMemberUids(audienceCourseIds, memberships);
+  }
+  const audienceUids = Array.from(
+    new Set([...viaKurs, ...audienceIndividualUids]),
+  );
   await updateDoc(doc(trainerPlansCol(gymId), planId), {
     audienceUids,
     audienceCourseIds,
+    audienceIndividualUids,
     updatedAt: serverTimestamp(),
   });
+  return audienceUids;
 }
 
 export async function deleteTrainerWorkoutPlan(gymId: string, planId: string) {

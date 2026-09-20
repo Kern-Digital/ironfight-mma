@@ -20,6 +20,7 @@ import { WORKOUT_DISCIPLINES } from "@/lib/workout-plan-defaults";
 import { resolveGymId } from "@/lib/gym";
 import SwipeAction from "@/components/SwipeAction";
 import { SheetShell } from "@/components/motion";
+import { syncMyPlanAccess } from "@/lib/plan-access";
 import {
   listPersonalWorkoutPlans,
   listSharedTrainerPlans,
@@ -203,7 +204,7 @@ export default function WorkoutHubPage() {
   const [ownPlans, setOwnPlans] = useState<PersonalWorkoutPlan[] | null>(null);
   const [recent, setRecent] = useState<WorkoutSession[] | null>(null);
   // Gym-Pläne aus Firestore (seit Seeding, Schritt 5) — nur für die
-  // Meta-Zeile der Disziplinkarten („n Pläne · n Level").
+  // Meta-Zeile der Disziplinkarten („n Pläne").
   const [gymPlans, setGymPlans] = useState<WorkoutPlan[] | null>(null);
   // Für MICH freigegebene Trainer-Pläne (AUSBAU Stufe 1) — Sektion
   // „Vom Trainer für dich"; leer = Sektion erscheint gar nicht.
@@ -287,8 +288,10 @@ export default function WorkoutHubPage() {
         if (!cancelled) setGymPlans([]);
       });
     // Freigegebene Trainer-Pläne — die array-contains-Query auf die eigene
-    // uid ist die einzige, die die Rules einem Athleten hier erlauben.
-    listSharedTrainerPlans(resolveGymId(profile), user.uid)
+    // uid ist die einzige, die die Rules einem Athleten hier erlauben. Vorher
+    // die Kurs-Freigaben nachführen (gebuchte Kurse, lib/plan-access.ts).
+    syncMyPlanAccess()
+      .then(() => listSharedTrainerPlans(resolveGymId(profile), user.uid))
       .then((plans) => {
         if (!cancelled) setTrainerPlans(plans);
       })
@@ -564,18 +567,17 @@ export default function WorkoutHubPage() {
           </span>
         </button>
 
-        {/* ── Disziplinen (Ebene 1: Disziplin → Level → Plan) ── */}
+        {/* ── Disziplinen (Ebene 1: Disziplin → Plan) ── */}
         <section className="flex flex-col gap-4">
           <SectionHeader
             title="Disziplinen"
-            subtitle="Strukturierte Pläne nach Level — wähle deine Disziplin"
+            subtitle="Strukturierte Pläne — wähle deine Disziplin"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             {WORKOUT_DISCIPLINES.map((d) => {
               const plans = (gymPlans ?? []).filter(
                 (p) => p.discipline === d.discipline,
               );
-              const levels = new Set(plans.map((p) => p.difficulty)).size;
               return (
                 // Ganze Karte = Link (keine Buttons mehr, Entscheidung 2026-08-23).
                 // Bild oben rechts klar, läuft nach links/unten in die
@@ -675,7 +677,7 @@ export default function WorkoutHubPage() {
                     <span style={{ ...META_FONT, color: "var(--text-2)" }}>
                       {gymPlans === null
                         ? " "
-                        : `${plans.length} Pläne · ${levels} Level`}
+                        : `${plans.length} Pläne`}
                     </span>
                   </div>
                 </Link>
@@ -951,7 +953,6 @@ export default function WorkoutHubPage() {
                         {plan.name || "Trainer-Plan"}
                       </h3>
                       <span style={{ ...META_FONT, color: "var(--text-2)" }}>
-                        {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
                         {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes} min ·{" "}
                         {exercises} Übungen
                       </span>
@@ -1076,7 +1077,6 @@ export default function WorkoutHubPage() {
                               className="truncate"
                               style={{ ...META_FONT, color: "var(--text-3)" }}
                             >
-                              {DIFFICULTY_LABEL[plan.difficulty]} ·{" "}
                               {DISCIPLINE_LABEL[plan.discipline]} · ≈ {minutes}{" "}
                               min · {exercises} Übungen
                             </span>

@@ -25,6 +25,7 @@ import { MorphSwap } from "@/components/motion";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ExerciseDetailSheet from "@/components/ExerciseDetailSheet";
 import ExercisePicker from "@/components/ExercisePicker";
+import PlanKursZuordnung from "@/components/PlanKursZuordnung";
 import RestWheel, { formatRest } from "@/components/RestWheel";
 import SwipeAction from "@/components/SwipeAction";
 import Icon, { type IconName } from "@/components/ui/Icon";
@@ -50,9 +51,7 @@ import {
   type WorkoutPlan,
 } from "@/lib/workout-plans";
 import {
-  DIFFICULTY_LABEL,
   GENDER_HEART_COLOR,
-  type Difficulty,
   type Discipline,
   type Exercise,
 } from "@/lib/types";
@@ -124,14 +123,16 @@ export interface PlanEditing {
   /** Expliziter Erstellen-Knopf (Neu-Erstellen statt Auto-Save); `hint`
       überschreibt die Statuszeile (Trainer-Plan ≠ „Meine Workouts") */
   create?: { onSave: () => void; saving: boolean; hint?: string };
-  /** Disziplin/Level-Selects im Editier-Kopf — Trainer-Pläne (AUSBAU
-      Stufe 1) brauchen beide für die Disziplin→Level-Navigation;
-      persönliche Pläne bleiben bewusst ohne (Leon 2026-08-28) */
+  /** Disziplin-Select im Editier-Kopf — Trainer-Pläne (AUSBAU Stufe 1)
+      brauchen sie für die Disziplin-Navigation der Athleten; persönliche
+      Pläne bleiben bewusst ohne (Leon 2026-08-28). Das Level daneben hat
+      Leon am 19.09. restlos gestrichen. */
   meta?: {
     discipline: Discipline;
-    difficulty: Difficulty;
     onDisciplineChange: (d: Discipline) => void;
-    onDifficultyChange: (d: Difficulty) => void;
+    /** Kurs-Zuordnung (Leon 19.09.) — reine Ordnung, keine Freigabe.
+        Fehlt sie, gibt es kein Kurs-Feld. */
+    courses?: { ids: string[]; onChange: (ids: string[]) => void };
   };
   /** Expliziter Speichern/Verwerfen-Weg (Trainer-Plan bearbeiten):
       freigegebene Athleten sehen den Live-Stand — Auto-Save würde
@@ -145,7 +146,6 @@ export interface PlanEditing {
   };
 }
 
-const DIFFICULTIES: Difficulty[] = ["anfaenger", "fortgeschritten", "pro"];
 
 /** Ziel-Slot beim Ziehen: schmaler als eine echte Zeile … */
 const DROP_SLOT_HEIGHT = 36;
@@ -228,6 +228,7 @@ export default function PlanView({
   allowEdit,
   editing,
   belowStats,
+  titleLeading,
   belowBlocks,
   startBelowBlocks,
   editHeadBelowStats,
@@ -250,13 +251,18 @@ export default function PlanView({
   /** Seiten-spezifische Sektion zwischen Eckdaten und Blöcken (Trainer-
       Plan: Freigabe) — hält Trainer-Details aus PlanView */
   belowStats?: React.ReactNode;
+  /** Steht VOR dem Plannamen in derselben Zeile (Leon 20.09.: großes Symbol
+      mit herauswachsendem Wort, z. B. „Freigeben" auf der Trainer-Seite).
+      Das Wort schiebt den Titel beim Aufklappen nach rechts — deshalb gehört
+      hier nur ein Knopf hinein, der am Zeilenanfang sitzt. */
+  titleLeading?: React.ReactNode;
   /** Seiten-spezifische Sektion GANZ unten, nach Blöcken und Start-Knopf
       (Trainer-Plan: „Plan löschen") */
   belowBlocks?: React.ReactNode;
   /** „Workout starten" unter dem LETZTEN Block statt oben in der
       Aktionszeile (Leon 30.08., Trainer-Plan-Detail) */
   startBelowBlocks?: boolean;
-  /** Editier-Kopf (Name + Disziplin/Level + Status) NACH belowStats statt
+  /** Editier-Kopf (Name + Disziplin + Kurse + Status) NACH belowStats statt
       ganz oben (Leon 30.08.: „das unter die Freigabe") */
   editHeadBelowStats?: boolean;
   /** Ersetzt bei allowEdit das Herz: statt einer persönlichen Kopie
@@ -876,7 +882,7 @@ export default function PlanView({
       </button>
     );
 
-  // Editier-Kopf: Name (+ ggf. Disziplin/Level) + Speicher-Status — sitzt
+  // Editier-Kopf: Name (+ ggf. Disziplin und Kurse) + Speicher-Status — sitzt
   // standardmäßig ganz oben, auf der Trainer-Detailseite unter der
   // Freigabe (editHeadBelowStats, Leon 30.08.)
   const editHead = edit ? (
@@ -899,33 +905,26 @@ export default function PlanView({
           }}
         />
       </label>
-      {/* Disziplin/Level — nur wo die Navigation sie braucht
-          (Trainer-Pläne); ui/Select ist der App-Standard */}
+      {/* Disziplin — nur wo die Navigation sie braucht (Trainer-Pläne);
+          ui/Select ist der App-Standard */}
       {edit.meta && (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <span className="t-label">Disziplin</span>
-            <Select
-              value={edit.meta.discipline}
-              onChange={(v) => edit.meta?.onDisciplineChange(v as Discipline)}
-              options={WORKOUT_DISCIPLINES.map((d) => ({
-                value: d.discipline,
-                label: d.name,
-              }))}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="t-label">Level</span>
-            <Select
-              value={edit.meta.difficulty}
-              onChange={(v) => edit.meta?.onDifficultyChange(v as Difficulty)}
-              options={DIFFICULTIES.map((d) => ({
-                value: d,
-                label: DIFFICULTY_LABEL[d],
-              }))}
-            />
-          </div>
+        <div className="flex flex-col gap-2">
+          <span className="t-label">Disziplin</span>
+          <Select
+            value={edit.meta.discipline}
+            onChange={(v) => edit.meta?.onDisciplineChange(v as Discipline)}
+            options={WORKOUT_DISCIPLINES.map((d) => ({
+              value: d.discipline,
+              label: d.name,
+            }))}
+          />
         </div>
+      )}
+      {edit.meta?.courses && (
+        <PlanKursZuordnung
+          ids={edit.meta.courses.ids}
+          onChange={edit.meta.courses.onChange}
+        />
       )}
       {edit.error && (
         <div
@@ -981,7 +980,13 @@ export default function PlanView({
       {/* Kopfbereich mit Ambient-Schicht */}
       <section className="relative">
         {/* Maske statt harter Kante: Schein + Ambient laufen zur Unterkante
-            des Kopfbereichs weich aus (Leon-Feedback 2026-08-27) */}
+            des Kopfbereichs weich aus (Leon-Feedback 2026-08-27).
+            NUR OHNE STAB-HÜLLE (Leons Befund 19.09.): In der Hülle beginnt
+            die Seite unter dem Kopf, und der Rubrik-Schein stand dort mit
+            harter Oberkante als Streifen im Bild. Den Flächen-Schein blendet
+            globals.css in der Hülle schon aus (.staff-content), den
+            Glow-Schein nicht — dort gehört der Schein der Hülle. */}
+        {!hasStaffShell && (
         <div
           className="absolute inset-0 overflow-hidden"
           aria-hidden
@@ -1008,6 +1013,7 @@ export default function PlanView({
             />
           </div>
         </div>
+        )}
         <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
           <div className="flex flex-1 flex-col gap-1">
             {/* Zurück-Weg: eine Ebene hoch zur Disziplin-Seite (Ebene 2);
@@ -1026,15 +1032,21 @@ export default function PlanView({
               <Icon name="arrow-left" size={14} strokeWidth={2.2} />
               {backLabel ?? disciplineInfo?.name ?? "Workout"}
             </Link>
-            <h1
-              style={{
-                font: "var(--type-display)",
-                letterSpacing: "var(--ls-display)",
-                textTransform: "uppercase",
-              }}
-            >
-              {shown.name || (edit ? "Neues Workout" : "Workout")}
-            </h1>
+            {/* Umbruch erlaubt: passt der Name neben dem Symbol nicht mehr,
+                rutscht er als GANZES in die nächste Zeile — sonst bricht er
+                am Handy mitten im Wort (gesehen 20.09.). */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {titleLeading}
+              <h1
+                style={{
+                  font: "var(--type-display)",
+                  letterSpacing: "var(--ls-display)",
+                  textTransform: "uppercase",
+                }}
+              >
+                {shown.name || (edit ? "Neues Workout" : "Workout")}
+              </h1>
+            </div>
             {/* Herkunft eines freigegebenen Trainer-Plans (Leon 31.08.) —
                 bei mehreren Trainern muss erkennbar sein, von wem er ist */}
             {sharedBy && (

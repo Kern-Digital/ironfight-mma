@@ -302,7 +302,6 @@ export interface WorkoutLog {
   id: string;
   label: string | null;
   category?: Category;
-  difficulty?: Difficulty;
   rounds: number;
   workSeconds: number;
   restSeconds: number;

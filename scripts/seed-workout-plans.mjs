@@ -158,13 +158,13 @@ function validate(plans, exerciseIds) {
         errors.push(`${where}: restOverrides verweist auf unbekannte Übung "${id}".`);
       }
     }
-    const cell = `${plan.discipline} × ${plan.difficulty}`;
-    perCell.set(cell, (perCell.get(cell) ?? 0) + 1);
+    perCell.set(plan.discipline, (perCell.get(plan.discipline) ?? 0) + 1);
   }
 
-  // Schritt 5 Teil 1: exakt ZWEI Pläne pro Disziplin × Level.
+  // Sechs Pläne je Disziplin (früher zwei je Disziplin × Level — das Level
+  // hat Leon am 19.09. restlos gestrichen).
   for (const [cell, count] of perCell) {
-    if (count !== 2) warnings.push(`Zelle ${cell}: ${count} Pläne (erwartet 2).`);
+    if (count !== 6) warnings.push(`Disziplin ${cell}: ${count} Pläne (erwartet 6).`);
   }
   return { errors, warnings };
 }
@@ -175,7 +175,6 @@ function payloadFor(gymId, plan, now) {
   return {
     gymId,
     discipline: plan.discipline,
-    difficulty: plan.difficulty,
     name: plan.name,
     short: plan.short,
     description: plan.description,
@@ -358,7 +357,7 @@ async function main() {
   for (const p of plans) {
     const count = p.blocks.reduce((s, b) => s + b.exerciseIds.length, 0);
     console.log(
-      `  ${String(p.sortOrder ?? "-").padStart(2)}  ${p.slug.padEnd(28)} ${p.discipline.padEnd(10)} ${p.difficulty.padEnd(15)} ${count} Übungen`,
+      `  ${String(p.sortOrder ?? "-").padStart(2)}  ${p.slug.padEnd(28)} ${p.discipline.padEnd(10)} ${count} Übungen`,
     );
   }
 

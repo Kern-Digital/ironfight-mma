@@ -21,6 +21,7 @@
 import Icon from "@/components/ui/Icon";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
+import { syncMyPlanAccess } from "@/lib/plan-access";
 import {
   copyAsOwnTrainerPlan,
   getGymWorkoutPlan,
@@ -61,6 +62,9 @@ export default function GymPlanPage({ slug }: { slug: string }) {
     getGymWorkoutPlan(gymId, slug)
       .then(async (gymPlan) => {
         if (gymPlan) return { plan: gymPlan, trainer: null };
+        // Trainer-Plan: erst die Kurs-Freigaben nachführen — sonst wiese
+        // die Regel ein frisches Kursmitglied ab (lib/plan-access.ts)
+        await syncMyPlanAccess();
         const tp = await getTrainerWorkoutPlan(gymId, slug);
         return tp ? { plan: tp as WorkoutPlan, trainer: tp } : null;
       })

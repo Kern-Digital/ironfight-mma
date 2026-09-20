@@ -15,7 +15,6 @@ import type { TimerConfig } from "./use-workout-timer";
 import type { WorkoutPlan } from "./workout-plans";
 import type {
   Category,
-  Difficulty,
   WorkoutDefinition,
   WorkoutStatus,
 } from "./types";
@@ -24,7 +23,6 @@ export type WorkoutSession = {
   id: string;
   label: string | null;
   category: Category | null;
-  difficulty: Difficulty | null;
   rounds: number;
   workSeconds: number;
   restSeconds: number;
@@ -49,7 +47,6 @@ export type WorkoutSession = {
 type WorkoutDoc = {
   label: string | null;
   category?: Category | null;
-  difficulty?: Difficulty | null;
   rounds: number;
   workSeconds: number;
   restSeconds: number;
@@ -72,7 +69,6 @@ export interface LogWorkoutOptions {
   config: TimerConfig;
   label: string | null;
   category?: Category | null;
-  difficulty?: Difficulty | null;
   status?: WorkoutStatus;
   /** Wann die Session gestartet wurde (Anzeige „Letzte Workouts") */
   startedAt?: Date | null;
@@ -111,7 +107,6 @@ export async function logWorkoutFull(
   const ref = await addDoc(workoutsCol(userId), {
     label: options.label,
     category: options.category ?? null,
-    difficulty: options.difficulty ?? null,
     rounds: config.rounds,
     workSeconds: config.workSeconds,
     restSeconds: config.restSeconds,
@@ -157,7 +152,6 @@ export async function getRecentWorkouts(
       id: d.id,
       label: data.label,
       category: data.category ?? null,
-      difficulty: data.difficulty ?? null,
       rounds: data.rounds,
       workSeconds: data.workSeconds,
       restSeconds: data.restSeconds,

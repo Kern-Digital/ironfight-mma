@@ -3,18 +3,20 @@
 /**
  * Freigabe-Dialog eines Trainer-Plans (Workout-Pläne AUSBAU Stufe 1) —
  * Sheet in der Picker-Optik (Overlay, slide-up, Grabber, x schließt;
- * Desktop zentriert). Zwei Wege, EIN Ergebnis:
- *   • Kurs-Chips (TRAINING_BLOCKS, nach Wochentag gruppiert): ein gewählter
- *     Kurs markiert seine Abonnenten in der Checkliste vor
- *     (users/{uid}/subscriptions — Doc-ID ist die Kurs-ID). Abwählen nimmt
- *     nur den Kurs raus, die Personen bleiben einzeln anpassbar.
- *   • Personen-Checkliste mit Suche — ALLE Gym-Mitglieder (Leons Vorgabe
+ * Desktop zentriert). Zwei Wege, die sich ADDIEREN (Leon 19.09.: „immer der
+ * ganze Kurs"):
+ *   • Kurs-Chips (TRAINING_BLOCKS, nach Wochentag gruppiert): Freigabe an
+ *     den GANZEN Kurs — jedes Mitglied, auch wer ihn später bucht. Früher
+ *     hakte ein Kurs nur einmal seine damaligen Abonnenten an; genau daher
+ *     kam „4 Athleten sehen diesen Plan", obwohl 9 im Kurs waren.
+ *   • Einzelne Personen mit Suche — ALLE Gym-Mitglieder (Leons Vorgabe
  *     30.08.: auch Trainer wählbar), gruppiert wie in den Kampfkontexten:
- *     „Ich selbst" · „Trainer & Coaches" · „Schüler" (listAllMembers).
- * Gespeichert wird IMMER die explizite Personen-Auswahl — sie wird als
- * audienceUids am Plan materialisiert (serverseitige Sichtbarkeit, Rules).
- * Die Kurs-Auswahl ist ein Snapshot: spätere Abonnenten kommen nicht
- * automatisch dazu (echte Kurs-Mitgliedschaft erst Multi-Gym Phase 2).
+ *     „Ich selbst" · „Trainer & Coaches" · „Athleten" (listAllMembers).
+ *     Wer über einen gewählten Kurs schon drin ist, trägt den Hinweis
+ *     „Sieht ihn über …" — einzeln anhaken bleibt möglich (dann behält er
+ *     den Plan auch, wenn er den Kurs abbestellt).
+ * Gespeichert werden Kurse und Einzelne getrennt; die Leseliste für die
+ * Rules (audienceUids) rechnet lib/workout-plans.ts daraus aus.
  */
 
 import GooeySearch from "@/components/ui/GooeySearch";
@@ -23,8 +25,16 @@ import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell } from "@/components/motion";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
-import { TRAINING_BLOCKS, WEEKDAY_LABELS } from "@/lib/schedule";
-import { filterSubscribedUids } from "@/lib/training-sessions";
+import {
+  courseTitlesOf,
+  TRAINING_BLOCKS,
+  WEEKDAY_LABELS,
+} from "@/lib/schedule";
+import {
+  loadCourseMemberships,
+  type CourseMemberships,
+} from "@/lib/student-courses";
+import { courseMemberUids } from "@/lib/workout-plans";
 import { useEffect, useMemo, useState } from "react";
 
 const BTN_FONT: React.CSSProperties = {
@@ -45,6 +55,15 @@ const GROUP_FONT: React.CSSProperties = {
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
+
+/** Fußzeile: was gerade freigegeben würde — ohne Kopfzahl, die ein Kurs
+    ohnehin sprengt (Leon 19.09.). */
+function fussZeile(kurse: number, einzelne: number): string {
+  const teile: string[] = [];
+  if (kurse > 0) teile.push(`${kurse} ${kurse === 1 ? "Kurs" : "Kurse"}`);
+  if (einzelne > 0) teile.push(`${einzelne} einzeln`);
+  return teile.length ? teile.join(" + ") : "Nichts gewählt";
+}
 
 function studentLabel(s: StudentEntry): string {
   return s.displayName ?? s.authProviderName ?? s.email ?? "Athlet";
@@ -75,29 +94,36 @@ function PlanAudienceInhalt({
   planName,
   initialUids,
   initialCourseIds,
+  initialIndividualUids,
   onSave,
   onClose,
 }: {
   gymId: string;
   planName: string;
+  /** Heutige Leseliste — nur für Altbestand (siehe initialIndividualUids) */
   initialUids: string[];
   initialCourseIds: string[];
-  /** Speichert die materialisierte Auswahl (wirft bei Fehler) */
-  onSave: (uids: string[], courseIds: string[]) => Promise<void>;
+  /** null = Altbestand von vor dem 19.09.: Einzelne und Kursmitglieder
+      stehen dort gemischt in initialUids und werden hier getrennt */
+  initialIndividualUids: string[] | null;
+  /** Speichert Kurse und Einzelne (wirft bei Fehler) */
+  onSave: (courseIds: string[], individualUids: string[]) => Promise<void>;
   onClose: () => void;
 }) {
   const { user } = useAuth();
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
+  // Kurs-Abos aller Mitglieder — für „Sieht ihn über …" und den Altbestand
+  const [memberships, setMemberships] = useState<CourseMemberships | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(
-    () => new Set(initialUids),
+    () => new Set(initialIndividualUids ?? initialUids),
   );
   const [courses, setCourses] = useState<Set<string>>(
     () => new Set(initialCourseIds),
   );
   const [search, setSearch] = useState("");
-  // Kurs, dessen Abonnenten gerade aufgelöst werden (Chip zeigt Busy)
-  const [resolvingCourse, setResolvingCourse] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,11 +131,16 @@ function PlanAudienceInhalt({
     let cancelled = false;
     listAllMembers(gymId)
       .then((list) => {
-        if (!cancelled) setMembers(list);
+        if (cancelled) return;
+        setMembers(list);
+        return loadCourseMemberships(list.map((m) => m.uid)).then((m) => {
+          if (!cancelled) setMemberships(m);
+        });
       })
       .catch(() => {
         if (!cancelled) {
           setMembers([]);
+          setMemberships(new Map());
           setLoadError(true);
         }
       });
@@ -117,6 +148,29 @@ function PlanAudienceInhalt({
       cancelled = true;
     };
   }, [gymId]);
+
+  // Altbestand einmalig trennen: wer heute über einen der gespeicherten
+  // Kurse drin ist, ist KEIN Einzelner — sonst behielte er den Plan beim
+  // Abbestellen für immer.
+  const [altGetrennt, setAltGetrennt] = useState(initialIndividualUids !== null);
+  useEffect(() => {
+    if (altGetrennt || !memberships) return;
+    const viaKurs = new Set(courseMemberUids(initialCourseIds, memberships));
+    setChecked(new Set(initialUids.filter((uid) => !viaKurs.has(uid))));
+    setAltGetrennt(true);
+  }, [altGetrennt, memberships, initialCourseIds, initialUids]);
+
+  /** uid → Kursnamen, über die er den Plan schon sieht (aktuelle Auswahl) */
+  const viaKurs = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!memberships) return map;
+    const gewaehlt = Array.from(courses);
+    memberships.forEach((abos, uid) => {
+      const titel = courseTitlesOf(gewaehlt.filter((c) => abos.has(c)));
+      if (titel.length) map.set(uid, titel);
+    });
+    return map;
+  }, [memberships, courses]);
 
   // Body-Scroll-Lock (Muster der App-Sheets)
   useEffect(() => {
@@ -154,37 +208,13 @@ function PlanAudienceInhalt({
     });
   }
 
-  async function toggleCourse(blockId: string) {
-    if (resolvingCourse) return;
-    if (courses.has(blockId)) {
-      // Nur der Kurs geht raus — die vorbelegten Schüler bleiben bewusst
-      // angehakt (einzeln anpassbar; wer über mehrere Kurse drin ist,
-      // fiele sonst fälschlich raus)
-      setCourses((prev) => {
-        const next = new Set(prev);
-        next.delete(blockId);
-        return next;
-      });
-      return;
-    }
-    setResolvingCourse(blockId);
-    setError(null);
-    try {
-      const uids = await filterSubscribedUids(
-        blockId,
-        (members ?? []).map((s) => s.uid),
-      );
-      setCourses((prev) => new Set(prev).add(blockId));
-      setChecked((prev) => {
-        const next = new Set(prev);
-        for (const uid of uids) next.add(uid);
-        return next;
-      });
-    } catch {
-      setError("Kurs-Abos konnten nicht geladen werden.");
-    } finally {
-      setResolvingCourse(null);
-    }
+  function toggleCourse(blockId: string) {
+    setCourses((prev) => {
+      const next = new Set(prev);
+      if (next.has(blockId)) next.delete(blockId);
+      else next.add(blockId);
+      return next;
+    });
   }
 
   async function handleSave() {
@@ -192,7 +222,7 @@ function PlanAudienceInhalt({
     setSaving(true);
     setError(null);
     try {
-      await onSave(Array.from(checked), Array.from(courses));
+      await onSave(Array.from(courses), Array.from(checked));
       onClose();
     } catch (err) {
       setSaving(false);
@@ -235,15 +265,14 @@ function PlanAudienceInhalt({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1">
-          {/* ── Kurse — Vorbelegung der Athleten-Auswahl ── */}
+          {/* ── Kurse — Freigabe an den GANZEN Kurs ── */}
           <SectionTitle title="Kurse" />
           <p
             className="px-2.5 pb-3"
             style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
           >
-            Ein Kurs wählt seine Abonnenten unten mit aus — die Auswahl
-            bleibt einzeln anpassbar und zählt. Wer den Kurs später
-            abonniert, kommt nicht automatisch dazu.
+            Jeder in diesen Kursen sieht den Plan — auch wer den Kurs erst
+            später bucht.
           </p>
           <div className="flex flex-col gap-3 px-2.5 pb-2">
             {weekdays.map((wd) => (
@@ -255,32 +284,27 @@ function PlanAudienceInhalt({
                   {TRAINING_BLOCKS.filter((b) => b.weekday === wd).map(
                     (block) => {
                       const active = courses.has(block.id);
-                      const busy = resolvingCourse === block.id;
+                      // Ohne Rahmen (Leon 19.09.: „weniger Kästen") — die
+                      // Fläche trägt den Zustand
                       return (
                         <button
                           key={block.id}
                           type="button"
-                          onClick={() => void toggleCourse(block.id)}
-                          disabled={busy || members === null}
+                          data-press
+                          onClick={() => toggleCourse(block.id)}
                           aria-pressed={active}
-                          className="t-interactive whitespace-nowrap rounded-field px-3 py-2 disabled:opacity-50"
+                          className="t-interactive whitespace-nowrap rounded-field px-3 py-2"
                           style={{
                             font: "600 12px/1.2 var(--font-archivo), system-ui, sans-serif",
                             background: active
                               ? "var(--accent-subtle)"
                               : "var(--surface-raised)",
-                            border: "1px solid",
-                            borderColor: active
-                              ? "var(--accent)"
-                              : "var(--line)",
                             color: active
                               ? "var(--accent-text)"
                               : "var(--text-2)",
                           }}
                         >
-                          {busy
-                            ? "Lade…"
-                            : `${block.title} · ${block.startTime}`}
+                          {`${block.title} · ${block.startTime}`}
                         </button>
                       );
                     },
@@ -290,9 +314,17 @@ function PlanAudienceInhalt({
             ))}
           </div>
 
-          {/* ── Personen — die Auswahl, die zählt. Gruppen wie in den
+          {/* ── Einzelne — zusätzlich zu den Kursen. Gruppen wie in den
               Kampfkontexten; die Suche filtert alle Gruppen. ── */}
-          <div className="px-2.5 pb-2 pt-4">
+          <SectionTitle title="Einzelne Personen" />
+          <p
+            className="px-2.5"
+            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+          >
+            Gib den Plan zusätzlich einzelnen Personen frei — unabhängig von
+            ihren Kursen.
+          </p>
+          <div className="px-2.5 pb-2 pt-3">
             <GooeySearch
               value={search}
               onChange={setSearch}
@@ -322,6 +354,7 @@ function PlanAudienceInhalt({
                   <SectionTitle title={group.title} />
                   {group.entries.map((s) => {
                     const active = checked.has(s.uid);
+                    const ueber = viaKurs.get(s.uid);
                     return (
                       <button
                         key={s.uid}
@@ -339,16 +372,28 @@ function PlanAudienceInhalt({
                           >
                             {studentLabel(s)}
                           </span>
-                          {s.email && (
+                          {ueber ? (
                             <span
                               className="truncate"
                               style={{
                                 font: "var(--type-sub)",
-                                color: "var(--text-3)",
+                                color: "var(--accent-text)",
                               }}
                             >
-                              {s.email}
+                              Sieht ihn über {ueber.join(", ")}
                             </span>
+                          ) : (
+                            s.email && (
+                              <span
+                                className="truncate"
+                                style={{
+                                  font: "var(--type-sub)",
+                                  color: "var(--text-3)",
+                                }}
+                              >
+                                {s.email}
+                              </span>
+                            )
                           )}
                         </div>
                         <span
@@ -393,7 +438,7 @@ function PlanAudienceInhalt({
               className="tabular-nums"
               style={{ ...META_FONT, color: "var(--text-2)" }}
             >
-              {checked.size} ausgewählt
+              {fussZeile(courseTitlesOf(Array.from(courses)).length, checked.size)}
             </span>
             {error && (
               <span
@@ -407,7 +452,7 @@ function PlanAudienceInhalt({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={saving || members === null}
+            disabled={saving || members === null || !altGetrennt}
             className="t-interactive inline-flex min-h-hit shrink-0 items-center justify-center gap-2 rounded-field px-5 disabled:opacity-50"
             style={{
               ...BTN_FONT,
@@ -433,7 +478,8 @@ export default function PlanAudienceSheet({
   planName: string;
   initialUids: string[];
   initialCourseIds: string[];
-  onSave: (uids: string[], courseIds: string[]) => Promise<void>;
+  initialIndividualUids: string[] | null;
+  onSave: (courseIds: string[], individualUids: string[]) => Promise<void>;
   onClose: () => void;
 }) {
   return (

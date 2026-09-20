@@ -350,7 +350,6 @@ function SessionRunner() {
       label:        plan.name,
       // Logs/Statistik rechnen weiter im Category-Raster
       category:     DISCIPLINE_CATEGORY[plan.discipline],
-      difficulty:   plan.difficulty,
       status:       "completed",
       startedAt:    startedAtRef.current,
       exerciseIds:  exerciseSequence,
@@ -425,7 +424,6 @@ function SessionRunner() {
         config:      t.config,
         label:       plan?.name ?? null,
         category:    plan ? DISCIPLINE_CATEGORY[plan.discipline] : null,
-        difficulty:  plan?.difficulty ?? null,
         status:      "aborted",
         startedAt:   startedAtRef.current,
         exerciseIds: exerciseSequence.slice(0, exerciseIndex + 1),

@@ -31,7 +31,6 @@ function emptyPlan(): WorkoutPlan {
     // Ohne Eingabefelder (Leon 2026-08-28: braucht man beim eigenen Workout
     // nicht) — die Defaults erfüllen nur das Datenmodell
     discipline: "boxing",
-    difficulty: "anfaenger",
     name: "",
     short: "",
     description: "",

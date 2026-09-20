@@ -1946,8 +1946,9 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       jwks-rsa-Override. Der Deckel 12 greift nur beim Hinzufügen; ein
       Bestandsplan mit mehr Einträgen (gibt es heute nicht, der Generator
       schreibt höchstens 12) würde beim Speichern gekappt.
-  - **GEGNERSEITE NEU + KOPFBALKEN MIT NAVIGATION (18.09.2026, Fenster
-    tidal-athletics-e0, alleiniger Baum — a0/b2 meldeten „frei", e8/b4 zu).**
+  - **GEGNERSEITE NEU + KOPFBALKEN MIT NAVIGATION (18./19.09.2026, Fenster
+    tidal-athletics-e0, alleiniger Baum — a0/b2 meldeten „frei", e8/b4 zu,
+    gepusht 23841a4).**
     Leons Antworten (wörtlich): „Gegnerseite neuer Look (Empfohlen)" · Stufe 4
     „Ist egal, kein Stufe 4" · Live-Blick „ich will ein paar dinge ändern" →
     zweite Runde (Freitext, siehe unten) · Athleten „Nur mit Analyse, beim
@@ -2135,6 +2136,61 @@ EIN Varianten-Umschalter, nur Kickboxen/Muay Thai · Kampf-Sambo läuft als MMA.
       33 Alt-Token) und `athleten/[uid]` (e8) im Alt-Look · der aktive
       Kopf-Knopf trägt den Gym-Akzent auch im Gegner-Modus (der Kopf liegt
       außerhalb von `[data-area]`).
+  - **NAVIGATION IM KOPF AUF ALLEN SEITEN (19.09.2026, Fenster
+    tidal-athletics-69, gepusht 1ef5726).** Leons Antworten (wörtlich): „Balken
+    oben überall (Empfohlen)" · was hineinkommt: „Sprungmarken (Empfohlen),
+    Umschalter der Seite (Empfohlen)" — Nachbarseiten und Hauptaktion
+    ausdrücklich NICHT · Mitgliederliste „Gruppen weglassen (Empfohlen)" ·
+    „Passt, weiter".
+    - **Drei neue Bausteine** in `components/shell/KopfNavigation.tsx`:
+      `KopfUmschalter` (Knöpfe mit `aria-pressed`, der Zustand bleibt in der
+      SEITE — oben und unten zeigen denselben Wert), `KopfSprungmarken`
+      (Abschnitte einer langen Seite) und `KopfZeile` (Rückweg + zweite
+      Navigation nebeneinander, getrennt von `.kopf-trenner`). Die Glas-Kapsel
+      liegt jetzt als `useLupe`/`LupenKapsel` unter ALLEN Leisten und misst
+      `[data-kopf-gewaehlt]` statt `[aria-current]` — Knöpfe und Anker tragen
+      kein `aria-current`.
+    - **Sprungmarken:** Sie zeigen nur, was im Dokument steht (Abschnitte
+      kommen mit den Daten), bei weniger als zwei Zielen gar nichts. Gemessen
+      wird gegen die UNTERKANTE des Kopfs plus 16 px — derselbe Wert für den
+      Sprung und für die Frage, welcher Abschnitt dran ist. Nach einem Klick
+      schweigt der Spion 900 ms (Falle 41). Am Fuß der Seite gewinnt der letzte
+      Abschnitt. Eingebaut: Wettkampfseite („Duell · Gameplan · Trainingsplan",
+      `id="duell"` neu) und Wettkampfliste („Geplant · Vergangene ·
+      Archiviert", `Section` bekam eine `id`).
+    - **Umschalter:** /regeln + /quiz „MMA · BJJ · Boxen", /help „Für Trainer ·
+      Für Athleten". Die alten Reiter in der Seite tragen `lg:hidden`, sobald
+      `useHatKopf()` — auf dem Handy bleiben sie.
+    - **Rückwege:** verwaltung/{mitglieder,einladungen,neuigkeiten} (zeigten
+      FALSCH auf „Trainer" — wer nur Verwaltungsrechte hat, kommt auf /trainer
+      nicht hinein), /timer, /techniques, /techniques/[id], /library nutzen
+      jetzt `SeitenZurueck`; der Link in der Seite trägt `min-h-hit` (44 px)
+      und `data-seiten-zurueck`.
+    - **`.kopf-neben` (globals.css):** Wird es eng, tritt die ZWEITE Navigation
+      zurück, nie der Rückweg — unter 1280 px und sobald die Lupe im Kopf
+      aufgeht (`header:has([data-app-suche="kopf"] [data-open])`).
+      `display: contents` hält Trenner und Leiste im Flex-Fluss des Slots.
+      Ohne die Regel: Slot 535 px, Kopf 71 px über die Seite (Falle 40).
+    - **Messung:** tsc/eslint 0 · `scripts/mess-gameplan.mjs` um `kopfUeberall`
+      erweitert (Kopftext, Sprung 16 px unter dem Kopf, Kapsel folgt
+      oben/unten, Suche auf → Marken weg + Rückweg bleibt + Überlauf 0,
+      Regeln-Umschalter wechselt den Inhalt, Timer-Rückweg oben) plus zwei
+      Handy-Prüfungen (kein Kopf, drei Reiter in der Seite, „← Techniken" 44 px)
+      → **117/117 dunkel + hell**, Konsole 0. Prüfkopie: tsc 0, `next build`
+      grün (152 Seiten).
+    - **Neue Fallen:** (38) Ein ABGEBROCHENES Blick-Skript räumt nicht auf —
+      vor jedem Blick auf Listen erst nachsehen, was schon in Firestore liegt
+      (`scripts/tmp-aufraeumen-e0.mjs`). (39) `StaggerList` reicht bei
+      reduzierter Bewegung NUR `className` durch — eine `id` für eine
+      Sprungmarke geht dort verloren, den Rahmen drumherum auszeichnen.
+      (40) Der Kopf-Slot schrumpft nicht (siehe `.kopf-neben`). (41) Beim
+      weichen Blättern zieht das Fenster durch alle Abschnitte — ohne die
+      900-ms-Sperre nach dem Klick flackert die Glas-Kapsel über die ganze
+      Leiste, statt zum Ziel zu gleiten.
+    - **Offen:** Seiten ohne Reiter und ohne Abschnitte (Dashboard, Kursplan,
+      Athletenliste, Trainer-/Verwaltungs-Übersicht, /profile, /admin) haben
+      oben weiter nur Gym und Kurs · /kampfprofil (KampfartUmschalter) gehört
+      Fenster e8 · /regeln, /quiz, /help stehen komplett im Alt-Look.
 
 ### Pipeline (Zwei-Phasen-Betrieb — WICHTIG)
 - **Phase 1 Gemini** (Beobachtung A+B) und **Phase 2 Claude** (Bewertung C+D+E)
@@ -2356,8 +2412,10 @@ den Schlüssel.**
       Firestore (Trainer pflegen), nicht Code. (2) Drei Ebenen im
       Training-Tab: Disziplinen (Karten mit Bild `public/plans/*.webp`,
       Farbpunkt aus discipline-colors, später nur die Rubriken des Gyms) →
-      Disziplin-Seite mit Level-Segment (Anfänger/Fortgeschritten/Pro) und
-      Planliste (Dauer, Übungszahl, Equipment) → Plan-Detail. Jede Ebene
+      Disziplin-Seite mit Planliste (Dauer, Übungszahl, Equipment) →
+      Plan-Detail. (Das Level Anfänger/Fortgeschritten/Pro — Segment,
+      Plan-Feld, Editor-Select, Log-Feld — hat Leon am 19.09. RESTLOS
+      gestrichen; nur der Auto-Generator wählt weiter nach Schwierigkeit.) Jede Ebene
       mit „← Zurück"-Kopf; Training-Tab bleibt für `/workout/*` aktiv.
       (3) Persönliche Kopien: `users/{uid}/workoutPlans` + Firestore-Regel,
       Sektion „Eigene Workoutpläne" als ERSTER Block im Hub, Auto-Save-
@@ -2365,8 +2423,9 @@ den Schlüssel.**
       Links wischen = Löschen (Undo-Leiste statt Popup), langes Halten =
       Verschieben, „+ Übung hinzufügen" unter jeder Rubrik mit Übungs-Picker
       (ui/Select-Stil, Filter Disziplin/Equipment); danach auch im Runner und
-      in der Bibliothek einsetzen. (5) Inhalt: Start-Pläne pro Disziplin ×
-      Level werden per KI ausgearbeitet, Trainer prüfen nur (Leons Vorgabe).
+      in der Bibliothek einsetzen. (5) Inhalt: Start-Pläne pro Disziplin
+      (sechs, leicht → schwer) werden per KI ausgearbeitet, Trainer prüfen
+      nur (Leons Vorgabe).
 - [ ] **Workout-Pläne AUSBAU — nach den Teilschritten der Etappe (Leons
       Ansage 2026-08-27):** Drei aufeinander aufbauende Stufen.
       (1) **Trainer-Pläne mit Freigabe:** Trainer erstellen Pläne manuell
@@ -2374,7 +2433,7 @@ den Schlüssel.**
       Listen-Gesten + Übungs-Picker aus Spec-Punkt 4) und geben sie an
       ausgewählte Kurse ODER einzelne Schüler frei; sichtbar für die
       Athleten unter „Strukturierte Pläne" im Hub (eigene Sektion „Vom
-      Trainer für dich") und in der Disziplin→Level-Navigation. ACHTUNG
+      Trainer für dich") und in der Disziplin-Navigation. ACHTUNG
       Sicherheitsmodell: Sichtbarkeit MUSS serverseitig in den Firestore-
       Regeln liegen (NICHT Client-Filter wie sharedWithAthlete heute) —
       rules-tauglich ist eine beim Freigeben materialisierte
@@ -2382,7 +2441,10 @@ den Schlüssel.**
       echte Kurs-Mitgliedschaft kommt erst mit Multi-Gym Phase 2
       (Einladungen/Mitglieder), bis dahin explizite Schüler-Auswahl.
       Persönliche Kopien bleiben Snapshots — ein Trainer-Edit synct nicht
-      in bestehende Kopien.
+      in bestehende Kopien. KURS-ZUORDNUNG (Leon 19.09.): `courseIds` am
+      Trainer-Plan ordnet ihn Kursen zu (Editor-Chips, „+" je Kurs in der
+      Ansicht „Nach Kursen") — reine Ordnung, sichtbar macht ihn allein die
+      Freigabe (`audienceUids`/`audienceCourseIds`).
       (2) **KI-Plan individuell (Athlet):** ab ≥3 übernommenen Analysen in
       einer Rubrik erzeugt KI aus fightProfile + Zeit + Equipment
       (Generator-Eingaben existieren) einen persönlichen Plan → landet als
