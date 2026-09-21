@@ -27,6 +27,7 @@
  */
 
 import AthleteTabBar from "@/components/AthleteTabBar";
+import GymGesperrtStreifen from "@/components/shell/GymGesperrtStreifen";
 import StaffHeader from "@/components/shell/StaffHeader";
 import { KopfNavigationProvider } from "@/components/shell/KopfNavigation";
 import StaffSidebar from "@/components/shell/StaffSidebar";
@@ -117,6 +118,11 @@ export default function StaffShell({ children }: { children: React.ReactNode }) 
       <KopfNavigationProvider>
       <div className="flex min-w-0 flex-1 flex-col">
         <StaffHeader />
+        {/* Stillgelegtes Gym: der Satz steht zwischen Kopf und Inhalt, auf
+            jeder Seite (Schritt 1 des Geschäftsplans, 21.09.2026). */}
+        <GymGesperrtStreifen
+          style={{ margin: "0 var(--shell-gap) calc(var(--shell-gap) * 2)" }}
+        />
         {/* `staff-content` schaltet den deckenden Grund des Kindes ab — in der
             Hülle gehört der Grund der Hülle (Begründung in globals.css). */}
         <main className="staff-content min-w-0 flex-1 pb-[84px] lg:pb-0">

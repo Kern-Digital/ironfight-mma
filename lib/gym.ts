@@ -20,6 +20,23 @@ export const DEFAULT_GYM_ID = "tidal-athletics";
 export const DEFAULT_GYM_LABEL = "Tidal Athletics";
 
 /**
+ * Analysen, die jedes neue Gym beim Anlegen geschenkt bekommt (Beschluss
+ * 20.09.2026, Plan „Das zweite Gym": drei, einmalig, vollständig, ohne
+ * Ablauf). Steht als `subscription.analysisQuota` am Gym; Schritt 2 des
+ * Geschäftsplans liest und verbraucht das Feld.
+ */
+export const FREIE_ANALYSEN = 3;
+
+/**
+ * Der Satz, den ein stillgelegtes Gym auf jeder Seite und aus jeder Route
+ * bekommt (Leon 20.09.2026: „lesen ja, ändern nein"). EINE Stelle für Client
+ * und Server — lib/server/gym-status.ts und der Streifen in der Hülle lesen
+ * beide hier.
+ */
+export const GYM_GESPERRT_TEXT =
+  "Dein Gym ist stillgelegt. Ihr seht alles wie bisher, könnt aber nichts ändern und keine Analysen starten. Wendet euch an Tidal Athletics.";
+
+/**
  * Normalisiert einen frei eingegebenen Gym-Namen zu einem stabilen Slug
  * (für das Anlegen neuer Gyms in der Admin-Konsole).
  */
@@ -150,23 +167,43 @@ export async function listGyms(): Promise<Gym[]> {
  * Netz, Gym-Dokument fehlt), kommt der Slug zurück. Eine Hülle, die wegen
  * eines Namens leer bleibt, wäre schlimmer als ein technischer Name.
  */
-const gymNameCache = new Map<string, string>();
+export interface GymInfo {
+  name: string;
+  status: Gym["status"];
+}
 
-export async function getGymName(gymId: string): Promise<string> {
-  const cached = gymNameCache.get(gymId);
-  if (cached) return cached;
+/**
+ * Seit dem 21.09.2026 trägt der Cache auch den ZUSTAND (aktiv/stillgelegt),
+ * weil der Streifen in der Hülle ihn braucht — und er verfällt nach fünf
+ * Minuten statt nie: Ein Gym, das Leon stilllegt, soll den Streifen beim
+ * nächsten Seitenwechsel sehen, nicht erst nach dem nächsten Neuladen. Der
+ * Name bleibt dabei so billig wie vorher: ein Lesevorgang je fünf Minuten.
+ */
+const GYM_INFO_TTL_MS = 5 * 60_000;
+const gymInfoCache = new Map<string, { info: GymInfo; bis: number }>();
+
+export async function getGymInfo(gymId: string): Promise<GymInfo> {
+  const cached = gymInfoCache.get(gymId);
+  if (cached && cached.bis > Date.now()) return cached.info;
   const fallback = gymId === DEFAULT_GYM_ID ? DEFAULT_GYM_LABEL : gymId;
   try {
     const { doc, getDoc } = await import("firebase/firestore");
     const { getFirestoreDb } = await import("./firebase");
     const snap = await getDoc(doc(getFirestoreDb(), "gyms", gymId));
-    const name = snap.exists() ? (snap.data().name as string | undefined) : undefined;
-    const value = name?.trim() || fallback;
-    gymNameCache.set(gymId, value);
-    return value;
+    const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
+    const info: GymInfo = {
+      name: (data.name as string | undefined)?.trim() || fallback,
+      status: (data.status as Gym["status"]) ?? null,
+    };
+    gymInfoCache.set(gymId, { info, bis: Date.now() + GYM_INFO_TTL_MS });
+    return info;
   } catch {
-    return fallback;
+    return { name: fallback, status: null };
   }
+}
+
+export async function getGymName(gymId: string): Promise<string> {
+  return (await getGymInfo(gymId)).name;
 }
 
 /**

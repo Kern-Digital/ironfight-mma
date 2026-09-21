@@ -26,7 +26,9 @@ export type AuditType =
   /** Rechte eines Mitglieds geändert (Checkpoint 2, /api/members/role). */
   | "member.role"
   /** Mitgliedschaft beendet (Checkpoint 2, /api/members/remove). */
-  | "member.remove";
+  | "member.remove"
+  /** Gym hat sich selbst angelegt (Schritt 1 des Geschäftsplans, /api/gyms/anmelden). */
+  | "gym.create";
 
 export interface AuditEntryInput {
   type: AuditType;

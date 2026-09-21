@@ -16,6 +16,7 @@
 
 import { deleteFile, observeVideo } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { evaluateObservation } from "@/lib/server/claude";
 import {
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+  // Stillgelegtes Gym: lesen ja, ändern nein — und keine Analyse, die Geld
+  // kostet (Schritt 1, 21.09.2026). VOR der Body-Prüfung, siehe gym-status.ts.
+  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  if (gesperrt) return gesperrt;
 
   let body: AnalyzeRequest;
   try {

@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { FieldValue } from "firebase-admin/firestore";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
+import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import { gameplaeneNachAnalyse } from "@/lib/server/gameplan";
 import {
   canAccessMember,
@@ -45,6 +46,7 @@ import {
   bearerToken,
   isTrainerOrAdmin,
   verifyUser,
+  userGymId,
 } from "@/lib/server/verify-user";
 import {
   computeVideoWeight,
@@ -81,6 +83,9 @@ export async function POST(req: Request) {
   if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
+  // Stillgelegtes Gym: lesen ja, ändern nein (Schritt 1, 21.09.2026).
+  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  if (gesperrt) return gesperrt;
 
   let body: { analysis?: VideoAnalysisInput };
   try {

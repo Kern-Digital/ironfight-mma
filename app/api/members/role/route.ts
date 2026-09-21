@@ -38,6 +38,7 @@ import {
   adminDb,
 } from "@/lib/server/firebase-admin";
 import { displayNameFor, writeAudit } from "@/lib/server/audit";
+import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import {
   bearerToken,
   canManageGym,
@@ -135,6 +136,9 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+  // Stillgelegtes Gym: keine Rechteänderungen (Schritt 1, 21.09.2026).
+  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  if (gesperrt) return gesperrt;
 
   let body: { uid?: string; trainer?: boolean; verwaltung?: boolean };
   try {

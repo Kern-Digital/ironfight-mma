@@ -256,6 +256,31 @@ function PlattformDashboard() {
   const [gymUsage, setGymUsage] = useState<AiUsageByGym[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Stilllegen / Wieder öffnen (Schritt 1 des Geschäftsplans, 21.09.2026):
+  // Der Plattform-Admin darf gyms/{id} laut Regel direkt schreiben — kein
+  // Umweg über eine Route. `statusChangedAt` hält den Zeitpunkt fest.
+  const [sperrFrage, setSperrFrage] = useState<string | null>(null);
+  const [sperrLaeuft, setSperrLaeuft] = useState(false);
+  const zustandSetzen = useCallback(async (gymId: string, stilllegen: boolean) => {
+    setSperrLaeuft(true);
+    try {
+      const { doc, serverTimestamp, updateDoc } = await import("firebase/firestore");
+      const { getFirestoreDb } = await import("@/lib/firebase");
+      await updateDoc(doc(getFirestoreDb(), "gyms", gymId), {
+        status: stilllegen ? "blocked" : "active",
+        statusChangedAt: serverTimestamp(),
+      });
+      setSperrFrage(null);
+      setGyms((alt) =>
+        alt ? alt.map((g) => (g.id === gymId ? { ...g, status: stilllegen ? "blocked" : "active" } : g)) : alt,
+      );
+    } catch (err) {
+      console.warn("[admin] Zustand ließ sich nicht setzen:", err);
+    } finally {
+      setSperrLaeuft(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     if (!user || profileLoading) return;
     setError(null);
@@ -711,10 +736,8 @@ function PlattformDashboard() {
                 const blocked = gym.status === "blocked";
                 const members = perGym?.map.get(gym.id) ?? null;
                 return (
-                  <div
-                    key={gym.id}
-                    className="flex items-start justify-between gap-3"
-                  >
+                  <div key={gym.id} className="flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span
                         className="truncate"
@@ -750,8 +773,66 @@ function PlattformDashboard() {
                         color: blocked ? "var(--negative)" : "var(--accent-text)",
                       }}
                     >
-                      {blocked ? "Gesperrt" : "Aktiv"}
+                      {blocked ? "Stillgelegt" : "Aktiv"}
                     </span>
+                    {/* Stilllegen = lesen ja, ändern nein (Leon 20.09.2026).
+                        Ein Wort, keine Schaltfläche; die Rückfrage steht als
+                        Streifen unter der Zeile — kein confirm(). */}
+                    <button
+                      type="button"
+                      data-gym-zustand={gym.id}
+                      onClick={() => setSperrFrage(sperrFrage === gym.id ? null : gym.id)}
+                      disabled={sperrLaeuft}
+                      className="shrink-0 min-h-hit"
+                      style={{
+                        font: "var(--type-sub)",
+                        color: blocked ? "var(--accent-text)" : "var(--text-2)",
+                        borderBottom: "1px solid var(--line)",
+                        background: "none",
+                        border: "0",
+                        cursor: "pointer",
+                        padding: "0",
+                      }}
+                    >
+                      {blocked ? "Wieder öffnen" : "Stilllegen"}
+                    </button>
+                  </div>
+                  {sperrFrage === gym.id && (
+                    <div
+                      role="alertdialog"
+                      aria-label={blocked ? "Gym wieder öffnen?" : "Gym stilllegen?"}
+                      className="flex flex-wrap items-center gap-3 rounded-field px-4 py-3"
+                      style={{
+                        font: "var(--type-sub)",
+                        border: "1px solid color-mix(in oklab, var(--warning) 45%, transparent)",
+                        background: "color-mix(in oklab, var(--warning) 12%, transparent)",
+                      }}
+                    >
+                      <span className="min-w-0 flex-1">
+                        {blocked
+                          ? `„${gym.name}“ wieder öffnen? Danach kann das Gym wieder ändern und analysieren.`
+                          : `„${gym.name}“ stilllegen? Alle sehen weiter ihre Daten, niemand kann etwas ändern oder analysieren.`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void zustandSetzen(gym.id, !blocked)}
+                        disabled={sperrLaeuft}
+                        className="min-h-hit"
+                        style={{ ...BTN_FONT, color: "var(--accent-text)", background: "none", border: "0", cursor: "pointer" }}
+                      >
+                        {sperrLaeuft ? "Moment…" : blocked ? "Ja, öffnen" : "Ja, stilllegen"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSperrFrage(null)}
+                        disabled={sperrLaeuft}
+                        className="min-h-hit"
+                        style={{ ...BTN_FONT, color: "var(--text-2)", background: "none", border: "0", cursor: "pointer" }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  )}
                   </div>
                 );
               })
@@ -764,9 +845,11 @@ function PlattformDashboard() {
                 paddingTop: "var(--sp-3)",
               }}
             >
-              Ein Gym anzulegen oder zu sperren gehört zur Admin-Konsole aus
-              Phase 3. Bis dahin entsteht ein Gym über das Migrations-Script,
-              und der Weg hinein führt ausschließlich über eine Einladung.
+              Ein Gym legt sich seit dem 21.09.2026 selbst an — unter
+              /gym-anmelden, ohne Freigabe, mit drei freien Analysen. Wer es
+              anlegt, ist seine Verwaltung. Stilllegen heißt: lesen ja, ändern
+              nein — die Analysen und Einladungen stoppen sofort; Kursplan und
+              Pläne folgen mit den Firestore-Regeln (Schritt 1b).
             </p>
           </div>
         </section>

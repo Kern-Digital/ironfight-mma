@@ -804,6 +804,66 @@ Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
   „Du gehörst gerade zu keinem Gym" plus Weg zu `/beitreten`. Denselben
   Zustand hat, wer sich ohne Einladung registriert.
 
+### Gym meldet sich selbst an — Schritt 1a des Geschäftsplans (21.09.2026, Fenster tidal-athletics-f1)
+Leons Antworten (wörtlich, 21.09.): Anmeldung „Eigene Seite ohne Login
+(Empfohlen)" · Wartezustand: **„ich will das es automatisch erstellt wird
+sobald der gym betreiber sich dafür anmeldet. dann soll er nach abschluss der
+regestrierung die kostenlose version direkt nutzen können"** — damit ist die
+Antwort vom 20.09. „Selbstanmeldung mit deiner Freigabe" überholt: KEINE
+Freigabe, keine Warteliste · USt-IdNr. „Erst beim Kauf (Empfohlen)" ·
+Stilllegen (20.09.) „lesen ja ändern nein".
+- **`app/gym-anmelden/page.tsx` (öffentlich, JoinLayout, ohne Hülle):** ein
+  Formular, zwei Wege — ohne Konto (Gym-Name, eigener Name, E-Mail,
+  Passwort → `signUp` wie /register, dann die Route), mit Konto ohne
+  gymId-Claim (nur der Gym-Name). Mit Konto UND Gym: kein Formular, nur der
+  Weg zurück. Nach dem Anlegen `refreshRole()` (Token-Refresh, die Claims
+  kommen vom Admin-SDK) → `/verwaltung`. Link „Du führst ein Gym?" auf
+  /register. `/gym-anmelden` steht NICHT im Middleware-Matcher (öffentlich)
+  und in `OHNE_HUELLE` (AppShell).
+- **`POST /api/gyms/anmelden`** (Bearer): 401 ohne Token · **409, wenn das
+  Konto schon einen gymId-Claim trägt** (ein Konto = ein Gym; wer keinen
+  Claim hat, ist heute Default-Gym-Mitglied und verlässt es damit) · Name
+  2–60 Zeichen · Kürzel `slugifyGym(name)`, vergeben (auch `tidal-athletics`)
+  → `-2` … `-9`. Reihenfolge mit Rücknahme: (1) Gym-Dokument in einer
+  Transaktion (`tx.create`, nur wenn frei) — `name, status: "active",
+  createdAt, createdBy, branding: null, subscription: { status: "active",
+  plan: "free", analysisQuota: FREIE_ANALYSEN (3), analysisUsed: 0,
+  currentPeriodEnd: null }`; (2) Claims: `gymId` + `trainer` + `verwaltung`,
+  bestehende gemergt (`claimsWithRights`) — scheitert das, wird das Gym
+  gelöscht; (3) users-Spiegel (`gymId, gymJoinedAt, rightsMirror`);
+  (4) Protokoll `gym.create` (neuer `AuditType`). `FREIE_ANALYSEN` und
+  `GYM_GESPERRT_TEXT` wohnen in `lib/gym.ts` (Client UND Server lesen sie).
+- **Stilllegen = lesen ja, ändern nein — SERVERSEITIG (1a):**
+  `lib/server/gym-status.ts` — `antwortWennGesperrt(adminDb, gymId)` liest
+  das Gym-Dokument (fail-open: Lesefehler = aktiv) und antwortet **423
+  Locked** `{ error, gesperrt: true }`. Steht in analyze, preview, rahmen,
+  commit, flag, wettkampf/gameplan, gameplan/scouting, invites/create,
+  members/role — direkt hinter der Rollenprüfung, VOR der Body-Prüfung
+  (darum lässt es sich ohne Body und ohne Token-Kosten messen). Der Streifen
+  `components/shell/GymGesperrtStreifen.tsx` steht in BEIDEN Hüllen
+  (StaffShell unter dem Kopf, AppShell über dem Inhalt); `getGymInfo` in
+  lib/gym.ts liefert Name + Zustand mit **5-Minuten-Cache** (vorher: Name
+  für immer gecacht). `/admin`: Wort „Stilllegen"/„Wieder öffnen" je Zeile,
+  Rückfrage als `role="alertdialog"`-Streifen, Client-`updateDoc` auf
+  `gyms/{id}` (Regel erlaubt es dem Plattform-Admin), `statusChangedAt`.
+  Pille sagt „Stillgelegt", nicht „Gesperrt".
+- **OFFEN — Schritt 1b:** Die CLIENT-Schreibwege (Kursplan, Pläne,
+  Wettkämpfe, Gegner, users/{uid}/…) laufen über die Firestore-Regeln, und
+  dort fehlt die Sperre — 24 `allow write/create/update/delete` müssten
+  `gymAktiv()` prüfen (get() je Schreibvorgang oder ein Claim `gymGesperrt`
+  auf allen Konten des Gyms + Token-Revoke). Braucht Rules-Deploy und eine
+  REST-Messung. Bis dahin sperrt 1a alles, was Geld kostet oder Rechte
+  vergibt.
+- **Gemessen:** tsc 0, eslint 0 (19 Dateien). Live
+  `scripts/tmp-mess-gym-anmelden.mjs` (Wegwerf-Konto per Firebase-REST,
+  Gym „Mess Gym F1" → `mess-gym-f1`, danach ALLES gelöscht): **19/19** —
+  401/400/200, Gym-Felder, Claims, Spiegel, Protokoll, zweites Gym 409,
+  stillgelegt → sechs Routen 423, wieder aktiv → 400 (Body fehlt) und
+  Einladung 200. KEIN Screenshot (Dev-Server mit CSS 404, Falle 42).
+- **Falle 43:** `VerifiedUser.stored` IST schon ein `RoleSet` —
+  `readRoleSet(user.stored)` scheitert am Typ (`ClaimLike` verlangt eine
+  Index-Signatur). Einfach spreaden.
+
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
   `/admin/*` = Plattform-Rang · `/trainer/*` = Trainer-Werkzeuge ·

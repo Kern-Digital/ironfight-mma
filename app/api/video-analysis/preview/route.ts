@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import { previewVideo } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import {
   bearerToken,
@@ -55,6 +56,9 @@ export async function POST(req: Request) {
   if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
+  // Stillgelegtes Gym → 423, bevor Gemini auch nur einen Token sieht.
+  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  if (gesperrt) return gesperrt;
 
   let body: { source?: VideoSource };
   try {

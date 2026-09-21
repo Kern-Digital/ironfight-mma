@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { locateFighters } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { bearerToken, isTrainerOrAdmin, userGymId, verifyUser } from "@/lib/server/verify-user";
 
@@ -30,6 +31,8 @@ export async function POST(req: Request) {
   if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
+  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  if (gesperrt) return gesperrt;
 
   let body: { image?: unknown; fighters?: unknown };
   try {

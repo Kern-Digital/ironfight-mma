@@ -237,6 +237,12 @@ function RegisterForm() {
           Zum Login
         </Link>
       </p>
+      <p className="text-center" style={{ font: "var(--type-sub)", color: "var(--panel-fg-2)" }}>
+        Du führst ein Gym?{" "}
+        <Link href="/gym-anmelden" style={{ color: "var(--panel-accent)", fontWeight: 600 }}>
+          Gym anmelden
+        </Link>
+      </p>
     </JoinLayout>
   );
 }

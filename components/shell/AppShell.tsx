@@ -28,6 +28,7 @@
  */
 
 import AthleteChromeGate from "@/components/AthleteChromeGate";
+import GymGesperrtStreifen from "@/components/shell/GymGesperrtStreifen";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import StaffShell from "@/components/shell/StaffShell";
@@ -51,7 +52,7 @@ import { usePathname } from "next/navigation";
  * `/dev/*` steht bewusst NICHT hier: Die Prüfseiten bilden Bausteine in ihrer
  * normalen Umgebung nach, und dazu gehört die Hülle.
  */
-const OHNE_HUELLE = ["/login", "/register", "/beitreten", "/forgot-password"];
+const OHNE_HUELLE = ["/login", "/register", "/beitreten", "/forgot-password", "/gym-anmelden"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, profileLoading } = useAuth();
@@ -73,6 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <AthleteChromeGate>
         <Navbar />
       </AthleteChromeGate>
+      <GymGesperrtStreifen style={{ margin: "16px 16px 0" }} />
       <main className="flex-1">{children}</main>
       <AthleteChromeGate>
         <Footer />
