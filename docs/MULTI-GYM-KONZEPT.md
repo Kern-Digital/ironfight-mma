@@ -96,11 +96,45 @@ Mechanismus, der die Trennung überhaupt herstellt.
 
 ## 6. Abrechnung & KI-Kontingent (DeepFight-Kosten)
 
-**Beschluss vom 20.09.2026 (Leon; ersetzt das Abo-Modell „Fixbetrag +
-Kontingent + Nachkauf" vom August):** Die Verwaltung ist GRATIS, ohne
-Mitgliedergrenze. Bezahlt wird allein DeepFight — in vorausbezahlten Paketen,
-gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
-(Fassung 2), Recherche aus vier Agenten-Läufen am 20.09.2026.
+**Beschluss vom 20./21.09.2026 (Leon):** Die Verwaltung ist GRATIS, ohne
+Mitgliedergrenze. Bezahlt wird allein DeepFight, gezählt in Analysen — **seit
+dem 21.09.2026 spät als MONATS-ABO** (Leon: „wie kann man das geschäftsmodel
+auf eine monatlich wiederkehrende summe umbauen ich finde das als die beste
+optoin"). Das ist die Rückkehr zum August-Modell „Fixbetrag + Kontingent +
+Nachkauf", jetzt mit der kostenlosen Verwaltung darunter; die am 20.09.
+beschlossenen Pakete auf Vorrat sind damit überholt und leben nur als
+Nachkauf weiter. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
+(Fassung 3), Recherche aus sieben Agenten-Läufen am 20.09.2026.
+- **Abo-Stufen (Startwerte, netto; Leon 21.09.: „Ja, als Startwerte"):**
+  Team 15 Analysen/Monat zu 49 € · Gym 40 zu 99 € (vorgewählt) · Saison 100
+  zu 219 € (3,27 → 2,19 € je Analyse); darüber auf Anfrage. **Jährlich zwei
+  Monate geschenkt** (490 / 990 / 2.190 €; Leon: „Beides, Jahr mit zwei
+  Monaten geschenkt") — die Analysen kommen trotzdem Monat für Monat, monatlich
+  bleibt jederzeit kündbar. Margen bei voller Ausnutzung: 76 / 68 / 63 % bei
+  0,80 € Einkauf, 63 / 52 / 45 % bei 1,20 €. Die Mitte liegt mit Absicht über
+  50 €: darunter behalten KI-Produkte 23 % ihres Umsatzes im Jahr, zwischen 50
+  und 249 $ 45 % (ChartMogul 12/2025, 3.500 Firmen).
+- **Ungenutzte Analysen sammeln sich UNBEGRENZT an** (Leon 21.09., gegen die
+  Empfehlung „einen Monat mitnehmen"). Rahmen aus zwei früheren
+  Entscheidungen: Jeder Monatsposten gilt 24 Monate (Verfallsregel), und nach
+  einer Kündigung darf das Gym den Rest aufbrauchen („Sie dürfen sie
+  aufbrauchen"). Das Preisrisiko auf Angespartes bleibt bei Tidal.
+- **Nachkauf-Paket**, wenn der Monat nicht reicht: einmalig, etwa 10 Analysen
+  für 35 € (Muster Descript, SportsVisio). Nur dafür gilt die Paket-Logik.
+- **Stilllegen wird automatisch:** geplatzte Abo-Zahlung (Stripe-Webhook) →
+  nach einer Frist schließt DeepFight; die kostenlose Verwaltung läuft weiter,
+  bezahltes Restguthaben bleibt nutzbar. Der Knopf auf /admin bleibt der
+  Notfallhebel.
+- **Im Code (Schritt 3):** neuer `GuthabenGrund` „abo" (zählt als bezahlt,
+  `istBezahlt`), je bezahlter Monatsrechnung ein Posten über `schreibeGut()`
+  mit `verfaelltAm` = +24 Monate; `GymSubscription` trägt Status, Stufe,
+  Stripe-IDs und `currentPeriodEnd` (Felder seit August da). Kündigung,
+  Stufenwechsel und Zahlungsmittel über das Stripe-Kundenportal.
+- **Rechnung mit dem Abo** (mittlere Stufe, volle Ausnutzung, 285 €/Monat
+  Fixkosten): Betrieb trägt sich ab 5 Gyms (6 bei 1,20 €), +1.500 €/Monat ab
+  27 (35), Vollzeit ab 75 (99) — mit Paketen waren es 8 / 47 / 131. Das Risiko
+  wandert vom Nachkauf zur KÜNDIGUNG; Kennzahl vor jedem Ausbau: Kündigungs-
+  quote nach 90 Tagen.
 - **Gratis, ohne Mitgliedergrenze:** Mitglieder, Kursplan, Anwesenheit,
   Trainer ohne Limit, Trainingspläne, Techniken, Basis-Berichte, manueller
   Mail-Versand, App in der Tidal-Marke. Das ist der Mindeststandard des
@@ -108,12 +142,12 @@ gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
   bremst das KI-Modul ausgerechnet bei den großen Gyms.
 - **Drei DeepFight-Analysen je Gym gratis** — einmalig, vollständig, ohne
   Ablauf, ohne Karte, je Gym (nicht je Trainer). Keine monatliche Gratismenge.
-- **Pakete (Startwerte, netto):** 10 / 25 / 60 / 150 Analysen zu 39 / 89 /
-  195 / 429 € (3,90 → 2,86 € je Analyse); ab 400 auf Anfrage. Der Regler
-  startet auf 60 — gerastert, logarithmisch, mit Zahlenfeld und Stepper, nie
-  frei. Eine Analyse = EINE ausgewertete Person samt der Gameplans, die danach
-  automatisch entstehen. Nach sechs Monaten mit echten Verbrauchszahlen
-  nachziehen.
+- **Pakete vom 20.09. — ÜBERHOLT am 21.09., nur noch Nachkauf:** 10 / 25 / 60
+  / 150 Analysen zu 39 / 89 / 195 / 429 € (3,90 → 2,86 € je Analyse). Was
+  davon bleibt: Die Stufenwahl ist gerastert mit Zahlenfeld und Stepper, nie
+  ein freier Regler; der Stückpreis steht sichtbar da. Eine Analyse = EINE
+  ausgewertete Person samt der Gameplans, die danach automatisch entstehen.
+  Nach sechs Monaten mit echten Verbrauchszahlen nachziehen.
 - **Zählung beim START** der Analyse (serverseitig in der Analyse-API, vor
   Gemini), nicht beim Übernehmen. Ein Fehler der App gibt die Analyse zurück.
   Gezählt wird der Aufruf, der das VIDEO ansieht — die zweite Stufe desselben
@@ -141,8 +175,10 @@ gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
   extra irgendwo stehen, es soll im Hintergrund passieren"). Der Vorlauf
   kostet gut einen Cent und zählt nicht gegen das Guthaben — er ist das
   Werkzeug, mit dem der Trainer den richtigen Ausschnitt findet.
-- **Zahlung:** Stripe Checkout als Einmalkauf, Karte beim Erstkauf (SEPA erst
-  für Bestandskunden), Analysenzähler in der eigenen Datenbank. USt-IdNr.
+- **Zahlung:** Stripe Checkout im ABO-Modus (seit 21.09.; der Nachkauf bleibt
+  ein Einmalkauf), Karte bei der ersten Zahlung (SEPA erst für
+  Bestandskunden), Analysenzähler in der eigenen Datenbank. Stripe Billing
+  kostet im Abo 0,7 % zusätzlich zur Zahlungsgebühr. USt-IdNr.
   ERST BEIM KAUF (Leon 21.09.2026), nicht beim Anlegen des Gyms — mit
   BZSt-Prüfung; Reverse Charge bei EU-Ausland.
   Nicht Paddle (kein SEPA), nicht Lemon Squeezy (läuft aus).
@@ -243,7 +279,10 @@ gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
    Gym seine DeepFight-Daten noch einsehen darf, ist offen) → (2)
    DeepFight-Guthaben mit Schranke (drei frei, Zählung beim Start,
    Vorlauf-Bremse, Messgrößen ab Tag eins) — gebaut 21.09. → (3) Werbeseite
-   hinter dem DeepFight-Eintrag mit gerastertem Regler und Stripe-Einmalkauf.
+   hinter dem DeepFight-Eintrag mit den drei Abo-Stufen (15 / 40 / 100 zu
+   49 / 99 / 219 € im Monat, jährlich zwei Monate geschenkt), Stripe im
+   Abo-Modus mit Webhook und Kundenportal, Nachkauf als Einmalkauf (Leon
+   21.09. spät: Monats-Abo statt Pakete, siehe §6).
    Wochenplan-Mehrplan-Modell: später (Leon 20.09.). Firestore-Regeln, die
    ein stillgelegtes Gym auch im Client bremsen („Schritt 1b"), sind bewusst
    ZURÜCKGESTELLT (Leon 21.09.: „erstmal lassen").
