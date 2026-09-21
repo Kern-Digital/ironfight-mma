@@ -6,14 +6,15 @@
  *
  * Schutzregeln (Konzept §4 „Rechte vergeben darf nur, wer sie selbst hat"):
  *   • EINLADEN DARF NUR DIE VERWALTUNG (Leon 31.08.) — geprüft über
- *     `canManageGym`: Plattform-Admin oder Verwaltungs-Claim im eigenen Gym.
- *     Bis Checkpoint 2 stand hier stellvertretend `isAdmin(user)`, weil es
- *     die Rolle `verwaltung` noch nicht gab; seit dem Verwaltungs-Claim ist
- *     die Prüfung echt. Ein Trainer MIT Verwaltungsrecht darf einladen, ein
+ *     `canManageGym`: Verwaltungs-Claim im eigenen Gym. Bis Checkpoint 2
+ *     stand hier stellvertretend `isAdmin(user)`, weil es die Rolle
+ *     `verwaltung` noch nicht gab; seit dem Verwaltungs-Claim ist die
+ *     Prüfung echt. Seit dem 21.09.2026 kommt auch der PLATTFORM-ADMIN nicht
+ *     mehr durch — Einladen ist eine Gym-Sache. Ein Trainer MIT Verwaltungsrecht darf einladen, ein
  *     Trainer ohne nicht. Dieselbe Kante steht in /revoke, /note, in
  *     /api/members/role und in den Rules (Lesen der Einladungen) — wer die
  *     Codes sieht, kann einladen.
- *   • Verwaltung/Admin lädt nur ins EIGENE Gym ein.
+ *   • Die Verwaltung lädt nur ins EIGENE Gym ein.
  *   • role="admin" ist gar nicht erst vorgesehen — Plattform-Rechte werden
  *     niemals über einen Link vergeben.
  */
@@ -32,7 +33,6 @@ import {
 import {
   bearerToken,
   canManageGym,
-  isAdmin,
   userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
@@ -83,10 +83,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // Nur der Plattform-Admin darf ein fremdes Gym adressieren (spätere
-  // Selbstbedienungs-Provisionierung); Trainer immer ihr eigenes.
-  const gymId =
-    isAdmin(user) && body.gymId?.trim() ? body.gymId.trim() : userGymId(user);
+  // IMMER das eigene Gym. Bis zum 21.09.2026 durfte der Plattform-Admin hier
+  // ein fremdes Gym adressieren — seit „ein admin konto soll nur admin sachen
+  // machen" kommt er gar nicht mehr bis hierher (canManageGym oben). Ein Gym
+  // entsteht seither ohnehin durch Selbstanmeldung, nicht durch eine
+  // Einladung von außen.
+  const gymId = userGymId(user);
 
   const maxUses = Math.min(
     Math.max(Math.floor(Number(body.maxUses) || 1), 1),

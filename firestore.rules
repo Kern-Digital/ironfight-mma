@@ -31,8 +31,18 @@ service cloud.firestore {
     }
     // Gym aus dem Token. Fehlender Claim = Default-Gym (Bestand vor Migration
     // und frische Signups ohne Einladung — Phase 2 setzt Claims via Invite).
+    //
+    // AUSNAHME seit 21.09.2026: Ein PLATTFORM-ADMIN ohne gymId-Claim gehoert
+    // zu KEINEM Gym (Leon: „ein admin konto soll kein gym angehoeren") und
+    // bekommt ein Kuerzel, auf das kein echtes Gym passt. Ohne diese Zeile
+    // waere er stillschweigend Mitglied von tidal-athletics. Sein Zugriff
+    // haengt seither allein an isAdmin() — dem Betreiber-Zugriff, der in die
+    // Datenschutzhinweise gehoert, nicht an einer Gym-Mitgliedschaft.
+    // Dieselbe Zeichenkette steht als KEIN_GYM in lib/gym.ts.
     function userGymId() {
-      return ("gymId" in request.auth.token) ? request.auth.token.gymId : "tidal-athletics";
+      return ("gymId" in request.auth.token)
+             ? request.auth.token.gymId
+             : (isAdmin() ? "__kein-gym__" : "tidal-athletics");
     }
     // Gym-Verwaltungsrecht — gesetzt ausschliesslich von /api/members/role.
     // BEWUSST kein Wert von `role` (und heute eines von drei Haekchen):

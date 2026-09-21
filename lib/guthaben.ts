@@ -53,12 +53,27 @@ export interface GuthabenPosten {
 export interface GuthabenStand {
   /** Was heute noch startbar ist. */
   rest: number;
+  /**
+   * Davon aus GEKAUFTEN Paketen — das, was auch ein stillgelegtes Gym noch
+   * aufbrauchen darf (Leon 21.09.2026).
+   */
+  restBezahlt: number;
   /** Alles, was jemals gültig war und noch nicht verfallen ist. */
   gesamt: number;
   verbraucht: number;
   /** Der nächste Ablauf — für den Hinweis „X verfallen am …". */
   naechsterVerfall: { am: Date; menge: number } | null;
   posten: GuthabenPosten[];
+}
+
+/**
+ * Ein Posten, der wirklich BEZAHLT wurde. Wichtig seit dem 21.09.2026: Ein
+ * stillgelegtes Gym darf genau das aufbrauchen, wofür es Geld gegeben hat
+ * (Leon: „Bezahlt ist bezahlt"). Das Geschenk und eine Gutschrift zählen
+ * dabei NICHT — wer nie gezahlt hat, hat auch nichts gut.
+ */
+export function istBezahlt(p: GuthabenPosten): boolean {
+  return p.grund === "paket";
 }
 
 /** Was von einem Posten noch übrig ist (nie negativ). */
@@ -96,6 +111,7 @@ export function standAusPosten(
 
   return {
     rest,
+    restBezahlt: offen.filter(istBezahlt).reduce((s, p) => s + restVonPosten(p), 0),
     gesamt,
     verbraucht,
     naechsterVerfall: naechster

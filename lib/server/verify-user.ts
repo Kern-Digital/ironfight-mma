@@ -13,7 +13,7 @@
  * KI-Routen aufrufen.
  */
 
-import { DEFAULT_GYM_ID } from "@/lib/gym";
+import { DEFAULT_GYM_ID, KEIN_GYM } from "@/lib/gym";
 import { readRoleSet, effectiveRights, type RoleSet } from "@/lib/roles";
 
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -97,9 +97,17 @@ export function isAdmin(user: VerifiedUser | null): boolean {
 /**
  * Gym des Aufrufers — fehlender Claim faellt aufs Default-Gym zurueck,
  * identisch zu userGymId() in firestore.rules und resolveGymId im Client.
+ *
+ * AUSNAHME seit dem 21.09.2026: Ein Konto mit Plattform-Rang und ohne
+ * gymId-Claim gehoert zu KEINEM Gym und bekommt `KEIN_GYM` — ein Kuerzel,
+ * auf das kein echtes Gym passt. Sonst waere ein Admin stillschweigend
+ * Mitglied des Default-Gyms (Falle 44), und jede Buchung, jeder Verbrauch
+ * und jede Einladung liefe auf Leons Gym.
  */
 export function userGymId(user: VerifiedUser): string {
-  return user.gymId?.trim() || DEFAULT_GYM_ID;
+  const claim = user.gymId?.trim();
+  if (claim) return claim;
+  return user.rights.admin ? KEIN_GYM : DEFAULT_GYM_ID;
 }
 
 /**
@@ -112,11 +120,13 @@ export function userGymId(user: VerifiedUser): string {
  * `verwaltung` noch nicht, und `admin` war der einzige Rang ueber dem
  * Trainer. Seit dem Verwaltungs-Claim ist der Zielzustand echt.
  *
- * Zwei Wege hinein — und nur diese zwei:
- *   • Plattform-Admin (gym-uebergreifend, deshalb ohne Gym-Vergleich),
- *   • Verwaltungs-Claim IM EIGENEN Gym.
- * Ein Trainer ohne Verwaltungsrecht faellt durch; das ist Leons
- * Entscheidung vom 31.08.2026 („Einladen darf nur die Verwaltung").
+ * EIN Weg hinein: der Verwaltungs-Claim IM EIGENEN Gym. Ein Trainer ohne
+ * Verwaltungsrecht faellt durch (Leon 31.08.2026: „Einladen darf nur die
+ * Verwaltung"), und seit dem 21.09.2026 faellt auch der PLATTFORM-ADMIN
+ * durch: „ein admin konto soll nur admin sachen machen". Einladen und Rechte
+ * vergeben sind Gym-Sachen. Wer als Betreiber auch ein Gym fuehrt, hat dafuer
+ * ein zweites Konto — in Tidal Athletics traegt es seit dem 21.09. den
+ * Verwaltungs-Claim (scripts/migrate-admin-ohne-gym.mjs).
  *
  * `gymId` weglassen heisst „irgendein Gym" — dann prueft nur, DASS ein
  * Verwaltungsrecht besteht; das betroffene Gym muss der Aufrufer danach
@@ -127,7 +137,6 @@ export function canManageGym(
   gymId?: string,
 ): boolean {
   if (!user) return false;
-  if (isAdmin(user)) return true;
   if (!user.rights.verwaltung) return false;
   return gymId === undefined || userGymId(user) === gymId;
 }

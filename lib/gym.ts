@@ -20,6 +20,26 @@ export const DEFAULT_GYM_ID = "tidal-athletics";
 export const DEFAULT_GYM_LABEL = "Tidal Athletics";
 
 /**
+ * DAS GYM, DAS ES NICHT GIBT — für Konten, die zu keinem gehören (Leon
+ * 21.09.2026: „ein admin konto soll kein gym angehören").
+ *
+ * Warum ein Kürzel und nicht `null`: `resolveGymId` und `userGymId` werden an
+ * über siebzig Stellen gelesen, fast immer als Filter einer Abfrage
+ * (`where("gymId","==", …)`). Ein `null` hätte jede dieser Stellen zu einer
+ * Fallunterscheidung gemacht; ein Kürzel, das auf KEIN Gym passt, beantwortet
+ * dieselbe Frage von selbst — der Admin sieht überall nichts, weil er
+ * nirgends Mitglied ist. Die eckigen Klammern sind in einer Gym-ID
+ * ausgeschlossen (`slugifyGym` lässt nur a–z, 0–9 und Bindestriche durch),
+ * die Verwechslung mit einem echten Gym also auch.
+ *
+ * Dieselbe Zeichenkette steht in `firestore.rules` (`userGymId()`).
+ */
+export const KEIN_GYM = "__kein-gym__";
+
+/** Was in der Hülle steht, wo sonst der Gym-Name stünde. */
+export const KEIN_GYM_LABEL = "Plattform";
+
+/**
  * Analysen, die jedes neue Gym beim Anlegen geschenkt bekommt (Beschluss
  * 20.09.2026, Plan „Das zweite Gym": drei, einmalig, vollständig, ohne
  * Ablauf). Liegt als Posten in `gyms/{gymId}/guthaben` — siehe
@@ -29,12 +49,24 @@ export const FREIE_ANALYSEN = 3;
 
 /**
  * Der Satz, den ein stillgelegtes Gym auf jeder Seite und aus jeder Route
- * bekommt (Leon 20.09.2026: „lesen ja, ändern nein"). EINE Stelle für Client
- * und Server — lib/server/gym-status.ts und der Streifen in der Hülle lesen
- * beide hier.
+ * bekommt. EINE Stelle für Client und Server — lib/server/gym-status.ts und
+ * der Streifen in der Hülle lesen beide hier.
+ *
+ * AM 21.09.2026 NEU GESCHRIEBEN: Der alte Satz („Ihr könnt nichts ändern und
+ * keine Analysen starten") stimmte nicht mehr. Stilllegen trifft seither nur
+ * DeepFight — Kursplan, Mitglieder, Einladungen und Pläne laufen weiter
+ * (Leon: die kostenlose Version bleibt frei verfügbar).
  */
 export const GYM_GESPERRT_TEXT =
-  "Dein Gym ist stillgelegt. Ihr seht alles wie bisher, könnt aber nichts ändern und keine Analysen starten. Wendet euch an Tidal Athletics.";
+  "Dein Gym ist stillgelegt. Kursplan, Mitglieder und Pläne laufen weiter — neue DeepFight-Analysen gehen erst wieder, wenn ihr euch bei Tidal Athletics meldet.";
+
+/**
+ * Derselbe Fall, aber das Gym hat noch GEKAUFTE Analysen übrig (Leon
+ * 21.09.2026: „Sie dürfen sie aufbrauchen"). Dann ist DeepFight NICHT zu —
+ * der Streifen sagt, wie viel noch geht.
+ */
+export const GYM_GESPERRT_MIT_GUTHABEN = (rest: number): string =>
+  `Dein Gym ist stillgelegt. Eure gekauften Analysen könnt ihr aufbrauchen — ${rest === 1 ? "noch eine" : `noch ${rest}`}. Danach geht DeepFight erst wieder, wenn ihr euch bei Tidal Athletics meldet.`;
 
 /**
  * Normalisiert einen frei eingegebenen Gym-Namen zu einem stabilen Slug
@@ -56,9 +88,19 @@ export function slugifyGym(name: string): string {
 /**
  * Liefert die Gym-ID eines Nutzers. `profile.gymId` wird in auth-context aus
  * dem Token-Claim gespeist; ohne Claim gilt das Default-Gym.
+ *
+ * MIT EINER AUSNAHME (21.09.2026): Ein Konto mit Plattform-Rang und ohne
+ * gymId-Claim gehört zu KEINEM Gym — es bekommt `KEIN_GYM`, nicht das
+ * Default-Gym. Ohne diese Zeile wäre ein Admin nach dem Umbau stillschweigend
+ * wieder Mitglied von Tidal Athletics (Falle 44: „kein Claim" ist nicht
+ * „kein Gym"). Ein Admin MIT gymId-Claim behält sein Gym — den Fall soll es
+ * nach der Wanderung nicht mehr geben, aber die Funktion soll ihn nicht
+ * verschlucken.
  */
 export function resolveGymId(profile: UserProfile | null | undefined): string {
-  return profile?.gymId?.trim() || DEFAULT_GYM_ID;
+  const claim = profile?.gymId?.trim();
+  if (claim) return claim;
+  return profile?.rights?.admin ? KEIN_GYM : DEFAULT_GYM_ID;
 }
 
 /**
@@ -181,6 +223,9 @@ const gymInfoCache = new Map<string, { info: GymInfo; bis: number }>();
 export async function getGymInfo(gymId: string): Promise<GymInfo> {
   const cached = gymInfoCache.get(gymId);
   if (cached && cached.bis > Date.now()) return cached.info;
+  // Wer zu keinem Gym gehört, bekommt kein Gym-Dokument gesucht — das wäre
+  // ein Lesevorgang auf eine Adresse, die es nie geben wird.
+  if (gymId === KEIN_GYM) return { name: KEIN_GYM_LABEL, status: null };
   const fallback = gymId === DEFAULT_GYM_ID ? DEFAULT_GYM_LABEL : gymId;
   try {
     const { doc, getDoc } = await import("firebase/firestore");

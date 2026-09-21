@@ -79,19 +79,41 @@ export function readRoleSet(claims: ClaimLike): RoleSet {
 }
 
 /**
- * Rechnet den Plattform-Rang ein: Ein Admin hat die Trainer-Werkzeuge und
- * verwaltet jedes Gym, auch ohne gesetzte Häkchen. Das ist die Form, die
- * JEDER Leser will — Navigation, Guards, Anzeige.
+ * DER PLATTFORM-RANG STEHT FÜR SICH (Leon 21.09.2026: „beachte das ein admin
+ * konto nur admin sachen machen soll. also ein admin konto soll kein gym
+ * angehören … alle admins sollen rein admin sein").
+ *
+ * Bis dahin rechnete diese Funktion den Rang in `trainer` UND `verwaltung`
+ * ein — ein Admin war damit überall ein vollwertiger Trainer des Gyms, auch
+ * ohne ein einziges gesetztes Häkchen. Das war die Wurzel der Ghost-Frage
+ * (03.09.: „Admins sind Ghosts"): Wer als Trainer gilt, taucht in
+ * Kollegen-Listen auf, und jeder Filter dagegen war Kosmetik an der falschen
+ * Stelle.
+ *
+ * Seit dem 21.09. gibt der Rang KEINE Gym-Rechte mehr. Ein Admin kommt weder
+ * nach /trainer noch nach /verwaltung, kann nicht einladen, keine Rechte
+ * vergeben und keine Analyse starten. Wer beides will, hat zwei Konten —
+ * genau so, wie Leon es seit dem 03.09. hält.
+ *
+ * Die Funktion bleibt als EINE Stelle bestehen, an der die Frage „was darf
+ * dieses Konto wirklich" beantwortet wird; sie rechnet heute nur nichts mehr
+ * hinzu. Wer den Rang künftig doch irgendwo einrechnen will, ändert HIER —
+ * und liest vorher den Absatz darüber.
+ *
+ * NICHT BERÜHRT: Der technische Betreiber-Zugriff in `firestore.rules`
+ * (`isAdmin()` steht dort vor jeder Gym-Prüfung). Leon am 21.09. gefragt und
+ * entschieden: „Rollen weg, Blick bleibt" — der Zugriff gehört deshalb in
+ * die Datenschutzhinweise und in den AVV, nicht in eine Kollegen-Liste.
  */
 export function effectiveRights(stored: RoleSet): RoleSet {
   return {
-    trainer: stored.trainer || stored.admin,
-    verwaltung: stored.verwaltung || stored.admin,
+    trainer: stored.trainer,
+    verwaltung: stored.verwaltung,
     admin: stored.admin,
   };
 }
 
-/** Kurzform für die häufigste Frage: Set lesen und Admin einrechnen. */
+/** Kurzform für die häufigste Frage: die Häkchen aus den Claims lesen. */
 export function rightsFromClaims(claims: ClaimLike): RoleSet {
   return effectiveRights(readRoleSet(claims));
 }

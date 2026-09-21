@@ -20,7 +20,7 @@ import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { canAccessMember, canAccessOpponent, readMember } from "@/lib/server/member-access";
 import { schreibeGameplan } from "@/lib/server/gameplan";
-import { antwortWennGesperrt } from "@/lib/server/gym-status";
+import { antwortWennDeepFightZu } from "@/lib/server/gym-status";
 import { bearerToken, isTrainerOrAdmin, userGymId, verifyUser } from "@/lib/server/verify-user";
 
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
   // Stillgelegtes Gym: kein Gameplan, der Geld kostet (Schritt 1, 21.09.2026).
-  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  const gesperrt = await antwortWennDeepFightZu(adminDb, userGymId(user));
   if (gesperrt) return gesperrt;
 
   let body: { uid?: string; campId?: string; erzwingen?: boolean };

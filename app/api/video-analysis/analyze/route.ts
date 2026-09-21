@@ -18,7 +18,8 @@ import { deleteFile, observeVideo } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
 import { gibAnalyseZurueck, nimmEineAnalyse } from "@/lib/server/guthaben";
 import { KEIN_GUTHABEN_TEXT } from "@/lib/guthaben";
-import { antwortWennGesperrt } from "@/lib/server/gym-status";
+import { GYM_GESPERRT_TEXT } from "@/lib/gym";
+import { deepfightZustand } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { evaluateObservation } from "@/lib/server/claude";
 import {
@@ -74,10 +75,15 @@ export async function POST(req: Request) {
     );
   }
   const gym = userGymId(user);
-  // Stillgelegtes Gym: lesen ja, ändern nein — und keine Analyse, die Geld
-  // kostet (Schritt 1, 21.09.2026). VOR der Body-Prüfung, siehe gym-status.ts.
-  const gesperrt = await antwortWennGesperrt(adminDb, gym);
-  if (gesperrt) return gesperrt;
+  // Stillgelegtes Gym: DeepFight ist zu — ES SEI DENN, es hat noch gekaufte
+  // Analysen übrig (Leon 21.09.: „Sie dürfen sie aufbrauchen"). Der Zustand
+  // wird EINMAL geholt und unten beim Abziehen wiederverwendet, damit das
+  // Guthaben nicht zweimal gelesen wird. VOR der Body-Prüfung, siehe
+  // gym-status.ts.
+  const zustand = await deepfightZustand(adminDb, gym);
+  if (zustand.zu) {
+    return Response.json({ error: GYM_GESPERRT_TEXT, gesperrt: true }, { status: 423 });
+  }
 
   let body: AnalyzeRequest;
   try {
@@ -92,7 +98,11 @@ export async function POST(req: Request) {
   // BEVOR Gemini das Video sieht — ab da ist das Geld weg. Der zweite Aufruf
   // desselben Ablaufs bringt die Beobachtung schon mit und zählt nicht noch
   // einmal; ein Wiederholungsversuch auf vorhandener Beobachtung ebenso wenig.
-  const buchung = body.observation ? null : await nimmEineAnalyse(adminDb, gym, user.uid);
+  // Ist das Gym stillgelegt, darf die Analyse NUR aus einem gekauften Posten
+  // gehen — das Geschenk ist dann tabu (wer nie gezahlt hat, hat nichts gut).
+  const buchung = body.observation
+    ? null
+    : await nimmEineAnalyse(adminDb, gym, user.uid, zustand.gesperrt);
   if (buchung && !buchung.ok) {
     return Response.json(
       { error: KEIN_GUTHABEN_TEXT, guthabenLeer: true, rest: buchung.rest },

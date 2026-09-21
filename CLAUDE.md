@@ -949,6 +949,91 @@ bei mir: Knopf „Analysen kaufen", der ab Schritt 3 auf die Werbeseite zeigt).
   schließenden „“ wird ein echtes `"`, und die Zeichenkette bricht ab.
   Solche Skripte mit dem Write-Werkzeug als UTF-8-Datei schreiben.
 
+### ADMIN-KONTEN SIND REIN ADMIN (Leon 21.09.2026, Fenster tidal-athletics-45)
+Leon wörtlich: **„beachte das ein admin konto nur admin sachen machen soll.
+also ein admin konto soll kein gym angehören, ich richte wenn nötig einen
+zweiten zugang ein aber alle admins sollen rein admin sein. der aktuelle admin
+acc soll entsprechend umgebaut werden."** Damit ist die Ghost-Regel vom
+03.09. („Admins sind Ghosts") vom Anzeigefilter zur ECHTEN Trennung geworden:
+`isGhostAccount()` versteckte den Admin in Listen, während er technisch
+weiter ein vollwertiger Trainer des Gyms war.
+- **`effectiveRights` rechnet den Rang NICHT MEHR EIN** (lib/roles.ts). Bis
+  zum 21.09. galt `trainer: stored.trainer || stored.admin` — ein Admin war
+  damit überall Trainer UND Verwaltung, ohne ein einziges Häkchen. Jetzt ist
+  die Funktion die Identität. EINE Zeile, die 28 `isTrainerOrAdmin`-Aufrufe,
+  die Middleware und jede Navigationsleiste mitzieht.
+- **`canManageGym` hat den `isAdmin`-Kurzschluss verloren** — einladen und
+  Rechte vergeben sind Gym-Sachen. Folge: `/api/invites/create` nimmt kein
+  fremdes `body.gymId` mehr an (die Abzweigung war danach tot).
+- **KEIN_GYM statt Default-Gym** (lib/gym.ts): Ein Konto mit Plattform-Rang
+  und ohne `gymId`-Claim gehört zu KEINEM Gym und bekommt `"__kein-gym__"`.
+  Ohne diese Zeile wäre jeder Admin nach dem Umbau stillschweigend wieder
+  Mitglied von Tidal Athletics (**Falle 44**). Dieselbe Zeichenkette steht in
+  `firestore.rules` (`userGymId()`) und in `lib/server/verify-user.ts`.
+  **Warum ein Kürzel und nicht `null`:** über siebzig Lesestellen, fast alle
+  als Abfrage-Filter — ein `null` hätte jede davon zu einer Fallunter-
+  scheidung gemacht; ein Kürzel, auf das kein Gym passt, beantwortet dieselbe
+  Frage von selbst. `getGymInfo(KEIN_GYM)` gibt ohne Lesevorgang
+  „Plattform" zurück — das steht in der Hülle, wo sonst der Gym-Name stünde.
+- **DER BLICK BLEIBT.** Leon am 21.09. gefragt („Rollen weg, Blick bleibt"
+  oder „auch der Blick weg") und entschieden: **„Rollen weg, Blick bleibt"**.
+  `isAdmin()` steht in `firestore.rules` weiter an 26 Stellen vor jeder
+  Gym-Prüfung. Der Betreiber-Zugriff gehört deshalb in die
+  Datenschutzhinweise und in den AVV — dort steht er richtig, in einer
+  Kollegen-Liste stünde er falsch (Backlog „vor der ersten Zahlung fällig").
+- **DAS GYM BRAUCHTE ERST EINE VERWALTUNG.** Nachgemessen am 21.09.: In
+  `tidal-athletics` hatte **NIEMAND** den `verwaltung`-Claim — der Admin
+  deckte das ab, weil der Rang es mitbrachte. Ohne Gegenmaßnahme hätte nach
+  dem Umbau niemand mehr einladen oder Rechte vergeben können, auch kein
+  Admin. Leons Wahl: **noelreichle@gmail.com** (sein zweites Konto „Leon",
+  bisher Trainer) bekommt `verwaltung`.
+- **Die Wanderung: `scripts/migrate-admin-ohne-gym.mjs`** (committet, kein
+  Wegwerf-Skript). Ohne `SCHREIBEN=1` zeigt sie nur, was sie täte. Sie
+  nimmt jedem Admin `gymId`, `trainer` und `verwaltung` aus den Claims und
+  die Gym-Felder aus dem users-Dokument, setzt die Verwaltung auf das
+  benannte Konto, zieht BEIDEN die Tokens zurück (sonst gilt die Änderung
+  erst nach bis zu einer Stunde — beide müssen sich neu anmelden) und
+  prüft am Ende, ob jedes Gym noch eine Verwaltung hat. `role: "admin"`
+  bleibt stehen: Die Regeln lesen ihn als Migrationspfad.
+- **Gemessen** (`scripts/tmp-mess-admin-ohne-gym.mjs`, Wegwerf-Konten, ohne
+  einen KI-Token): Admin lädt ein → 403 · vergibt Rechte → 403 · startet
+  Vorlauf → 403 · startet Analyse → 403 · /trainer → /dashboard ·
+  /verwaltung → /dashboard · /admin offen · die Hülle sagt „Plattform".
+
+### STILLLEGEN: BEZAHLT IST BEZAHLT (Leon 21.09.2026)
+Auf die Frage, was mit dem Restguthaben eines stillgelegten Gyms passiert,
+das 60 Analysen gekauft und 10 verbraucht hat: **„Sie dürfen sie
+aufbrauchen."** Damit ist Stilllegen kein Schalter mehr, sondern eine
+Rechnung.
+- **`deepfightZustand(db, gymId)`** (lib/server/gym-status.ts) liefert
+  `{ gesperrt, bezahltRest, zu }`. **Zu** ist DeepFight nur, wenn das Gym
+  stillgelegt ist UND kein bezahltes Guthaben mehr hat. `bezahlt` heißt
+  `grund === "paket"` — das Geschenk und eine Gutschrift zählen NICHT: Wer
+  nie gezahlt hat, hat auch nichts gut.
+- **Ein Lesevorgang im Alltag.** Die Guthaben-Sammlung wird nur gelesen, wenn
+  das Gym wirklich stillgelegt ist. `analyze` holt den Zustand EINMAL und
+  gibt ihn als `nurBezahlt` an `nimmEineAnalyse` weiter — kein zweiter Griff.
+- **`nimmEineAnalyse(…, nurBezahlt)`**: Im stillgelegten Zustand kommen nur
+  gekaufte Posten in Frage, und das Geschenk entsteht auch nicht mehr.
+  Gemessen: stillgelegt → die Analyse geht aus dem Paket (1/5), das Geschenk
+  bleibt bei 0/3; Paket leer → wieder zu, auch über die Hintertür kein
+  Zugriff aufs Geschenk; wieder geöffnet → die nächste geht aus dem Geschenk.
+- **`antwortWennGesperrt` heißt jetzt `antwortWennDeepFightZu`** (sieben
+  Routen). Der alte Name wurde mit der Bedeutung falsch: stillgelegt ist
+  nicht mehr dasselbe wie zu.
+- **Der Streifen sagt zwei Sätze.** `GYM_GESPERRT_TEXT` war nach dem
+  21.09. schlicht falsch („Ihr könnt nichts ändern") — Kursplan, Mitglieder
+  und Pläne laufen längst weiter. Neu: ohne bezahlten Rest der schlichte
+  Satz, mit Rest `GYM_GESPERRT_MIT_GUTHABEN(n)` samt Zahl. Ein ATHLET darf
+  die Guthaben-Sammlung nicht lesen (Regel: nur Trainer und Verwaltung) —
+  er bekommt den schlichten Satz. Richtig so: Er startet ohnehin keine
+  Analyse.
+- **Falle 49:** In `lib/server/gym-status.ts` darf **kein `next/server`**
+  stehen. Der Ladeweg der Messskripte (`scripts/lib/ts-loader.mjs`) kann es
+  nicht auflösen — mit dem Import lässt sich diese Logik nicht mehr direkt
+  prüfen. `Response.json` aus dem Web-Standard tut dasselbe, und eine Route
+  darf sie genauso zurückgeben.
+
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
   `/admin/*` = Plattform-Rang · `/trainer/*` = Trainer-Werkzeuge ·

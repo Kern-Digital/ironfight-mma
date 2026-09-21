@@ -25,7 +25,7 @@ import { nachAntwortWeiter } from "@/lib/server/nachlauf";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { canAccessOpponent } from "@/lib/server/member-access";
 import { gameplaeneNachScouting, merkeScoutingAenderung } from "@/lib/server/gameplan";
-import { antwortWennGesperrt } from "@/lib/server/gym-status";
+import { antwortWennDeepFightZu } from "@/lib/server/gym-status";
 import { bearerToken, isTrainerOrAdmin, userGymId, verifyUser } from "@/lib/server/verify-user";
 
 export const runtime = "nodejs";
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   if (!user || !isTrainerOrAdmin(user)) {
     return NextResponse.json({ error: "Nur für Trainer/Admins verfügbar." }, { status: 403 });
   }
-  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  const gesperrt = await antwortWennDeepFightZu(adminDb, userGymId(user));
   if (gesperrt) return gesperrt;
 
   let body: { opponentId?: string };

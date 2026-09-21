@@ -35,6 +35,7 @@ import { FREIE_ANALYSEN } from "../gym";
 import {
   VORLAUF_JE_TAG,
   decodeGuthabenPosten,
+  istBezahlt,
   naechsterPosten,
   standAusPosten,
   tagSchluessel,
@@ -56,11 +57,17 @@ export type Buchung = Abbuchung | { ok: false; rest: number };
 /**
  * Eine Analyse abziehen. Alles in EINER Transaktion, damit zwei gleichzeitige
  * Starts nicht denselben letzten Rest verbrauchen.
+ *
+ * `nurBezahlt` gilt für ein STILLGELEGTES Gym (Leon 21.09.2026: „Bezahlt ist
+ * bezahlt — sie dürfen sie aufbrauchen"). Dann kommen nur gekaufte Posten
+ * in Frage, und das Geschenk entsteht auch nicht mehr: Wer nie gezahlt hat,
+ * bekommt im stillgelegten Zustand nichts geschenkt.
  */
 export async function nimmEineAnalyse(
   dbHolen: () => Firestore,
   gymId: string,
   uid: string,
+  nurBezahlt = false,
 ): Promise<Buchung> {
   const jetzt = new Date();
   try {
@@ -79,8 +86,8 @@ export async function nimmEineAnalyse(
       // Die drei geschenkten entstehen beim ersten Mal — hier, in derselben
       // Transaktion, zusammen mit der Marke am Gym. Doppelt schenken geht so
       // nicht, auch nicht bei zwei gleichzeitigen Starts.
-      const gratisOffen = !gymSnap.get("guthabenStart");
-      const alle = [...posten];
+      const gratisOffen = !gymSnap.get("guthabenStart") && !nurBezahlt;
+      const alle = nurBezahlt ? posten.filter(istBezahlt) : [...posten];
       const gratisRef = gratisOffen ? postenColl.doc() : null;
       if (gratisRef) {
         alle.push({
@@ -126,6 +133,30 @@ export async function nimmEineAnalyse(
   } catch {
     // Fail-closed: lieber eine Analyse verweigern als eine verschenken.
     return { ok: false, rest: 0 };
+  }
+}
+
+/**
+ * Was ein Gym an GEKAUFTEN Analysen noch übrig hat. Nur dafür gebraucht:
+ * Ein stillgelegtes Gym darf genau das aufbrauchen (Leon 21.09.2026). Kostet
+ * einen Sammlungs-Lesevorgang und wird deshalb NUR gefragt, wenn das Gym
+ * wirklich stillgelegt ist (lib/server/gym-status.ts).
+ *
+ * Fail-closed wie der Rest dieser Datei: Was sich nicht lesen lässt, ist
+ * nicht da.
+ */
+export async function restBezahlt(
+  dbHolen: () => Firestore,
+  gymId: string,
+): Promise<number> {
+  try {
+    const snap = await dbHolen().collection("gyms").doc(gymId).collection("guthaben").get();
+    const posten = snap.docs.map((d) =>
+      decodeGuthabenPosten(d.id, d.data() as Record<string, unknown>),
+    );
+    return standAusPosten(posten, false).restBezahlt;
+  } catch {
+    return 0;
   }
 }
 
