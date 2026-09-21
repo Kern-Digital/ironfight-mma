@@ -48,6 +48,12 @@ import { useAuth, useRights } from "@/lib/auth-context";
 import { greetingFor } from "@/lib/greeting";
 import { resolveGymId } from "@/lib/gym";
 import {
+  getGuthabenStand,
+  listGuthabenNutzung,
+  type GuthabenNutzung,
+  type GuthabenStand,
+} from "@/lib/guthaben";
+import {
   courseLoad,
   getParticipationsSince,
   memberGrowth,
@@ -245,6 +251,10 @@ export default function VerwaltungDashboardPage() {
   // (z. B. ein noch bauender Index), soll das Diagramm das sagen, statt
   // stumm eine Null-Auslastung zu zeigen — eine falsche Null wäre eine
   // Aussage über Kurse, nach der jemand entscheidet.
+  // DeepFight-Guthaben (Schritt 2, Konzept §6: „Verwaltung sieht Stand und
+  // Nutzung je Trainer"). Faellt es aus, bleibt der Rest der Seite heil.
+  const [guthaben, setGuthaben] = useState<GuthabenStand | null>(null);
+  const [nutzung, setNutzung] = useState<GuthabenNutzung[] | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -255,6 +265,8 @@ export default function VerwaltungDashboardPage() {
     setInvites(null);
     setNews(null);
     setParticipations(null);
+    setGuthaben(null);
+    setNutzung(null);
     setStatsFailed(false);
 
     // Stichtag: Montag der ältesten der zwölf Wochen — dieselbe
@@ -267,12 +279,16 @@ export default function VerwaltungDashboardPage() {
     );
 
     try {
-      const [memberList, inviteList, auditList, parts] = await Promise.all([
+      const [memberList, inviteList, auditList, parts, stand, nutz] = await Promise.all([
         listAllMembers(gymId),
         listGymInvites(gymId).catch(() => [] as GymInvite[]),
         listGymAuditLog(gymId).catch(() => [] as AuditEntry[]),
         getParticipationsSince(gymId, since).catch(() => null),
+        getGuthabenStand(gymId).catch(() => null),
+        listGuthabenNutzung(gymId).catch(() => [] as GuthabenNutzung[]),
       ]);
+      setGuthaben(stand);
+      setNutzung(nutz);
       setMembers(memberList);
       setInvites(inviteList);
       setNews(auditList);
@@ -800,6 +816,61 @@ export default function VerwaltungDashboardPage() {
             Die Komponente liegt weiterhin unter `components/trainer/` — sie
             dorthin zu verschieben hieße, die Trainer-Übersicht anzufassen;
             das gehört in den Rollout, nicht hierher. */}
+        {/* ─── DeepFight-Guthaben ──────────────────────────────────────────
+            Konzept §6: „Verwaltung sieht Stand und Nutzung je Trainer; der
+            Trainer sieht die Zahl VOR dem Klick." Der Vorlauf steht hier
+            bewusst NICHT — seine Tagesbremse läuft still im Server (Leon
+            21.09.: „es soll im hintergrund passieren"). */}
+        <section className="flex flex-col gap-2">
+          <SectionHead label="DeepFight-Analysen" />
+          <div className="t-card flex flex-col gap-4 p-4">
+            {guthaben === null ? (
+              <Skeleton className="h-24 w-full" />
+            ) : (
+              <>
+                <div className="flex items-baseline gap-3">
+                  <span
+                    data-guthaben-rest={guthaben.rest}
+                    style={{ font: "var(--type-display)", color: "var(--text-1)" }}
+                  >
+                    {guthaben.rest}
+                  </span>
+                  <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                    von {guthaben.gesamt} {guthaben.gesamt === 1 ? "Analyse" : "Analysen"} übrig
+                  </span>
+                </div>
+                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                  Eine Analyse ist eine ausgewertete Person — die Gameplans, die
+                  danach entstehen, kosten nichts extra.{" "}
+                  {guthaben.naechsterVerfall
+                    ? `${guthaben.naechsterVerfall.menge} davon laufen am ${guthaben.naechsterVerfall.am.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" })} ab.`
+                    : "Eure geschenkten Analysen laufen nicht ab."}
+                </p>
+                {nutzung && nutzung.length > 0 && (
+                  <div className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+                    <span style={{ font: "var(--type-label)", color: "var(--text-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Wer gestartet hat
+                    </span>
+                    {nutzung.map((n) => {
+                      const person = members?.find((m) => m.uid === n.uid);
+                      return (
+                        <div key={n.uid} className="flex items-baseline justify-between gap-3">
+                          <span style={{ font: "var(--type-body)", color: "var(--text-body)" }}>
+                            {person?.displayName || person?.email || "Nicht mehr im Gym"}
+                          </span>
+                          <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                            {n.anzahl} {n.anzahl === 1 ? "Analyse" : "Analysen"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-2 lg:col-span-2">
           <SectionHead label="Auslastung je Kurs" />
           <div className="t-card flex flex-col gap-3 p-4">

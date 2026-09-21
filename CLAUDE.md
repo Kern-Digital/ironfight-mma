@@ -837,8 +837,8 @@ Stilllegen (20.09.) „lesen ja ändern nein".
   `lib/server/gym-status.ts` — `antwortWennGesperrt(adminDb, gymId)` liest
   das Gym-Dokument (fail-open: Lesefehler = aktiv) und antwortet **423
   Locked** `{ error, gesperrt: true }`. Steht in analyze, preview, rahmen,
-  commit, flag, wettkampf/gameplan, gameplan/scouting, invites/create,
-  members/role — direkt hinter der Rollenprüfung, VOR der Body-Prüfung
+  commit, flag, wettkampf/gameplan, gameplan/scouting — direkt hinter der
+  Rollenprüfung, VOR der Body-Prüfung
   (darum lässt es sich ohne Body und ohne Token-Kosten messen). Der Streifen
   `components/shell/GymGesperrtStreifen.tsx` steht in BEIDEN Hüllen
   (StaffShell unter dem Kopf, AppShell über dem Inhalt); `getGymInfo` in
@@ -847,22 +847,107 @@ Stilllegen (20.09.) „lesen ja ändern nein".
   Rückfrage als `role="alertdialog"`-Streifen, Client-`updateDoc` auf
   `gyms/{id}` (Regel erlaubt es dem Plattform-Admin), `statusChangedAt`.
   Pille sagt „Stillgelegt", nicht „Gesperrt".
-- **OFFEN — Schritt 1b:** Die CLIENT-Schreibwege (Kursplan, Pläne,
-  Wettkämpfe, Gegner, users/{uid}/…) laufen über die Firestore-Regeln, und
-  dort fehlt die Sperre — 24 `allow write/create/update/delete` müssten
-  `gymAktiv()` prüfen (get() je Schreibvorgang oder ein Claim `gymGesperrt`
-  auf allen Konten des Gyms + Token-Revoke). Braucht Rules-Deploy und eine
-  REST-Messung. Bis dahin sperrt 1a alles, was Geld kostet oder Rechte
-  vergibt.
+- **STILLLEGEN TRIFFT NUR DEEPFIGHT (Leon 21.09.2026, wörtlich):** „ich
+  denke erstmal lassen da man ja ein gym hauptsäschlich stilllegt wenn es
+  seine beiträge nicht zahlt und die kostenlose version soll erstmal
+  weiterhin frei verfügbar sein. wie es dann genau mit den deepfight themen
+  aussieht und wie weit sie diese noch einsehen dürfen legen wir später
+  fest." Daraus folgte am selben Tag: **`invites/create` und `members/role`
+  sperren NICHT mehr** (Einladen und Rechte vergeben gehören zur kostenlosen
+  Version), und **Schritt 1b ist zurückgestellt** — die Firestore-Regeln
+  bleiben, wie sie sind. Offen und bewusst später: Wie viel seiner
+  DeepFight-Daten ein stillgelegtes Gym noch sehen darf.
 - **Gemessen:** tsc 0, eslint 0 (19 Dateien). Live
   `scripts/tmp-mess-gym-anmelden.mjs` (Wegwerf-Konto per Firebase-REST,
   Gym „Mess Gym F1" → `mess-gym-f1`, danach ALLES gelöscht): **19/19** —
   401/400/200, Gym-Felder, Claims, Spiegel, Protokoll, zweites Gym 409,
   stillgelegt → sechs Routen 423, wieder aktiv → 400 (Body fehlt) und
   Einladung 200. KEIN Screenshot (Dev-Server mit CSS 404, Falle 42).
+- **Falle 44:** Ein Konto OHNE `gymId`-Claim gilt überall als Mitglied des
+  Default-Gyms (`tidal-athletics`) — wer auf /register ohne Einladung ein
+  Konto anlegt, landet in Leons Gym. `/api/gyms/anmelden` nimmt genau diese
+  Konten und zieht sie in ihr eigenes Gym. **„Kein Claim“ ist NICHT „kein
+  Gym“**; wer Guthaben oder Rechnungen je Gym rechnet, muss das wissen.
 - **Falle 43:** `VerifiedUser.stored` IST schon ein `RoleSet` —
   `readRoleSet(user.stored)` scheitert am Typ (`ClaimLike` verlangt eine
   Index-Signatur). Einfach spreaden.
+
+### DeepFight-Guthaben — Schritt 2 des Geschäftsplans (21.09.2026, Fenster tidal-athletics-45)
+Leons Antworten (wörtlich, 21.09.): Vorlauf **„frei tagesbremse 60 stk. aber
+das muss nicht extra irg. wo stehen es soll im hintergrund passieren"** ·
+Tagesdeckel auf Analysen **„Kein Deckel für zahlende Gyms"** · leeres
+Guthaben „egal es benutzt sowieso keiner die app grade" (Entscheidung damit
+bei mir: Knopf „Analysen kaufen", der ab Schritt 3 auf die Werbeseite zeigt).
+- **DAS GUTHABEN LIEGT ALS POSTEN, NICHT ALS ZAHL** —
+  `gyms/{gymId}/guthaben/{postenId}`: `menge`, `verbraucht`, `grund`
+  (gratis|paket|gutschrift), `erstelltAm`, `verfaelltAm` (**null** bei den
+  drei geschenkten, sonst Kauf + 24 Monate). Grund: Leons Verfall vom 20.09.
+  braucht ein Datum JE KAUF; eine einzelne Zahl kann nicht sagen, welche
+  Analysen wann ablaufen. Verbraucht wird aus dem Posten, der ZUERST
+  verfällt (`naechsterPosten`) — sonst liefe ein Paket ab, während das
+  Geschenk unberührt danebenliegt. `subscription.analysisQuota/analysisUsed`
+  sind DAFÜR GELÖSCHT worden (waren nie beschrieben).
+- **Die drei geschenkten entstehen beim ersten Mal.** Solange am Gym kein
+  `guthabenStart` steht, gilt das Geschenk als offen und wird in
+  `standAusPosten(posten, gratisOffen)` mitgerechnet — Client und Server an
+  derselben Stelle. Der Server legt den Posten in DERSELBEN Transaktion an,
+  in der er die erste Analyse abzieht. Damit braucht kein Bestands-Gym eine
+  Wanderung, und doppelt schenken kann sich niemand. `/api/gyms/anmelden`
+  legt ihn für neue Gyms gleich mit an.
+- **Die Schranke sitzt in `analyze` VOR Gemini** (Konzept §6, Zählung beim
+  Start): `nimmEineAnalyse` in einer Transaktion, sonst **402** mit
+  `guthabenLeer: true`. **Gezählt wird nur der Aufruf, der das VIDEO ansieht**
+  — der Zwei-Phasen-Betrieb schickt zwei Requests, und der zweite bringt
+  `body.observation` mit; würde er auch zählen, kostete jede Analyse zwei.
+  Ein Fehler im Stream gibt sie zurück (`gibAnalyseZurueck`), auch wenn
+  Gemini schon geantwortet hat.
+- **FAIL-CLOSED**, anders als beim Stilllegen: Lässt sich das Guthaben nicht
+  lesen, startet keine Analyse. Ein Lesefehler darf hier nicht Geld kosten.
+  Die Vorlauf-Bremse dagegen ist fail-open — sie ist eine Bequemlichkeit,
+  kein Kassenhäuschen.
+- **Vorlauf-Bremse:** 60 je Gym und Tag (deutsche Zeit, `tagSchluessel`),
+  gezählt am Gym-Dokument in `vorlaufTag: { tag, anzahl }`, greift in
+  `preview` UND `rahmen` → **429**. KEINE Anzeige in der Oberfläche (Leons
+  Auflage). 60 Vorläufe ≈ 60 Cent.
+- **Oberfläche:** `components/deepfight/Guthaben.tsx` (`useGuthaben` +
+  `GuthabenZeile`) steht im Upload-Fluss über dem Analysieren-Knopf — „Noch 3
+  von 3 Analysen", bei 0 der Streifen mit dem Knopf „Analysen kaufen" (heute
+  ein Hinweis, ab Schritt 3 die Werbeseite). `handleAnalysieren` bremst
+  schon vor dem Weg zum Server, wenn weniger übrig ist als Personen
+  ausgewählt sind. Die Verwaltung bekam die Karte „DeepFight-Analysen"
+  (Stand + Nutzung je Trainer aus `guthabenNutzung/{uid}`).
+- **Regeln (NEU, Deploy nötig):** `gyms/{gymId}/guthaben/{postenId}` —
+  lesen Trainer/Verwaltung des Gyms, **`allow write: if false`** (dasselbe
+  Muster wie bei den Einladungen: Wer sein Guthaben selbst schreiben darf,
+  schreibt sich tausend Analysen). `guthabenNutzung/{uid}` — lesen nur die
+  Verwaltung. Ohne Deploy zeigt die Oberfläche die Zahl NICHT (der Lesefehler
+  wird geschluckt), der Server rechnet trotzdem richtig.
+- **Gemessen:** tsc 0, eslint 0 (eigene Dateien).
+  `scripts/tmp-mess-guthaben.mjs` **23/24** — der eine Fehlschlag ist die
+  Regel, die noch nicht deployt ist (Trainer liest → 403 statt 200). Sonst
+  alles grün: Anmeldung schenkt drei, Trainer schreibt sich 9999 → 403,
+  Athlet liest → 403, vierte Analyse abgelehnt, 402 ohne einen Gemini-Token,
+  Fortsetzung mit Beobachtung zählt nicht, toter `fileUri` → genommen UND
+  zurückgegeben, Vorlauf 61 → 429, Verfall 21.09.2028, Paket vor Geschenk.
+  Die Messung kostet fast nichts, weil jeder Weg vor dem Modell endet.
+  `scripts/tmp-mess-gym-anmelden.mjs` (Schritt 1a) auf den neuen Stand
+  gezogen: **20/20**.
+- **Falle 46 — EINE ANALYSE SIND ZWEI REQUESTS.** Der Zwei-Phasen-Betrieb
+  ruft `/analyze` erst mit `observeOnly` (Gemini sieht das Video), dann noch
+  einmal mit `body.observation` (Claude bewertet). Wer beim Zählen nicht auf
+  `!body.observation` prüft, zieht jedem Gym doppelt ab.
+- **Falle 47:** Firestore-Transaktionen verlangen **alle Lesevorgänge vor dem
+  ersten Schreiben**. `gibAnalyseZurueck` liest Posten UND Nutzungs-Dokument
+  in einem `Promise.all`, bevor es irgendetwas anfasst; `nimmEineAnalyse`
+  liest Gym-Dokument und Posten-Sammlung gemeinsam.
+- **Falle 45:** `mess-gameplan.mjs` wartet nach `goto(/library)` nur 2000 ms.
+  Auf dem Dev-Server reicht das manchmal nicht — dann meldet die letzte
+  Prüfung „← null, 0 px hoch“. Mit 6 s steht der Rückweg in beiden Themes
+  (44 px, „Techniken“), nachgemessen 21.09. Kein Produktfehler.
+- **Falle 48:** Ein Python-Heredoc über die Bash mit deutschen
+  Anführungszeichen im Quelltext wird als cp1252 gelesen — aus einem
+  schließenden „“ wird ein echtes `"`, und die Zeichenkette bricht ab.
+  Solche Skripte mit dem Write-Werkzeug als UTF-8-Datei schreiben.
 
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):

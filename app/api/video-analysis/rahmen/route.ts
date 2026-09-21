@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { locateFighters } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
 import { antwortWennGesperrt } from "@/lib/server/gym-status";
+import { vorlaufErlaubt } from "@/lib/server/guthaben";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { bearerToken, isTrainerOrAdmin, userGymId, verifyUser } from "@/lib/server/verify-user";
 
@@ -33,6 +34,16 @@ export async function POST(req: Request) {
   }
   const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
   if (gesperrt) return gesperrt;
+
+  // Die stille Tagesbremse (Leon 21.09.: „frei, Tagesbremse 60 Stk., … es soll
+  // im Hintergrund passieren"). Kein Zähler in der Oberfläche — sie fängt nur
+  // den Unfall, im Alltag greift sie nie.
+  if (!(await vorlaufErlaubt(adminDb, userGymId(user)))) {
+    return NextResponse.json(
+      { error: "Für heute sind genug Vorläufe gelaufen. Morgen geht es weiter." },
+      { status: 429 },
+    );
+  }
 
   let body: { image?: unknown; fighters?: unknown };
   try {

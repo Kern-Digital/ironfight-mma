@@ -24,7 +24,6 @@ import {
   AdminUnavailableError,
   adminDb,
 } from "@/lib/server/firebase-admin";
-import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import {
   displayNameFor,
   reserveInviteCode,
@@ -58,10 +57,6 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
-  // Stillgelegtes Gym: keine neuen Einladungen (Schritt 1, 21.09.2026).
-  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
-  if (gesperrt) return gesperrt;
-
   let body: {
     role?: string;
     maxUses?: number;

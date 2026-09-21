@@ -16,6 +16,8 @@
 
 import { deleteFile, observeVideo } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
+import { gibAnalyseZurueck, nimmEineAnalyse } from "@/lib/server/guthaben";
+import { KEIN_GUTHABEN_TEXT } from "@/lib/guthaben";
 import { antwortWennGesperrt } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { evaluateObservation } from "@/lib/server/claude";
@@ -71,9 +73,10 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+  const gym = userGymId(user);
   // Stillgelegtes Gym: lesen ja, ändern nein — und keine Analyse, die Geld
   // kostet (Schritt 1, 21.09.2026). VOR der Body-Prüfung, siehe gym-status.ts.
-  const gesperrt = await antwortWennGesperrt(adminDb, userGymId(user));
+  const gesperrt = await antwortWennGesperrt(adminDb, gym);
   if (gesperrt) return gesperrt;
 
   let body: AnalyzeRequest;
@@ -84,6 +87,18 @@ export async function POST(req: Request) {
   }
   const invalid = validate(body);
   if (invalid) return Response.json({ error: invalid }, { status: 400 });
+
+  // DIE SCHRANKE (Schritt 2, Konzept §6): eine Analyse aus dem Guthaben,
+  // BEVOR Gemini das Video sieht — ab da ist das Geld weg. Der zweite Aufruf
+  // desselben Ablaufs bringt die Beobachtung schon mit und zählt nicht noch
+  // einmal; ein Wiederholungsversuch auf vorhandener Beobachtung ebenso wenig.
+  const buchung = body.observation ? null : await nimmEineAnalyse(adminDb, gym, user.uid);
+  if (buchung && !buchung.ok) {
+    return Response.json(
+      { error: KEIN_GUTHABEN_TEXT, guthabenLeer: true, rest: buchung.rest },
+      { status: 402 },
+    );
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -112,7 +127,7 @@ export async function POST(req: Request) {
           // Gemini-Kosten SOFORT buchen (Schritt 0, 20.09.2026): Sie sind da,
           // sobald das Modell geantwortet hat — egal, ob der Trainer das
           // Ergebnis später übernimmt. Gebucht aufs Gym des Aufrufers.
-          await bucheGeminiKosten(adminDb, userGymId(user), result.usage);
+          await bucheGeminiKosten(adminDb, gym, result.usage);
           // Beobachtung sofort an den Client geben — falls die Claude-Stufe
           // oder die Verbindung scheitert, kann ohne Gemini fortgesetzt werden.
           send({ type: "observation", observation, model: geminiModel });
@@ -174,6 +189,10 @@ export async function POST(req: Request) {
           if (match) await deleteFile(match[0]);
         }
       } catch (err) {
+        // „Ein Fehler der App gibt die Analyse zurück" (Konzept §6). Auch
+        // dann, wenn Gemini schon geantwortet hat: Die Gemini-Kosten sind
+        // gebucht und sichtbar, aber der Trainer hat nichts in der Hand.
+        if (buchung?.ok) await gibAnalyseZurueck(adminDb, gym, buchung.postenId, user.uid);
         send({
           type: "error",
           message:

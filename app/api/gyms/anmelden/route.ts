@@ -103,15 +103,26 @@ export async function POST(req: Request) {
         createdBy: user.uid,
         branding: null,
         // Der Gratis-Tarif (Plan „Das zweite Gym"): kein Zeitraum, kein
-        // Betrag — nur die drei Analysen zum Ausprobieren. Schritt 2 zählt
-        // `analysisUsed` hoch und stoppt bei `analysisQuota`.
+        // Betrag. Das Guthaben selbst liegt NICHT hier, sondern als Posten in
+        // `guthaben/` — ein Verfallsdatum je Kauf braucht ein eigenes
+        // Dokument (Schritt 2, lib/guthaben.ts).
         subscription: {
           status: "active",
           plan: "free",
-          analysisQuota: FREIE_ANALYSEN,
-          analysisUsed: 0,
           currentPeriodEnd: null,
         },
+        // Die drei geschenkten Analysen (Leon 20.09.: „einmalig, vollständig,
+        // ohne Ablauf"). `guthabenStart` ist die Marke, die ein zweites
+        // Geschenk verhindert.
+        guthabenStart: now,
+      });
+      tx.create(ref.collection("guthaben").doc(), {
+        menge: FREIE_ANALYSEN,
+        verbraucht: 0,
+        grund: "gratis",
+        erstelltAm: now,
+        verfaelltAm: null,
+        paket: null,
       });
     });
 

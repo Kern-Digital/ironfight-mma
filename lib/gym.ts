@@ -22,8 +22,8 @@ export const DEFAULT_GYM_LABEL = "Tidal Athletics";
 /**
  * Analysen, die jedes neue Gym beim Anlegen geschenkt bekommt (Beschluss
  * 20.09.2026, Plan „Das zweite Gym": drei, einmalig, vollständig, ohne
- * Ablauf). Steht als `subscription.analysisQuota` am Gym; Schritt 2 des
- * Geschäftsplans liest und verbraucht das Feld.
+ * Ablauf). Liegt als Posten in `gyms/{gymId}/guthaben` — siehe
+ * lib/guthaben.ts; ein Verfallsdatum je Kauf braucht ein eigenes Dokument.
  */
 export const FREIE_ANALYSEN = 3;
 
@@ -97,10 +97,6 @@ export interface GymSubscription {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   currentPeriodEnd?: Date | null;
-  /** Enthaltene KI-Analysen pro Abrechnungszeitraum (Konzept §6). */
-  analysisQuota?: number;
-  /** Im laufenden Zeitraum verbraucht — Prüfung erfolgt serverseitig. */
-  analysisUsed?: number;
 }
 
 export interface Gym {

@@ -116,17 +116,35 @@ gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
   nachziehen.
 - **Zählung beim START** der Analyse (serverseitig in der Analyse-API, vor
   Gemini), nicht beim Übernehmen. Ein Fehler der App gibt die Analyse zurück.
+  Gezählt wird der Aufruf, der das VIDEO ansieht — die zweite Stufe desselben
+  Ablaufs (Bewertung auf vorhandener Beobachtung) und jeder
+  Wiederholungsversuch darauf kosten nichts. Gebaut am 21.09.2026 als
+  Schritt 2: `lib/guthaben.ts` + `lib/server/guthaben.ts`.
 - **Verfall nach 24 Monaten** (Leon 20.09., gegen die Empfehlung „ohne
   Ablauf" — begrenzt das Preisrisiko steigender Modellpreise). Die Frist
   braucht in den AGB einen sachlichen Grund: Anwalt (§ 307 BGB; das OLG
   München hält bei Gutscheinen schon ein Jahr für zu kurz).
 - **Gemeinsamer Gym-Pool**, keine Pro-Kopf-Budgets. Verwaltung sieht Stand
   und Nutzung je Trainer; der Trainer sieht die Zahl VOR dem Klick.
-- **Deckel:** höchstens drei Einreichungen je Gym und Tag (Hudl-Muster),
-  Videolänge (15 min) und Auflösung — die einzigen echten Kostenhebel.
+- **Das Guthaben liegt als POSTEN**, nicht als eine Zahl: je Geschenk und je
+  Kauf ein Dokument in `gyms/{gymId}/guthaben` mit eigenem Verfallsdatum
+  (`verfaelltAm: null` bei den drei geschenkten). Anders ginge „Verfall nach
+  24 Monaten" nicht — eine einzelne Zahl kann nicht sagen, WELCHE Analysen
+  wann ablaufen. Verbraucht wird immer aus dem Posten, der ZUERST verfällt.
+  Geschrieben wird ausschließlich serverseitig; die Firestore-Regel auf
+  `guthaben/` verbietet jedes Schreiben aus dem Client.
+- **Deckel (überarbeitet am 21.09.2026, Leon: „Kein Deckel für zahlende
+  Gyms"):** Auf Analysen gibt es KEINEN Tagesdeckel mehr — das Guthaben ist
+  die einzige Grenze, und ein Gratis-Gym hat ohnehin nur drei. Geblieben sind
+  die Videolänge (15 min), die Auflösung und eine STILLE Tagesbremse von 60
+  Vorläufen je Gym (Leon: „frei, Tagesbremse 60 Stk., aber das muss nicht
+  extra irgendwo stehen, es soll im Hintergrund passieren"). Der Vorlauf
+  kostet gut einen Cent und zählt nicht gegen das Guthaben — er ist das
+  Werkzeug, mit dem der Trainer den richtigen Ausschnitt findet.
 - **Zahlung:** Stripe Checkout als Einmalkauf, Karte beim Erstkauf (SEPA erst
-  für Bestandskunden), Analysenzähler in der eigenen Datenbank. USt-IdNr. im
-  Anmeldefluss Pflicht mit BZSt-Prüfung; Reverse Charge bei EU-Ausland.
+  für Bestandskunden), Analysenzähler in der eigenen Datenbank. USt-IdNr.
+  ERST BEIM KAUF (Leon 21.09.2026), nicht beim Anlegen des Gyms — mit
+  BZSt-Prüfung; Reverse Charge bei EU-Ausland.
   Nicht Paddle (kein SEPA), nicht Lemon Squeezy (läuft aus).
 - **Zweites Bein (Phase 4):** App mit Gym-Logo (Branding-Kit, §8) und
   Automatisierungen als bezahlte Stufe — der Markt nimmt dafür einstimmig
@@ -217,11 +235,17 @@ gezählt in Analysen. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
    2026-09-01. Das Verwaltungs-Dashboard (Kennzahlen, Kontingent) hängt an
    Phase 3.
 5. **Phase 3** — Betrieb (Beschluss 20.09.2026, in dieser Reihenfolge):
-   (0) Gemini-Kosten buchen → (1) Selbstanmeldung eines Gyms mit Freigabe
-   durch den Plattform-Admin, Stilllegen = „lesen ja, ändern nein" →
-   (2) DeepFight-Guthaben mit Schranke (drei frei, Zählung beim Start, Deckel,
-   Messgrößen ab Tag eins) → (3) Werbeseite hinter dem DeepFight-Eintrag mit
-   gerastertem Regler und Stripe-Einmalkauf. Wochenplan-Mehrplan-Modell:
-   später (Leon 20.09.).
+   (0) Gemini-Kosten buchen — LIVE im Code seit 20.09. → (1) Selbstanmeldung
+   eines Gyms OHNE Freigabe (Leon 21.09.: „automatisch erstellt … kostenlose
+   version direkt nutzen"), Stilllegen = „lesen ja, ändern nein" und trifft
+   NUR DeepFight (Leon 21.09.: ein Gym wird stillgelegt, wenn es nicht zahlt —
+   die kostenlose Version bleibt frei verfügbar; wie weit ein stillgelegtes
+   Gym seine DeepFight-Daten noch einsehen darf, ist offen) → (2)
+   DeepFight-Guthaben mit Schranke (drei frei, Zählung beim Start,
+   Vorlauf-Bremse, Messgrößen ab Tag eins) — gebaut 21.09. → (3) Werbeseite
+   hinter dem DeepFight-Eintrag mit gerastertem Regler und Stripe-Einmalkauf.
+   Wochenplan-Mehrplan-Modell: später (Leon 20.09.). Firestore-Regeln, die
+   ein stillgelegtes Gym auch im Client bremsen („Schritt 1b"), sind bewusst
+   ZURÜCKGESTELLT (Leon 21.09.: „erstmal lassen").
 6. **Phase 4** — Zweites Bein: Branding-Kit / App mit Gym-Logo (§8) und
    Automatisierungen als bezahlte Stufe; Vertex AI (EU-Region) prüfen.

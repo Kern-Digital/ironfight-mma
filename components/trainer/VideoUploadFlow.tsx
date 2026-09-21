@@ -76,6 +76,7 @@ import RainbowButton from "@/components/ui/RainbowButton";
 import Select from "@/components/ui/Select";
 import Skeleton from "@/components/ui/Skeleton";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
+import { GuthabenZeile, useGuthaben } from "@/components/deepfight/Guthaben";
 import { useAuth } from "@/lib/auth-context";
 import { nameVon, sichtbareMitglieder } from "@/lib/deepfight-analysen";
 import { zwischenstandKey } from "@/lib/deepfight-zwischenstand";
@@ -442,6 +443,8 @@ export default function VideoUploadFlow({
 }) {
   const { user, profile } = useAuth();
   const gymId = resolveGymId(profile);
+  // Das DeepFight-Guthaben (Schritt 2): die Zahl vor dem Klick.
+  const { stand: guthaben, laden: guthabenNeuLaden } = useGuthaben(gymId);
   const eigeneUid = user?.uid ?? "";
   const router = useRouter();
   const { canBlur } = useMotionCapability();
@@ -1027,6 +1030,16 @@ export default function VideoUploadFlow({
       setHinweis("Wähl noch, wann das Video entstanden ist.");
       return;
     }
+    // Die Zahl vor dem Klick (Konzept §6). Der Server entscheidet noch einmal
+    // — diese Prüfung erspart nur den Weg dorthin und sagt es freundlicher.
+    if (guthaben && guthaben.rest < aktiveZuordnungen.length) {
+      setHinweis(
+        guthaben.rest === 0
+          ? "Eure Analysen sind aufgebraucht. Holt euch neue, dann geht es sofort weiter."
+          : `Ihr habt noch ${guthaben.rest} ${guthaben.rest === 1 ? "Analyse" : "Analysen"} — ausgewählt sind ${aktiveZuordnungen.length} Personen.`,
+      );
+      return;
+    }
     if (!preview) return;
     setHinweis(null);
     setRunError(null);
@@ -1219,6 +1232,9 @@ export default function VideoUploadFlow({
       setStage("idle");
       setStageDetail(null);
       setLaufKarte(null);
+      // Der Stand hat sich geaendert — egal ob die Analyse durchlief oder die
+      // App sie zurueckgegeben hat.
+      guthabenNeuLaden();
     }
   }
 
@@ -1892,6 +1908,7 @@ export default function VideoUploadFlow({
                   {hinweis}
                 </div>
               )}
+              <GuthabenZeile stand={guthaben} />
               <div className="flex flex-wrap items-center gap-3">
                 {/* Voll farbig erst, wenn alles steht — sonst sagt der Klick, was
                     fehlt. BEWUSST kein `aria-disabled`: Der Knopf IST klickbar,

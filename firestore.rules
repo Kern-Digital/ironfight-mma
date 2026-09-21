@@ -474,6 +474,34 @@ service cloud.firestore {
                   && (isAdmin() || userGymId() == gymId);
       allow write: if request.auth != null && isAdmin();
 
+      // DEEPFIGHT-GUTHABEN (Schritt 2 des Geschaeftsplans, 21.09.2026).
+      // Ein Posten je Geschenk und je Kauf, mit eigenem Verfallsdatum.
+      //
+      // SCHREIBEN IST HIER GANZ VERBOTEN — dasselbe Muster wie bei den
+      // Einladungen: Wer sein Guthaben selbst schreiben darf, schreibt sich
+      // tausend Analysen. Angelegt und abgezogen wird ausschliesslich per
+      // Admin-SDK (lib/server/guthaben.ts, /api/video-analysis/analyze).
+      //
+      // LESEN duerfen Trainer und Verwaltung des Gyms: Der Trainer sieht die
+      // Zahl VOR dem Klick (Konzept §6), die Verwaltung den Stand. Athleten
+      // geht das Guthaben nichts an.
+      match /guthaben/{postenId} {
+        allow read: if request.auth != null
+                    && (isAdmin()
+                        || ((isTrainerOrAdmin() || canManageGymId(gymId))
+                            && userGymId() == gymId));
+        allow write: if false;
+      }
+
+      // Wie oft welcher Trainer gestartet hat (Konzept §6: „Verwaltung sieht
+      // Stand und Nutzung je Trainer"). Ein Dokument je Trainer, Dokument-ID
+      // = uid. Lesen nur die Verwaltung, schreiben nur der Server.
+      match /guthabenNutzung/{uid} {
+        allow read: if request.auth != null
+                    && (isAdmin() || canManageGymId(gymId));
+        allow write: if false;
+      }
+
       // Gym-Workoutplaene (Etappe Workout-Plaene): Gym-Scope liegt im PFAD —
       // Mitglieder lesen die Plaene ihres Gyms, Trainer desselben Gyms
       // pflegen sie; Admin gym-uebergreifend. Persoenliche Kopien liegen in
