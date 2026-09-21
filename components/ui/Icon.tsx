@@ -43,6 +43,7 @@ export type IconName =
   | "timer"
   | "arrow-right"
   | "arrow-left"
+  | "download"
   | "plus"
   | "wave"
   | "video"
@@ -310,6 +311,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   "arrow-right": <path d="M4 12h16M14 6l6 6-6 6" />,
   "arrow-left": <path d="M20 12H4m6-6-6 6 6 6" />,
+  // Rechnung als PDF laden (DeepFight-Abo, 21.09.2026).
+  download: <path d="M12 4v11m-5-5 5 5 5-5M5 20h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   // Zwei Blätter versetzt — „als Kopie speichern"

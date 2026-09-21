@@ -34,7 +34,11 @@ export const VERFALL_MONATE = 24;
 export const KEIN_GUTHABEN_TEXT =
   "Eure Analysen sind aufgebraucht. Holt euch neue, dann geht es sofort weiter.";
 
-export type GuthabenGrund = "gratis" | "paket" | "gutschrift";
+/**
+ * `abo` seit Schritt 3 (21.09.2026): je bezahlter Abo-Rechnung ein Posten
+ * (im Jahresabo zwölf, einer je Monat). `paket` ist seitdem der NACHKAUF.
+ */
+export type GuthabenGrund = "gratis" | "paket" | "abo" | "gutschrift";
 
 export interface GuthabenPosten {
   id: string;
@@ -46,6 +50,12 @@ export interface GuthabenPosten {
   erstelltAm: Date | null;
   /** null = ohne Ablauf (die drei geschenkten). */
   verfaelltAm: Date | null;
+  /**
+   * Ab wann der Posten zählt. null = sofort. Das Jahresabo wird einmal
+   * bezahlt, die Analysen kommen trotzdem Monat für Monat (Leon 21.09.) —
+   * der Webhook legt deshalb zwölf Posten an, jeden mit seinem Monat.
+   */
+  abAm?: Date | null;
   /** Paketgröße beim Kauf, z. B. "60" — nur zur Anzeige. */
   paket?: string | null;
 }
@@ -63,6 +73,8 @@ export interface GuthabenStand {
   verbraucht: number;
   /** Der nächste Ablauf — für den Hinweis „X verfallen am …". */
   naechsterVerfall: { am: Date; menge: number } | null;
+  /** Der nächste schon bezahlte Posten, der erst noch kommt (Jahresabo). */
+  naechsteGutschrift: { am: Date; menge: number } | null;
   posten: GuthabenPosten[];
 }
 
@@ -73,7 +85,7 @@ export interface GuthabenStand {
  * dabei NICHT — wer nie gezahlt hat, hat auch nichts gut.
  */
 export function istBezahlt(p: GuthabenPosten): boolean {
-  return p.grund === "paket";
+  return p.grund === "paket" || p.grund === "abo";
 }
 
 /** Was von einem Posten noch übrig ist (nie negativ). */
@@ -82,6 +94,7 @@ export function restVonPosten(p: GuthabenPosten): number {
 }
 
 function gueltig(p: GuthabenPosten, jetzt: Date): boolean {
+  if (p.abAm && p.abAm.getTime() > jetzt.getTime()) return false;
   return !p.verfaelltAm || p.verfaelltAm.getTime() > jetzt.getTime();
 }
 
@@ -108,6 +121,9 @@ export function standAusPosten(
     .filter((p) => p.verfaelltAm && restVonPosten(p) > 0)
     .sort((a, b) => a.verfaelltAm!.getTime() - b.verfaelltAm!.getTime());
   const naechster = ablaufend[0];
+  const kommend = posten
+    .filter((p) => p.abAm && p.abAm.getTime() > jetzt.getTime())
+    .sort((a, b) => a.abAm!.getTime() - b.abAm!.getTime())[0];
 
   return {
     rest,
@@ -117,6 +133,7 @@ export function standAusPosten(
     naechsterVerfall: naechster
       ? { am: naechster.verfaelltAm!, menge: restVonPosten(naechster) }
       : null,
+    naechsteGutschrift: kommend ? { am: kommend.abAm!, menge: restVonPosten(kommend) } : null,
     posten: offen,
   };
 }
@@ -166,9 +183,10 @@ export function decodeGuthabenPosten(id: string, d: Record<string, unknown>): Gu
     id,
     menge: Number(d.menge ?? 0),
     verbraucht: Number(d.verbraucht ?? 0),
-    grund: grund === "paket" || grund === "gutschrift" ? grund : "gratis",
+    grund: grund === "paket" || grund === "abo" || grund === "gutschrift" ? grund : "gratis",
     erstelltAm: datum(d.erstelltAm),
     verfaelltAm: datum(d.verfaelltAm),
+    abAm: datum(d.abAm),
     paket: (d.paket as string | undefined) ?? null,
   };
 }

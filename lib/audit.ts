@@ -34,7 +34,11 @@ export type AuditType =
   | "invite.redeem"
   | "invite.note"
   | "member.role"
-  | "member.remove";
+  | "member.remove"
+  | "gym.create"
+  | "abo.start"
+  | "abo.ende"
+  | "guthaben.kauf";
 
 export interface AuditEntry {
   id: string;
@@ -84,6 +88,12 @@ const KNOWN_TYPES = new Set<string>([
   "invite.note",
   "member.role",
   "member.remove",
+  // Bis zum 21.09.2026 fehlte `gym.create` hier — der Eintrag stand dann als
+  // „hat die Notiz einer Einladung geändert" in der Liste.
+  "gym.create",
+  "abo.start",
+  "abo.ende",
+  "guthaben.kauf",
 ]);
 
 function decodeEntry(id: string, data: AuditDoc): AuditEntry {
@@ -189,6 +199,16 @@ export function auditHeadline(entry: AuditEntry): string {
       return `${entry.actorName} hat eine Einladung erstellt.`;
     case "invite.revoke":
       return `${entry.actorName} hat eine Einladung zurückgezogen.`;
+    case "gym.create":
+      return `${entry.actorName} hat das Gym angelegt.`;
+    case "abo.start":
+      return `${entry.actorName} hat das DeepFight-Abo gebucht.`;
+    case "abo.ende":
+      return "Euer DeepFight-Abo ist beendet.";
+    case "guthaben.kauf": {
+      const n = Number(entry.details.analysen) || 0;
+      return `${entry.actorName} hat ${n} ${n === 1 ? "Analyse" : "Analysen"} nachgekauft.`;
+    }
     case "invite.note":
     default:
       return `${entry.actorName} hat die Notiz einer Einladung geändert.`;
@@ -226,6 +246,11 @@ export function auditDetail(entry: AuditEntry): string {
         uses === 1 ? "für eine Person" : `für bis zu ${uses} Personen`;
       return `${INVITE_ROLE_LABEL[role]} · ${forWhom}${code ? ` · ${code}` : ""}`;
     }
+    case "abo.start": {
+      const stufe = String(entry.details.stufe ?? "");
+      const takt = entry.details.intervall === "jahr" ? "jährlich" : "monatlich";
+      return stufe ? `Stufe ${stufe.charAt(0).toUpperCase()}${stufe.slice(1)} · ${takt}` : "";
+    }
     default:
       return code;
   }
@@ -244,6 +269,13 @@ export function auditIcon(entry: AuditEntry): IconName {
       return "plus";
     case "invite.revoke":
       return "x";
+    case "gym.create":
+    case "guthaben.kauf":
+      return "plus";
+    case "abo.start":
+      return "spark";
+    case "abo.ende":
+      return "minus";
     default:
       return "edit";
   }

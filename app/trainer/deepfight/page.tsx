@@ -85,6 +85,7 @@ import DeepFightSuche from "@/components/deepfight/DeepFightSuche";
 import { useDeepFightModus } from "@/components/deepfight/deepfight-modus";
 import FightDnaEntry, { FightDnaHeading } from "@/components/deepfight/FightDnaEntry";
 import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
+import { GuthabenEinstieg } from "@/components/deepfight/Guthaben";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import ErrorState from "@/components/ui/ErrorState";
 import Icon from "@/components/ui/Icon";
@@ -370,6 +371,7 @@ function LandungInhalt() {
 
           {/* ── Rechts: In Arbeit und Archiv ─────────────────────────────── */}
           <div className="min-w-0 lg:pt-3">
+            <GuthabenEinstieg gymId={gymId} />
             <AnalysenFelder
               arbeit={arbeit}
               archiv={archiv}

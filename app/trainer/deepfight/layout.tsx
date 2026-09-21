@@ -82,8 +82,11 @@ function segmenteFuer(pathname: string, modus: "leute" | "gegner"): KopfSegment[
   const unter = (basis: string) => pathname === basis || pathname.startsWith(`${basis}/`);
   const athletenAktiv = unter(ATHLETEN) || (analyse && modus === "leute");
   const gegnerAktiv = unter(GEGNER) || (analyse && modus === "gegner");
+  // Die Abo-Seite (Schritt 3) hängt an der Landung: „DeepFight" trägt dort
+  // den Pfeil zurück, wie „Athleten" auf einer Athleten-Detailseite.
+  const abo = unter("/trainer/deepfight/abo");
   return [
-    { href: LANDUNG, label: "DeepFight", aktiv: pathname === LANDUNG, wortmarke: true },
+    { href: LANDUNG, label: "DeepFight", aktiv: pathname === LANDUNG || abo, zurueck: abo, wortmarke: true },
     { href: ATHLETEN, label: "Athleten", aktiv: athletenAktiv, zurueck: athletenAktiv && pathname !== ATHLETEN },
     { href: GEGNER, label: "Gegner", aktiv: gegnerAktiv, zurueck: gegnerAktiv && pathname !== GEGNER },
   ];

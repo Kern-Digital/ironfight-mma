@@ -28,7 +28,13 @@ export type AuditType =
   /** Mitgliedschaft beendet (Checkpoint 2, /api/members/remove). */
   | "member.remove"
   /** Gym hat sich selbst angelegt (Schritt 1 des Geschäftsplans, /api/gyms/anmelden). */
-  | "gym.create";
+  | "gym.create"
+  /** DeepFight-Abo gebucht — erste bezahlte Rechnung (Schritt 3, Stripe-Webhook). */
+  | "abo.start"
+  /** DeepFight-Abo beendet — gekündigt und ausgelaufen, oder Frist verstrichen. */
+  | "abo.ende"
+  /** Nachkauf bezahlt (Schritt 3, Stripe-Webhook). */
+  | "guthaben.kauf";
 
 export interface AuditEntryInput {
   type: AuditType;

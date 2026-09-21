@@ -1034,6 +1034,132 @@ Rechnung.
   prüfen. `Response.json` aus dem Web-Standard tut dasselbe, und eine Route
   darf sie genauso zurückgeben.
 
+### SCHRITT 3: DAS DEEPFIGHT-ABO (21.09.2026, Fenster tidal-athletics-dd)
+Leon hat am 21.09. spät im Fenster f1 das Modell umgestellt: **„wie kann man
+das geschäftsmodel auf eine monatlich wiederkehrende summe umbauen ich finde
+das als die beste optoin"** — Stufen, Sammeln und Laufzeit stehen im Konzept
+§6. Die Pakete vom 20.09. leben nur als Nachkauf weiter. Leons Antworten in
+DIESEM Fenster (wörtlich): Wer baut „Ja, hier als Abo bauen (Empfohlen)" ·
+Ort „Eigene Seite (Empfohlen)" · Stufenwahl „Drei Karten nebeneinander
+(Empfohlen)" · Preis „Netto groß, brutto klein (Empfohlen)" · Wer kauft „Nur
+die Verwaltung (Empfohlen)" · Mit Guthaben „Stand oben, Nachkauf darunter
+(Empfohlen)" · Frist „Nach 14 Tagen (Empfohlen)" · Nachkauf „10 Analysen für
+35 € (Empfohlen)" · Stripe-Konto „Nein, noch keins" · Steuer „Noch kein
+Gewerbe" · Rechnung „Stripe schreibt sie (Empfohlen)" · Push „Noch nicht".
+- **EINE Rechenstelle: `lib/abo.ts`** — `ABO_STUFEN` (Team 15/49 €, Gym
+  40/99 €, Saison 100/219 €; Jahr = zehn Monatspreise), `ABO_VORWAHL`,
+  `NACHKAUF`, **`STEUERMODUS: "regel" | "klein"` — die EINE Zeile, die Leon
+  umstellt, sobald das Gewerbe steht** ("klein" = § 19 UStG: keine USt., der
+  Nettopreis ist der Endpreis, Fußzeile auf jeder Rechnung), `ZAHLUNGSFRIST_TAGE
+  = 14`, `preisSchluessel()` (der Betrag steht im Stripe-`lookup_key` — ein
+  neuer Preis in dieser Datei legt in Stripe einen neuen Preis an, laufende
+  Abos behalten ihren), `aboLage()` (keins / aktiv / zahlung-offen /
+  gekuendigt), `decodeGymAbo()`.
+- **NIEMAND LEGT IN STRIPE VON HAND PRODUKTE AN.** `lib/server/stripe.ts`
+  legt Produkte (feste IDs `tidal_deepfight_{stufe}`), Preise (per
+  `lookup_key`), den Steuersatz 19 % (Metadaten `tidal: "ust19"`) und die
+  Portal-Konfiguration (Marke mit den Preisen darin) beim ersten Bedarf an
+  und merkt sich die IDs im Modul. EIN Stripe-Kunde je Gym
+  (`subscription.stripeCustomerId`), nicht je Person.
+- **Routen** (alle nur Verwaltung des eigenen Gyms, `verwaltungDesGyms` in
+  `lib/server/abo.ts`; 401/403; ein Admin ohne Gym fällt durch):
+  `POST /api/abo/kaufen` (`art: "abo"` mit Stufe + Intervall, oder
+  `"nachkauf"`; 423 stillgelegt, 409 schon ein Abo / Nachkauf ohne Abo /
+  Zahlung offen, 400 `feld: "ustId"`, 503 Prüfstelle stumm oder Stripe nicht
+  eingerichtet) → `{ url }` der Stripe-Kasse · `POST /api/abo/portal` →
+  Kundenportal (Karte, Rechnungen, Stufenwechsel OHNE Anteil — gilt ab der
+  nächsten Abrechnung, Kündigung zum Ende) · `GET /api/abo/rechnungen` (holt
+  die PDF-Links bei JEDEM Aufruf frisch, Falle 56).
+- **`POST /api/stripe/webhook` IST DIE EINZIGE STELLE, AN DER GEKAUFTE
+  ANALYSEN ENTSTEHEN.** Unterschrift zuerst (400 ohne/mit falscher), roher
+  Body. `invoice.paid` → je Abo-Zeile ein Posten `grund: "abo"` über die
+  Analysen der Stufe, im Jahresabo ZWÖLF, jeder mit `abAm` = sein Monat
+  (Leon: „Analysen kommen trotzdem monatlich"); anteilige Zeilen bringen
+  nichts. `checkout.session.completed` (bezahlt, `art: "nachkauf"`) → ein
+  Posten `grund: "paket"` über 10. **Posten-IDs aus Stripe**
+  (`abo_{rechnung}_{zeile}_{monat}`, `kauf_{sitzung}`) — eine doppelte
+  Lieferung scheitert am vorhandenen Dokument (`schreibeGutschriften`, Batch
+  mit `create`, ALREADY_EXISTS = schon erledigt). `customer.subscription.*`
+  spiegelt Stufe, Intervall, Zustand, `currentPeriodEnd`, `kuendigtZum` ans
+  Gym; beendet → `plan: "free"`, der Kunde bleibt.
+- **Die Frist (14 Tage):** `invoice.payment_failed` merkt sich den ersten Tag
+  (`zahlungOffenSeit`); kommt nach 14 Tagen noch eine geplatzte Zahlung,
+  beendet der Webhook das Abo selbst (`subscriptions.cancel`). Eine neue
+  Gutschrift gibt es ohnehin nur mit bezahlter Rechnung, und alles schon
+  Bezahlte bleibt nutzbar — `istBezahlt` zählt `abo` UND `paket`.
+- **`lib/guthaben.ts`:** neuer Grund `abo`, neues Feld `abAm` (ein Posten
+  zählt erst ab diesem Tag), `naechsteGutschrift` im Stand. Verfall = `abAm`
+  + 24 Monate — jeder Monat läuft seine eigene Frist.
+- **USt-IdNr. (`lib/server/ust-id.ts`)**, erst beim Kauf, optional: DE nur
+  Format (prüft keiner für uns), EU-Ausland per **BZSt** (`EIGENE_UST_ID`
+  gesetzt) oder **VIES** (sonst) → Reverse Charge: keine Steuersätze,
+  `tax_exempt: "reverse"`, Fußzeile. Der Beleg (Nummer, Quelle, Kennung,
+  Zeitpunkt) liegt am Gym unter `rechnung`. Kleinunternehmer-Modus: nur
+  Format.
+- **Seite `/trainer/deepfight/abo`** (im DeepFight-Layout, Segment
+  „DeepFight" mit Rückpfeil): ohne Abo Stand → Werbung (Fight-DNA-Titel,
+  drei Punkte, Helix mit Beispieldaten) → Umschalter monatlich/jährlich →
+  drei Karten (`<label>` um ein verstecktes Radio, Gym vorgewählt) → Kasse;
+  mit Abo Stand + „Abo verwalten" → Nachkauf → Rechnungen. Wer nicht
+  Verwaltung ist, sieht den Satz, wer bucht. Nach `?kauf=ok` fragt die Seite
+  bis zu 40 s nach, bis der Webhook geschrieben hat. **Middleware-Ausnahme:**
+  eine reine Verwaltung ohne Trainer-Häkchen darf GENAU diese Seite öffnen.
+- **Einstiege:** „Analysen holen" im leeren Guthaben-Streifen des
+  Upload-Flusses (vorher ein Hinweis), die ruhige Zeile „Noch N Analysen ·
+  DeepFight-Abo →" über dem Archiv der Landung (`GuthabenEinstieg`), „Abo und
+  Rechnungen" in der Verwaltungs-Karte. Protokoll: `abo.start`, `abo.ende`,
+  `guthaben.kauf` (lib/audit.ts kennt jetzt auch `gym.create` — stand vorher
+  als „Notiz einer Einladung geändert" in der Liste).
+- **WAS LEON IN STRIPE EINRICHTEN MUSS, bevor jemand kaufen kann:** Konto
+  anlegen · `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` in Vercel (und
+  lokal in `.env.local`) · Webhook-Endpunkt
+  `https://tidal-athletics.vercel.app/api/stripe/webhook` mit
+  `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+  `invoice.paid`, `invoice.payment_failed`, `customer.subscription.created`,
+  `.updated`, `.deleted` · Firmendaten + eigene USt-IdNr. für die Rechnung ·
+  Mahnwesen: Wiederholungen über 2 Wochen, danach Abo kündigen, Mails an
+  den Kunden an · `EIGENE_UST_ID` in Vercel, sobald es sie gibt ·
+  `STEUERMODUS` in lib/abo.ts. **Rechtlich vor dem ersten Verkauf:** AGB
+  (inkl. 24-Monats-Frist mit sachlichem Grund, § 307 BGB), Impressum,
+  Datenschutzhinweise + AVV (samt Betreiber-Zugriff „Blick bleibt").
+- **Gemessen OHNE Stripe-Konto** (`scripts/tmp-mess-abo.mjs`, Wegwerf, mit
+  einer Stripe-ATTRAPPE auf Port 12111 und selbst unterschriebenen Webhooks,
+  0 € KI): **62/62** in sechs Läufen (dunkel und hell mit Bildern), dazu
+  `mess-gameplan.mjs` **117/117 dunkel, 117/117 hell**, tsc 0 — Türen
+  zu, Trainer 403, reine Verwaltung sieht nur die Abo-Seite, Kasse im
+  Abo-Modus mit 99 € + 19 %, Kunde je Gym, USt-IdNr. normalisiert, IE-Nummer
+  per VIES → Reverse Charge, alte Nummer ersetzt, erste Rechnung → 40,
+  doppelt → 1 Posten, Verfall 21.09.2028, Nachkauf 10 (doppelt → 1),
+  unbezahlt → nichts, Jahr → 12 Posten, heute zählt nur der erste,
+  anteilig → nichts, Portal einmal angelegt, Rechnungen, offene Zahlung →
+  Frist → nach 15 Tagen gekündigt, beendet → `free`, bezahlt bleibt 150,
+  stillgelegt → 423. Querüberlauf 0 px auf 1440 und 390, keine
+  Konsolenfehler. Umschalten auf echte Testschlüssel: die drei
+  STRIPE-Zeilen in `.env.local` ersetzen, `STRIPE_API_HOST` WEGLASSEN.
+- **Falle 52:** Der Dev-Server merkt sich Stripe-IDs im MODUL. Eine
+  Attrappe, die bei jedem Lauf leer startet, kennt die IDs des vorigen
+  Laufs nicht → der zweite Lauf scheitert an sich selbst. Die Attrappe
+  sichert ihren Stand deshalb im Temp-Ordner (`tidal-stripe-attrappe.json`);
+  wer ihn löscht, stößt vorher eine Neukompilierung an (`touch
+  lib/server/stripe.ts`).
+- **Falle 53:** `inert` als JSX-Attribut warnt unter React 18 in der
+  Konsole („non-boolean attribute"). Per Ref setzen, wie in FightDnaEntry.
+- **Falle 54:** Seit der Stripe-API-Fassung 2025 trägt eine Rechnungszeile
+  nur die Preis-ID (`pricing.price_details.price`), das Abo-Kennzeichen steht
+  unter `invoice.parent.subscription_details` (samt Metadaten des Abos) —
+  ältere Anleitungen mit `line.price` und `invoice.subscription` greifen ins
+  Leere.
+- **Falle 55:** Die BZSt-Prüfung verlangt die EIGENE deutsche USt-IdNr.
+  (`evatr-0002` ohne); die alte XML-RPC-Schnittstelle ist seit dem
+  30.11.2025 abgeschaltet. VIES meldet Fehler mit HTTP **200** und
+  `actionSucceed: false`; Griechenland heißt **EL**.
+- **Falle 56:** Stripes `invoice_pdf`-Links laufen nach spätestens 120 Tagen
+  ab — nie speichern, immer frisch holen.
+- **Falle 57:** `npx eslint .` läuft auch durch `backup/` (dort liegen die
+  alten Fehler ein zweites Mal). Für die Zählung `--ignore-pattern
+  "backup/**"`: außerhalb sind es SECHS Alt-Fehler (CourseLoadChart 2×,
+  lib/beep.ts 3×, lib/extensions/technique-progress.ts 1×).
+
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
   `/admin/*` = Plattform-Rang · `/trainer/*` = Trainer-Werkzeuge ·

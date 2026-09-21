@@ -846,6 +846,25 @@ export default function VerwaltungDashboardPage() {
                     ? `${guthaben.naechsterVerfall.menge} davon laufen am ${guthaben.naechsterVerfall.am.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" })} ab.`
                     : "Eure geschenkten Analysen laufen nicht ab."}
                 </p>
+                {/* Schritt 3 (21.09.2026): Abo buchen, nachkaufen, Rechnungen —
+                    alles auf der Abo-Seite hinter dem DeepFight-Eintrag. */}
+                <Link
+                  href="/trainer/deepfight/abo"
+                  data-press
+                  data-verwaltung-abo
+                  className="t-interactive inline-flex min-h-hit w-fit items-center gap-2 rounded-field px-4"
+                  style={{
+                    font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    border: "1px solid var(--line)",
+                    color: "var(--text-1)",
+                    textDecoration: "none",
+                  }}
+                >
+                  <Icon name="spark" size={13} strokeWidth={2.4} />
+                  Abo und Rechnungen
+                </Link>
                 {nutzung && nutzung.length > 0 && (
                   <div className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: "var(--line)" }}>
                     <span style={{ font: "var(--type-label)", color: "var(--text-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>

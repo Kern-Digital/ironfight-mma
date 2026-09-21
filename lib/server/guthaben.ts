@@ -217,9 +217,71 @@ export async function vorlaufErlaubt(
   }
 }
 
+export interface Gutschrift {
+  /**
+   * Feste Dokument-ID. Stripe liefert jeden Webhook MINDESTENS einmal — also
+   * manchmal zweimal. Mit einer ID aus der Stripe-Rechnung scheitert die
+   * zweite Lieferung am schon vorhandenen Dokument, statt doppelt
+   * gutzuschreiben. Ohne ID vergibt Firestore eine.
+   */
+  id?: string;
+  menge: number;
+  grund: GuthabenGrund;
+  /** Stufe oder Paket, z. B. "gym" oder "nachkauf-10" — nur zur Anzeige. */
+  paket?: string | null;
+  /** Ab wann der Posten zählt (Jahresabo: ein Posten je Monat). null = sofort. */
+  abAm?: Date | null;
+  /** Die Stripe-Rechnung dahinter — für den Download in der Verwaltung. */
+  rechnungId?: string | null;
+}
+
 /**
- * Analysen gutschreiben — heute für Schritt 3 (Stripe) und für die Hand des
- * Plattform-Admins. Gekaufte Posten verfallen nach 24 Monaten (Leon 20.09.).
+ * Mehrere Posten in EINEM Zug — alle oder keiner. Gibt `false` zurück, wenn
+ * einer davon schon existiert: Dann hat eine frühere Lieferung desselben
+ * Webhooks die Arbeit schon getan, und das ist kein Fehler.
+ *
+ * Gekaufte Posten verfallen 24 Monate nach dem Tag, ab dem sie zählen (Leon
+ * 20.09.) — im Jahresabo läuft also jeder Monat seine eigene Frist.
+ */
+export async function schreibeGutschriften(
+  dbHolen: () => Firestore,
+  gymId: string,
+  liste: Gutschrift[],
+): Promise<boolean> {
+  if (!liste.length) return true;
+  const jetzt = new Date();
+  const db = dbHolen();
+  const coll = db.collection("gyms").doc(gymId).collection("guthaben");
+  const batch = db.batch();
+  for (const g of liste) {
+    const ab = g.abAm ?? null;
+    batch.create(g.id ? coll.doc(g.id) : coll.doc(), {
+      menge: Math.max(1, Math.round(g.menge)),
+      verbraucht: 0,
+      grund: g.grund,
+      erstelltAm: Timestamp.fromDate(jetzt),
+      abAm: ab ? Timestamp.fromDate(ab) : null,
+      verfaelltAm:
+        g.grund === "gratis" ? null : Timestamp.fromDate(verfallsDatum(ab ?? jetzt)),
+      paket: g.paket ?? null,
+      rechnungId: g.rechnungId ?? null,
+    });
+  }
+  try {
+    await batch.commit();
+    return true;
+  } catch (err) {
+    // 6 = ALREADY_EXISTS (gRPC-Code). Alles andere ist ein echter Fehler, und
+    // der Webhook soll ihn sehen — Stripe versucht es dann später noch einmal.
+    if ((err as { code?: number }).code === 6) return false;
+    throw err;
+  }
+}
+
+/**
+ * Einen Posten gutschreiben — für die Hand des Plattform-Admins und alles,
+ * was nur einen braucht. Gibt die Posten-ID zurück, oder `null`, wenn es ihn
+ * mit dieser ID schon gab.
  */
 export async function schreibeGut(
   dbHolen: () => Firestore,
@@ -227,16 +289,9 @@ export async function schreibeGut(
   menge: number,
   grund: GuthabenGrund = "paket",
   paket: string | null = null,
-): Promise<string> {
-  const jetzt = new Date();
-  const ref = dbHolen().collection("gyms").doc(gymId).collection("guthaben").doc();
-  await ref.create({
-    menge: Math.max(1, Math.round(menge)),
-    verbraucht: 0,
-    grund,
-    erstelltAm: Timestamp.fromDate(jetzt),
-    verfaelltAm: grund === "gratis" ? null : Timestamp.fromDate(verfallsDatum(jetzt)),
-    paket,
-  });
-  return ref.id;
+  extra: Pick<Gutschrift, "id" | "abAm" | "rechnungId"> = {},
+): Promise<string | null> {
+  const id = extra.id ?? dbHolen().collection("gyms").doc(gymId).collection("guthaben").doc().id;
+  const neu = await schreibeGutschriften(dbHolen, gymId, [{ ...extra, id, menge, grund, paket }]);
+  return neu ? id : null;
 }

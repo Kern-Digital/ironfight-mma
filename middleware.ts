@@ -229,7 +229,12 @@ export async function middleware(req: NextRequest) {
   if (isVerwaltungPath(pathname) && !claims.verwaltung) {
     return toDashboard(req);
   }
-  if (matchesPrefix(pathname, TRAINER_PREFIXES) && !claims.trainer) {
+  // EINE AUSNAHME (Schritt 3, 21.09.2026): Das DeepFight-Abo bucht die
+  // Verwaltung (Leon: „Nur die Verwaltung"), die Seite steht aber hinter dem
+  // DeepFight-Eintrag unter /trainer. Eine reine Verwaltung ohne
+  // Trainer-Häkchen darf genau diese eine Seite öffnen.
+  const aboSeite = matchesPrefix(pathname, ["/trainer/deepfight/abo"]);
+  if (matchesPrefix(pathname, TRAINER_PREFIXES) && !claims.trainer && !(aboSeite && claims.verwaltung)) {
     return toDashboard(req);
   }
 
