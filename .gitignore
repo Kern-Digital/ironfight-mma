@@ -44,7 +44,8 @@ next-env.d.ts
 /Tidal-Athletics-App
 
 # agent / AI tooling (lokal, nicht versionieren)
-/.claude/
+/.claude/*
+!/.claude/skills/
 /.cowork/
 /.agents/
 /.codex/
