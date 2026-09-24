@@ -117,25 +117,43 @@ export function standAusPosten(
     gesamt += FREIE_ANALYSEN;
   }
 
-  const ablaufend = offen
-    .filter((p) => p.verfaelltAm && restVonPosten(p) > 0)
-    .sort((a, b) => a.verfaelltAm!.getTime() - b.verfaelltAm!.getTime());
-  const naechster = ablaufend[0];
-  const kommend = posten
-    .filter((p) => p.abAm && p.abAm.getTime() > jetzt.getTime())
-    .sort((a, b) => a.abAm!.getTime() - b.abAm!.getTime())[0];
+  const naechsterVerfall = ersterTag(
+    offen.filter((p) => p.verfaelltAm && restVonPosten(p) > 0),
+    (p) => p.verfaelltAm!,
+  );
+  const naechsteGutschrift = ersterTag(
+    posten.filter((p) => p.abAm && p.abAm.getTime() > jetzt.getTime()),
+    (p) => p.abAm!,
+  );
 
   return {
     rest,
     restBezahlt: offen.filter(istBezahlt).reduce((s, p) => s + restVonPosten(p), 0),
     gesamt,
     verbraucht,
-    naechsterVerfall: naechster
-      ? { am: naechster.verfaelltAm!, menge: restVonPosten(naechster) }
-      : null,
-    naechsteGutschrift: kommend ? { am: kommend.abAm!, menge: restVonPosten(kommend) } : null,
+    naechsterVerfall,
+    naechsteGutschrift,
     posten: offen,
   };
+}
+
+/**
+ * Der früheste Tag und alles, was an DIESEM Tag fällig wird. Abo und
+ * Nachkauf vom selben Tag laufen am selben Tag ab — der Hinweis nennt beide
+ * zusammen, sonst stünde „40 laufen ab", wo es 50 sind.
+ */
+function ersterTag(
+  posten: GuthabenPosten[],
+  datum: (p: GuthabenPosten) => Date,
+): { am: Date; menge: number } | null {
+  if (!posten.length) return null;
+  const tag = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+  const erster = posten.reduce((a, b) => (datum(b).getTime() < datum(a).getTime() ? b : a));
+  const erstTag = tag(datum(erster));
+  const menge = posten
+    .filter((p) => tag(datum(p)) === erstTag)
+    .reduce((s, p) => s + restVonPosten(p), 0);
+  return { am: datum(erster), menge };
 }
 
 /**
