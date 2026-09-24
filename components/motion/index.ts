@@ -21,6 +21,8 @@ export {
 } from "./Stagger";
 export { Collapse, Pop, MorphSwap } from "./Morph";
 export { Reveal } from "./Reveal";
+export { RollZahl } from "./RollZahl";
+export { WortReveal } from "./WortReveal";
 export { SheetShell, useLetzterWert } from "./SheetShell";
 export { useMotionCapability } from "./useMotionCapability";
 export type { MotionCapability } from "./useMotionCapability";

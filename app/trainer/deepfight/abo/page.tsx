@@ -13,8 +13,10 @@
  * Analysen für 35 € (Empfohlen)".
  *
  * ZWEI GESICHTER, EINE ADRESSE:
- *   ohne Abo   Stand (die Geschenkten) → Werbung → drei Karten mit
- *              Umschalter monatlich/jährlich → Kasse.
+ *   ohne Abo   Stand (die Geschenkten) → Werbung mit Handy-Aufnahme, drei
+ *              Schritten und der Auswertung (`AboWerbung`) → drei Karten mit
+ *              Umschalter monatlich/jährlich, jede mit eigenem Kaufknopf
+ *              (`AboKarten`, seit 22.09. nach Leons Vorlage) → USt-IdNr.
  *   mit Abo    Stand mit nächster Gutschrift → Nachkauf → Rechnungen. Die
  *              Karten fallen weg: Stufe und Laufzeit wechselt das Gym im
  *              Stripe-Kundenportal („Abo verwalten").
@@ -28,14 +30,12 @@
  * bis sie da sind.
  */
 
-import FightDnaHelix from "@/components/deepfight/FightDnaHelix";
-import { FightDnaHeading } from "@/components/deepfight/FightDnaEntry";
+import AboKarten from "@/components/deepfight/AboKarten";
+import AboWerbung from "@/components/deepfight/AboWerbung";
 import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import {
-  ABO_STUFEN,
-  ABO_VORWAHL,
   NACHKAUF,
   STEUERMODUS,
   UST_SATZ,
@@ -45,14 +45,12 @@ import {
   decodeGymAbo,
   euro,
   fristEnde,
-  stueckpreis,
   stufeInfo,
   type AboIntervall,
   type AboStufe,
   type GymAbo,
 } from "@/lib/abo";
 import { useAuth, useRights } from "@/lib/auth-context";
-import { DEMO_FIGHT_PROFILE } from "@/lib/demo-fight-profile";
 import { resolveGymId } from "@/lib/gym";
 import { getGuthabenStand, type GuthabenStand } from "@/lib/guthaben";
 import { useSearchParams } from "next/navigation";
@@ -79,25 +77,6 @@ const KNOPF: React.CSSProperties = {
   letterSpacing: "0.08em",
   textTransform: "uppercase",
 };
-
-/** Die drei Punkte der Werbung — was eine Analyse dem Gym bringt. */
-const PUNKTE: { icon: "video" | "chart" | "target"; titel: string; text: string }[] = [
-  {
-    icon: "video",
-    titel: "Ein Video, jeder Fighter einzeln",
-    text: "Lad ein Sparring hoch und wähl die Person. DeepFight wertet genau diesen Fighter aus.",
-  },
-  {
-    icon: "chart",
-    titel: "Die Fight-DNA wächst mit",
-    text: "Jede Analyse schärft das Profil deines Athleten. Du siehst Stärken und Lücken, bevor sie im Kampf auffallen.",
-  },
-  {
-    icon: "target",
-    titel: "Gameplan gegen den nächsten Gegner",
-    text: "Scoute den Gegner mit demselben Werkzeug. Der Gameplan für den Wettkampf entsteht daraus — ohne Aufpreis.",
-  },
-];
 
 // ─── Server-Aufrufe ────────────────────────────────────────────────────────
 
@@ -194,7 +173,7 @@ function UstFeld({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span style={LABEL}>USt-IdNr. eures Gyms · optional</span>
+      <span style={LABEL}>USt-IdNr. deines Gyms · optional</span>
       <input
         value={wert}
         onChange={(e) => onWert(e.target.value)}
@@ -210,7 +189,7 @@ function UstFeld({
         {fehler ??
           (STEUERMODUS === "regel"
             ? "Gyms in Deutschland zahlen 19 % USt. Ein Gym im EU-Ausland mit gültiger Nummer zahlt den Nettopreis und führt die Steuer selbst ab."
-            : "Die Nummer steht dann auf eurer Rechnung.")}
+            : "Die Nummer steht dann auf deiner Rechnung.")}
       </span>
     </label>
   );
@@ -230,11 +209,11 @@ function AboSeite() {
   const [ustVorher, setUstVorher] = useState("");
   const [geladen, setGeladen] = useState(false);
   const [intervall, setIntervall] = useState<AboIntervall>("monat");
-  const [stufe, setStufe] = useState<AboStufe>(ABO_VORWAHL);
   const [ust, setUst] = useState("");
   const [ustFehler, setUstFehler] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState<"kaufen" | "nachkauf" | "portal" | null>(null);
+  /** Was gerade eine Kasse oder das Portal öffnet — bei einer Stufe deren Name. */
+  const [laeuft, setLaeuft] = useState<AboStufe | "nachkauf" | "portal" | null>(null);
   const [rechnungen, setRechnungen] = useState<Rechnung[] | null>(null);
   const [bestaetigt, setBestaetigt] = useState(false);
 
@@ -304,11 +283,11 @@ function AboSeite() {
     };
   }, [user, darfKaufen, lage]);
 
-  async function zurKasse(art: "abo" | "nachkauf") {
+  async function zurKasse(art: "abo" | "nachkauf", stufe?: AboStufe) {
     if (!user) return;
     setFehler(null);
     setUstFehler(null);
-    setLaeuft(art === "abo" ? "kaufen" : "nachkauf");
+    setLaeuft(art === "abo" && stufe ? stufe : "nachkauf");
     try {
       const { ok, daten } = await mitToken<{ url?: string }>(await user.getIdToken(), "/api/abo/kaufen", {
         method: "POST",
@@ -345,7 +324,6 @@ function AboSeite() {
     setLaeuft(null);
   }
 
-  const gewaehlt = stufeInfo(stufe);
   const aktuelleStufe = abo && abo.plan !== "free" ? stufeInfo(abo.plan) : null;
 
   return (
@@ -364,18 +342,18 @@ function AboSeite() {
           <Streifen ton={bestaetigt ? "gut" : "ruhig"}>
             {bestaetigt ? (
               <>
-                <strong style={{ fontWeight: 600 }}>Geschafft.</strong> Eure Analysen sind da — leg los.
+                <strong style={{ fontWeight: 600 }}>Geschafft.</strong> Deine Analysen sind da — leg los.
               </>
             ) : (
               <>
-                <strong style={{ fontWeight: 600 }}>Danke!</strong> Stripe bestätigt gerade die Zahlung. Eure
+                <strong style={{ fontWeight: 600 }}>Danke.</strong> Stripe bestätigt gerade die Zahlung. Deine
                 Analysen erscheinen hier in ein paar Sekunden.
               </>
             )}
           </Streifen>
         )}
         {kauf === "abgebrochen" && (
-          <Streifen ton="ruhig">Du hast die Kasse verlassen. Wähl in Ruhe — die Stufen warten hier.</Streifen>
+          <Streifen ton="ruhig">Kasse verlassen, nichts gebucht. Die Stufen stehen unten.</Streifen>
         )}
 
         {/* ── Der Stand ──────────────────────────────────────────────── */}
@@ -384,15 +362,29 @@ function AboSeite() {
         ) : lage === "keins" ? (
           stand && stand.rest > 0 ? (
             <p data-abo-stand={stand.rest} style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-              Ihr habt noch {stand.rest} {stand.rest === 1 ? "Analyse" : "Analysen"}
-              {stand.restBezahlt === 0 ? " zum Ausprobieren" : ""}. Mit dem Abo kommen jeden Monat neue dazu.
+              {stand.restBezahlt === 0 ? (
+                <>
+                  Überzeug dich selbst mit{" "}
+                  <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>
+                    {stand.rest} gratis {stand.rest === 1 ? "Analyse" : "Analysen"}
+                  </strong>
+                  .
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>
+                    {stand.rest} {stand.rest === 1 ? "Analyse" : "Analysen"}
+                  </strong>{" "}
+                  hast du noch. Mit dem Abo kommen jeden Monat neue dazu.
+                </>
+              )}
             </p>
           ) : null
         ) : (
-          <section aria-label="Euer Abo" className="t-card flex flex-col gap-4 p-5" data-abo-lage={lage}>
+          <section aria-label="Dein Abo" className="t-card flex flex-col gap-4 p-5" data-abo-lage={lage}>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="flex flex-col gap-1">
-                <span style={LABEL}>Eure Analysen</span>
+                <span style={LABEL}>Deine Analysen</span>
                 <div className="flex items-baseline gap-3">
                   <span
                     data-abo-stand={stand?.rest ?? 0}
@@ -421,7 +413,7 @@ function AboSeite() {
             <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
               {aktuelleStufe && (
                 <>
-                  Euer Abo: <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>{aktuelleStufe.name}</strong>
+                  Dein Abo: <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>{aktuelleStufe.name}</strong>
                   {" · "}
                   {aktuelleStufe.analysenJeMonat} Analysen im Monat
                   {" · "}
@@ -435,20 +427,20 @@ function AboSeite() {
                     ? `Die nächsten ${aktuelleStufe.analysenJeMonat} kommen am ${datumLang(abo.currentPeriodEnd)}.`
                     : "")}
               {" "}
-              Ungenutzte Analysen sammeln sich an und gelten 24 Monate.
+              Ungenutztes bleibt dir und gilt 24 Monate.
             </p>
             {lage === "zahlung-offen" && abo && (
               <Streifen ton="warnung">
-                <strong style={{ fontWeight: 600 }}>Eure letzte Zahlung ist nicht durchgegangen.</strong>{" "}
+                <strong style={{ fontWeight: 600 }}>Deine letzte Zahlung ist nicht durchgegangen.</strong>{" "}
                 {fristEnde(abo)
                   ? `Aktualisier die Karte bis ${datumLang(fristEnde(abo)!)}, sonst endet das Abo.`
                   : "Aktualisier die Karte unter „Abo verwalten“."}{" "}
-                Was ihr schon bezahlt habt, bleibt nutzbar.
+                Was du schon bezahlt hast, bleibt nutzbar.
               </Streifen>
             )}
             {lage === "gekuendigt" && abo?.kuendigtZum && (
               <Streifen ton="ruhig">
-                Euer Abo endet am {datumLang(abo.kuendigtZum)}. Die Analysen, die ihr bis dahin habt, bleiben 24
+                Dein Abo endet am {datumLang(abo.kuendigtZum)}. Die Analysen, die du bis dahin hast, bleiben 24
                 Monate nutzbar.
               </Streifen>
             )}
@@ -458,155 +450,39 @@ function AboSeite() {
         {/* ── Ohne Abo: Werbung und die drei Stufen ───────────────────── */}
         {geladen && lage === "keins" && (
           <>
-            <section aria-label="Was DeepFight kann" className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-              <div className="flex min-w-0 flex-col gap-5">
-                <FightDnaHeading />
-                <ul className="flex flex-col gap-4">
-                  {PUNKTE.map((p) => (
-                    <li key={p.titel} className="flex gap-3">
-                      <span
-                        aria-hidden
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-field"
-                        style={{ background: "color-mix(in oklab, var(--accent) 14%, transparent)", color: "var(--accent)" }}
-                      >
-                        <Icon name={p.icon} size={18} strokeWidth={2} />
-                      </span>
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <strong style={{ font: "var(--type-body-strong)", color: "var(--text-1)" }}>{p.titel}</strong>
-                        <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>{p.text}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {/* Beispieldaten — wie auf der Landung inert und stumm. `inert`
-                  per Ref wie in FightDnaEntry: React 18 kennt das Attribut
-                  noch nicht und warnt sonst in der Konsole. */}
-              <div
-                className="abo-helix hidden min-w-0 lg:block"
-                aria-hidden="true"
-                ref={(el) => {
-                  if (el) el.inert = true;
-                }}
-              >
-                <FightDnaHelix profile={DEMO_FIGHT_PROFILE} variant="athlete" size="md" kennzahlZeigen={false} />
-              </div>
-            </section>
+            <AboWerbung restAnalysen={stand?.rest ?? 0} darfKaufen={darfKaufen} />
 
-            <section aria-labelledby="abo-stufen-titel" className="flex flex-col gap-5">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <h2 id="abo-stufen-titel" className="t-sheet-title" style={{ color: "var(--text-1)" }}>
-                  Wähl euer Abo
-                </h2>
-                <div className="df-filter" role="group" aria-label="Laufzeit">
-                  {(["monat", "jahr"] as const).map((i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-pressed={intervall === i}
-                      data-abo-intervall={i}
-                      onClick={() => setIntervall(i)}
-                    >
-                      {i === "monat" ? "Monatlich" : "Jährlich · 2 Monate geschenkt"}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <AboKarten
+              intervall={intervall}
+              onIntervall={setIntervall}
+              darfKaufen={darfKaufen}
+              laeuft={laeuft}
+              onKaufen={(s) => zurKasse("abo", s)}
+            />
 
-              <div role="radiogroup" aria-labelledby="abo-stufen-titel" className="grid gap-4 md:grid-cols-3">
-                {ABO_STUFEN.map((s) => {
-                  const an = s.id === stufe;
-                  return (
-                    <label
-                      key={s.id}
-                      data-abo-stufe={s.id}
-                      data-gewaehlt={an || undefined}
-                      className="abo-karte t-card relative flex cursor-pointer flex-col gap-4 p-5"
-                    >
-                      <input
-                        type="radio"
-                        name="abo-stufe"
-                        value={s.id}
-                        checked={an}
-                        onChange={() => setStufe(s.id)}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <span style={{ ...LABEL, color: an ? "var(--accent-text, var(--accent))" : "var(--text-2)" }}>
-                          {s.name}
-                        </span>
-                        <span
-                          aria-hidden
-                          className="flex h-5 w-5 items-center justify-center rounded-full"
-                          style={{
-                            border: `2px solid ${an ? "var(--accent)" : "var(--line)"}`,
-                            background: an ? "var(--accent)" : "transparent",
-                            color: "var(--on-accent)",
-                          }}
-                        >
-                          {an && <Icon name="check" size={12} strokeWidth={3} />}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span style={{ font: "var(--type-num-xl)", color: "var(--text-1)" }}>{s.analysenJeMonat}</span>
-                        <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>Analysen im Monat</span>
-                      </div>
-                      <Preis netto={s.netto[intervall]} takt={intervall === "jahr" ? "im Jahr" : "im Monat"} />
-                      <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-                        {euro(stueckpreis(s.id, intervall))} je Analyse
-                        {intervall === "jahr" ? ` · ${s.analysenJeMonat * 12} im Jahr` : ""}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              <div className="t-card flex flex-col gap-5 p-5">
-                {darfKaufen ? (
-                  <>
-                    <UstFeld wert={ust} onWert={setUst} fehler={ustFehler} />
-                    <div className="flex flex-wrap items-center gap-4">
-                      <button
-                        type="button"
-                        data-press
-                        data-abo-kaufen={stufe}
-                        onClick={() => zurKasse("abo")}
-                        disabled={laeuft !== null}
-                        className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
-                        style={{
-                          ...KNOPF,
-                          background: "var(--accent)",
-                          color: "var(--on-accent)",
-                          boxShadow: "var(--accent-glow)",
-                        }}
-                      >
-                        <Icon name="spark" size={14} strokeWidth={2.4} />
-                        {laeuft === "kaufen" ? "Kasse öffnet …" : `${gewaehlt.name} abonnieren`}
-                      </button>
-                      <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                        Bezahlt wird per Karte über Stripe.
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <p data-abo-nur-verwaltung style={{ font: "var(--type-body)", color: "var(--text-1)" }}>
-                    Das Abo bucht die Verwaltung eures Gyms. Sprich sie an — die Stufen seht ihr hier schon.
-                  </p>
-                )}
-                {fehler && (
-                  <p role="alert" style={{ font: "var(--type-sub)", color: "var(--text-1)" }}>
-                    {fehler}
-                  </p>
-                )}
-                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  {intervall === "monat"
-                    ? "Monatlich kündbar zum Ende des Monats."
-                    : "Ein Jahr Laufzeit, die Analysen kommen trotzdem Monat für Monat."}{" "}
-                  Ungenutzte Analysen sammeln sich an und gelten 24 Monate. Das Angebot richtet sich an Gyms und
-                  Vereine.
+            {/* Unter den Karten: was für alle drei gilt. Der Fehler steht hier,
+                nicht in der Karte — er betrifft oft die USt-IdNr. darüber. */}
+            <div className="t-card flex flex-col gap-5 p-5">
+              {darfKaufen ? (
+                <UstFeld wert={ust} onWert={setUst} fehler={ustFehler} />
+              ) : (
+                <p data-abo-nur-verwaltung style={{ font: "var(--type-body)", color: "var(--text-1)" }}>
+                  Das Abo bucht die Verwaltung deines Gyms. Sprich sie an — die Stufen siehst du hier schon.
                 </p>
-              </div>
-            </section>
+              )}
+              {fehler && (
+                <p role="alert" style={{ font: "var(--type-sub)", color: "var(--text-1)" }}>
+                  {fehler}
+                </p>
+              )}
+              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
+                {intervall === "monat"
+                  ? "Monatlich kündbar zum Ende des Monats."
+                  : "Ein Jahr Laufzeit, die Analysen kommen trotzdem Monat für Monat."}{" "}
+                Ungenutzte Analysen sammeln sich an und gelten 24 Monate. Bezahlt wird per Karte über Stripe. Das
+                Angebot richtet sich an Gyms und Vereine.
+              </p>
+            </div>
           </>
         )}
 
@@ -619,7 +495,7 @@ function AboSeite() {
                   Nachkauf
                 </h2>
                 <p style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-                  Der Monat reicht nicht? Hol euch {NACHKAUF.analysen} Analysen dazu. Sie gelten 24 Monate, wie alle
+                  Der Monat reicht nicht? Hol dir {NACHKAUF.analysen} Analysen dazu. Sie gelten 24 Monate, wie alle
                   anderen.
                 </p>
               </div>
@@ -646,7 +522,7 @@ function AboSeite() {
                   </button>
                 ) : (
                   <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-                    Nachkaufen kann die Verwaltung eures Gyms.
+                    Nachkaufen kann die Verwaltung deines Gyms.
                   </span>
                 )}
               </div>
@@ -667,7 +543,7 @@ function AboSeite() {
                   <Skeleton className="h-20 w-full rounded-card" />
                 ) : rechnungen.length === 0 ? (
                   <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                    Eure erste Rechnung erscheint hier, sobald Stripe sie ausgestellt hat.
+                    Deine erste Rechnung erscheint hier, sobald Stripe sie ausgestellt hat.
                   </p>
                 ) : (
                   <ul className="t-card flex flex-col divide-y p-1" style={{ borderColor: "var(--line)" }}>
