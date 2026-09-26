@@ -77,7 +77,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const lage = aboLage(decodeGymAbo(gymSnap.get("subscription")));
+    const abo = decodeGymAbo(gymSnap.get("subscription"));
+    const lage = aboLage(abo);
     if (art === "abo" && lage !== "keins") {
       return NextResponse.json(
         { error: "Ihr habt schon ein Abo. Stufe und Laufzeit wechselst du unter „Abo verwalten“." },
@@ -165,7 +166,14 @@ export async function POST(req: Request) {
             ...gemeinsam,
             mode: "payment",
             line_items: [
-              { price: await nachkaufPreisId(), quantity: 1, ...(steuer.length ? { tax_rates: steuer } : {}) },
+              {
+                // Der Nachkauf kostet je Stufe anders (Leon 22.09.: 35 / 30 /
+                // 25 €). Ein Gym ohne Abo kommt hier nicht an — der Riegel
+                // oben schickt es mit 409 zurück, lange bevor die Kasse aufgeht.
+                price: await nachkaufPreisId(abo.plan === "free" ? "team" : abo.plan),
+                quantity: 1,
+                ...(steuer.length ? { tax_rates: steuer } : {}),
+              },
             ],
             invoice_creation: {
               enabled: true,

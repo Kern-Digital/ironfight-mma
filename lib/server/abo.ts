@@ -42,16 +42,15 @@ import { bearerToken, canManageGym, userGymId, verifyUser, type VerifiedUser } f
  */
 export async function verwaltungDesGyms(
   req: Request,
+  /** Was dasteht, wenn jemand ohne Verwaltungsrecht anklopft. */
+  verbotenText = "Das DeepFight-Abo bucht die Verwaltung deines Gyms.",
 ): Promise<{ user: VerifiedUser; gymId: string } | Response> {
   const token = bearerToken(req);
   const user = token ? await verifyUser(token) : null;
   if (!user) return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   const gymId = userGymId(user);
   if (gymId === KEIN_GYM || !canManageGym(user, gymId)) {
-    return Response.json(
-      { error: "Das DeepFight-Abo bucht die Verwaltung deines Gyms." },
-      { status: 403 },
-    );
+    return Response.json({ error: verbotenText }, { status: 403 });
   }
   return { user, gymId };
 }

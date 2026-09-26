@@ -19,7 +19,7 @@ import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
 import { gibAnalyseZurueck, nimmEineAnalyse } from "@/lib/server/guthaben";
 import { KEIN_GUTHABEN_TEXT } from "@/lib/guthaben";
 import { GYM_GESPERRT_TEXT } from "@/lib/gym";
-import { deepfightZustand } from "@/lib/server/gym-status";
+import { deepfightZustand, videoSekundenFuerGym } from "@/lib/server/gym-status";
 import { adminDb } from "@/lib/server/firebase-admin";
 import { evaluateObservation } from "@/lib/server/claude";
 import {
@@ -29,34 +29,39 @@ import {
   verifyUser,
 } from "@/lib/server/verify-user";
 import { isFlaeche, varianteFuer } from "@/lib/kampfart-steckbrief";
-import { MAX_VIDEO_SECONDS, isSport, type AnalyzeRequest } from "@/lib/video-analysis";
+import { isSport, type AnalyzeRequest } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
 // Vercel-Limit: Hobby-Plan erlaubt maximal 300s Funktionslaufzeit.
 export const maxDuration = 300;
 
-function validate(body: AnalyzeRequest): string | null {
+/**
+ * `maxSekunden` ist die Länge, die DIESES Gym in seiner Stufe darf (Leon
+ * 22.09.: 10 / 15 / 15 min) — `null` schaltet die Längenprüfung ab. Das tut
+ * der zweite Aufruf desselben Ablaufs: Er bringt die Beobachtung schon mit
+ * und sieht kein Video mehr (Falle 46).
+ */
+function validate(body: AnalyzeRequest, maxSekunden: number | null): string | null {
   if (!body || (body.mode !== "opponent" && body.mode !== "athlete"))
     return "Ungültiger Modus.";
   if (!body.fighter?.name?.trim()) return "Kämpfer-Name fehlt.";
   if (body.tier !== "flash" && body.tier !== "pro")
     return "Ungültige Modellstufe.";
+  const grenze = maxSekunden;
+  const minuten = grenze != null ? Math.round(grenze / 60) : 0;
   const src = body.source;
   if (!src) return "Videoquelle fehlt.";
   if (src.kind === "upload") {
     if (!src.fileUri) return "Video-Upload fehlt.";
-    if (
-      src.durationSeconds != null &&
-      src.durationSeconds > MAX_VIDEO_SECONDS + 5
-    )
-      return "Video ist länger als 15 Minuten.";
+    if (grenze != null && src.durationSeconds != null && src.durationSeconds > grenze + 5)
+      return `Nimm einen Ausschnitt bis ${minuten} Minuten.`;
   } else if (src.kind === "youtube") {
     if (!/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(src.url))
       return "Bitte einen gültigen YouTube-Link angeben.";
     const start = src.startSeconds ?? 0;
     const end = src.endSeconds;
-    if (end != null && end - start > MAX_VIDEO_SECONDS + 5)
-      return "Der gewählte Ausschnitt ist länger als 15 Minuten.";
+    if (grenze != null && end != null && end - start > grenze + 5)
+      return `Wähl einen Ausschnitt bis ${minuten} Minuten.`;
     if (end != null && end <= start)
       return "Endzeit muss nach der Startzeit liegen.";
   } else {
@@ -91,7 +96,11 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Ungültiger Request-Body." }, { status: 400 });
   }
-  const invalid = validate(body);
+  // Die Videolänge hängt an der Abo-Stufe (Leon 22.09.). Gefragt wird nur
+  // beim Aufruf MIT Video — die zweite Runde bringt die Beobachtung mit und
+  // kostet so keinen zusätzlichen Lesevorgang (Falle 46).
+  const maxSekunden = body.observation ? null : await videoSekundenFuerGym(adminDb, gym);
+  const invalid = validate(body, maxSekunden);
   if (invalid) return Response.json({ error: invalid }, { status: 400 });
 
   // DIE SCHRANKE (Schritt 2, Konzept §6): eine Analyse aus dem Guthaben,

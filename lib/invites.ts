@@ -316,6 +316,13 @@ export interface InvitePreview {
    * erste Gym ein Logo hinterlegt, KEINE Code-Änderung mehr braucht.
    */
   gymLogo?: string | null;
+  /**
+   * Die Farbe des Gyms aus dem Branding-Kit — Farbton und Buntheit im
+   * OKLCH-Raum. Die Beitritts-Karte färbt sich damit von selbst (JoinLayout),
+   * weil das Token-System alles daraus ableitet. Fehlt sie, gilt der
+   * Tidal-Ton.
+   */
+  gymAkzent?: { h: number; c: number } | null;
   role?: InviteRole;
   /** Der Betrachter gehört bereits zu diesem Gym — Beitreten wäre Leerlauf. */
   alreadyMember?: boolean;

@@ -187,6 +187,16 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
           icon: "bell",
           isActive: under("/verwaltung/neuigkeiten"),
         },
+        // MARKE — Logo und Farbe des Gyms (Branding-Kit, 24.09.2026). Der
+        // Eintrag steht für JEDE Verwaltung da, auch für eine ohne die Stufe
+        // Gym: Die Seite erklärt dann, was das Kit bringt. Ein Punkt, der je
+        // nach Tarif verschwindet, verkauft nichts — er versteckt nur.
+        {
+          href: "/verwaltung/branding",
+          label: "Marke",
+          icon: "spark",
+          isActive: under("/verwaltung/branding"),
+        },
         // WOCHENPLAN — der Kursplan als Sache des GYMS.
         //
         // ER STEHT HIER FÜR JEDE VERWALTUNG, auch für eine, die zusätzlich

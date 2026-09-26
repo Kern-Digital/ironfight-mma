@@ -8,6 +8,7 @@ import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import FighterNameModal from "@/components/auth/FighterNameModal";
 import TrainerOnboardingModal from "@/components/auth/TrainerOnboardingModal";
 import SubscriptionAutoSync from "@/components/SubscriptionAutoSync";
+import GymBrandingTokens from "@/components/GymBrandingTokens";
 
 const barlowCondensed = Barlow_Condensed({
   subsets: ["latin"],
@@ -104,6 +105,10 @@ export default function RootLayout({
             <FighterNameModal />
             <TrainerOnboardingModal />
             <SubscriptionAutoSync />
+            {/* Branding-Kit (Konzept §8): trägt das Gym eine eigene Farbe,
+                setzt diese Zeile sie als --accent-h/--accent-c ans <html>.
+                Ohne Kit passiert nichts und der Tidal-Ton gilt. */}
+            <GymBrandingTokens />
           </AuthProvider>
         </ThemeProvider>
       </body>

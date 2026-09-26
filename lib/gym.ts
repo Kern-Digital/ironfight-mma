@@ -141,6 +141,62 @@ export interface GymSubscription {
   currentPeriodEnd?: Date | null;
 }
 
+/**
+ * DAS BRANDING-KIT — Logo und Farbe des Gyms (Konzept §8, gebaut 24.09.2026).
+ *
+ * Es gehört zu den Stufen Gym und Saison (Leon 22.09.: Branding „Gym +
+ * Saison"). Der Server prüft die Stufe, bevor er schreibt — die Oberfläche
+ * versteckt den Schreiber nur.
+ *
+ * DIE FARBE SIND ZWEI ZAHLEN, nicht fünfzig Tokens: Farbton und Buntheit im
+ * OKLCH-Raum. Alles andere — Verlauf, Glühen, Felder, Knöpfe, Kontraste —
+ * rechnet das Token-System daraus ab (DESIGN-BRIEF §1, globals.css Kopf).
+ * Genau deshalb kann ein Gym seine Farbe setzen, ohne das Design zu zerlegen.
+ *
+ * DAS LOGO STEHT ALS DATA-URL IM DOKUMENT, nicht in einem Speicher-Eimer.
+ * Begründung: Der Browser rechnet es vor dem Senden auf 320 px Breite
+ * herunter (`components/verwaltung/BrandingKit.tsx`), damit bleiben 5–20 KB
+ * übrig — ein Bruchteil der 1 MiB, die ein Firestore-Dokument fassen darf.
+ * Dafür gibt es keinen zweiten Dienst, keine CORS-Regeln, keine verwaisten
+ * Dateien und keine Adresse, die ins Leere zeigt. Wird das Logo eines Tages
+ * größer gebraucht (Druck, eigene App), wandert es in einen Speicher — das
+ * Feld bleibt eine Adresse, der Leseweg (`<img src>`) unverändert.
+ */
+export interface GymBranding {
+  /** Adresse des Logos — heute eine Data-URL. `null` = Tidal-Zeichen. */
+  logoUrl?: string | null;
+  /** Farbton in Grad (0–360), OKLCH. `null` = Tidal-Cyan. */
+  akzentH?: number | null;
+  /** Buntheit (0–0,37), OKLCH. `null` = Tidal-Cyan. */
+  akzentC?: number | null;
+}
+
+/** Die Grenzen, in denen eine Gym-Farbe das Design nicht zerlegt. */
+export const AKZENT_C_MAX = 0.3;
+
+/** Was das Token-System ohne Branding-Kit nimmt (globals.css: Logo-Cyan). */
+export const AKZENT_TIDAL = { h: 197, c: 0.14 } as const;
+
+/**
+ * Gym-Dokument → Branding-Kit. Was nicht passt, fällt weg: Ein krummer Wert
+ * im Dokument darf die Farben der ganzen App nicht kippen.
+ */
+export function decodeBranding(x: unknown): GymBranding {
+  const d = (x ?? {}) as Record<string, unknown>;
+  const zahl = (v: unknown, min: number, max: number): number | null =>
+    typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : null;
+  return {
+    logoUrl: typeof d.logoUrl === "string" && d.logoUrl ? d.logoUrl : null,
+    akzentH: zahl(d.akzentH, 0, 360),
+    akzentC: zahl(d.akzentC, 0, AKZENT_C_MAX),
+  };
+}
+
+/** Hat dieses Gym überhaupt etwas hinterlegt? */
+export function hatBranding(b: GymBranding | null | undefined): boolean {
+  return !!b && (!!b.logoUrl || b.akzentH != null);
+}
+
 export interface Gym {
   id: string;
   name: string;
@@ -152,8 +208,8 @@ export interface Gym {
    * Falschaussage.
    */
   status?: "active" | "blocked" | null;
-  /** Branding-Tokens (Konzept §8) — leer = kompletter Tidal-Look. */
-  branding?: Record<string, string> | null;
+  /** Branding-Kit (Konzept §8) — leer = kompletter Tidal-Look. */
+  branding?: GymBranding | null;
   subscription?: GymSubscription | null;
   createdAt?: Date | null;
 }

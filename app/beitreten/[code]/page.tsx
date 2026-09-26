@@ -24,6 +24,7 @@
  */
 
 import JoinCodeSlots from "@/components/JoinCodeSlots";
+import { useAkzentAmRoot } from "@/components/GymBrandingTokens";
 import JoinLayout, {
   JoinPrimary,
   JoinSecondary,
@@ -58,6 +59,10 @@ export default function JoinWithCodePage({
   const plausible = isPlausibleInviteCode(code);
 
   const [preview, setPreview] = useState<InvitePreview | null>(null);
+  // Branding-Kit (Konzept §8): Hält das einladende Gym eine eigene Farbe,
+  // trägt die Karte sie — Verlauf, Glühen, Felder und der Knopf leiten sich
+  // alle aus den zwei Zahlen ab. Beim Verlassen räumt der Hook wieder auf.
+  useAkzentAmRoot(preview?.gymAkzent);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);

@@ -114,6 +114,85 @@ Nachkauf weiter. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
   0,80 € Einkauf, 63 / 52 / 45 % bei 1,20 €. Die Mitte liegt mit Absicht über
   50 €: darunter behalten KI-Produkte 23 % ihres Umsatzes im Jahr, zwischen 50
   und 249 $ 45 % (ChartMogul 12/2025, 3.500 Firmen).
+- **WAS DIE STUFEN AUSSER DER MENGE TRENNT (Leon 22.09.2026: „außer der
+  größeren Anzahl der Analysen zu billigeren Preisen pro Analyse auch in
+  mindestens dem mittleren Abo-Modell plus dem ganz teuren einen Mehrwert wie
+  z. B. das Farbpaket").** Grundlage: drei Agenten-Läufe am 22.09. (Code-
+  Katalog, 31 Anbieter mit lesbarer Stufung, Studien; Belege im Plan-Artifact
+  „Das zweite Gym", Fassung 4). Die Logik ist §8: **Basis / Branding-Kit /
+  White-Label SIND Team / Gym / Saison.** Menge bleibt der Hauptzaun; je
+  Stufengrenze höchstens vier weitere Unterschiede (Mohammed, HBR 2018);
+  nichts, was die Analyse selbst ausmacht, wird gesperrt (Kampfart-
+  Steckbriefe, Gameplan, Athleten-Ansicht, Trainer ohne Limit — in JEDER
+  Stufe, auch gratis).
+
+  | | Team 49 € · 15 | Gym 99 € · 40 (vorgewählt) | Saison 219 € · 100 |
+  |---|---|---|---|
+  | Für wen | 1–2 Wettkämpfer im Monat | 10–25 Wettkämpfer | Wettkampfteam, mehrere Trainer/Standorte |
+  | Marke | Tidal-Look | **Branding-Kit: Gym-Logo + Gym-Farbe** (§8) | + eigene App / White-Label auf Anfrage (Phase 4) |
+  | Berichte | in der App | + Verlauf über mehrere Videos (Trends, Lücken „4 von 5 ohne Takedown"), PDF-Bericht im Gym-Look — SOBALD GEBAUT | + Gym-Übersicht über alle Athleten — sobald gebaut |
+  | Videolänge | bis 10 min | bis 15 min | bis 15 min |
+  | Nachkauf 10 Stück | 35 € (3,50) | 30 € (3,00) | 25 € (2,50) |
+  | Hilfe | E-Mail | + Einführungs-Call, Antwort am nächsten Werktag | + persönlicher Ansprechpartner, Onboarding fürs Team, Frühzugang zu neuen Kampfarten/Funktionen |
+  | Standorte | 1 | 1 | bis 3 Gyms, ein Topf — sobald „Athlet in mehreren Gyms" gebaut ist |
+
+  Leons Antworten (22.09., gewählte Optionen): Branding „Gym + Saison
+  (Empfohlen)" · Videolänge „10 / 15 / 15 min (Empfohlen)" · Bau „Erst
+  Plan/Konzept/Roadmap nachziehen" (NICHT bauen). Der Nachkauf liegt in jeder
+  Stufe ÜBER dem Abo-Stückpreis (3,27 / 2,48 / 2,19 €) — sonst kauft niemand
+  hoch. Alle Mehrwerte von Team und Gym kosten Tidal keinen Token (Branding-
+  Kit einmalig Cent-Bereich); die Margen 76 / 68 / 63 % bleiben. Später
+  hinzukommende Funktionen landen nach Kostenart: Athleten-Einreichung → Gym
+  (treibt Verbrauch, nur Storage); Tidal Coach, KI-Kursplan → Saison
+  (Token-Kosten). Gratis-Gyms (drei Analysen) verhalten sich wie Team.
+  - **„Genaue Analyse" (Gemini Pro + Opus garantiert) ist KEIN Stufenmerkmal**
+    — Leons Nachfrage 22.09. („haben wir nicht durch unsere Tests
+    herausgefunden, dass wir genau als Standard nehmen und Flash entfernen?")
+    beantwortet aus dem Gedächtnis `stresstest-kameraschwenk`: Stresstest 2 mit
+    Pro (16.09.) war in manchem besser, in anderem neu schlechter („Modell-
+    wechsel allein löst es NICHT"); der Gewinn kam am 17.09. aus 5 Bildern/s +
+    einer Ereignisliste AUF FLASH; Benchmarks Flash 42 % exakt, Pro 39,8 %.
+    Flash bleibt Standard (Leon 16.09.). Verkauft wird eine genauere Stufe
+    erst, wenn ein Test sie belegt (Ereignis-F1, Akteur-Genauigkeit ≥ 90 %);
+    dann als Saison-Merkmal, das doppelt zählt (Pro ≈ 2,7× Flash).
+  - **Bewusst KEIN Zaun:** Trainer-/Sitzzahl (bei 1–5 Trainern Churn-Treiber,
+    Per-Seat-Anekdote 34 % bei 1–3 Nutzern) · Speicherdauer/Löschen von
+    Analysen · Ansammeln als Stufenmerkmal (Leons Regel „unbegrenzt" bleibt für
+    alle, siehe unten — marktweit die großzügigste: ElevenLabs 2 Monate,
+    Runway 1 Monat nur oben, Descript gar nicht).
+  - **Nur GEBAUTES auf die Abo-Seite** — „kommt bald" in einer Preistabelle
+    ist in Deutschland irreführend; Verlauf, PDF, Standorte erscheinen dort
+    erst, wenn sie da sind. Und: Selbstanmeldung ohne Freigabe + Netto groß
+    ist abmahnfähig, wenn Verbraucher faktisch bestellen könnten (IT-Recht
+    Kanzlei 06/2026) — brutto klein daneben hilft, sauber wird es mit
+    Gewerbe-/USt-Angabe als Pflichtfeld in der Kasse.
+  - **Markt-Beleg (22.09., 31 Anbieter):** häufigste Mitte/Oben-Trenner sind
+    erweiterte Analytik (16×), Support-Leiter (16×), Branding/eigene App (15×);
+    Branding als Add-on 39–100 $/Monat (Zen Planner, PushPress, Gymdesk,
+    TeamUp), 299–349 €/Monat (Magicline), Stufenmerkmal oben bei FightDesk
+    Elite (219 €), Glofox Elite, bsport. Kein Sport-Video-Anbieter bietet
+    Branding an; dort trennen Analytik, Speicherdauer (Veo 6/12 Monate) und
+    Sitze. Athlete Analyzer verkauft Gegner-Scouting allein für 99,99 €/Monat.
+    ChartMogul (n = 3.500): KI-Produkte unter 250 $/Monat halten 45 % ihres
+    Umsatzes im Jahr, darüber 70 % → die Jahreszahlung ist der wichtigste
+    Retention-Hebel, wichtiger als jeder Feature-Zaun.
+  - **Im Code (offen, Bau nicht beauftragt):** `lib/abo.ts` bekommt je Stufe
+    einen `leistungen`-Block (Videominuten, Branding, Nachkauf-Netto, Hilfe);
+    ein Server-Helfer `stufeDesGyms()` neben `deepfightZustand`; Gates in
+    `analyze`/`preview` (Falle 46: nur der Aufruf mit Video) und in `kaufen`
+    (Nachkauf-Staffel); die Abo-Karten zeigen die Unterschiede.
+    **GEBAUT am 24.09.2026** (36/36 gemessen, 0 € KI-Kosten): `leistungen` je
+    Stufe in `lib/abo.ts` (der Gratis-Tarif erbt Team), `stufeDesGyms()` und
+    `videoSekundenFuerGym()` in `lib/server/gym-status.ts`, Gates in
+    `analyze`/`preview`, Nachkauf-Staffel in `kaufen` mit eigenem
+    Stripe-Preis je Stufe, Punkte auf den Karten. Das Branding-Kit (§8) ist
+    damit ebenfalls da: Schreiber unter `/verwaltung/branding` („Marke"),
+    Stufenprüfung in `POST /api/gym/branding`, Farbe als
+    `--accent-h`/`--accent-c` am `<html>`. **Die Stufe entscheidet bei jedem
+    Lesen**: Wer absteigt, trägt wieder den Tidal-Look, verliert seine
+    Einstellungen aber nicht. OFFEN bleibt die Hilfe-Leiter (Versprechen,
+    kein Code) und die Mehrfach-Standorte (hängen an „Athlet in mehreren
+    Gyms").
 - **Ungenutzte Analysen sammeln sich UNBEGRENZT an** (Leon 21.09., gegen die
   Empfehlung „einen Monat mitnehmen"). Rahmen aus zwei früheren
   Entscheidungen: Jeder Monatsposten gilt 24 Monate (Verfallsregel), und nach
@@ -213,11 +292,11 @@ Nachkauf weiter. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
 
 ## 8. Branding (Stufenmodell + Branding-Kit)
 
-| Stufe | Gym bekommt | Tidal behält |
-|---|---|---|
-| Basis | Gym-Name in der App | kompletter Tidal-Look |
-| **Branding-Kit** (Aufpreis) | Logo + Akzentfarbe | Layout, Typo, Struktur, „powered by Tidal Athletics", DeepFight-Wordmark unangetastet |
-| White-Label (nur falls je strategisch gewollt, deutlich teurer) | alles | — |
+| Stufe | Abo-Stufe (seit 22.09.2026) | Gym bekommt | Tidal behält |
+|---|---|---|---|
+| Basis | Gratis + **Team** | Gym-Name in der App | kompletter Tidal-Look |
+| **Branding-Kit** | **Gym + Saison** (kein Aufpreis mehr — Stufenmerkmal, Leon 22.09.: „Gym + Saison (Empfohlen)") | Logo + Akzentfarbe, auch auf der Beitritts-Karte | Layout, Typo, Struktur, „powered by Tidal Athletics", DeepFight-Wordmark unangetastet |
+| White-Label / eigene App im Store (Capacitor) | **Saison auf Anfrage** (Phase 4, das „zweite Bein"; Markt 249–449 $/Monat) | alles | — |
 
 **Branding-Kit-Flow (KI-gestützt):**
 1. Upload-Bereich (nur Verwaltung, nur mit gekauftem Kit): Logo (Pflicht),
@@ -282,9 +361,16 @@ Nachkauf weiter. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
    hinter dem DeepFight-Eintrag mit den drei Abo-Stufen (15 / 40 / 100 zu
    49 / 99 / 219 € im Monat, jährlich zwei Monate geschenkt), Stripe im
    Abo-Modus mit Webhook und Kundenportal, Nachkauf als Einmalkauf (Leon
-   21.09. spät: Monats-Abo statt Pakete, siehe §6).
+   21.09. spät: Monats-Abo statt Pakete, siehe §6) — gebaut 21.09., per
+   Stripe-Attrappe bewiesen → (4) **Stufen-Mehrwerte** (Leon 22.09., §6:
+   Branding-Kit in Gym + Saison, Videolänge 10/15/15, Nachkauf-Staffel,
+   Hilfe-Leiter) — beschlossen, Bau NICHT beauftragt („Erst Plan/Konzept/
+   Roadmap nachziehen"); das Branding-Kit (§8) zieht damit aus Phase 4 direkt
+   hinter die Stufen-Gates vor.
    Wochenplan-Mehrplan-Modell: später (Leon 20.09.). Firestore-Regeln, die
    ein stillgelegtes Gym auch im Client bremsen („Schritt 1b"), sind bewusst
    ZURÜCKGESTELLT (Leon 21.09.: „erstmal lassen").
-6. **Phase 4** — Zweites Bein: Branding-Kit / App mit Gym-Logo (§8) und
-   Automatisierungen als bezahlte Stufe; Vertex AI (EU-Region) prüfen.
+6. **Phase 4** — Zweites Bein: eigene App im Store / White-Label (§8; das
+   Branding-Kit selbst ist seit 22.09. Stufenmerkmal von Gym + Saison und
+   gehört zu Phase 3 (4)) und Automatisierungen als bezahlte Stufe; Vertex AI
+   (EU-Region) prüfen.

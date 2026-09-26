@@ -42,6 +42,7 @@
  */
 
 import type { Firestore } from "firebase-admin/firestore";
+import { decodeGymAbo, videoSekunden, VIDEO_SEKUNDEN_MAX, type AboStufe } from "../abo";
 import { GYM_GESPERRT_TEXT, GYM_GESPERRT_MIT_GUTHABEN } from "../gym";
 import { restBezahlt } from "./guthaben";
 
@@ -99,4 +100,48 @@ export async function antwortWennDeepFightZu(
 /** Der Satz für den Streifen — mit Restguthaben ein anderer. */
 export function gesperrtText(bezahltRest: number): string {
   return bezahltRest > 0 ? GYM_GESPERRT_MIT_GUTHABEN(bezahltRest) : GYM_GESPERRT_TEXT;
+}
+
+// ─── Die Stufe und was sie erlaubt ──────────────────────────────────────────
+
+/**
+ * Welchen Tarif dieses Gym hat. `null` heißt: nicht lesbar — NICHT „gratis".
+ *
+ * Seit dem 22.09.2026 hängt die Videolänge an der Stufe (Leon: „10 / 15 /
+ * 15 min"), und das ist die erste Zeile, die `plan` wirklich PRÜFT statt ihn
+ * nur anzuzeigen. Ein laufend nicht bezahltes Abo behält seine Stufe: Bleibt
+ * die Zahlung 14 Tage aus, kündigt Stripe, der Webhook setzt `free`, und
+ * damit greift die kleinste Länge von selbst.
+ */
+export async function stufeDesGyms(
+  dbHolen: () => Firestore,
+  gymId: string,
+): Promise<"free" | AboStufe | null> {
+  try {
+    const snap = await dbHolen().collection("gyms").doc(gymId).get();
+    if (!snap.exists) return null;
+    return decodeGymAbo(snap.get("subscription")).plan;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Wie lang ein Video für dieses Gym sein darf, in Sekunden.
+ *
+ * FAIL-OPEN wie oben: Lässt sich die Stufe nicht lesen, gilt die längste
+ * Länge. Ein Lesefehler darf ein zahlendes Gym nicht auf zehn Minuten kürzen
+ * — die paar Cent für fünf Minuten mehr Video sind billiger als ein Trainer,
+ * der vor einer Fehlermeldung sitzt.
+ *
+ * KOSTEN: ein Lesevorgang. Er fällt nur beim Aufruf MIT Video an (Falle 46:
+ * eine Analyse sind zwei Requests) — die zweite Runde bringt die Beobachtung
+ * schon mit und braucht kein Limit mehr.
+ */
+export async function videoSekundenFuerGym(
+  dbHolen: () => Firestore,
+  gymId: string,
+): Promise<number> {
+  const stufe = await stufeDesGyms(dbHolen, gymId);
+  return stufe ? videoSekunden(stufe) : VIDEO_SEKUNDEN_MAX;
 }

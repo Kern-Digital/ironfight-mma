@@ -37,6 +37,7 @@ import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
 import {
   NACHKAUF,
+  nachkaufNetto,
   STEUERMODUS,
   UST_SATZ,
   aboLage,
@@ -505,7 +506,7 @@ function AboSeite() {
                     <span style={{ font: "var(--type-num-xl)", color: "var(--text-1)" }}>{NACHKAUF.analysen}</span>
                     <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>Analysen</span>
                   </div>
-                  <Preis netto={NACHKAUF.netto} takt={null} gross={false} />
+                  <Preis netto={nachkaufNetto(aktuelleStufe?.id ?? "team")} takt={null} gross={false} />
                 </div>
                 {darfKaufen ? (
                   <button

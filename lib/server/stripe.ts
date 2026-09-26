@@ -25,8 +25,10 @@ import {
   NACHKAUF,
   STEUERMODUS,
   UST_SATZ,
+  nachkaufNetto,
   nachkaufSchluessel,
   preisSchluessel,
+  stufeInfo,
   type AboIntervall,
   type AboStufe,
 } from "../abo";
@@ -120,15 +122,22 @@ export async function aboPreisId(stufe: AboStufe, intervall: AboIntervall): Prom
   }));
 }
 
-export async function nachkaufPreisId(): Promise<string> {
+/**
+ * Der Nachkauf kostet je Stufe anders (Leon 22.09.: 35 / 30 / 25 €) — ein
+ * Produkt, drei Preise. Die Menge bleibt zehn; wer aufsteigt, zahlt beim
+ * nächsten Nachkauf weniger, und die alten Preise bleiben für bereits
+ * bezahlte Käufe stehen.
+ */
+export async function nachkaufPreisId(stufe: AboStufe): Promise<string> {
+  const netto = nachkaufNetto(stufe);
   const produkt = await sicheresProdukt(produktId("nachkauf"), `DeepFight Nachkauf · ${NACHKAUF.analysen} Analysen`);
-  return sichererPreis(nachkaufSchluessel(), () => ({
+  return sichererPreis(nachkaufSchluessel(stufe), () => ({
     product: produkt,
     currency: "eur",
-    unit_amount: NACHKAUF.netto,
+    unit_amount: netto,
     tax_behavior: "exclusive",
-    nickname: `Nachkauf · ${NACHKAUF.analysen} Analysen`,
-    metadata: { paket: NACHKAUF.id, analysen: String(NACHKAUF.analysen) },
+    nickname: `Nachkauf · ${NACHKAUF.analysen} Analysen · ${stufeInfo(stufe).name}`,
+    metadata: { paket: NACHKAUF.id, analysen: String(NACHKAUF.analysen), stufe },
   }));
 }
 

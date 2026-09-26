@@ -50,6 +50,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { VIDEO_SEKUNDEN_MAX } from "./abo";
 import { getFirebaseAuth, getFirestoreDb } from "./firebase";
 import type { ActionStat, CageZone, DnaSplit } from "./fight-stats";
 import type { AnalyseWirkung } from "./profile-evidence";
@@ -70,8 +71,16 @@ export type AnalysisMode = "opponent" | "athlete";
 /** Gemini-Modellstufe: Flash (Standard) oder Pro (Detail-Analyse). */
 export type GeminiTier = "flash" | "pro";
 
-/** Maximale analysierbare Videolänge in Sekunden (15 Minuten). */
-export const MAX_VIDEO_SECONDS = 15 * 60;
+/**
+ * Die längste Videolänge, die überhaupt eine Stufe erlaubt.
+ *
+ * ACHTUNG: Das ist die Obergrenze, NICHT das Limit eines Gyms. Seit dem
+ * 22.09.2026 hängt die Länge an der Abo-Stufe (10 / 15 / 15 min) — wer prüft,
+ * fragt `videoSekunden(plan)` aus `lib/abo.ts`, serverseitig über
+ * `videoSekundenFuerGym` aus `lib/server/gym-status.ts`. Dieser Wert taugt nur
+ * noch für Stellen ohne Gym-Bezug.
+ */
+export const MAX_VIDEO_SECONDS = VIDEO_SEKUNDEN_MAX;
 
 // ─── Gewichtung eines Videos ────────────────────────────────────────────────
 

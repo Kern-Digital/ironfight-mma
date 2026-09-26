@@ -30,7 +30,8 @@ import {
   normalizeInviteCode,
   type InviteRole,
 } from "@/lib/invites";
-import { DEFAULT_GYM_LABEL } from "@/lib/gym";
+import { decodeGymAbo, leistungenFuer } from "@/lib/abo";
+import { DEFAULT_GYM_LABEL, decodeBranding } from "@/lib/gym";
 
 export const runtime = "nodejs";
 
@@ -115,9 +116,17 @@ export async function POST(req: Request) {
     // Beitritts-Karte es statt des Tidal-Zeichens. Heute ist das Feld überall
     // leer — der Aufruf kostet nichts extra, das Gym-Dokument wird ohnehin
     // für den Namen gelesen.
-    const gymLogo =
-      (gym.get("branding") as Record<string, string> | undefined)?.logoUrl ??
-      null;
+    // Das Branding-Kit gehört zu Gym und Saison (Leon 22.09.). Steht das Gym
+    // heute auf Team oder gratis, trägt die Einladung den Tidal-Look — auch
+    // wenn früher einmal ein Logo hinterlegt wurde. Gelöscht wird nichts.
+    const darfBranden = leistungenFuer(decodeGymAbo(gym.get("subscription")).plan).branding;
+    const marke = darfBranden ? decodeBranding(gym.get("branding")) : null;
+    const gymLogo = marke?.logoUrl ?? null;
+    // Die Farbe kommt aus demselben Feld — kein zusätzlicher Lesevorgang.
+    const gymAkzent =
+      marke?.akzentH != null && marke?.akzentC != null
+        ? { h: marke.akzentH, c: marke.akzentC }
+        : null;
 
     // Schon in DIESEM Gym: der Beitritt wäre ein Leerlauf, würde aber eine
     // Nutzung verbrauchen. Die Oberfläche bietet ihn deshalb gar nicht erst
@@ -128,6 +137,7 @@ export async function POST(req: Request) {
       valid: true,
       gymName,
       gymLogo,
+      gymAkzent,
       role,
       alreadyMember,
     });

@@ -85,12 +85,12 @@ import { getFightProfile } from "@/lib/fight-profile";
 import type { ActionStat, DnaSplit } from "@/lib/fight-stats";
 import { resolveGymId } from "@/lib/gym";
 import { getOpponent, listOpponentsForGym, type Opponent } from "@/lib/opponents";
+import { useAboStufe } from "@/lib/use-abo-stufe";
 import { useAnalysisProgress } from "@/lib/use-analysis-progress";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import {
   CORNER_LABEL,
   FIGHT_RECENCY_LABEL,
-  MAX_VIDEO_SECONDS,
   SPORT_LABEL,
   SPORT_ORDER,
   VIDEO_TYPE_LABEL,
@@ -445,6 +445,10 @@ export default function VideoUploadFlow({
   const gymId = resolveGymId(profile);
   // Das DeepFight-Guthaben (Schritt 2): die Zahl vor dem Klick.
   const { stand: guthaben, laden: guthabenNeuLaden } = useGuthaben(gymId);
+  // Wie lang ein Video sein darf, hängt seit dem 22.09.2026 an der Abo-Stufe
+  // (Leon: „10 / 15 / 15 min"). Der Server prüft es noch einmal.
+  const { videoSekunden: maxVideoSekunden } = useAboStufe(gymId);
+  const maxVideoMinuten = Math.round(maxVideoSekunden / 60);
   const eigeneUid = user?.uid ?? "";
   const router = useRouter();
   const { canBlur } = useMotionCapability();
@@ -779,9 +783,9 @@ export default function VideoUploadFlow({
         );
       }
       const duration = await readVideoDuration(file);
-      if (duration != null && duration > MAX_VIDEO_SECONDS + 5) {
+      if (duration != null && duration > maxVideoSekunden + 5) {
         throw new Error(
-          `Dein Video dauert ${Math.round(duration / 60)} Minuten. Nimm einen Ausschnitt bis 15 Minuten.`,
+          `Dein Video dauert ${Math.round(duration / 60)} Minuten. Nimm einen Ausschnitt bis ${maxVideoMinuten} Minuten.`,
         );
       }
       setStage("upload");
@@ -811,8 +815,8 @@ export default function VideoUploadFlow({
     if (!youtubeUrl.trim()) throw new Error("Füg zuerst einen YouTube-Link ein.");
     const startSeconds = parseTimecode(ytStart);
     const endSeconds = parseTimecode(ytEnd);
-    if (startSeconds != null && endSeconds != null && endSeconds - startSeconds > MAX_VIDEO_SECONDS) {
-      throw new Error("Wähl einen Ausschnitt bis 15 Minuten.");
+    if (startSeconds != null && endSeconds != null && endSeconds - startSeconds > maxVideoSekunden) {
+      throw new Error(`Wähl einen Ausschnitt bis ${maxVideoMinuten} Minuten.`);
     }
     return { kind: "youtube", url: youtubeUrl.trim(), startSeconds, endSeconds };
   }
@@ -1437,7 +1441,7 @@ export default function VideoUploadFlow({
                     </span>
                     <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
                       Oder tipp hier und such es aus. Mit Strg+V fügst du ein kopiertes Video oder einen
-                      YouTube-Link ein. Bis 15 Minuten.
+                      YouTube-Link ein. Bis {maxVideoMinuten} Minuten.
                     </span>
                   </>
                 )}

@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server";
 import { previewVideo } from "@/lib/server/gemini";
 import { bucheGeminiKosten } from "@/lib/server/gemini-kosten";
-import { antwortWennDeepFightZu } from "@/lib/server/gym-status";
+import { antwortWennDeepFightZu, videoSekundenFuerGym } from "@/lib/server/gym-status";
 import { vorlaufErlaubt } from "@/lib/server/guthaben";
 import { adminDb } from "@/lib/server/firebase-admin";
 import {
@@ -27,17 +27,23 @@ import {
   userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
-import { MAX_VIDEO_SECONDS, type VideoSource } from "@/lib/video-analysis";
+import { type VideoSource } from "@/lib/video-analysis";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-function validate(src: VideoSource | undefined): string | null {
+/**
+ * `maxSekunden` ist die Länge, die DIESES Gym in seiner Stufe darf (Leon
+ * 22.09.: 10 / 15 / 15 min). Der Vorlauf sieht zwar nur die ersten zwei
+ * Minuten — er hält die Grenze trotzdem, damit der Trainer sie vor dem
+ * Hochladen erfährt und nicht erst am Startknopf.
+ */
+function validate(src: VideoSource | undefined, maxSekunden: number): string | null {
   if (!src) return "Videoquelle fehlt.";
   if (src.kind === "upload") {
     if (!src.fileUri) return "Video-Upload fehlt.";
-    if (src.durationSeconds != null && src.durationSeconds > MAX_VIDEO_SECONDS + 5)
-      return "Video ist länger als 15 Minuten.";
+    if (src.durationSeconds != null && src.durationSeconds > maxSekunden + 5)
+      return `Nimm einen Ausschnitt bis ${Math.round(maxSekunden / 60)} Minuten.`;
     return null;
   }
   if (src.kind === "youtube") {
@@ -77,7 +83,8 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Ungültiger Request-Body." }, { status: 400 });
   }
-  const invalid = validate(body.source);
+  // Die Videolänge hängt an der Abo-Stufe (Leon 22.09.).
+  const invalid = validate(body.source, await videoSekundenFuerGym(adminDb, userGymId(user)));
   if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
   try {
