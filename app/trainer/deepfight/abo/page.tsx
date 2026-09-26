@@ -30,8 +30,11 @@
  * bis sie da sind.
  */
 
+import AboFragen from "@/components/deepfight/AboFragen";
 import AboKarten from "@/components/deepfight/AboKarten";
-import AboWerbung from "@/components/deepfight/AboWerbung";
+import AboSchluss from "@/components/deepfight/AboSchluss";
+import AboVergleich from "@/components/deepfight/AboVergleich";
+import AboWerbung, { Etage } from "@/components/deepfight/AboWerbung";
 import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
@@ -326,21 +329,24 @@ function AboSeite() {
   }
 
   const aktuelleStufe = abo && abo.plan !== "free" ? stufeInfo(abo.plan) : null;
+  // Der Nachkauf kostet je Stufe anders (Leon 22.09.: 35 / 30 / 25 €). Den
+  // Block sieht ohnehin nur ein Gym MIT Abo — `aktuelleStufe` steht dort.
+  const nachkaufPreis = nachkaufNetto(aktuelleStufe?.id ?? "team");
 
   return (
     <main className="pb-16" style={{ color: "var(--text-body)" }}>
       {/* Der Rückweg steht AUSSERHALB der Lücken-Spalte: Ab lg wandert er
           in den Kopf der Hülle, und eine leere Zeile hätte oben trotzdem
           ihre 32 px Abstand behalten. */}
-      <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">
+      <div className="abo-spalte pt-4 lg:pt-0">
         <SeitenZurueck href="/trainer/deepfight" label="DeepFight" />
         <h1 className="sr-only">DeepFight-Abo</h1>
       </div>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-2 sm:px-6">
+      <div className={geladen && lage === "keins" ? "abo-vollbild flex flex-col" : "abo-spalte flex flex-col gap-8 pt-2"}>
 
         {/* ── Rückkehr aus der Kasse ─────────────────────────────────── */}
         {kauf === "ok" && (
-          <Streifen ton={bestaetigt ? "gut" : "ruhig"}>
+          <div className="abo-spalte pt-2 pb-6"><Streifen ton={bestaetigt ? "gut" : "ruhig"}>
             {bestaetigt ? (
               <>
                 <strong style={{ fontWeight: 600 }}>Geschafft.</strong> Deine Analysen sind da — leg los.
@@ -351,37 +357,16 @@ function AboSeite() {
                 Analysen erscheinen hier in ein paar Sekunden.
               </>
             )}
-          </Streifen>
+          </Streifen></div>
         )}
         {kauf === "abgebrochen" && (
-          <Streifen ton="ruhig">Kasse verlassen, nichts gebucht. Die Stufen stehen unten.</Streifen>
+          <div className="abo-spalte pt-2 pb-6"><Streifen ton="ruhig">Kasse verlassen, nichts gebucht. Die Stufen stehen unten.</Streifen></div>
         )}
 
         {/* ── Der Stand ──────────────────────────────────────────────── */}
         {!geladen ? (
-          <Skeleton className="h-28 w-full rounded-card" />
-        ) : lage === "keins" ? (
-          stand && stand.rest > 0 ? (
-            <p data-abo-stand={stand.rest} style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
-              {stand.restBezahlt === 0 ? (
-                <>
-                  Überzeug dich selbst mit{" "}
-                  <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>
-                    {stand.rest} gratis {stand.rest === 1 ? "Analyse" : "Analysen"}
-                  </strong>
-                  .
-                </>
-              ) : (
-                <>
-                  <strong style={{ color: "var(--text-1)", fontWeight: 600 }}>
-                    {stand.rest} {stand.rest === 1 ? "Analyse" : "Analysen"}
-                  </strong>{" "}
-                  hast du noch. Mit dem Abo kommen jeden Monat neue dazu.
-                </>
-              )}
-            </p>
-          ) : null
-        ) : (
+          <div className="abo-spalte pt-2"><Skeleton className="h-28 w-full rounded-card" /></div>
+        ) : lage === "keins" ? null : (
           <section aria-label="Dein Abo" className="t-card flex flex-col gap-4 p-5" data-abo-lage={lage}>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="flex flex-col gap-1">
@@ -451,8 +436,10 @@ function AboSeite() {
         {/* ── Ohne Abo: Werbung und die drei Stufen ───────────────────── */}
         {geladen && lage === "keins" && (
           <>
-            <AboWerbung restAnalysen={stand?.rest ?? 0} darfKaufen={darfKaufen} />
+            <AboWerbung restAnalysen={stand?.rest ?? 0} restBezahlt={stand?.restBezahlt ?? 0} darfKaufen={darfKaufen} />
 
+            <section className="abo-band abo-band--durchsichtig">
+            <div className="abo-spalte flex flex-col gap-10">
             <AboKarten
               intervall={intervall}
               onIntervall={setIntervall}
@@ -463,7 +450,7 @@ function AboSeite() {
 
             {/* Unter den Karten: was für alle drei gilt. Der Fehler steht hier,
                 nicht in der Karte — er betrifft oft die USt-IdNr. darüber. */}
-            <div className="t-card flex flex-col gap-5 p-5">
+            <div className="abo-recht flex flex-col gap-5">
               {darfKaufen ? (
                 <UstFeld wert={ust} onWert={setUst} fehler={ustFehler} />
               ) : (
@@ -484,6 +471,30 @@ function AboSeite() {
                 Angebot richtet sich an Gyms und Vereine.
               </p>
             </div>
+            </div>
+            </section>
+
+            {/* Die Vergleichstabelle (N26-Muster) — dieselben Zahlen wie die Karten. */}
+            <section aria-labelledby="abo-vergleich-titel" className="abo-band abo-band--flaeche">
+              <div className="abo-spalte flex flex-col gap-7">
+              <Etage
+                id="abo-vergleich-titel"
+                label="Im Vergleich"
+                zeile="Alle Leistungen auf einen Blick."
+                nutzen="Jede Stufe hat die ganze Analyse. Sie unterscheiden sich in Menge, Videolänge, Nachkauf und darin, ob die App dein Logo trägt."
+              />
+              <AboVergleich intervall={intervall} />
+              </div>
+            </section>
+
+            <section aria-labelledby="abo-fragen-titel" className="abo-band abo-band--durchsichtig">
+              <div className="abo-spalte flex flex-col gap-7">
+              <Etage id="abo-fragen-titel" label="Fragen" zeile="Was vor dem Abo kommt." />
+              <AboFragen />
+              </div>
+            </section>
+
+            <AboSchluss restAnalysen={stand?.rest ?? 0} darfKaufen={darfKaufen} />
           </>
         )}
 
@@ -506,7 +517,7 @@ function AboSeite() {
                     <span style={{ font: "var(--type-num-xl)", color: "var(--text-1)" }}>{NACHKAUF.analysen}</span>
                     <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>Analysen</span>
                   </div>
-                  <Preis netto={nachkaufNetto(aktuelleStufe?.id ?? "team")} takt={null} gross={false} />
+                  <Preis netto={nachkaufPreis} takt={null} gross={false} />
                 </div>
                 {darfKaufen ? (
                   <button

@@ -1158,7 +1158,203 @@ Gewerbe" · Rechnung „Stripe schreibt sie (Empfohlen)" · Push „Noch nicht".
 - **Falle 57:** `npx eslint .` läuft auch durch `backup/` (dort liegen die
   alten Fehler ein zweites Mal). Für die Zählung `--ignore-pattern
   "backup/**"`: außerhalb sind es SECHS Alt-Fehler (CourseLoadChart 2×,
-  lib/beep.ts 3×, lib/extensions/technique-progress.ts 1×).
+  lib/beep.ts 3×, lib/extensions/technique-progress.ts 1×) — am 24.09.
+  SIEBEN, weil ein Parallelfenster `updateDoc` in `technique-progress.ts`
+  ungenutzt stehen ließ.
+
+### DIE ABO-SEITE ALS VERKAUFSSEITE — UND DIE STIMME (22.–24.09.2026, Fenster tidal-athletics-3f, committet 49c6fc1 · 14bf146 · f7891c3)
+Leon: „baue die Abo anzeige so ca" (Vorlage pricing-section-3, shadcn) ·
+„lösche anzeigen wie was eine analyse kostet je paket" · „die ganze seite
+sollte mehr nach verkauf und anreiz schaffen ausgelegt sein … eins zwei
+bilder … ein handy das zwei kämpfer aufnimmt … die deepfight DNA und die
+passende auswertung". Seine Antworten: Abzeichen „„Empfohlen" (Empfohlen)"
+(NIE „Beliebt" — niemand hat gekauft) · Werbung „Behalten, Karten darunter"
+· Knöpfe „In jeder Karte (Empfohlen)".
+- **`components/deepfight/AboWerbung.tsx`**: Handy im Querformat
+  (`public/library-stack/coach-pads.jpg`, CSS-Gehäuse `.abo-phone`, Rahmen
+  „Dein Athlet"), drei Schritte, Helix neben drei Befunden WÖRTLICH aus
+  `DEMO_FIGHT_PROFILE`, Block „Gegner-Scouting". Kein `next/image` (wie
+  JoinBackdrop). **`AboKarten.tsx`**: drei Karten auf einer Bühne, Gym
+  größer (nur ab md — sonst läuft sie auf 390 über den Rand) mit Akzentrahmen
+  UND Wort „Empfohlen", Kaufknopf je Karte, Laufzeit-Schalter mit gleitender
+  Kapsel (misst `offsetLeft`/`offsetWidth`, Übergang erst nach dem ersten
+  Messen), Preise rollen über `components/motion/RollZahl`
+  (`@number-flow/react`, prüft Reduced Motion) und `WortReveal` — beide in
+  der Bewegungs-Schicht, die Seite fasst keine Bibliothek an. `IMMER_DABEI`
+  / `EXTRAS`: die Staffel aus Konzept §6 (Branding, 10/15/15, Nachkauf
+  35/30/25) war bis zum 24.09. NICHT gebaut → `EXTRAS` leer. Seit dem
+  24.09. greifen Videolänge, Branding und Nachkaufpreis — die Punkte stehen
+  jetzt drin (siehe nächster Abschnitt). Die Hilfe-Leiter bleibt draußen:
+  Sie ist ein Versprechen, kein Code.
+- **Die Texte sind Leons.** „Überzeug dich selbst mit 3 gratis Analysen." ·
+  „Designt für maximale Performance." (Adidas-Partizip) · Scouting-Absatz mit
+  **748** charakteristischen Parametern (2 × 374 Analysepunkte je Video,
+  Zählung eines Parallelfensters 24.09.; Leon schrieb „über 750", die Quelle
+  gezeigt — bei Katalogänderung neu zählen). **„Athlet", nie „Fighter"** für
+  die eigenen Leute (Leon 23.09.). „du", nie „ihr" — außer in Leons eigenen
+  Sätzen („eurem Gegner", „ihr erhaltet"). 67 Fragen (nicht 60:
+  `DNA_CATEGORIES`).
+- **Der Skill `.claude/skills/tidal-stimme/` ist die Quelle der Stimme** —
+  vor jedem sichtbaren Satz laden. Darin: zwölf abgelehnte Vorschlagsrunden
+  wörtlich mit Leons Grund („zu künstlich, holt mich als Kunden nicht ab",
+  „gewollt aber nicht gekonnt"), seine angenommenen Sätze, die belegten
+  Muster aus McFit, Snocks, N26, Nike, Adidas (`references/vorbilder.md`,
+  vier Agenten-Läufe). Kern: Slogan-Poesie und Zweitakt-Formeln mit Dreh sind
+  bei Leon IMMER falsch; der Mangel gehört nie dem Leser; echte Inhalte
+  schlagen jeden Spruch; Bilder der Seite statt Vorschlagslisten. `.gitignore`
+  nimmt `.claude/skills/` deshalb von `/.claude/*` aus.
+- **lib/guthaben.ts `ersterTag()`:** Abo-Posten und Nachkauf vom selben Tag
+  laufen am selben Tag ab — der Hinweis nannte nur den ersten („40 laufen
+  ab", wo es 50 sind). Jetzt Summe aller Posten des frühesten Tages.
+- **Falle 58:** `items-start` auf der Hero-Spalte lässt `FightDnaHeading` auf
+  Minimalbreite schrumpfen — auf 390 px steht der Titel Buchstabe für
+  Buchstabe untereinander. **Falle 59:** `npm install <paket>` entfernt
+  Playwright (`--no-save`) — danach `npm install --no-save playwright@1.62.1`.
+  **Falle 60:** `page.screenshot({ fullPage })` hängt feste Leisten und den
+  Hintergrund mitten ins Bild; `tmp-mess-abo.mjs` setzt das Fenster jetzt auf
+  Seitenhöhe. **Falle 61:** ein offenes Bild in der Windows-Fotoanzeige
+  sperrt die Datei — Kopien unter neuem Namen (`final3-*`).
+- Gemessen: 62/62 dunkel und hell (acht Läufe), tsc 0, eslint 0, Querüberlauf
+  0 px auf 1440 und 390. KI-Kosten 0 € (Agenten-Recherche ohne Modellaufrufe
+  der App). Bilder `D:\Tidal-Athletics\abnahme-schritt3\final3-*.png`.
+
+### DIE ABO-SEITE ALS KONZERN-VERKAUFSSEITE (24.09.2026, Fenster tidal-athletics-9f)
+Leon: „die seite http://localhost:3001/trainer/deepfight/abo muss viel
+schöner gestaltett werden … schau auf den seiten [McFit, N26, Nike, Adidas,
+Snocks] nach wie die es machen, texte bilder aufbau … dass wir uns wie ein
+großer konzern präsentieren." Ein Agent las die fünf Seiten (HTML + CSS,
+Adidas nur als Archivkopie) und lieferte das Rezept; die Seite folgt ihm.
+- **Das Rezept:** Poster-Hero (Foto, Text drauf, EIN dominanter Knopf) →
+  Beweisband mit vier Kennzahlen → Dreier-Kacheln „So läuft's" → Karten
+  (Preis 48 px wie McFit, eine hervorgehoben) → Feature-Matrix (N26) →
+  dunkles Statement-Band → FAQ-Akkordeon → Schluss-Band mit DEMSELBEN
+  Knopf-Wortlaut wie im Hero („Jetzt durchstarten"). Sektionsabstand
+  96–128 px (`gap-12 md:gap-16`, nur ohne Abo).
+- **Bausteine:** `AboWerbung.tsx` (Hero `.abo-hero` mit Metall-Überschrift,
+  Leons Zeile, Nutzensatz, Handy rechts, Kennzahlen-`<dl>`: 748 / 67 / 3 /
+  24 — jede aus dem Code: `2 × 374`, `DNA_TOTAL_QUESTIONS`, Gratis-Start,
+  Verfall; Schritte 01–03 mit Ziffern-Outline; Ergebnis-Band mit Helix und
+  drei Befunden; Scouting als `.abo-band--dunkel` mit `.abo-foto` und der
+  748 auf dem Foto) · `AboVergleich.tsx` (Zeilen aus `ABO_STUFEN.leistungen`,
+  Gym-Spalte `data-empfohlen`, mobil waagerecht scrollbar, erste Spalte
+  sticky) · `AboFragen.tsx` (sieben Fragen, `Collapse`, jede Antwort eine
+  Tatsache aus diesem Abschnitt und „SCHRITT 3") · `AboSchluss.tsx` („Lad
+  dein erstes Sparring hoch.") · `Etage` (Label + Kernzeile + Nutzensatz,
+  exportiert aus AboWerbung, auch über den Karten: „Wähl deine Stufe.").
+  Der Stand-Satz („Überzeug dich selbst mit 3 gratis Analysen.") steht jetzt
+  IM Hero; `data-abo-stand` bleibt für die Messung.
+- **Poster-Farben sind FEST** (`--poster-cyan: #00c7ce`, `--poster-ink`):
+  Das helle Theme dreht `--accent` auf dunkles Teal — auf einem dunklen Foto
+  unsichtbar. Gleiches für die Metall-Töne im Hero (dunkle Fassung erzwungen)
+  und den Handy-Rahmen. Ein Poster sieht in beiden Themes gleich aus.
+- **Falle 65:** `.df-entry-heading` ist ein eigener Container; `cqi` misst
+  seine SPALTE, nicht die Seite — in der Hero-Spalte landete die Überschrift
+  am Minimum. `container-type: normal` im Hero, dann darf sie umbrechen.
+- **Falle 66:** ALLE 52 Fotos in `public/join-stack` sind 320×427 px
+  (Pexels-Thumbnails, keine IDs in `docs/join-stack-herkunft.md`) — auf
+  1000 px gezogen unscharf. Poster-Fotos liegen in `public/abo/` mit
+  Herkunft in `docs/abo-bilder-herkunft.md`; `library-stack` hat 800–1200 px.
+- **Falle 67:** `DNA_CATEGORIES.length` ist 9 (Kategorien), die Fragen zählt
+  `DNA_TOTAL_QUESTIONS` (67). Stand kurz mit „9" auf der Seite.
+- **Falle 68:** Zwei 6-KB-Heredocs in EINEM Bash-Aufruf brechen mit
+  „unexpected EOF" — getrennt in den Scratchpad schreiben, per node einfügen.
+- **VOLLBILD (Leon 25.09.2026: „es sieht immer so aus als wäre alles in
+  Rahmen mit runden Ecken … die Verkaufsseite soll eine Vollbild-Seite
+  werden"):** Kein Abschnitt trägt mehr Rahmen, Rundung oder Schatten. Jeder
+  Abschnitt ist ein Band über die volle Breite der Inhaltsspalte (`<main>` der
+  Stab-Hülle hat keinen Seitenabstand, nur der Kopf), der Inhalt steht in
+  `.abo-spalte` (72 rem, zentriert, 16/24 px Rand). Bänder wechseln den Grund
+  wie McFit: Foto → durchsichtig (Synthesis scheint durch) → `--flaeche`
+  (surface-card) → `--dunkel` → durchsichtig → Fläche → durchsichtig → Foto.
+  Hero `min-height: min(82vh, 860px)`, Bandhöhe `clamp(56px, 7vw, 112px)`.
+  Karten stehen ohne Bühne direkt auf dem Band (`.abo-karte` mit eigener
+  Fläche), Tabelle und Fragen nur mit Linien, USt-Block mit Linie oben
+  (`.abo-recht`). Die Regeln stehen als eigener Block „VOLLBILD" NACH den
+  Karten-Regeln und überschreiben sie. **Falle 69:** `.abo-band__inhalt` und
+  `.abo-hero__inhalt` setzen `padding` — das schlug den Seitenrand der
+  `.abo-spalte` (Hero und Scouting standen 24 px weiter links); deshalb
+  `.abo-spalte.abo-…` mit eigenem `padding-inline`. Bilder
+  `abnahme-abo-neu/final2-vollbild-*.png`.
+- **Leons Runde 26.09.2026:** Der Hero beginnt DIREKT unter dem Kopfbalken
+  — der Kopf hält nach unten `--shell-gap × 4`, genau das holt
+  `.abo-vollbild > div:first-child > .abo-hero:first-child` ab `lg` mit
+  negativem Rand zurück; nur bei `header + .staff-content` (kein
+  Stillgelegt-Streifen) und ohne Kassen-Streifen davor, sonst schöbe sich
+  der Hero darüber. Schritt 1 ohne Minutenzahl („Handyvideo vom Mattenrand,
+  direkt aus der App." — Team hat 10, die Längen stehen in Karten, Tabelle
+  und FAQ). Nachkaufpreise NUR noch in Karten und Tabelle; die FAQ sagt
+  „Dann kaufst du 10 Analysen nach." (Leons Einwand „lädt zum Rechnen ein").
+  `public/abo/gegner.jpg` ist jetzt Pexels 2216610 (Blick in die Kamera) —
+  das Nike-Logo auf der Hose liegt bei ~72 % der Bildhöhe, der Ausschnitt
+  endet bei 42 %: Es ist nicht in der Datei, nicht nur verdeckt. Das
+  Messskript erwartet den Nachkauf der Stufe Gym (3000).
+- Bilder `D:\Tidal-Athletics\abnahme-abo-neu\`, Hilfsskript
+  `scripts/tmp-blick-abo.mjs` (Wegwerf: `auf` legt Gym `blick-abo-gym` an,
+  `bild <name> [breite] [theme] [jahr] [selector]`, `zu` räumt auf).
+
+### DIE STUFEN-STAFFEL GEBAUT — WAS AUSSER DER MENGE TRENNT (24.09.2026, Fenster tidal-athletics-7a)
+Leon am 22.09.: Branding „Gym + Saison" · Videolänge „10 / 15 / 15 min" ·
+Nachkauf 35 / 30 / 25 €. Bis zum 24.09. prüfte **keine einzige Zeile**
+`subscription.plan` — er war reine Anzeige. Jetzt entscheidet er.
+- **`lib/abo.ts` ist die eine Quelle**: `AboLeistungen` (`videoMinuten`,
+  `branding`, `nachkaufNetto`) hängt an jeder Stufe; `leistungenFuer(plan)`,
+  `videoSekunden(plan)`, `nachkaufNetto(plan)`, `VIDEO_SEKUNDEN_MAX`.
+  **Der Gratis-Tarif erbt Team** — wer nichts zahlt, bekommt nie mehr als die
+  Stufe für 49 €. `NACHKAUF` trägt nur noch die MENGE; der Preis kommt aus
+  `leistungen`, und `nachkaufSchluessel(stufe)` gibt jeder Stufe einen eigenen
+  Stripe-Preis (der Betrag steht im Schlüssel, die drei Beträge trennen sie).
+- **`lib/server/gym-status.ts`**: `stufeDesGyms()` (`null` = nicht lesbar,
+  NICHT „gratis") und `videoSekundenFuerGym()`. **FAIL-OPEN wie beim
+  Stilllegen**: Lesefehler → Obergrenze. Ein zahlendes Gym wegen eines
+  Lesefehlers auf zehn Minuten zu kürzen wäre die teurere Falschaussage.
+- **Die Länge prüft nur der Aufruf MIT Video** (Falle 46: eine Analyse sind
+  zwei Requests). In `analyze/route.ts` steht deshalb
+  `body.observation ? null : await videoSekundenFuerGym(…)` — die zweite
+  Runde kostet keinen zusätzlichen Lesevorgang. `MAX_VIDEO_SECONDS` in
+  `lib/video-analysis.ts` ist ab jetzt NUR die Obergrenze aller Stufen.
+- **Das Branding-Kit**: `/verwaltung/branding` (Menüpunkt „Marke", steht für
+  JEDE Verwaltung da — ohne die Stufe erklärt die Seite, was das Kit bringt;
+  ein Punkt, der je nach Tarif verschwindet, verkauft nichts). Geschrieben
+  wird über **`POST /api/gym/branding`** mit Admin-SDK und Stufenprüfung
+  (402 `stufeFehlt`). Der Browser versteckt den Schreiber nur zusätzlich.
+- **Die Farbe sind ZWEI ZAHLEN** (`branding.akzentH`, `akzentC`, OKLCH) —
+  `components/GymBrandingTokens.tsx` setzt sie als `--accent-h`/`--accent-c`
+  ans `<html>`, alles Weitere rechnet das Token-System ab (globals.css Kopf).
+  Die Bereichsfarben bleiben: `[data-area="verwaltung"]` deklariert auf einem
+  TIEFEREN Element und gewinnt für seinen Teilbaum. `lib/farbe.ts` rechnet
+  zwischen Hex (Farbwähler) und OKLCH um (Ottosson-Matrizen, Hin- und
+  Rückweg auf dem Byte genau geprüft). Die **Helligkeit gehört dem Theme**
+  (dunkel 0,78, hell 0,50), deshalb speichert das Gym seinen FARBTON, nie
+  einen Farbwert.
+- **DIE STUFE ENTSCHEIDET BEI JEDEM LESEN, nicht das Gespeicherte.** Wechselt
+  ein Gym von Gym auf Team, trägt die App wieder den Tidal-Look — sonst wäre
+  das Kit ein Schalter, den man einmal für einen Monat kauft und für immer
+  behalt. Gelöscht wird nichts; beim Aufstieg steht die Farbe wieder da. Das
+  gilt an BEIDEN Lesewegen: `GymBrandingTokens` und
+  `/api/invites/preview` (dort sieht sie ein Gast ohne Konto).
+- **Das Logo steht als Data-URL im Gym-Dokument**, nicht in einem Speicher.
+  Der Browser rechnet es vor dem Senden auf 320 × 96 px und WebP herunter —
+  5–20 KB statt Megabyte. Dafür: kein zweiter Dienst, keine CORS-Regeln,
+  keine verwaisten Dateien, keine tote Adresse. Grenze **96 KB**, geprüft auf
+  BEIDEN Seiten; erlaubt sind `data:image/png|jpeg|webp|svg+xml` und
+  `https:`. Wird es einmal größer gebraucht (Druck, eigene App), wandert es
+  in einen Speicher — das Feld bleibt eine Adresse, der Leseweg `<img src>`
+  unverändert.
+- **Messung `scripts/mess-stufen.mjs`** — 36/36 dunkel und hell, **0 €
+  KI-Kosten**. Eigenes Prüf-Gym `mess-stufen-gym` (am echten Gym wäre das ein
+  Eingriff in Leons Daten), am Ende gelöscht.
+- **Falle 62 — EIN GYM OHNE GUTHABEN GIBT ES NICHT VON SELBST.**
+  `nimmEineAnalyse` legt die drei Gratis-Analysen an, sobald `guthabenStart`
+  am Gym fehlt. Eine Messung, die auf 402 „kein Guthaben" baut, bekommt sonst
+  **200** — und der Stream ruft Gemini. Also `guthabenStart` setzen UND den
+  Unterordner `guthaben/` leeren: **Unterordner überleben das Löschen ihres
+  Dokuments**, ein Posten aus einem früheren Lauf reicht.
+- **Falle 63:** Die Abo-Karten stehen NUR vor dem ersten Abo (`lage ===
+  "keins"`). Wer für den Schirm eine Stufe setzt, sieht sie nicht mehr.
+- **Falle 64:** Die Karten blenden beim Scrollen ein. Ein `fullPage`-Bild
+  fängt sie ungesehen und damit LEER (verwandt mit Falle 60) —
+  `scrollIntoViewIfNeeded()`, warten, dann den sichtbaren Ausschnitt nehmen
+  und mit `isVisible()` gegenprüfen.
 
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):

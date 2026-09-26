@@ -1868,6 +1868,183 @@ header:has([data-app-suche="kopf"] [data-open]) .kopf-neben {
 @media (prefers-reduced-motion: reduce) { .abo-laufzeit__daumen[data-bereit] { transition: none; } }
 .abo-feld:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .abo-helix { max-height: 420px; }
+/* ─── DIE ABO-SEITE ALS KONZERN-VERKAUFSSEITE (24.09.2026) ────────────────
+ * Leon: „muss viel schöner … wie ein großer Konzern präsentieren" — Vorbilder
+ * McFit, N26, Nike, Adidas, Snocks. Der Aufbau: Poster-Hero mit Foto und dem
+ * Handy als Produktbild → Kennzahlen → drei Schritte mit großen Ziffern →
+ * Ergebnis → Foto-Band Gegner-Scouting → Karten → Vergleichstabelle → Fragen
+ * → Schluss-Band. Fotos liegen unter einem Schleier, der Text darauf ist FEST
+ * hell — ein Poster sieht in beiden Themes gleich aus (wie `.abo-phone`). */
+.abo-hero, .abo-band--foto, .abo-band--dunkel { --poster-cyan: #00c7ce; --poster-ink: #062a30; }
+.abo-hero { position: relative; isolation: isolate; overflow: hidden; container-type: inline-size; border-radius: var(--r-xl); border: 1px solid rgb(255 255 255 / 0.08); background: #07090b; color: #fff; box-shadow: 0 30px 80px rgb(0 0 0 / 0.35); }
+.abo-hero__bild, .abo-band--foto .abo-band__bild { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+.abo-hero__bild { object-position: 62% 40%; transform: scale(1.02); }
+.abo-hero__schleier { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(6 9 11 / 0.94) 0%, rgb(6 9 11 / 0.78) 34%, rgb(6 9 11 / 0.22) 62%, rgb(6 9 11 / 0.06) 100%), linear-gradient(180deg, rgb(6 9 11 / 0.1) 0%, transparent 25%, transparent 55%, rgb(6 9 11 / 0.9) 100%); }
+.abo-hero__glut { position: absolute; z-index: -1; left: -10%; bottom: -30%; width: 60%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%); pointer-events: none; }
+.abo-hero__inhalt { position: relative; display: grid; gap: 36px; padding: clamp(26px, 5cqi, 64px); }
+@media (min-width: 1024px) { .abo-hero__inhalt { grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); align-items: center; padding-top: clamp(40px, 6cqi, 80px); } }
+.abo-hero__text { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+/* Die Metall-Überschrift bleibt auf dem Poster IMMER die dunkle Fassung —
+   das helle Theme dreht ihre Töne sonst auf Tinte, unsichtbar auf dem Foto. */
+.abo-hero .df-entry-heading { padding-top: 0; --df-silver-top: #f5fffd; --df-silver-mid: #c8dcda; --df-silver-edge: #779295; --df-silver-dark: #365458; --df-cyan: #00c7ce; --df-cyan-light: #a4fff8; --df-white: #ffffff; --df-copy: #eaf5f4; --df-shadow: #001012; --df-glint: #ffffff; --df-glint-schein: #a8fff6cc; }
+/* `container-type: normal`: Die Überschrift misst sonst ihre eigene Spalte
+   und landet beim Minimum. Sie darf hier umbrechen — zwei Zeilen Metall
+   sind das Poster (Nike setzt 76 px). */
+.abo-hero .df-entry-heading { container-type: normal; }
+.abo-hero .df-entry-heading h2 { white-space: normal; font-size: clamp(38px, 6.2cqi, 70px); line-height: 1.02; }
+.abo-hero .df-entry-heading__rule { display: none; }
+.abo-hero__label { display: inline-flex; align-items: center; gap: 8px; width: fit-content; padding: 6px 12px; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); backdrop-filter: blur(6px); font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: rgb(255 255 255 / 0.86); }
+.abo-hero__label i { width: 6px; height: 6px; border-radius: 999px; background: var(--poster-cyan); box-shadow: 0 0 10px var(--poster-cyan); }
+.abo-hero__zeile { font: 700 clamp(22px, 2.5cqi, 30px)/1.15 var(--font-body); letter-spacing: -0.005em; color: #fff; text-wrap: balance; }
+.abo-hero__nutzen { max-width: 56ch; font: 400 clamp(16px, 1.5cqi, 18px)/1.55 var(--font-body); color: rgb(255 255 255 / 0.8); }
+.abo-hero__stand { display: flex; align-items: center; gap: 10px; font: var(--type-sub); color: rgb(255 255 255 / 0.78); }
+.abo-hero__stand strong { color: #fff; font-weight: 600; }
+.abo-hero__stand .abo-haken { width: 20px; height: 20px; border-color: color-mix(in oklab, var(--poster-cyan) 60%, transparent); background: color-mix(in oklab, var(--poster-cyan) 22%, transparent); color: var(--poster-cyan); }
+.abo-hero__knopf { border: 1px solid rgb(255 255 255 / 0.28); color: #fff; background: rgb(255 255 255 / 0.06); backdrop-filter: blur(6px); }
+.abo-hero__knopf--primaer { border-color: transparent; background: var(--poster-cyan); color: var(--poster-ink); box-shadow: 0 10px 30px color-mix(in oklab, var(--poster-cyan) 35%, transparent); }
+.abo-hero__handy { min-width: 0; justify-self: end; width: min(100%, 560px); transform: translateY(6px); }
+@media (min-width: 1024px) { .abo-hero__handy { transform: translateY(0) rotate(-1.5deg); } }
+.abo-hero__handy figcaption { color: rgb(255 255 255 / 0.62); }
+.abo-hero .abo-phone { box-shadow: 0 40px 80px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06); }
+.abo-hero .abo-phone__rahmen { border-color: var(--poster-cyan); box-shadow: 0 0 22px color-mix(in oklab, var(--poster-cyan) 45%, transparent); }
+.abo-hero .abo-phone__marke { background: var(--poster-cyan); color: var(--poster-ink); }
+
+/* Kennzahlen unter dem Hero-Inhalt: die Leiste, mit der Konzerne Größe
+   zeigen — hier nur Zahlen, die im Code gezählt sind. */
+.abo-kennzahlen { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; margin: 0; padding: 22px clamp(26px, 5cqi, 64px) clamp(24px, 4cqi, 40px); border-top: 1px solid rgb(255 255 255 / 0.12); }
+@media (min-width: 768px) { .abo-kennzahlen { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.abo-kennzahlen div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.abo-kennzahlen dt { order: 2; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: rgb(255 255 255 / 0.62); }
+.abo-kennzahlen dd { order: 1; margin: 0; font: 800 clamp(28px, 3cqi, 40px)/1 var(--font-body); letter-spacing: -0.01em; color: #fff; font-variant-numeric: tabular-nums; }
+.abo-kennzahlen dd small { font: 600 14px/1 var(--font-body); letter-spacing: 0.02em; color: rgb(255 255 255 / 0.7); margin-left: 4px; }
+
+/* Etage: Label (Versalien) über Kernzeile — das McFit-/Nike-Muster. */
+.abo-etage { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.abo-etage__label { display: flex; align-items: center; gap: 10px; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--accent-text, var(--accent)); }
+.abo-etage__label::before { content: ""; width: 22px; height: 2px; border-radius: 2px; background: var(--accent); }
+.abo-etage__zeile { font: 800 clamp(26px, 3.2cqi, 40px)/1.1 var(--font-body); letter-spacing: -0.01em; color: var(--text-1); text-wrap: balance; }
+.abo-etage__nutzen { max-width: 62ch; font: var(--type-body); color: var(--text-2); }
+.abo-band--foto .abo-etage__label { color: var(--poster-cyan); }
+.abo-band--foto .abo-etage__zeile { color: #fff; }
+.abo-band--foto .abo-etage__nutzen { color: rgb(255 255 255 / 0.82); }
+
+/* Drei Schritte mit großen Ziffern. */
+.abo-schritte { display: grid; gap: 14px; }
+@media (min-width: 768px) { .abo-schritte { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.abo-schritt { position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 26px 24px 24px; overflow: hidden; }
+.abo-schritt__ziffer { font: 800 clamp(44px, 5cqi, 60px)/1 var(--font-body); letter-spacing: -0.03em; color: transparent; -webkit-text-stroke: 1.5px color-mix(in oklab, var(--accent) 70%, transparent); font-variant-numeric: tabular-nums; }
+.abo-schritt__icon { display: grid; place-content: center; width: 40px; height: 40px; border-radius: var(--r-md); background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent-text, var(--accent)); }
+.abo-schritt__titel { font: 700 20px/1.2 var(--font-body); color: var(--text-1); }
+.abo-schritt__text { font: var(--type-sub); color: var(--text-2); }
+
+/* Bänder: eine ruhige Fläche oder ein Foto unter Schleier. */
+.abo-band { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--r-xl); border: 1px solid var(--line); background: var(--surface-card); container-type: inline-size; }
+.abo-band--foto { border-color: rgb(255 255 255 / 0.08); background: #07090b; color: #fff; box-shadow: 0 30px 80px rgb(0 0 0 / 0.3); }
+.abo-band--foto .abo-band__bild { object-position: 85% 20%; }
+.abo-band__schleier { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(6 9 11 / 0.95) 0%, rgb(6 9 11 / 0.82) 40%, rgb(6 9 11 / 0.3) 70%, rgb(6 9 11 / 0.08) 100%); }
+.abo-band__schleier--mitte { background: linear-gradient(180deg, rgb(6 9 11 / 0.45) 0%, rgb(6 9 11 / 0.7) 100%); }
+.abo-band__inhalt { position: relative; display: grid; gap: 28px; padding: clamp(26px, 5cqi, 64px); }
+@media (min-width: 1024px) { .abo-band__inhalt--zwei { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); align-items: center; } }
+.abo-band__inhalt--mitte { justify-items: center; text-align: center; padding-top: clamp(40px, 7cqi, 88px); padding-bottom: clamp(40px, 7cqi, 88px); }
+.abo-band__inhalt--mitte .abo-etage { align-items: center; }
+.abo-band__inhalt--mitte .abo-etage__label::before { display: none; }
+/* Das dunkle Statement-Band (N26 „Wechsle deine Bank", adidas „ON NOW"):
+   feste Tiefe in beiden Themes, ein Foto als Bild-Text-Block daneben. */
+.abo-band--dunkel { border-color: rgb(255 255 255 / 0.08); background: radial-gradient(120% 90% at 0% 100%, color-mix(in oklab, var(--accent) 16%, #07090b), #07090b 60%); color: #fff; box-shadow: 0 30px 80px rgb(0 0 0 / 0.3); }
+.abo-band--dunkel .abo-etage__label { color: var(--poster-cyan); }
+.abo-band--foto .abo-etage__label::before, .abo-band--dunkel .abo-etage__label::before { background: var(--poster-cyan); }
+.abo-band--dunkel .abo-etage__zeile { color: #fff; }
+.abo-band--dunkel .abo-etage__nutzen { color: rgb(255 255 255 / 0.82); }
+.abo-foto { position: relative; isolation: isolate; overflow: hidden; min-width: 0; aspect-ratio: 4 / 3; border-radius: var(--r-lg); border: 1px solid rgb(255 255 255 / 0.1); background: #000; box-shadow: 0 30px 60px rgb(0 0 0 / 0.45); }
+.abo-foto__bild { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 28%; filter: saturate(0.9); }
+.abo-foto__schleier { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(6 9 11 / 0.05) 35%, rgb(6 9 11 / 0.85) 100%); }
+.abo-foto__marke { position: absolute; top: 14px; left: 14px; padding: 4px 10px; border-radius: 999px; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; background: rgb(255 255 255 / 0.12); color: #fff; backdrop-filter: blur(6px); border: 1px solid rgb(255 255 255 / 0.18); }
+.abo-foto .abo-grosszahl { position: absolute; left: 20px; right: 20px; bottom: 18px; }
+.abo-grosszahl { display: flex; flex-direction: column; gap: 6px; justify-self: start; }
+.abo-grosszahl strong { font: 800 clamp(56px, 9cqi, 96px)/0.95 var(--font-body); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 40px color-mix(in oklab, var(--accent) 40%, transparent); }
+.abo-grosszahl span { font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: rgb(255 255 255 / 0.7); }
+.abo-befund { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface-raised); border-left: 3px solid var(--accent); }
+
+/* Die Vergleichstabelle — N26-Muster: Zeilen mit Häkchen, Empfehlung als Spalte. */
+.abo-vergleich { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface-card); }
+.abo-vergleich table { width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 0; }
+.abo-vergleich th, .abo-vergleich td { padding: 14px 16px; text-align: center; font: var(--type-sub); color: var(--text-2); border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.abo-vergleich td:first-child, .abo-vergleich tbody th:first-child { white-space: normal; min-width: 180px; }
+.abo-vergleich th:first-child, .abo-vergleich td:first-child { text-align: left; color: var(--text-1); font: var(--type-body); position: sticky; left: 0; z-index: 1; background: var(--surface-card); }
+.abo-vergleich thead th { padding-top: 20px; padding-bottom: 16px; font: 700 18px/1.2 var(--font-body); color: var(--text-1); }
+.abo-vergleich thead th small { display: block; margin-top: 4px; font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); }
+.abo-vergleich tbody tr:last-child td { border-bottom: 0; }
+.abo-vergleich [data-empfohlen] { background: color-mix(in oklab, var(--accent) 9%, transparent); color: var(--text-1); }
+.abo-vergleich thead [data-empfohlen] { box-shadow: inset 0 3px 0 var(--accent); }
+.abo-vergleich td strong { font-weight: 600; color: var(--text-1); }
+.abo-vergleich .abo-haken { margin: 0 auto; }
+.abo-vergleich .abo-fehlt { display: inline-block; width: 14px; height: 2px; border-radius: 2px; background: var(--line-strong); vertical-align: middle; }
+
+/* Fragen: eine Liste, die aufklappt. */
+.abo-fragen { display: flex; flex-direction: column; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface-card); }
+.abo-frage + .abo-frage { border-top: 1px solid var(--line); }
+.abo-frage__knopf { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 60px; padding: 16px 20px; text-align: left; font: var(--type-body-strong); color: var(--text-1); background: none; border: 0; cursor: pointer; }
+.abo-frage__knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-md); }
+.abo-frage__pfeil { display: grid; place-content: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--text-2); transition: transform var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out); }
+.abo-frage__knopf[aria-expanded="true"] .abo-frage__pfeil { transform: rotate(180deg); background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent-text, var(--accent)); border-color: transparent; }
+.abo-frage__antwort { padding: 0 20px 20px; max-width: 70ch; font: var(--type-body); color: var(--text-2); }
+@media (hover: hover) { .abo-frage__knopf:hover .abo-frage__pfeil { color: var(--text-1); } }
+@media (prefers-reduced-motion: reduce) { .abo-frage__pfeil { transition: none; } }
+/* ─── VOLLBILD (Leon 25.09.2026: „es sieht immer so aus als wäre alles in
+ * Rahmen mit runden Ecken … die Verkaufsseite soll eine Vollbild-Seite
+ * werden") ───────────────────────────────────────────────────────────────
+ * Kein Abschnitt trägt mehr Rahmen, Rundung oder Schatten. Jeder Abschnitt
+ * ist ein BAND über die volle Breite der Inhaltsspalte; nur sein Inhalt
+ * steht in der `.abo-spalte` (72 rem, zentriert). Die Bänder wechseln den
+ * Grund wie McFit (Schwarz → Weiß → Graphit): Foto → durchsichtig (die
+ * bewegte DeepFight-Schicht scheint durch) → Fläche → Tiefe → durchsichtig →
+ * Fläche → durchsichtig → Foto. Diese Regeln stehen NACH den Karten-Regeln
+ * oben und überschreiben sie. */
+.abo-spalte { width: 100%; max-width: 72rem; margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 640px) { .abo-spalte { padding-inline: 24px; } }
+.abo-hero, .abo-band, .abo-band--foto, .abo-band--dunkel { border: 0; border-radius: 0; box-shadow: none; }
+.abo-hero { min-height: min(82vh, 860px); display: flex; flex-direction: column; justify-content: flex-end; }
+.abo-hero__inhalt { flex: 1; padding-block: clamp(40px, 6vw, 96px) clamp(32px, 4vw, 56px); }
+@media (min-width: 1024px) { .abo-hero__inhalt { padding-top: clamp(56px, 7vw, 112px); } }
+.abo-hero__schleier { background: linear-gradient(90deg, rgb(6 9 11 / 0.94) 0%, rgb(6 9 11 / 0.78) 30%, rgb(6 9 11 / 0.28) 58%, rgb(6 9 11 / 0.08) 100%), linear-gradient(180deg, rgb(6 9 11 / 0.35) 0%, transparent 22%, transparent 55%, rgb(6 9 11 / 0.92) 100%); }
+.abo-kennzahlen { padding-block: 26px clamp(28px, 4vw, 48px); border-top: 1px solid rgb(255 255 255 / 0.14); }
+.abo-band { padding-block: clamp(56px, 7vw, 112px); }
+.abo-band__inhalt { padding-block: 0; }
+.abo-band__inhalt--mitte { padding-block: 0; }
+/* Die Spalte hält ihren Seitenabstand auch dort, wo der Inhalt eigene Regeln hat. */
+.abo-spalte.abo-hero__inhalt, .abo-spalte.abo-kennzahlen, .abo-spalte.abo-band__inhalt { padding-inline: 16px; }
+@media (min-width: 640px) { .abo-spalte.abo-hero__inhalt, .abo-spalte.abo-kennzahlen, .abo-spalte.abo-band__inhalt { padding-inline: 24px; } }
+.abo-band--flaeche { background: var(--surface-card); }
+.abo-band--durchsichtig { background: transparent; }
+.abo-band--foto { min-height: min(62vh, 640px); display: flex; align-items: center; }
+.abo-band--dunkel { background: radial-gradient(90% 120% at 0% 100%, color-mix(in oklab, var(--accent) 14%, #07090b), #07090b 62%); }
+/* Die Karten stehen ohne Bühne direkt auf dem Band. */
+.abo-buehne { border: 0; background: none; padding: 0; gap: 18px; border-radius: 0; }
+.abo-karte { border: 1px solid var(--line); background: color-mix(in oklab, var(--surface-card) 72%, transparent); }
+.abo-karte--empfohlen { border-color: transparent; }
+/* Tabelle und Fragen: nur Linien, kein Kasten. Die klebende erste Spalte
+   nimmt den Grund des Bandes, sonst schiebt sich Text darunter durch. */
+.abo-vergleich { border: 0; border-radius: 0; background: transparent; }
+.abo-vergleich th:first-child, .abo-vergleich td:first-child { background: var(--surface-card); }
+.abo-vergleich thead th { border-bottom: 2px solid var(--line-strong); }
+.abo-vergleich tbody tr:last-child th, .abo-vergleich tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+.abo-fragen { border: 0; border-radius: 0; background: transparent; }
+.abo-frage:first-child { border-top: 1px solid var(--line); }
+.abo-frage:last-child { border-bottom: 1px solid var(--line); }
+.abo-frage__knopf, .abo-frage__antwort { padding-inline: 4px; }
+/* Der Rechtsblock unter den Karten: eine Linie oben, keine Karte. */
+.abo-recht { padding-top: 28px; border-top: 1px solid var(--line); }
+/* Der Hero beginnt direkt unter dem Kopfbalken (Leon 26.09.2026). Der Kopf
+   hält nach unten `--shell-gap × 4` Abstand (StaffHeader) — genau den holt
+   der Hero zurück. Nur wenn Kopf und Inhalt direkt aufeinander folgen
+   (`header + main`: kein Stillgelegt-Streifen dazwischen) und der Hero das
+   Erste der Seite ist (kein Kassen-Streifen davor) — sonst schöbe er sich
+   über den Streifen. */
+@media (min-width: 1024px) {
+  header + .staff-content .abo-vollbild > div:first-child > .abo-hero:first-child { margin-top: calc(var(--shell-gap) * -4); }
+}
+
+
 .df-filter__summe { margin-left: auto; padding-bottom: 10px; font: var(--type-meta); letter-spacing: var(--ls-label); color: var(--text-2); font-variant-numeric: tabular-nums; }
 @media (hover: hover) {
   .df-feld__zeile:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }

@@ -16,7 +16,8 @@
  * Empfehlung, keine Aussage über Käufer.
  */
 
-import { Reveal, RollZahl, WortReveal } from "@/components/motion";
+import { Etage } from "@/components/deepfight/AboWerbung";
+import { Reveal, RollZahl } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import {
   ABO_STUFEN,
@@ -48,13 +49,16 @@ const FUER: Record<AboStufe, string> = {
  * `EXTRAS` ist das, was eine Stufe VORAUS hat. Leon hat am 22.09. die Staffel
  * beschlossen (Konzept §6, Tabelle „WAS DIE STUFEN AUSSER DER MENGE TRENNT":
  * Branding-Kit ab Gym, Videolänge 10/15/15, Nachkauf 35/30/25 €,
- * Hilfe-Leiter) — GEBAUT ist davon noch nichts, heute prüft keine Zeile die
- * Stufe. Deshalb stehen hier leere Listen.
+ * Hilfe-Leiter). Seit dem 24.09. GREIFEN die ersten drei:
+ *   · Videolänge  → `videoSekundenFuerGym` in lib/server/gym-status.ts
+ *   · Branding    → /verwaltung/branding, geprüft in /api/gym/branding
+ *   · Nachkauf    → `nachkaufNetto` in lib/abo.ts, ein Stripe-Preis je Stufe
  *
  * **Ein Punkt kommt erst hierher, wenn er wirklich greift.** „Kommt bald" in
- * einer Preistabelle ist in Deutschland irreführend (Konzept §6). Sobald eine
- * höhere Stufe etwas Eigenes hat, schreibt ihre Karte von selbst „Alles aus
- * Team, plus:" und listet nur das Neue.
+ * einer Preistabelle ist in Deutschland irreführend (Konzept §6). Die
+ * Hilfe-Leiter steht deshalb NICHT hier: Sie ist Leons Versprechen, kein Code.
+ * Eine höhere Stufe schreibt von selbst „Alles aus Team, plus:" und listet nur
+ * das Neue.
  */
 const IMMER_DABEI = [
   "Fight-DNA für jeden Athleten",
@@ -62,7 +66,15 @@ const IMMER_DABEI = [
   "Gameplan ohne Aufpreis",
   "Ungenutztes sammelt sich an",
 ];
-const EXTRAS: Record<AboStufe, string[]> = { team: [], gym: [], saison: [] };
+const EXTRAS: Record<AboStufe, string[]> = {
+  team: ["Videos bis 10 Minuten"],
+  gym: [
+    "Videos bis 15 Minuten",
+    "Dein Logo und deine Farbe in der App",
+    "Nachkauf für 30 € statt 35 €",
+  ],
+  saison: ["Nachkauf für 25 € statt 30 €"],
+};
 
 function inhalt(i: number): { kopf: string; liste: string[] } {
   const s = ABO_STUFEN[i];
@@ -156,17 +168,15 @@ export default function AboKarten({
   onKaufen: (stufe: AboStufe) => void;
 }) {
   return (
-    <section aria-labelledby="abo-stufen-titel" className="flex flex-col gap-6">
+    <section aria-labelledby="abo-stufen-titel" className="flex scroll-mt-24 flex-col gap-7">
       <div className="flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
-        <h2 id="abo-stufen-titel" className="t-sheet-title" style={{ color: "var(--text-1)" }}>
-          <WortReveal text="Dein Abo" />
-        </h2>
+        <Etage id="abo-stufen-titel" label="Dein Abo" zeile="Wähl deine Stufe." />
         <Reveal delay={0.2} className="shrink-0">
           <Laufzeit wert={intervall} onWert={onIntervall} />
         </Reveal>
       </div>
 
-      <div className="abo-buehne grid gap-3 rounded-card p-2 sm:p-3 md:grid-cols-3">
+      <div className="abo-buehne grid md:grid-cols-3">
         {ABO_STUFEN.map((s, i) => {
           const empfohlen = s.id === ABO_VORWAHL;
           const netto = s.netto[intervall];
@@ -184,10 +194,11 @@ export default function AboKarten({
 
                 <div className="flex flex-col gap-1">
                   <div className="flex flex-wrap items-baseline gap-x-1.5">
+                    {/* Preis 48 px — die Größe, mit der McFit ihn setzt. */}
                     <RollZahl
                       wert={netto}
                       waehrung
-                      style={{ font: "var(--type-display)", color: "var(--text-1)" }}
+                      style={{ font: "800 48px/1 var(--font-body)", letterSpacing: "-0.02em", color: "var(--text-1)" }}
                     />
                     <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
                       / {intervall === "jahr" ? "Jahr" : "Monat"}
@@ -206,7 +217,7 @@ export default function AboKarten({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <h3 style={{ font: "var(--type-h2)", color: "var(--text-1)" }}>{s.name}</h3>
+                  <h3 style={{ font: "700 22px/1.2 var(--font-body)", letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-1)" }}>{s.name}</h3>
                   <p style={{ font: "var(--type-body-strong)", color: "var(--text-1)" }}>
                     {s.analysenJeMonat} Analysen im Monat
                   </p>
