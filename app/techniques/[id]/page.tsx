@@ -1,4 +1,5 @@
 import { ALL_TECHNIQUES, getTechniqueById } from "@/lib/techniques";
+import { reinerText } from "@/lib/glossar";
 import { notFound } from "next/navigation";
 import TechniqueDetailView from "./TechniqueDetailView";
 
@@ -14,7 +15,8 @@ export function generateMetadata({ params }: { params: { id: string } }) {
   if (!t) return { title: "Technik nicht gefunden — Tidal Athletics" };
   return {
     title: `${t.name} — Tidal Athletics Techniken`,
-    description: t.description,
+    // Ohne `reinerText` stünden Glossar-Markierungen in der Suchvorschau.
+    description: reinerText(t.description),
   };
 }
 

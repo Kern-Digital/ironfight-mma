@@ -1,10 +1,12 @@
 import type { Category, Difficulty, Discipline, Technique } from "../types";
+import { reinerText } from "../glossar";
 import { BOXING_TECHNIQUES } from "./boxing";
 import { WRESTLING_TECHNIQUES } from "./wrestling";
 import { BJJ_TECHNIQUES } from "./bjj";
 import { MUAY_THAI_TECHNIQUES } from "./muay-thai";
 import { KICKBOXEN_TECHNIQUES } from "./kickboxen";
 import { MMA_BASIC_TECHNIQUES } from "./mma-basics";
+import { DRILL_TECHNIQUES } from "./drills";
 
 /** Aggregierte Technikbibliothek über alle Disziplinen. */
 export const ALL_TECHNIQUES: Technique[] = [
@@ -14,7 +16,13 @@ export const ALL_TECHNIQUES: Technique[] = [
   ...MUAY_THAI_TECHNIQUES,
   ...KICKBOXEN_TECHNIQUES,
   ...MMA_BASIC_TECHNIQUES,
+  ...DRILL_TECHNIQUES,
 ];
+
+/** Die Einstiegs-Drills einer Kampfart — „Übungen für den Anfang". */
+export function getDrillsByCategory(cat: Category): Technique[] {
+  return ALL_TECHNIQUES.filter((t) => t.role === "drill" && t.category === cat);
+}
 
 const BY_ID = new Map<string, Technique>(
   ALL_TECHNIQUES.map((t) => [t.id, t]),
@@ -46,10 +54,13 @@ export function getTechniquesByDifficulty(d: Difficulty): Technique[] {
 export function searchTechniques(q: string): Technique[] {
   if (!q.trim()) return ALL_TECHNIQUES;
   const needle = q.toLowerCase();
+  // `reinerText` entfernt Glossar-Markierungen — sonst fände die Suche
+  // „{{clinch}}" statt „Clinch" und ginge bei „clinch" trotzdem leer aus,
+  // weil die geschweiften Klammern mitten im Wort stehen.
   return ALL_TECHNIQUES.filter(
     (t) =>
       t.name.toLowerCase().includes(needle) ||
-      t.description.toLowerCase().includes(needle) ||
+      reinerText(t.description).toLowerCase().includes(needle) ||
       t.usage.toLowerCase().includes(needle),
   );
 }

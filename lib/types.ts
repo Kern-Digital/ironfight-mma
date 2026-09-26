@@ -234,6 +234,13 @@ export interface Technique {
   diversityGroup?: string;
   /** YouTube-Suchbegriff als Fallback, wenn kein eigenes Video vorhanden */
   videoSearchQuery?: string;
+  /**
+   * Warum das zählt — ein Satz, der VOR der Anleitung steht und dem
+   * Einsteiger sagt, wofür er die Mühe auf sich nimmt („Ausweichen ist die
+   * wichtigste Fähigkeit, egal welchen Kampfsport du später machst").
+   * Darf Glossar-Markierungen enthalten, siehe lib/glossar.ts.
+   */
+  whyItMatters?: string;
 }
 
 // ─── Übungen (Exercise = trainierbare Einheit, ggf. Technik-bezogen) ───────

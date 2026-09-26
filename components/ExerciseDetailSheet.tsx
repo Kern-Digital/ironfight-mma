@@ -26,6 +26,7 @@ import { CATEGORY_LABEL, getTechniqueById } from "@/lib/techniques";
 import { DIFFICULTY_LABEL, type Exercise, type Technique } from "@/lib/types";
 import { useEffect, useState } from "react";
 import XKnopf from "@/components/ui/XKnopf";
+import { reinerText } from "@/lib/glossar";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -484,7 +485,7 @@ function TechnikInhalt({ technique }: { technique: Technique }) {
           className="mt-3"
           style={{ font: "var(--type-body)", color: "var(--text-2)" }}
         >
-          {technique.description}
+          {reinerText(technique.description)}
         </p>
       )}
 

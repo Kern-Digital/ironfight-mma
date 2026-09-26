@@ -41,6 +41,7 @@ import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { reinerText } from "@/lib/glossar";
 
 /** Alle Disziplinen, die tatsächlich in der Datenbank vorkommen */
 const ALL_DISCIPLINES: Discipline[] = [
@@ -495,7 +496,7 @@ export default function TechniquesPage() {
                             className="line-clamp-2"
                             style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
                           >
-                            {t.description}
+                            {reinerText(t.description)}
                           </p>
                           <span
                             className="mt-2"

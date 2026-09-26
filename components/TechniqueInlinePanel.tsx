@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import Link from "next/link";
 import { useState } from "react";
+import { reinerText } from "@/lib/glossar";
 
 interface TechniqueInlinePanelProps {
   id: string;          // for aria-controls
@@ -133,7 +134,7 @@ export default function TechniqueInlinePanel({
 
         {/* Short description */}
         <p className="mt-2 text-xs text-foreground/70 leading-relaxed">
-          {t.description}
+          {reinerText(t.description)}
         </p>
       </div>
 
