@@ -37,7 +37,6 @@
 
 import { collection, getDocs } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
-import { TRAINING_BLOCKS } from "./schedule";
 import { DISCIPLINE_LABEL, type TrainingBlock } from "./types";
 
 /** uid → die Kurs-IDs, für die dieser Athlet ein Abo hat. */
@@ -70,9 +69,10 @@ export async function loadCourseMemberships(
 
 // ─── Ableitungen für die Filter ─────────────────────────────────────────────
 
-const BLOCK_BY_ID = new Map<string, TrainingBlock>(
-  TRAINING_BLOCKS.map((b) => [b.id, b]),
-);
+/** Termin-ID → Termin, aus den Kursen des eigenen Gyms (useKursplan). */
+function nachId(kurse: TrainingBlock[]): Map<string, TrainingBlock> {
+  return new Map(kurse.map((b) => [b.id, b]));
+}
 
 export const COURSE_GROUP_LABEL: Record<string, string> = {
   kids: "Kinder",
@@ -104,7 +104,9 @@ export interface StudentFilterOptions {
  */
 export function filterOptions(
   memberships: CourseMemberships,
+  kurse: TrainingBlock[],
 ): StudentFilterOptions {
+  const BLOCK_BY_ID = nachId(kurse);
   const belegt = new Set<string>();
   memberships.forEach((set) => set.forEach((id) => belegt.add(id)));
 
@@ -178,6 +180,7 @@ export function matchesCourseFilter(
   uid: string,
   memberships: CourseMemberships,
   f: { courses: string[]; disciplines: string[]; groups: string[] },
+  kurse: TrainingBlock[],
 ): boolean {
   if (!f.courses.length && !f.disciplines.length && !f.groups.length) {
     return true;
@@ -185,6 +188,7 @@ export function matchesCourseFilter(
   const ids = memberships.get(uid);
   if (!ids || ids.size === 0) return false;
 
+  const BLOCK_BY_ID = nachId(kurse);
   const blocks = Array.from(ids)
     .map((id) => BLOCK_BY_ID.get(id))
     .filter((b): b is TrainingBlock => Boolean(b));

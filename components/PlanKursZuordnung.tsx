@@ -25,6 +25,7 @@ import {
   courseTitles,
   courseTitlesOf,
 } from "@/lib/schedule";
+import { useKursplan } from "@/lib/kursplan-context";
 import { useState } from "react";
 
 const CHIP_FONT = "600 12px/1.2 var(--font-archivo), system-ui, sans-serif";
@@ -40,21 +41,22 @@ export default function PlanKursZuordnung({
   ids,
   onChange,
 }: {
-  /** Gespeicherte Termin-IDs (TRAINING_BLOCKS) */
+  /** Gespeicherte Termin-IDs aus dem Kursplan des Gyms */
   ids: string[];
   onChange: (ids: string[]) => void;
 }) {
-  const gewaehlt = courseTitlesOf(ids);
+  const { kurse } = useKursplan();
+  const gewaehlt = courseTitlesOf(kurse, ids);
   const [offen, setOffen] = useState(false);
 
   function umschalten(titel: string) {
     if (gewaehlt.includes(titel)) {
       // Nur die Termine DIESES Kurses gehen raus. IDs, die sich nicht mehr
       // auflösen (Kurs aus dem Plan genommen), bleiben unangetastet liegen.
-      onChange(ids.filter((id) => blockById(id)?.title !== titel));
+      onChange(ids.filter((id) => blockById(kurse, id)?.title !== titel));
       return;
     }
-    const neu = blocksForCourse(titel)
+    const neu = blocksForCourse(kurse, titel)
       .map((b) => b.id)
       .filter((id) => !ids.includes(id));
     onChange([...ids, ...neu]);
@@ -102,7 +104,7 @@ export default function PlanKursZuordnung({
           aria-label="Kurse"
           className="flex flex-wrap gap-2 pt-1"
         >
-          {courseTitles().map((titel) => {
+          {courseTitles(kurse).map((titel) => {
             const active = gewaehlt.includes(titel);
             return (
               <button

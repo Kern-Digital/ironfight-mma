@@ -38,8 +38,9 @@ import { ladeAlleAnalysen, nameVon } from "./deepfight-analysen";
 import { listOpponentsForGym, listOpponentsSharedWith, type Opponent } from "./opponents";
 import { darfSehen } from "./profile-sharing";
 import type { RoleSet } from "./roles";
+import type { TrainingBlock } from "./types";
 import { SHELL_ACCOUNT_ITEMS, shellNavGroups } from "./shell-nav";
-import { TRAINING_BLOCKS, WEEKDAY_SHORT } from "./schedule";
+import { WEEKDAY_SHORT } from "./schedule";
 import { ALL_TECHNIQUES, CATEGORY_LABEL } from "./techniques";
 import {
   listPersonalWorkoutPlans,
@@ -159,8 +160,9 @@ export function technikTreffer(): SuchTreffer[] {
   }));
 }
 
-export function kursTreffer(): SuchTreffer[] {
-  return TRAINING_BLOCKS.map((b) => ({
+/** Die Kurse des EIGENEN Gyms (useKursplan) — seit 26.09.2026 keine feste Liste mehr. */
+export function kursTreffer(kurse: TrainingBlock[]): SuchTreffer[] {
+  return kurse.map((b) => ({
     id: b.id,
     gruppe: "kurse" as const,
     titel: b.title,

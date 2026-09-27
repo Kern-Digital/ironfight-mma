@@ -594,6 +594,18 @@ export interface TrainingBlock {
   /** Fein-Disziplin für die Farbcodierung (z. B. Kickboxen ≠ Boxen). */
   discipline?: Discipline;
   level?: "kids" | "teens" | "adult" | "advanced" | "mixed";
+  /**
+   * Wer den Kurs gibt (Leon 26.09.2026: mindestens einer, mehrere erlaubt).
+   * Seit dem 26.09. liegt der Kurs im Plan des Gyms (lib/kursplan.ts);
+   * übernommene Kurse stehen leer da, bis die Verwaltung zuweist.
+   */
+  trainerUids?: string[];
+  /**
+   * In welchem Raum (Leon 27.09.2026: „es gibt gyms die verschiedene räume
+   * haben"). ID aus `raeume` am Plan-Dokument; fehlt, wenn das Gym keine
+   * Räume pflegt.
+   */
+  raumId?: string;
 }
 
 export interface TrainingSession {

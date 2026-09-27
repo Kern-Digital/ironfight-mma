@@ -1356,6 +1356,139 @@ Nachkauf 35 / 30 / 25 €. Bis zum 24.09. prüfte **keine einzige Zeile**
   `scrollIntoViewIfNeeded()`, warten, dann den sichtbaren Ausschnitt nehmen
   und mit `isVisible()` gegenprüfen.
 
+### KURSPLAN JE GYM — KURS BEKOMMT TRAINER (26.09.2026, Fenster nach 26-09)
+Leon: „wir sollten uns mal an die verwaltungsebene machen", Wahl aus der
+Bestandsaufnahme: „Kurs bekommt Trainer". **Befund vorher:** Die Kurse waren
+`TRAINING_BLOCKS` in `lib/schedule.ts`, EINE Woche für ALLE Gyms. Jedes
+selbst angemeldete Gym sah Leons Wing-Tsung-Plan als seinen eigenen. Leons
+Entscheidungen: **Weg 2** (Kursplan je Gym statt Trainer-Feld an der
+Konstante), **mindestens ein Trainer, mehrere erlaubt**, **nur Verwaltung**
+legt an — „ein trainer der auch in der verwaltung ist darf natürlich über
+die verwaltungsebene kurse bearbeiten" (geprüft wird das Häkchen).
+- **Daten:** `gyms/{gymId}/schedulePlans/{planId}` = `{ name, aktiv: true,
+  kurse: TrainingBlock[], geaendertAm, geaendertVon }`. EIN Dokument mit
+  Liste (ein Lesevorgang für die ganze Woche); gelesen wird der Plan mit
+  `aktiv == true` — so kommt das Mehrplan-Modell (Konzept §7, „später")
+  nur dazu. `TrainingBlock.trainerUids` ist neu. Rubrik folgt aus der
+  Kampfart (`rubrikAusKampfart`, lib/kursplan.ts).
+- **Lesen:** `useKursplan()` aus `lib/kursplan-context.tsx` (Provider im
+  Root-Layout, EIN onSnapshot für die App). Alle Helfer in `lib/schedule.ts`
+  bekommen die Kurse als erstes Argument. `TRAINING_BLOCKS` gibt es nicht
+  mehr — die alte Woche heißt `KURSPLAN_VORLAGE_TIDAL`
+  (`lib/kursplan-vorlage.ts`) und ist NUR für die Übernahme und den
+  Demo-Seeder da. **Nie wieder eine gym-übergreifende Kursliste im Code.**
+- **Schreiben:** nur `POST /api/gym/kurse` (`anlegen` / `aendern` /
+  `loeschen`), Admin-SDK, `verwaltungDesGyms`, Transaktion (zwei
+  Verwaltungen überschreiben sich nicht). Jede Trainer-uid muss
+  `gymId == gymId` UND `readRoleSet(...).trainer` tragen. Neue Kurse bekommen
+  ZUFÄLLIGE IDs — `trainingSessions` und Kurs-Abos tragen die ID ohne gymId.
+  Regel: `schedulePlans` lesen Mitglieder des Gyms, `write: if false`.
+- **Oberfläche:** `/verwaltung/wochenplan` („Wochenplan" in der Verwaltung,
+  Leon 27.09.: statt „Kursplan"; Raster aus `components/schedule/WochenRaster`
+  wie der Kursplan, je Tag „+ Kurs"; die Liste `/verwaltung/kurse` vom
+  26.09. ist darin aufgegangen), Sheet
+  `components/KursSheet.tsx`. Kurse ohne gültigen Trainer (leer, ausgetreten,
+  Häkchen weg) zählt ein Hinweis oben, jede Zeile sagt „Trainer zuweisen".
+  Der Kursplan (`/schedule`) zeigt bei leerem Plan „Leg deinen ersten Kurs
+  an." (Verwaltung, mit Knopf) bzw. „Hier steht bald deine Trainingswoche."
+- **Übernahme:** `scripts/kursplan-uebernehmen.mjs` (Probe ohne,
+  `--schreiben` mit) — am 26.09. ausgeführt: `gyms/tidal-athletics/
+  schedulePlans/FXcyG9LIh82uW1hxsTIg`, 24 Kurse, DIESELBEN IDs, noch ohne
+  Trainer. Regeln am 26.09. deployt (Leon: „Ja, beides").
+- **Nebenbefund:** `trainingSessions` sind weiter nicht gym-gescopet;
+  Abdeckung und Dashboards zählen jetzt nur IDs aus dem eigenen Plan
+  (`getSessionBlockIdsForWeek`).
+- **Falle 70:** Git Bash schreibt `/verwaltung/kurse` als Argument in
+  `C:/Program Files/Git/verwaltung/kurse` um → `MSYS_NO_PATHCONV=1`.
+  **Falle 71:** Ein per REST angelegtes Testkonto hat kein `createdAt`;
+  `listAllMembers` sortiert danach und lässt es AUS (Firestore-orderBy).
+  Echte Registrierungen setzen es (lib/user-profile.ts).
+- Gemessen: `scripts/tmp-mess-kurse.mjs` 23/23 (Route + deployte Regeln),
+  `scripts/tmp-blick-kurse.mjs ablauf` 9/9 (Anlegen per UI, live in Liste
+  und Kursplan, Löschen mit Rückfrage), tsc 0, eslint 0 in allen berührten
+  Dateien, Querüberlauf 0 px auf 1440 und 390. Bilder
+  `D:\Tidal-Athletics\abnahme-kurse\`. `mess-gameplan.mjs` (27.09.): hell
+  117/117, dunkel 116/117 — der eine Befund ist „← Techniken" auf /library
+  bei 390 px: Die Prüfung wartet fest 2 s, der Link braucht auf dem
+  Dev-Server 1,1–2,1 s (nachgemessen, 44 px, steht korrekt). Gegenprobe auf
+  dem committeten Stand per `git stash`: 117/117.
+- **Falle 72:** `mess-gameplan.mjs` spricht ohne `BASE` mit Port 3000 — dort
+  lief am 26./27.09. ein zweiter, hängender Next-Prozess (`fetch failed`,
+  Timeouts). Immer `BASE=http://localhost:3001`. Ohne `OUT` landen ~50
+  `mess-*.png` im App-Ordner → `OUT=../abnahme-…`.
+- **RÄUME (Leon 27.09.2026: „bedenke das es gyms gibt die verschiedene räume
+  haben"):** `raeume: { id, name }[]` am Plan-Dokument, `TrainingBlock.raumId`
+  am Kurs. Leons Antworten: Räume pflegt man IM WOCHENPLAN (Knopf „Räume",
+  `components/RaeumeSheet.tsx`) · gleicher Raum zur selben Zeit = **NUR
+  WARNEN** (Speichern geht, z. B. geteilte Matte) · den Raum sehen ALLE, auch
+  Athleten im Kursplan. Ab ZWEI Räumen: Raumwahl im Kurs-Sheet, Raum an jedem
+  Kurs (Wochenplan und /schedule), Filter „Alle Räume · … · Ohne Raum" im
+  Wochenplan; mit einem Raum gibt es nichts zu wählen. `ueberschneidungen()`
+  (lib/kursplan.ts) warnt bei Raum UND bei Trainer, der zur selben Zeit
+  schon einen Kurs gibt. Route: `raum-anlegen` / `raum-umbenennen` /
+  `raum-loeschen` (Namen eindeutig ohne Groß/klein, höchstens 20 Räume);
+  gelöschter Raum → Kurse bleiben, nur ohne Raum. Das Wochenraster teilen
+  Kursplan und Wochenplan über `components/schedule/WochenRaster.tsx`
+  (`DayColumn` mit `zusatz` und `fuss`).
+- Gemessen nach Wochenplan und Räumen (27.09.): `tmp-mess-kurse.mjs` 35/35,
+  `tmp-blick-kurse.mjs ablauf` 16/16 (Filter, Warnung, Raum im Kursplan,
+  Räume-Sheet), `mess-gameplan.mjs` **117/117 hell und dunkel**, tsc 0,
+  eslint 0. **Fund 27.09.:** noelreichle@ hat im ECHTEN Plan von Tidal
+  Athletics einen Kurs „TEST" angelegt (Mi 17:01–19:30) — nicht angefasst.
+- **EIN KURS, MEHRERE TERMINE (Leon 27.09.2026: „bedenke auch das ein kurs
+  an mehreren Tagen passieren kann … für mehrere tage und dann noch für
+  unterschiedliche zeiten. finde eine user freundliche lösung die nicht
+  verwirrend ist"):** Gespeichert bleibt die Woche als TERMINE (ein
+  `TrainingBlock` je Tag + Uhrzeit — Abos, Rückmeldungen, Freigaben hängen
+  an deren IDs). Ein KURS ist die Gruppe aller Termine mit demselben NAMEN
+  (die Regel galt schon seit 03.09. für Filter und Plan-Zuordnung):
+  `kurseGruppieren`, `kursMitTerminenPruefen`, `termineKurz` in
+  lib/kursplan.ts. Im Sheet oben Name, Kampfart, Gruppe, Trainer (gelten für
+  den ganzen Kurs), darunter „Termine" — je Zeile Tag, Beginn, Ende, ab zwei
+  Räumen der Raum; „+ Termin" übernimmt Uhrzeit und Raum des letzten, am
+  nächsten Tag. Ein Tipp auf IRGENDEINEN Termin im Wochenplan öffnet den
+  ganzen Kurs. Route: `kurs-speichern` ({ alterTitel, kurs }) ersetzt alle
+  Termine des Kurses in einer Transaktion, mitgeschickte `id` bleibt
+  erhalten, neue Termine bekommen zufällige IDs; `kurs-loeschen` ({ titel })
+  nimmt alle Termine. Ein Name, den schon ein ANDERER Kurs trägt, wird
+  abgelehnt („Öffne ihn und füg dort einen Termin hinzu.") — Sheet prüft
+  vorab, Server noch einmal. Die alten Einzel-Aktionen
+  `anlegen`/`aendern`/`loeschen` gibt es nicht mehr. Der Hinweis oben zählt
+  KURSE ohne Trainer (Leons Gym: 18 Kurse · 24 Termine). Gemessen:
+  `tmp-mess-kurse.mjs` 42/42, `tmp-blick-kurse.mjs ablauf` 18/18 (zweimal
+  frisch hintereinander; ein Lauf davor scheiterte am 2,5-s-Warten nach
+  dem Löschen), `mess-gameplan.mjs` hell 117/117, dunkel 116/117 (die
+  bekannte /library-Zeitfrage, s. o.).
+- **TAGE ANTIPPEN, UHRZEIT JE TAG (Leon 27.09.2026, zweite Runde):** „wenn
+  ich auf tag klicke möchte ich mehrere auswählen und wenn ich dann auf dem
+  kurs an jeweiligen tag bin ändere ich für dort die uhrzeit". Im Sheet
+  heißen die Blöcke jetzt „Tage" (Mo–So als Knöpfe, mehrere auf einmal; ein
+  neuer Tag übernimmt Uhrzeit und Raum des zuletzt gewählten) und „Uhrzeit"
+  (je Tag eine Zeile, ab zwei Räumen darunter der Raum; „+ Uhrzeit" gibt
+  einem Tag eine zweite Stunde, z. B. MMA Teens Mi 16:00 + 17:15).
+  **Uhrzeit = `components/ui/TimePicker.tsx`**: EIN Feld „18:30", das ein
+  Fenster mit zwei Spalten öffnet (Std | Min), die gewählten Werte
+  HINTERLEGT, kein Haken (Leon: „nur einen bereich zum klicken … std und min
+  zsm … hinterlegt und nicht ein haken"); 24 h, Minuten in 5er-Schritten
+  (gespeicherte andere Minute bleibt wählbar), Minute schließt das Fenster,
+  Escape schließt nur das Fenster. Leons Vorlage war ein shadcn-„time-picker"
+  (Radix, cva, motion/react, `--hu-*`) — NICHT installiert: kein shadcn,
+  Tailwind 3, Select-Standard und MOTION-BRIEF; nachgebaut mit `Pop`.
+  `Select` hat seither `ariaLabel`. Raumfilter im Wochenplan: Knöpfe 44 px
+  hoch, 14 px Schrift, gewählter mit Akzent-Rand (Leon: „mach den
+  ausgewählten raum größer … das ganze feld dazu"). Fehlertexte nennen den
+  Tag („Freitag: Der Kurs endet nach seinem Beginn."), ohne Tag „Wähl
+  mindestens einen Tag.", doppelter Name „… Öffne ihn und tipp dort den Tag
+  dazu." Gemessen: `tmp-mess-kurse.mjs` 42/42, `tmp-blick-kurse.mjs ablauf`
+  22/22, 0 Konsolenfehler. **Die große Regression (`mess-gameplan.mjs`) lief
+  nach TimePicker und Raumknöpfen NICHT mehr** — Leon hat den Lauf
+  abgebrochen; vor dem Commit nachholen.
+- **Offen danach:** Trainer-Auslastung im Verwaltungs-Dashboard (Backlog b,
+  Kapazitätsplanung, kein Ranking) · „Kampfart über den Kurs" (Roadmap P3
+  Schritt 14) · Trainer im Kursplan der Athleten anzeigen · Leons 22 Kurse
+  ohne Trainer zuweisen (macht er selbst unter /verwaltung/wochenplan, sobald
+  gepusht).
+
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
   `/admin/*` = Plattform-Rang · `/trainer/*` = Trainer-Werkzeuge ·
@@ -3287,7 +3420,9 @@ den Schlüssel.**
       `weeklyCoverage`, nur noch eine Verwaltung im Gym, ablaufende
       Einladungen) — das Dashboard hat viel „so ist es", wenig „das solltest
       du tun".
-      (b) **Braucht Kurs→Trainer-Zuordnung** (Leons Wunsch Trainer-Auslastung):
+      (b) **Kurs→Trainer-Zuordnung GEBAUT 26.09.2026** (Abschnitt „KURSPLAN JE
+      GYM"; Weg 2 statt Mapping am Gym-Dokument) — die Auslastung selbst
+      ist noch offen. Ursprünglicher Stand (Leons Wunsch Trainer-Auslastung):
       `TRAINING_BLOCKS` ist statischer Code OHNE Trainer-Bezug, auch
       Rückmeldungen tragen keinen Trainer — vorher ist keine Auslastung
       rechenbar. Die Zuordnung kommt sauber mit dem Wochenplan-Mehrplan-Modell

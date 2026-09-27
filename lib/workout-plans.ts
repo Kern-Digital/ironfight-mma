@@ -123,7 +123,7 @@ export interface TrainerWorkoutPlan extends WorkoutPlan {
       wenn Athleten Kurse buchen oder abbestellen (Leon 19.09.: „immer der
       ganze Kurs" — vorher war die Kurs-Wahl ein einmaliger Schnappschuss). */
   audienceUids: string[];
-  /** Freigabe an KURSE (TRAINING_BLOCKS-IDs): jedes Mitglied dieser Kurse
+  /** Freigabe an KURSE (Kurs-IDs aus dem Kursplan des Gyms): jedes Mitglied dieser Kurse
       sieht den Plan, auch wer den Kurs später bucht. */
   audienceCourseIds: string[];
   /** Freigabe an EINZELNE — unabhängig von Kursen. null = Altbestand von vor
@@ -133,7 +133,7 @@ export interface TrainerWorkoutPlan extends WorkoutPlan {
   /** KURS-ZUORDNUNG (Leon 19.09.) — reine Ordnung, KEINE Sichtbarkeit: der
       Trainer ordnet den Plan einem oder mehreren Kursen zu, sehen können ihn
       Athleten erst über die Freigabe oben (die an ganz andere Kurse gehen
-      darf). Termin-IDs aus TRAINING_BLOCKS, alle Termine eines Kursnamens.
+      darf). Termin-IDs aus dem Kursplan des Gyms, alle Termine eines Kursnamens.
       Fällt ein Kurs aus dem Kursplan, bleibt der Plan bestehen — die ID
       löst sich nicht mehr auf, und er steht unter „Ohne Kurs". */
   courseIds: string[];

@@ -26,7 +26,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
-import { TRAINING_BLOCKS } from "./schedule";
+import { KURSPLAN_VORLAGE_TIDAL as TRAINING_BLOCKS } from "./kursplan-vorlage";
 import { ALL_TECHNIQUES } from "./techniques";
 import { EXERCISES } from "./exercises";
 import { updateAthleteProfile } from "./user-profile";

@@ -51,6 +51,7 @@ import { StaggerFlow, FlowItem } from "@/components/motion";
 import ErrorState from "@/components/ui/ErrorState";
 import { listAllStudents, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
+import { useKursplan } from "@/lib/kursplan-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   filterOptions,
@@ -242,9 +243,10 @@ function StudentsContent() {
     load();
   }, [load]);
 
+  const { kurse: planKurse } = useKursplan();
   const options = useMemo(
-    () => (memberships ? filterOptions(memberships) : null),
-    [memberships],
+    () => (memberships ? filterOptions(memberships, planKurse) : null),
+    [memberships, planKurse],
   );
 
   // Ein Filter, dessen Auswahlliste verschwindet (Gym-Wechsel, Kurs
@@ -281,9 +283,9 @@ function StudentsContent() {
         courses,
         disciplines,
         groups,
-      });
+      }, planKurse);
     });
-  }, [students, search, memberships, courses, disciplines, groups]);
+  }, [students, search, memberships, courses, disciplines, groups, planKurse]);
 
   const filterAktiv =
     courses.length > 0 || disciplines.length > 0 || groups.length > 0;

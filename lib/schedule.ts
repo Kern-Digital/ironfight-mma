@@ -1,44 +1,10 @@
 import type { TrainingBlock } from "./types";
 
-export const TRAINING_BLOCKS: TrainingBlock[] = [
-  // ─── Montag (0) ───────────────────────────────────────────────────────────
-  { id: "mon-01", weekday: 0, title: "Wing Tsung Kleine Helden", startTime: "16:15", endTime: "17:00", level: "kids", discipline: "wing-tsung" },
-  { id: "mon-02", weekday: 0, title: "Wing Tsung Jugend", startTime: "17:15", endTime: "18:15", level: "teens", discipline: "wing-tsung" },
-  { id: "mon-03", weekday: 0, title: "Wing Tsung Adult", startTime: "18:30", endTime: "20:00", level: "adult", discipline: "wing-tsung" },
-  { id: "mon-04", weekday: 0, title: "MMA Advanced (Grappling)", startTime: "20:15", endTime: "21:45", level: "advanced", category: "wrestling", discipline: "wrestling" },
-
-  // ─── Dienstag (1) ─────────────────────────────────────────────────────────
-  { id: "tue-01", weekday: 1, title: "Karate Mixed", startTime: "15:00", endTime: "17:00", level: "mixed", discipline: "karate" },
-  { id: "tue-02", weekday: 1, title: "Kickboxen Teens", startTime: "17:15", endTime: "18:15", level: "teens", category: "boxing", discipline: "kickboxen" },
-  { id: "tue-03", weekday: 1, title: "Kickboxen Adult", startTime: "18:30", endTime: "20:00", level: "adult", category: "boxing", discipline: "kickboxen" },
-  { id: "tue-04", weekday: 1, title: "MMA (Ringen)", startTime: "20:15", endTime: "21:45", category: "wrestling", discipline: "wrestling" },
-
-  // ─── Mittwoch (2) ─────────────────────────────────────────────────────────
-  { id: "wed-01", weekday: 2, title: "MMA Teens", startTime: "16:00", endTime: "17:00", level: "teens", discipline: "mma" },
-  { id: "wed-02", weekday: 2, title: "MMA Teens", startTime: "17:15", endTime: "18:15", level: "teens", discipline: "mma" },
-  { id: "wed-03", weekday: 2, title: "MMA Advanced (Sparring)", startTime: "18:30", endTime: "20:00", level: "advanced", discipline: "mma" },
-  { id: "wed-04", weekday: 2, title: "MMA", startTime: "20:15", endTime: "21:45", discipline: "mma" },
-
-  // ─── Donnerstag (3) ───────────────────────────────────────────────────────
-  { id: "thu-01", weekday: 3, title: "MMA Mixed", startTime: "10:00", endTime: "11:30", level: "mixed", discipline: "mma" },
-  { id: "thu-02", weekday: 3, title: "Muay Thai Teens", startTime: "16:00", endTime: "17:00", level: "teens", category: "muay-thai", discipline: "muay-thai" },
-  { id: "thu-03", weekday: 3, title: "Wing Tsung Jugend", startTime: "17:15", endTime: "18:15", level: "teens", discipline: "wing-tsung" },
-  { id: "thu-04", weekday: 3, title: "(Fitness-)Kickboxen", startTime: "18:30", endTime: "20:00", category: "boxing", discipline: "fitness-kickboxen" },
-  { id: "thu-05", weekday: 3, title: "Muay Thai Adult", startTime: "20:15", endTime: "21:45", level: "adult", category: "muay-thai", discipline: "muay-thai" },
-
-  // ─── Freitag (4) ──────────────────────────────────────────────────────────
-  { id: "fri-01", weekday: 4, title: "MMA Teens", startTime: "16:00", endTime: "17:00", level: "teens", discipline: "mma" },
-  { id: "fri-02", weekday: 4, title: "MMA Teens", startTime: "17:15", endTime: "18:15", level: "teens", discipline: "mma" },
-  { id: "fri-03", weekday: 4, title: "MMA Advanced", startTime: "18:30", endTime: "20:00", level: "advanced", discipline: "mma" },
-  { id: "fri-04", weekday: 4, title: "MMA", startTime: "20:15", endTime: "21:45", discipline: "mma" },
-
-  // ─── Samstag (5) ──────────────────────────────────────────────────────────
-  { id: "sat-01", weekday: 5, title: "MMA/Kickboxen Sparring", startTime: "10:00", endTime: "11:30", category: "boxing", discipline: "kickboxen" },
-  { id: "sat-02", weekday: 5, title: "Karate Mixed", startTime: "18:00", endTime: "20:00", level: "mixed", discipline: "karate" },
-
-  // ─── Sonntag (6) ──────────────────────────────────────────────────────────
-  { id: "sun-01", weekday: 6, title: "Open Mat für Mitglieder", startTime: "10:00", endTime: "12:00" },
-];
+// ─── WOHER DIE KURSE KOMMEN (seit 26.09.2026) ──────────────────────────────
+// Bis zum 26.09. stand hier `TRAINING_BLOCKS`, EINE Woche für alle Gyms. Jetzt
+// hat jedes Gym seinen eigenen Plan (lib/kursplan.ts), gelesen über
+// useKursplan() (lib/kursplan-context.tsx). Jede Funktion hier bekommt die
+// Kurse deshalb als erstes Argument — sie rechnet, sie liest nicht.
 
 export const WEEKDAY_LABELS = [
   "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag",
@@ -52,35 +18,33 @@ export const WEEKDAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 // Kurs-Filter der Athletenliste (lib/student-courses.ts). Gespeichert werden
 // trotzdem die Termin-IDs: sie sind stabil, ein Titel ist es nicht.
 
-const BLOCK_BY_ID = new Map(TRAINING_BLOCKS.map((b) => [b.id, b]));
-
 /** Alle Kursnamen in der Reihenfolge des Kursplans (erster Termin zählt). */
-export function courseTitles(): string[] {
-  return Array.from(new Set(TRAINING_BLOCKS.map((b) => b.title)));
+export function courseTitles(blocks: TrainingBlock[]): string[] {
+  return Array.from(new Set(blocks.map((b) => b.title)));
 }
 
 /** Die Termine eines Kursnamens (leer, wenn es ihn nicht gibt). */
-export function blocksForCourse(title: string): TrainingBlock[] {
-  return TRAINING_BLOCKS.filter((b) => b.title === title);
+export function blocksForCourse(blocks: TrainingBlock[], title: string): TrainingBlock[] {
+  return blocks.filter((b) => b.title === title);
 }
 
 /**
  * Kursnamen zu gespeicherten Termin-IDs — in Kursplan-Reihenfolge, jeder
  * einmal. Unbekannte IDs (Kurs aus dem Plan genommen) fallen still raus.
  */
-export function courseTitlesOf(blockIds: string[]): string[] {
+export function courseTitlesOf(blocks: TrainingBlock[], blockIds: string[]): string[] {
   const titel = new Set(
     blockIds.flatMap((id) => {
-      const b = BLOCK_BY_ID.get(id);
+      const b = blockById(blocks, id);
       return b ? [b.title] : [];
     }),
   );
-  return courseTitles().filter((t) => titel.has(t));
+  return courseTitles(blocks).filter((t) => titel.has(t));
 }
 
 /** Termin-ID → Termin (undefined für unbekannte IDs). */
-export function blockById(id: string): TrainingBlock | undefined {
-  return BLOCK_BY_ID.get(id);
+export function blockById(blocks: TrainingBlock[], id: string): TrainingBlock | undefined {
+  return blocks.find((b) => b.id === id);
 }
 
 /** ISO-Wochenkennung — nur intern, nie im UI anzeigen. Bsp: "2026-W19" */
@@ -98,9 +62,11 @@ export function getCurrentWeekday(): number {
   return (new Date().getDay() + 6) % 7;
 }
 
-/** Blöcke für einen bestimmten Wochentag */
-export function getBlocksForDay(weekday: number): TrainingBlock[] {
-  return TRAINING_BLOCKS.filter((b) => b.weekday === weekday);
+/** Blöcke für einen bestimmten Wochentag, nach Beginn sortiert. */
+export function getBlocksForDay(blocks: TrainingBlock[], weekday: number): TrainingBlock[] {
+  return blocks
+    .filter((b) => b.weekday === weekday)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 // ─── Aktueller / nächster Kurs (Header der Stab-Hülle, 01.09.2026) ───────────
@@ -128,21 +94,12 @@ function minutesOfDay(hhmm: string): number {
  * Funktion selbst die Uhr, stünden dort zwei verschiedene Zeiten und React
  * meldete einen Hydrations-Fehler. Der Aufrufer bestimmt den Zeitpunkt —
  * und ruft erst NACH dem Einhängen (siehe components/shell/StaffHeader).
- *
- * Die Woche ist heute eine Code-Konstante (TRAINING_BLOCKS). Mit dem
- * Mehrplan-Modell aus Phase 3 (Konzept §7) wird daraus der aktive Wochenplan
- * des Gyms — diese Funktion bleibt, nur ihre Quelle wechselt.
  */
-export function getCurrentBlock(now: Date): CurrentBlock | null {
+export function getCurrentBlock(blocks: TrainingBlock[], now: Date): CurrentBlock | null {
   const today = (now.getDay() + 6) % 7;
   const minutes = now.getHours() * 60 + now.getMinutes();
 
-  const sorted = (weekday: number) =>
-    getBlocksForDay(weekday)
-      .slice()
-      .sort((a, b) => minutesOfDay(a.startTime) - minutesOfDay(b.startTime));
-
-  for (const block of sorted(today)) {
+  for (const block of getBlocksForDay(blocks, today)) {
     const start = minutesOfDay(block.startTime);
     const end = minutesOfDay(block.endTime);
     if (minutes >= start && minutes < end) return { block, state: "now", dayOffset: 0 };
@@ -152,7 +109,7 @@ export function getCurrentBlock(now: Date): CurrentBlock | null {
   // Feierabend: der erste Kurs des nächsten Tages, an dem überhaupt einer ist.
   // Bis 7, nicht bis 6 — sonst fände ein Sonntagabend den Sonntag nicht wieder.
   for (let offset = 1; offset <= 7; offset++) {
-    const [first] = sorted((today + offset) % 7);
+    const [first] = getBlocksForDay(blocks, (today + offset) % 7);
     if (first) return { block: first, state: "next", dayOffset: offset };
   }
   return null;

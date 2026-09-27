@@ -28,6 +28,7 @@ import Icon from "@/components/ui/Icon";
 import { useAuth } from "@/lib/auth-context";
 import { getGymName, gymInitials, resolveGymId } from "@/lib/gym";
 import { getCurrentBlock, type CurrentBlock } from "@/lib/schedule";
+import { useKursplan } from "@/lib/kursplan-context";
 import Link from "next/link";
 import AppSuche from "./AppSuche";
 import { KopfSlot } from "./KopfNavigation";
@@ -81,7 +82,8 @@ function CourseChip() {
     return () => clearInterval(id);
   }, []);
 
-  const current = useMemo(() => (now ? getCurrentBlock(now) : null), [now]);
+  const { kurse } = useKursplan();
+  const current = useMemo(() => (now ? getCurrentBlock(kurse, now) : null), [kurse, now]);
   // Kein Kurs in der ganzen Woche (leerer Plan) → gar nichts anzeigen. Ein
   // leerer Rahmen wäre eine Aussage über nichts.
   if (!current) return null;

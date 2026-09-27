@@ -512,6 +512,23 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // KURSPLAN DES GYMS (Leon 26.09.2026, „Kurs bekommt Trainer").
+      // Ein Dokument je Wochenplan, die Kurse als Liste darin; gelesen wird
+      // der mit aktiv == true (lib/kursplan.ts). Bis zum 26.09. standen die
+      // Kurse als Konstante im Code und JEDES Gym sah dieselbe Woche.
+      //
+      // LESEN: jedes Mitglied des Gyms — der Kursplan ist fuer Athleten da.
+      // SCHREIBEN: niemand per Client. Kurse anlegen und Trainer zuweisen
+      // laeuft ueber /api/gym/kurse (Admin-SDK), das die Verwaltung prueft
+      // und dass jeder Kurs mindestens einen Trainer DIESES Gyms hat. Eine
+      // Client-Regel koennte das zweite nicht pruefen (Trainer-Recht steht
+      // in fremden users-Dokumenten).
+      match /schedulePlans/{planId} {
+        allow read: if request.auth != null
+                    && (isAdmin() || userGymId() == gymId);
+        allow write: if false;
+      }
+
       // Gym-Workoutplaene (Etappe Workout-Plaene): Gym-Scope liegt im PFAD —
       // Mitglieder lesen die Plaene ihres Gyms, Trainer desselben Gyms
       // pflegen sie; Admin gym-uebergreifend. Persoenliche Kopien liegen in

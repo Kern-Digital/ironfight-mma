@@ -44,8 +44,8 @@ import {
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
 import { syncMyPlanAccess } from "./plan-access";
-import { TRAINING_BLOCKS, getWeekIdentifier } from "./schedule";
-import type { BlockSubscription, LibraryEntry, TrainingSession } from "./types";
+import { getWeekIdentifier } from "./schedule";
+import type { BlockSubscription, LibraryEntry, TrainingBlock, TrainingSession } from "./types";
 
 // ─── Training Sessions ─────────────────────────────────────────────────────
 
@@ -321,14 +321,20 @@ export async function hasParticipated(
   return snap.exists();
 }
 
-/** Zählt Trainingseinheiten, die in einer bestimmten Woche angelegt wurden (Trainer-Dashboard). */
-export async function getSessionCountForWeek(weekId: string): Promise<number> {
+/**
+ * Die Kurs-IDs, für die in einer Woche Inhalte gepflegt sind (Trainer-Dashboard).
+ *
+ * IDs statt einer Zahl (seit 26.09.2026): `trainingSessions` tragen kein
+ * gymId. Solange alle Gyms dieselbe feste Woche hatten, fiel das nicht auf;
+ * jetzt zählt der Aufrufer nur die IDs, die im Plan SEINES Gyms stehen.
+ */
+export async function getSessionBlockIdsForWeek(weekId: string): Promise<string[]> {
   const q = query(
     collection(getFirestoreDb(), "trainingSessions"),
     where("weekIdentifier", "==", weekId),
   );
   const snap = await getDocs(q);
-  return snap.size;
+  return snap.docs.map((d) => String(d.get("trainingBlockId") ?? ""));
 }
 
 // ─── Kurs-Abonnements ──────────────────────────────────────────────────────
@@ -344,10 +350,11 @@ function subscriptionColRef(uid: string) {
 /** Abonniert einen festen Wochenkurs. Idempotent. */
 export async function subscribeToBlock(
   uid: string,
-  blockId: string,
+  block: TrainingBlock,
 ): Promise<void> {
-  const block = TRAINING_BLOCKS.find((b) => b.id === blockId);
-  if (!block) throw new Error(`Unknown training block: ${blockId}`);
+  // Der Kurs kommt aus dem Plan des Gyms (useKursplan) — seit 26.09.2026
+  // gibt es keine feste Liste mehr, in der hier nachzuschlagen wäre.
+  const blockId = block.id;
 
   const ref = subscriptionDocRef(uid, blockId);
   const existing = await getDoc(ref);

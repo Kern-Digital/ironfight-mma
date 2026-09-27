@@ -45,6 +45,7 @@ import {
   type AuditEntry,
 } from "@/lib/audit";
 import { useAuth, useRights } from "@/lib/auth-context";
+import { useKursplan } from "@/lib/kursplan-context";
 import { greetingFor } from "@/lib/greeting";
 import { resolveGymId } from "@/lib/gym";
 import {
@@ -360,9 +361,10 @@ export default function VerwaltungDashboardPage() {
     [news],
   );
 
+  const { kurse } = useKursplan();
   const courses = useMemo(
-    () => (participations === null ? null : courseLoad(participations)),
-    [participations],
+    () => (participations === null ? null : courseLoad(participations, kurse)),
+    [participations, kurse],
   );
 
   const memberCount = members?.length ?? null;

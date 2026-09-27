@@ -51,7 +51,8 @@ import {
 } from "@/lib/gym-stats";
 import { listOpponentsForGym, type Opponent } from "@/lib/opponents";
 import { getWeekIdentifier } from "@/lib/schedule";
-import { getSessionCountForWeek } from "@/lib/training-sessions";
+import { getSessionBlockIdsForWeek } from "@/lib/training-sessions";
+import { useKursplan } from "@/lib/kursplan-context";
 import { competitionGroup } from "@/components/trainer/CompetitionCard";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -180,7 +181,7 @@ export default function TrainerDashboardPage() {
   const [participations, setParticipations] = useState<
     ParticipationPoint[] | null
   >(null);
-  const [sessionCount, setSessionCount] = useState<number | null>(null);
+  const [sessionIds, setSessionIds] = useState<string[] | null>(null);
   // Getrennt vom allgemeinen Fehler: Schlagen NUR die Kennzahlen fehl
   // (z. B. ein noch bauender Index), sollen die Diagramme das sagen, statt
   // stumm eine Null-Kurve zu zeigen — eine falsche Null wäre eine Aussage.
@@ -193,7 +194,7 @@ export default function TrainerDashboardPage() {
     setOpponents(null);
     setMembers(null);
     setParticipations(null);
-    setSessionCount(null);
+    setSessionIds(null);
     setStatsFailed(false);
 
     // Stichtag: Montag der ältesten der zwölf Wochen — dieselbe
@@ -223,21 +224,21 @@ export default function TrainerDashboardPage() {
           listOpponentsForGym(gymId).catch(() => [] as Opponent[]),
           memberP,
           getParticipationsSince(gymId, since).catch(() => null),
-          getSessionCountForWeek(getWeekIdentifier()).catch(() => null),
+          getSessionBlockIdsForWeek(getWeekIdentifier()).catch(() => null),
         ]);
       setCamps(allCamps.filter((c) => belongsToGym(c.gymId, gymId)));
       setOpponents(gymOpponents);
       setMembers(memberList);
       setParticipations(parts ?? []);
       setStatsFailed(parts === null);
-      setSessionCount(sessions ?? 0);
+      setSessionIds(sessions ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
       setCamps([]);
       setOpponents([]);
       setMembers([]);
       setParticipations([]);
-      setSessionCount(0);
+      setSessionIds([]);
     }
   }, [gymId, eigeneUid]);
 
@@ -271,11 +272,17 @@ export default function TrainerDashboardPage() {
         : weeklyCourse(participations, WEEKS, new Date()),
     [participations],
   );
+  const { kurse } = useKursplan();
   const courses = useMemo(
-    () => (participations === null ? null : courseLoad(participations)),
-    [participations],
+    () => (participations === null ? null : courseLoad(participations, kurse)),
+    [participations, kurse],
   );
-  const coverage = sessionCount === null ? null : weeklyCoverage(sessionCount);
+  // Nur Einheiten zu Kursen DIESES Gyms zählen (trainingSessions tragen kein gymId).
+  const coverage = useMemo(() => {
+    if (sessionIds === null) return null;
+    const imPlan = new Set(kurse.map((k) => k.id));
+    return weeklyCoverage(new Set(sessionIds.filter((id) => imPlan.has(id))).size, kurse.length);
+  }, [sessionIds, kurse]);
 
   // Wachstum: Beitritte je Monat aus der ohnehin geladenen Mitgliederliste
   // (memberGrowth rechnet bewusst auf der Liste statt selbst abzufragen).

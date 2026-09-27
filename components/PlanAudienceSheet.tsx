@@ -5,7 +5,7 @@
  * Sheet in der Picker-Optik (Overlay, slide-up, Grabber, x schließt;
  * Desktop zentriert). Zwei Wege, die sich ADDIEREN (Leon 19.09.: „immer der
  * ganze Kurs"):
- *   • Kurs-Chips (TRAINING_BLOCKS, nach Wochentag gruppiert): Freigabe an
+ *   • Kurs-Chips (Kursplan des Gyms, nach Wochentag gruppiert): Freigabe an
  *     den GANZEN Kurs — jedes Mitglied, auch wer ihn später bucht. Früher
  *     hakte ein Kurs nur einmal seine damaligen Abonnenten an; genau daher
  *     kam „4 Athleten sehen diesen Plan", obwohl 9 im Kurs waren.
@@ -25,11 +25,8 @@ import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell } from "@/components/motion";
 import { isStaffEntry, listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth } from "@/lib/auth-context";
-import {
-  courseTitlesOf,
-  TRAINING_BLOCKS,
-  WEEKDAY_LABELS,
-} from "@/lib/schedule";
+import { courseTitlesOf, WEEKDAY_LABELS } from "@/lib/schedule";
+import { useKursplan } from "@/lib/kursplan-context";
 import {
   loadCourseMemberships,
   type CourseMemberships,
@@ -111,6 +108,7 @@ function PlanAudienceInhalt({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const { kurse } = useKursplan();
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
   // Kurs-Abos aller Mitglieder — für „Sieht ihn über …" und den Altbestand
   const [memberships, setMemberships] = useState<CourseMemberships | null>(
@@ -166,11 +164,11 @@ function PlanAudienceInhalt({
     if (!memberships) return map;
     const gewaehlt = Array.from(courses);
     memberships.forEach((abos, uid) => {
-      const titel = courseTitlesOf(gewaehlt.filter((c) => abos.has(c)));
+      const titel = courseTitlesOf(kurse, gewaehlt.filter((c) => abos.has(c)));
       if (titel.length) map.set(uid, titel);
     });
     return map;
-  }, [memberships, courses]);
+  }, [memberships, courses, kurse]);
 
   // Body-Scroll-Lock (Muster der App-Sheets)
   useEffect(() => {
@@ -234,9 +232,9 @@ function PlanAudienceInhalt({
 
   // Wochentage mit Kursen — Reihenfolge Mo–So
   const weekdays = useMemo(() => {
-    const set = new Set(TRAINING_BLOCKS.map((b) => b.weekday));
+    const set = new Set(kurse.map((b) => b.weekday));
     return Array.from(set).sort((a, b) => a - b);
-  }, []);
+  }, [kurse]);
 
   return (
     <>
@@ -281,7 +279,7 @@ function PlanAudienceInhalt({
                   {WEEKDAY_LABELS[wd]}
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {TRAINING_BLOCKS.filter((b) => b.weekday === wd).map(
+                  {kurse.filter((b) => b.weekday === wd).map(
                     (block) => {
                       const active = courses.has(block.id);
                       // Ohne Rahmen (Leon 19.09.: „weniger Kästen") — die
@@ -438,7 +436,7 @@ function PlanAudienceInhalt({
               className="tabular-nums"
               style={{ ...META_FONT, color: "var(--text-2)" }}
             >
-              {fussZeile(courseTitlesOf(Array.from(courses)).length, checked.size)}
+              {fussZeile(courseTitlesOf(kurse, Array.from(courses)).length, checked.size)}
             </span>
             {error && (
               <span

@@ -197,52 +197,23 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
           icon: "spark",
           isActive: under("/verwaltung/branding"),
         },
-        // WOCHENPLAN — der Kursplan als Sache des GYMS.
+        // WOCHENPLAN — die Woche des GYMS (Leon 27.09.2026: „in der
+        // verwaltungsebene soll der Kursplan wochenplan heißen und wenn ich
+        // darauf gehe dann soll ich kurse hinzufügen können, bearbeiten").
+        // Hier entsteht die Woche: Kurse anlegen, Tag, Uhrzeit, Trainer
+        // (lib/kursplan.ts). Was in der Stunde geübt wird, pflegen Trainer
+        // weiter im Kursplan des Trainerbereichs (/schedule).
         //
-        // ER STEHT HIER FÜR JEDE VERWALTUNG, auch für eine, die zusätzlich
-        // Trainer ist (Leons Einwand 02.09.2026: „Es fehlt der Kursplan in der
-        // Verwaltung"). Bis dahin blendete ihn ein `rights.trainer`-Gate aus,
-        // mit der Begründung, ein Trainer habe den Plan ja schon oben als
-        // im Trainerbereich. Das war aus Sicht des MENÜS gedacht und nicht aus
-        // der des Menschen: Wer den Verwaltungsbereich aufklappt, um das Gym zu
-        // führen, erwartet den Kursplan dort — und findet ihn nicht, weil ein
-        // ganz anderes Häkchen ihn versteckt. Eine Rubrik muss vollständig
-        // sein; ein Eintrag, der je nach zweiter Rolle verschwindet, ist keine
-        // Aufräumhilfe, sondern eine Lücke.
-        //
-        // ER HEISST WIE ÜBERALL „Kursplan" (Leon 02.09.2026) — siehe die
-        // Begründung im Trainerbereich oben. „Wochenplan" bleibt dem
-        // Phase-3-Objekt vorbehalten (benannte Pläne, `schedulePlans`).
-        //
-        // ER FÜHRT AUF DIESELBE SEITE wie der Punkt im Trainerbereich — seit dem
-        // 02.09. auch mit denselben Rechten: `firestore.rules` erlaubt Schreiben
-        // an `trainingSessions` Trainern UND Verwaltung (per REST nachgemessen:
-        // beide 200, Athlet 403), und `app/schedule/page.tsx` bietet die Pflege
-        // seitdem beiden an. Der frühere Kommentar hier behauptete das
-        // Gegenteil — er stammte aus der Zeit, als das UI hinter den Regeln
-        // zurückblieb. Mit Phase 3 bekommt dieser Punkt seine eigene Adresse;
-        // bis dahin trägt er die Unterscheidung nur im Namen.
-        //
-        // BEIDE ZEILEN GELTEN ALS AKTIV — die im Trainerbereich und diese.
-        //
-        // Ein erster Versuch am 02.09. ließ diese hier bewusst NICHT leuchten,
-        // damit ein Cheftrainer nicht zwei markierte Zeilen für eine Seite
-        // sieht. Das war falsch, und zwar sichtbar: `groupContains()` in
-        // StaffSidebar fragt genau diese Funktion, um zu entscheiden, welche
-        // Rubrik AUFGEKLAPPT steht. Eine Zeile, die nie aktiv ist, nimmt ihrer
-        // Rubrik den Anspruch auf die Seite — wer in der Verwaltung auf
-        // „Kursplan" klickte, landete auf der Seite und sah, wie das Akkordeon
-        // unter seiner Hand zum Trainerbereich sprang (Leons Einwand 02.09.).
-        //
-        // Zwei markierte Zeilen entstehen dadurch trotzdem nicht: Es ist immer
-        // nur EINE Rechte-Rubrik aufgeklappt, und welche das ist, entscheidet
-        // die Sidebar — sie bleibt in der Rubrik, aus der man kam
-        // (`openGroupId` in StaffSidebar). Sichtbar ist deshalb genau eine.
+        // Bis zum 27.09. stand hier „Kursplan" → /schedule (Leons Einwand
+        // 02.09.: „Es fehlt der Kursplan in der Verwaltung"). Der Punkt steht
+        // weiter für JEDE Verwaltung da, auch für eine, die zusätzlich Trainer
+        // ist — eine Rubrik muss vollständig sein. „Wochenplan" ist zugleich
+        // der Name des Plan-Dokuments (schedulePlans, Konzept §7).
         {
-          href: "/schedule",
-          label: "Kursplan",
+          href: "/verwaltung/wochenplan",
+          label: "Wochenplan",
           icon: "calendar" as IconName,
-          isActive: under("/schedule"),
+          isActive: under("/verwaltung/wochenplan"),
         },
       ],
     });
@@ -300,12 +271,10 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
       // Nur für Menschen ohne Trainer-Häkchen: mit Häkchen steht dieselbe
       // Adresse oben im Trainerbereich (siehe dort).
       //
-      // ER LEUCHTET NICHT AUF, WENN OBEN SCHON DIE VERWALTUNGS-ZEILE STEHT: Beide führen
-      // heute auf dieselbe Seite, und zwei gleichzeitig markierte Zeilen
-      // ließen den Menschen rätseln, was ihn unterscheidet. Markiert wird die
-      // Zeile in der RECHTE-Gruppe — wer Verwaltung ist und den Plan öffnet,
-      // tut das als Gym, nicht als Athlet. Mit Phase 3 werden es zwei echte
-      // Seiten und die Ausnahme fällt weg.
+      // Bis zum 27.09.2026 leuchtete diese Zeile für die Verwaltung nicht auf,
+      // weil deren Rubrik denselben Kursplan führte. Seit dem 27.09. hat die
+      // Verwaltung ihren eigenen Wochenplan (/verwaltung/wochenplan) — es
+      // sind zwei echte Seiten, und die Ausnahme ist weg.
       ...(rights.trainer
         ? []
         : [
@@ -313,7 +282,7 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
               href: "/schedule",
               label: "Kursplan",
               icon: "calendar" as IconName,
-              isActive: rights.verwaltung ? () => false : under("/schedule"),
+              isActive: under("/schedule"),
             },
           ]),
     ],

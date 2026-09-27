@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useAuth, useHasStaffShell, useRights } from "@/lib/auth-context";
 import { isPermissionDenied } from "@/lib/admin";
 import { resolveGymId } from "@/lib/gym";
+import { useKursplan } from "@/lib/kursplan-context";
 import { useTheme } from "@/lib/theme-context";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import Icon from "@/components/ui/Icon";
@@ -44,39 +45,10 @@ import type {
   TrainingSession,
 } from "@/lib/types";
 import { TRAINING_AREA_LABEL, TECHNIQUE_LEVEL_LABEL } from "@/lib/types";
-import { CATEGORY_COLOR, DISCIPLINE_COLOR } from "@/lib/discipline-colors";
 import TrainerHint from "@/components/TrainerHint";
+import { blockMeta, CATEGORY_STYLE, DayColumn, KAMPFART_KURZ, MONO_TIME } from "@/components/schedule/WochenRaster";
 
 // ─── Visuelle Hilfskonstanten ──────────────────────────────────────────────
-
-const LEVEL_LABEL: Record<string, string> = {
-  kids: "Kids",
-  teens: "Teens",
-  adult: "Adult",
-  advanced: "Advanced",
-  mixed: "Mixed",
-};
-
-// Farben zentral aus lib/discipline-colors.ts — eine Rubrik = app-weit eine Farbe.
-const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
-  boxing:      { label: "Box",       color: CATEGORY_COLOR.boxing },
-  wrestling:   { label: "Ringen",    color: CATEGORY_COLOR.wrestling },
-  bjj:         { label: "BJJ",       color: CATEGORY_COLOR.bjj },
-  "muay-thai": { label: "Muay Thai", color: CATEGORY_COLOR["muay-thai"] },
-};
-
-const DISCIPLINE_LABEL: Record<string, string> = {
-  boxing:            "Boxing",
-  kickboxen:         "Kickboxen",
-  "muay-thai":       "Muay Thai",
-  "fitness-kickboxen": "Fitness-KB",
-  wrestling:         "Wrestling",
-  bjj:               "BJJ",
-  mma:               "MMA",
-  karate:            "Karate",
-  "wing-tsung":      "Wing Tsung",
-  "self-defense":    "Self-Defense",
-};
 
 // Technik-Level laufen über die Semantik-Tokens (keine eigenen Farbwerte)
 const TECHNIQUE_LEVEL_COLOR: Record<string, string> = {
@@ -99,67 +71,6 @@ const META_FONT: React.CSSProperties = {
   letterSpacing: "var(--ls-label)",
   textTransform: "uppercase",
 };
-
-const MONO_TIME: React.CSSProperties = {
-  font: "600 13px/1.2 var(--font-mono), ui-monospace, monospace",
-};
-
-/**
- * Meta-Zeile eines Kurses + Farbpunkt der Disziplin. Der Text trägt die
- * Information, die Farbe verstärkt nur (Multi-Gym: Rubriken sind später frei
- * konfigurierbar). Gezeigt wird NUR, was der Kurstitel nicht schon selbst
- * sagt — Titel wie „Kickboxen Adult" bekommen keine Echo-Unterzeile.
- */
-function blockMeta(block: TrainingBlock): { dotColor: string; meta: string } {
-  const catStyle = block.category ? CATEGORY_STYLE[block.category] : null;
-  const dotColor =
-    (block.discipline ? DISCIPLINE_COLOR[block.discipline] : null) ??
-    catStyle?.color ??
-    "var(--text-3)";
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9äöüß]/g, "");
-  const title = norm(block.title);
-  const levelLabel = block.level ? LEVEL_LABEL[block.level] ?? block.level : null;
-  const disciplineLabel = block.discipline
-    ? DISCIPLINE_LABEL[block.discipline] ?? block.discipline
-    : catStyle?.label ?? null;
-  const meta = [levelLabel, disciplineLabel]
-    .filter((part): part is string => Boolean(part && !title.includes(norm(part))))
-    .join(" · ");
-  return { dotColor, meta };
-}
-
-/**
- * Zerlegt einen Kurstitel an den Stellen, an denen er umbrechen DARF.
- *
- * Kurstitel sind keine normalen Wörter: „MMA/Kickboxen Sparring" und
- * „(Fitness-)Kickboxen" haben für den Browser keinen einzigen regulären
- * Umbruchpunkt — nach einem Schrägstrich bricht er nicht, und der Bindestrich
- * in „(Fitness-)" ist durch die Klammer dahinter blockiert. In einer 145 px
- * schmalen Tagesspalte kam deshalb erst gar kein Umbruch zustande (der Titel
- * wurde bis 02.09. am Kartenrand abgeschnitten) und danach, mit
- * `overflow-wrap: anywhere`, einer mitten im Wort: „MMA/Kickboxe | n".
- *
- * Die Rückgabe wird mit `<wbr />` verbunden — dem HTML-Element, das genau
- * das sagt: „hier darfst du trennen, musst aber nicht". Anders als ein
- * eingefügtes Nullbreiten-Leerzeichen landet es nicht im kopierten Text.
- */
-function titleParts(title: string): string[] {
-  // Nach Schrägstrich, Bindestrich und schließender Klammer darf getrennt
-  // werden — das sind die Fugen, die ein Mensch selbst wählen würde. Echte
-  // Wortzwischenräume bleiben INNERHALB der Stücke: würde man auch an ihnen
-  // trennen, klebten die Wörter beim Zusammensetzen aneinander.
-  const parts: string[] = [];
-  let current = "";
-  for (const ch of title) {
-    current += ch;
-    if (ch === "/" || ch === "-" || ch === ")") {
-      parts.push(current);
-      current = "";
-    }
-  }
-  if (current) parts.push(current);
-  return parts;
-}
 
 // ─── Struktur-Hilfsfunktionen ──────────────────────────────────────────────
 
@@ -312,6 +223,22 @@ export default function SchedulePage() {
   const canEditSessions = rights.trainer || rights.verwaltung;
   const isTrainer = rights.trainer;
   const hasStaffShell = useHasStaffShell();
+  // Die Woche DIESES Gyms (seit 26.09.2026 kein fester Plan mehr im Code).
+  const { kurse, geladen: kurseGeladen, raeume } = useKursplan();
+  // Ab zwei Räumen steht der Raum an jedem Kurs — auch für Athleten, damit
+  // sie wissen, wohin (Leon 27.09.2026).
+  const raumName = new Map(raeume.map((r) => [r.id, r.name]));
+  const raumZeile = (b: TrainingBlock) => {
+    const name = raeume.length >= 2 && b.raumId ? raumName.get(b.raumId) : undefined;
+    return name ? (
+      <span className="flex items-start gap-1.5" style={{ font: "var(--type-sub)", color: "var(--text-2)", overflowWrap: "anywhere" }}>
+        <span className="mt-[3px] shrink-0">
+          <Icon name="mat" size={12} strokeWidth={2.2} />
+        </span>
+        {name}
+      </span>
+    ) : null;
+  };
 
   const [modal, setModal] = useState<ModalState>({ phase: "idle" });
   const [attending, setAttending] = useState(false);
@@ -360,11 +287,10 @@ export default function SchedulePage() {
     if (!user || modal.phase !== "ready") return;
     setSubscribing(true);
     try {
-      const blockId = modal.block.id;
       if (modal.subscribed) {
-        await unsubscribeFromBlock(user.uid, blockId);
+        await unsubscribeFromBlock(user.uid, modal.block.id);
       } else {
-        await subscribeToBlock(user.uid, blockId);
+        await subscribeToBlock(user.uid, modal.block);
       }
       setModal((prev) =>
         prev.phase === "ready" ? { ...prev, subscribed: !prev.subscribed } : prev,
@@ -517,7 +443,7 @@ export default function SchedulePage() {
       </section>
 
       {/* Trainer-Hinweis: Übersicht (nur einmal pro Browser) */}
-      {canEditSessions && (
+      {canEditSessions && kurse.length > 0 && (
         <div className="week-lane">
           <TrainerHint id="schedule-overview" title="Kursplan">
             Öffne einen Kurs und leg fest, was diese Woche geübt wird. Die
@@ -526,18 +452,54 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Wochengitter */}
-      <div className="week-lane week-grid pt-1">
-        {Array.from({ length: 7 }, (_, i) => (
-          <DayColumn
-            key={i}
-            blocks={getBlocksForDay(i)}
-            isToday={i === todayWeekday}
-            onBlockClick={openBlock}
-            label={WEEKDAY_LABELS[i]}
-          />
-        ))}
-      </div>
+      {/* Wochengitter — oder, solange das Gym noch keinen Kurs hat, der
+          Weg dorthin. Ein frisch angemeldetes Gym sah bis zum 26.09. hier
+          die Woche von Tidal Athletics. */}
+      {kurseGeladen && kurse.length === 0 ? (
+        <div className="week-lane pt-1" data-kursplan-leer>
+          <section className="t-card flex flex-col items-start gap-3 p-5 lg:p-6">
+            <h2 className="t-sheet-title" style={{ color: "var(--text-1)" }}>
+              {rights.verwaltung ? "Leg deinen ersten Kurs an." : "Hier steht bald deine Trainingswoche."}
+            </h2>
+            <p style={{ font: "var(--type-sub)", color: "var(--text-2)", maxWidth: "60ch" }}>
+              {rights.verwaltung
+                ? "Name, Tag, Uhrzeit und wer ihn gibt. Danach steht er hier im Kursplan, und deine Athleten melden sich direkt zurück."
+                : "Sobald dein Gym seine Kurse anlegt, findest du sie hier: jeden Tag, jede Uhrzeit, mit den Techniken der Woche."}
+            </p>
+            {rights.verwaltung && (
+              <Link
+                href="/verwaltung/wochenplan"
+                data-press
+                className="t-interactive mt-1 inline-flex min-h-hit items-center gap-2 rounded-field px-5"
+                style={{
+                  font: "600 13px/1.2 var(--font-archivo), system-ui, sans-serif",
+                  letterSpacing: "var(--ls-label)",
+                  textTransform: "uppercase",
+                  background: "var(--accent)",
+                  color: "var(--on-accent)",
+                  boxShadow: "var(--accent-glow)",
+                }}
+              >
+                <Icon name="plus" size={14} strokeWidth={2.4} />
+                Kurs anlegen
+              </Link>
+            )}
+          </section>
+        </div>
+      ) : (
+        <div className="week-lane week-grid pt-1">
+          {Array.from({ length: 7 }, (_, i) => (
+            <DayColumn
+              key={i}
+              blocks={getBlocksForDay(kurse, i)}
+              isToday={i === todayWeekday}
+              onBlockClick={openBlock}
+              zusatz={raumZeile}
+              label={WEEKDAY_LABELS[i]}
+            />
+          ))}
+        </div>
+      )}
       </div>
 
       {/* Modal */}
@@ -603,132 +565,6 @@ export default function SchedulePage() {
 
       {!hasStaffShell && <AthleteTabBar />}
     </main>
-  );
-}
-
-// ─── DayColumn ────────────────────────────────────────────────────────────
-
-function DayColumn({
-  blocks,
-  isToday,
-  onBlockClick,
-  label,
-}: {
-  blocks: TrainingBlock[];
-  isToday: boolean;
-  onBlockClick: (b: TrainingBlock) => void;
-  label: string;
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center gap-1.5">
-        <span
-          className="t-label"
-          style={isToday ? { color: "var(--accent-text)" } : undefined}
-        >
-          {label}
-        </span>
-        {isToday && (
-          <span
-            className="h-[5px] w-[5px] rounded-full"
-            style={{ background: "var(--accent)" }}
-            aria-hidden
-          />
-        )}
-      </div>
-      <div className="t-card flex-1 px-3.5 py-0.5">
-        {blocks.length === 0 ? (
-          <div
-            className="flex items-center justify-center py-5"
-            style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
-          >
-            Frei
-          </div>
-        ) : (
-          blocks.map((block, i) => (
-            <Fragment key={block.id}>
-              {/* Trennlinie als eigenes Element — läge sie als border-top auf
-                  der gerundeten Zeile, würden ihre Enden mitgerundet */}
-              {i > 0 && (
-                <div aria-hidden style={{ height: "1px", background: "var(--line)" }} />
-              )}
-              <BlockRow block={block} onClick={() => onBlockClick(block)} />
-            </Fragment>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-// ─── BlockRow ─────────────────────────────────────────────────────────────
-
-function BlockRow({
-  block,
-  onClick,
-}: {
-  block: TrainingBlock;
-  onClick: () => void;
-}) {
-  const { dotColor, meta } = blockMeta(block);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="week-row t-interactive flex min-h-hit w-full items-start gap-3 rounded-badge py-3 text-left"
-    >
-      {/* Zeitspanne. In der Listen-Fassung eine schmale Spalte LINKS, im
-          Wochenraster eine Zeile ÜBER dem Titel (globals.css `.week-row`) —
-          die 56 px, die Spalte und Lücke dort kosten, fehlten dem Titel
-          genau dort, wo er am wenigsten Platz hat. */}
-      <div className="week-row-time flex w-11 shrink-0 flex-col gap-0.5">
-        <span style={{ ...MONO_TIME, color: "var(--accent-text)" }}>
-          {block.startTime}
-        </span>
-        <span
-          className="week-row-dash"
-          aria-hidden
-          style={{ font: "var(--row-time-end)", color: "var(--text-3)" }}
-        >
-          –
-        </span>
-        <span style={{ font: "var(--row-time-end)", color: "var(--text-3)" }}>
-          {block.endTime}
-        </span>
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        {/* `anywhere`: Kurstitel wie „MMA/Kickboxen Sparring" haben in einer
-            schmalen Spalte keinen regulären Umbruchpunkt und wurden bis
-            02.09. am Kartenrand ABGESCHNITTEN (gemessen: 9 von 30 Titeln bei
-            1440 px). Lieber ein Umbruch mitten im Wort als ein halber Titel. */}
-        <span
-          style={{ font: "var(--type-body-strong)", overflowWrap: "anywhere" }}
-        >
-          {titleParts(block.title).map((part, i, all) => (
-            <Fragment key={i}>
-              {part}
-              {i < all.length - 1 && <wbr />}
-            </Fragment>
-          ))}
-        </span>
-        {meta && (
-          <span
-            className="flex items-center gap-1.5"
-            style={{ ...META_FONT, color: "var(--text-3)" }}
-          >
-            <span
-              className="h-[5px] w-[5px] shrink-0 rounded-full"
-              style={{ background: dotColor }}
-              aria-hidden
-            />
-            <span className="min-w-0" style={{ overflowWrap: "anywhere" }}>
-              {meta}
-            </span>
-          </span>
-        )}
-      </div>
-    </button>
   );
 }
 
@@ -1183,7 +1019,7 @@ function TechniquePicker({
                 color: active ? "var(--accent-text)" : "var(--text-3)",
               }}
             >
-              {DISCIPLINE_LABEL[d] ?? d}
+              {KAMPFART_KURZ[d] ?? d}
             </button>
           );
         })}

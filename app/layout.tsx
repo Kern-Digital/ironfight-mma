@@ -3,6 +3,7 @@ import { Archivo, Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/goog
 import "./globals.css";
 import AppShell from "@/components/shell/AppShell";
 import { AuthProvider } from "@/lib/auth-context";
+import { KursplanProvider } from "@/lib/kursplan-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import FighterNameModal from "@/components/auth/FighterNameModal";
@@ -93,22 +94,26 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col antialiased">
         <ThemeProvider>
           <AuthProvider>
-            {/* PwaRegister (Service Worker) ist bewusst RAUS (2026-08-26):
-                der alte Cache-First-SW servierte dauerhaft veraltete Stände.
-                public/sw.js bleibt als Kill-Switch für Bestandsclients. */}
-            <PwaInstallPrompt />
-            {/* Die Hüllen-Weiche (Sidebar-Etappe 01.09.2026): Stab-Rollen
-                bekommen die Sidebar links, Navbar und Footer entfallen für
-                sie ersatzlos; Athleten behalten alles wie bisher. Begründung
-                und die beiden Zweige in components/shell/AppShell.tsx. */}
-            <AppShell>{children}</AppShell>
-            <FighterNameModal />
-            <TrainerOnboardingModal />
-            <SubscriptionAutoSync />
-            {/* Branding-Kit (Konzept §8): trägt das Gym eine eigene Farbe,
-                setzt diese Zeile sie als --accent-h/--accent-c ans <html>.
-                Ohne Kit passiert nichts und der Tidal-Ton gilt. */}
-            <GymBrandingTokens />
+            {/* Die Kurse des eigenen Gyms, EIN Abo für die ganze App
+                (lib/kursplan-context.tsx, seit 26.09.2026). */}
+            <KursplanProvider>
+              {/* PwaRegister (Service Worker) ist bewusst RAUS (2026-08-26):
+                  der alte Cache-First-SW servierte dauerhaft veraltete Stände.
+                  public/sw.js bleibt als Kill-Switch für Bestandsclients. */}
+              <PwaInstallPrompt />
+              {/* Die Hüllen-Weiche (Sidebar-Etappe 01.09.2026): Stab-Rollen
+                  bekommen die Sidebar links, Navbar und Footer entfallen für
+                  sie ersatzlos; Athleten behalten alles wie bisher. Begründung
+                  und die beiden Zweige in components/shell/AppShell.tsx. */}
+              <AppShell>{children}</AppShell>
+              <FighterNameModal />
+              <TrainerOnboardingModal />
+              <SubscriptionAutoSync />
+              {/* Branding-Kit (Konzept §8): trägt das Gym eine eigene Farbe,
+                  setzt diese Zeile sie als --accent-h/--accent-c ans <html>.
+                  Ohne Kit passiert nichts und der Tidal-Ton gilt. */}
+              <GymBrandingTokens />
+            </KursplanProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

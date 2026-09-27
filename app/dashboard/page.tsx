@@ -24,7 +24,6 @@ import {
   type WorkoutStats,
 } from "@/lib/workouts";
 import {
-  TRAINING_BLOCKS,
   getBlocksForDay,
   getCurrentWeekday,
   getWeekIdentifier,
@@ -37,7 +36,8 @@ import {
   fightCampProgress,
   type FightCamp,
 } from "@/lib/fight-camp";
-import { getSessionCountForWeek } from "@/lib/training-sessions";
+import { getSessionBlockIdsForWeek } from "@/lib/training-sessions";
+import { useKursplan } from "@/lib/kursplan-context";
 import GameplanSheet, { type WettkampfTab } from "@/components/GameplanSheet";
 import { useGameplan } from "@/components/trainer/GameplanBlock";
 import Link from "next/link";
@@ -157,13 +157,13 @@ const LEVEL_LABEL: Record<string, string> = {
 };
 
 /** Nächste Kurse ab jetzt: heute ab Uhrzeit, danach die folgenden Tage. */
-function upcomingBlocks(count: number): { block: TrainingBlock; dayShort: string }[] {
+function upcomingBlocks(kurse: TrainingBlock[], count: number): { block: TrainingBlock; dayShort: string }[] {
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const result: { block: TrainingBlock; dayShort: string }[] = [];
   for (let offset = 0; offset < 7 && result.length < count; offset++) {
     const weekday = (getCurrentWeekday() + offset) % 7;
-    for (const block of getBlocksForDay(weekday)) {
+    for (const block of getBlocksForDay(kurse, weekday)) {
       if (offset === 0) {
         const [h, m] = block.startTime.split(":").map(Number);
         if (h * 60 + m < nowMinutes) continue;
@@ -288,7 +288,8 @@ function DashboardContent() {
       ? Math.round(((weekSeconds - prevWeekSeconds) / prevWeekSeconds) * 100)
       : null;
 
-  const nextBlocks = upcomingBlocks(4);
+  const { kurse } = useKursplan();
+  const nextBlocks = upcomingBlocks(kurse, 4);
 
   return (
     <main
@@ -805,10 +806,14 @@ function TrainerDashboardContent() {
 
   const weekId = getWeekIdentifier();
   const todayWeekday = getCurrentWeekday();
-  const todayBlocks = getBlocksForDay(todayWeekday);
+  const { kurse } = useKursplan();
+  const todayBlocks = getBlocksForDay(kurse, todayWeekday);
 
   const [topTechniques, setTopTechniques] = useState<TechniqueStatEntry[] | null>(null);
-  const [sessionCount, setSessionCount] = useState<number | null>(null);
+  // Kurs-IDs mit Inhalten; gezählt werden nur die im Plan DIESES Gyms.
+  const [sessionIds, setSessionIds] = useState<string[] | null>(null);
+  const sessionCount =
+    sessionIds === null ? null : sessionIds.filter((id) => kurse.some((k) => k.id === id)).length;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -817,17 +822,17 @@ function TrainerDashboardContent() {
 
     Promise.all([
       getTopTechniques(10),
-      getSessionCountForWeek(weekId),
+      getSessionBlockIdsForWeek(weekId),
     ])
-      .then(([techniques, count]) => {
+      .then(([techniques, ids]) => {
         setTopTechniques(techniques);
-        setSessionCount(count);
+        setSessionIds(ids);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Daten konnten nicht geladen werden";
         setError(msg);
         setTopTechniques([]);
-        setSessionCount(0);
+        setSessionIds([]);
       });
   }, [user, weekId]);
 
@@ -864,12 +869,12 @@ function TrainerDashboardContent() {
               hint="Prüfe deine Internetverbindung und lade die Seite neu."
               onRetry={() => {
                 setTopTechniques(null);
-                setSessionCount(null);
+                setSessionIds(null);
                 setError(null);
                 if (!user) return;
-                Promise.all([getTopTechniques(10), getSessionCountForWeek(weekId)])
-                  .then(([t, c]) => { setTopTechniques(t); setSessionCount(c); })
-                  .catch(() => { setTopTechniques([]); setSessionCount(0); });
+                Promise.all([getTopTechniques(10), getSessionBlockIdsForWeek(weekId)])
+                  .then(([t, ids]) => { setTopTechniques(t); setSessionIds(ids); })
+                  .catch(() => { setTopTechniques([]); setSessionIds([]); });
               }}
             />
           </div>
@@ -886,7 +891,7 @@ function TrainerDashboardContent() {
             <StatCard
               label="Trainingsblöcke"
               icon="clipboard"
-              value={String(TRAINING_BLOCKS.length)}
+              value={String(kurse.length)}
             />
             <StatCard
               label="Heute"

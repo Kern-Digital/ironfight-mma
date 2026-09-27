@@ -37,6 +37,7 @@ import {
 } from "@/lib/app-suche";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
+import { useKursplan } from "@/lib/kursplan-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -130,10 +131,12 @@ export default function AppSuche({
     return () => mq.removeEventListener("change", setzen);
   }, []);
 
-  // Was im Code steht, kostet nichts — sofort da.
+  // Was im Code steht, kostet nichts — sofort da. Die Kurse liegen seit dem
+  // 26.09.2026 im Plan des Gyms, sind über useKursplan() aber ebenso schon da.
+  const { kurse } = useKursplan();
   const fest = useMemo(
-    () => ({ seiten: seitenTreffer(rights), techniken: technikTreffer(), kurse: kursTreffer() }),
-    [rights],
+    () => ({ seiten: seitenTreffer(rights), techniken: technikTreffer(), kurse: kursTreffer(kurse) }),
+    [rights, kurse],
   );
 
   // Mit dem ersten Buchstaben laden (einmal je fünf Minuten, lib/app-suche.ts).

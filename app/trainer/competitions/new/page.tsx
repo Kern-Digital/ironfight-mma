@@ -55,6 +55,7 @@ import OpponentEditor, {
 import VersusBanner, { type VersusSeite } from "@/components/trainer/VersusBanner";
 import { MorphSwap, SheetShell, StaggerFlow, FlowItem } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
+import { useKursplan } from "@/lib/kursplan-context";
 import { resolveGymId } from "@/lib/gym";
 import {
   getStudentEntry,
@@ -428,9 +429,10 @@ function NewCompetitionContent() {
     };
   }, [wahl, memberships, members]);
 
+  const { kurse: planKurse } = useKursplan();
   const kategorien = useMemo(
-    () => (memberships ? filterOptions(memberships) : null),
-    [memberships],
+    () => (memberships ? filterOptions(memberships, planKurse) : null),
+    [memberships, planKurse],
   );
   /**
    * Ein Kategoriefeld erscheint NUR, wenn es mindestens zwei Werte kennt
@@ -461,9 +463,9 @@ function NewCompetitionContent() {
         courses: kurse,
         disciplines: disziplinen,
         groups: gruppen,
-      });
+      }, planKurse);
     });
-  }, [members, studentSearch, memberships, kurse, disziplinen, gruppen]);
+  }, [members, studentSearch, memberships, kurse, disziplinen, gruppen, planKurse]);
 
   // Trainer sind ebenfalls Athleten — sie stehen nur in eigenen Gruppen, damit
   // niemand sie versehentlich statt eines Schülers erwischt.

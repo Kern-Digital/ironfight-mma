@@ -30,16 +30,17 @@ import {
   type WorkoutPlan,
 } from "@/lib/workout-plans";
 import { blocksForCourse } from "@/lib/schedule";
-import type { Discipline } from "@/lib/types";
+import { useKursplan } from "@/lib/kursplan-context";
+import type { Discipline, TrainingBlock } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import PlanView from "../../../workout/plans/[slug]/PlanView";
 
 type NeuerPlan = WorkoutPlan & { courseIds: string[] };
 
 /** Leerer Entwurf — mit `kurs` diesem Kurs zugeordnet (alle Termine). */
-function emptyPlan(kurs: string | null): NeuerPlan {
-  const termine = kurs ? blocksForCourse(kurs) : [];
+function emptyPlan(kurs: string | null, kurse: TrainingBlock[]): NeuerPlan {
+  const termine = kurs ? blocksForCourse(kurse, kurs) : [];
   // Rubrik des Kurses als Disziplin, sofern er eine trägt (MMA-Kurse
   // haben keine — dann bleibt der Standard)
   const rubrik = termine.find((b) => b.category)?.category;
@@ -88,10 +89,26 @@ function NewTrainerPlanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, profile } = useAuth();
+  const { kurse, geladen } = useKursplan();
 
   const [plan, setPlan] = useState<NeuerPlan>(() =>
-    emptyPlan(searchParams.get("kurs")),
+    emptyPlan(searchParams.get("kurs"), kurse),
   );
+  // Der Kursplan des Gyms kommt live und ist beim ersten Rendern oft noch
+  // nicht da. Sobald er steht, bekommt der Entwurf seinen Kurs — EINMAL, und
+  // nur, solange noch niemand selbst Kurse zugeordnet hat.
+  const kursGesetzt = useRef(false);
+  useEffect(() => {
+    const kurs = searchParams.get("kurs");
+    if (!geladen || !kurs || kursGesetzt.current) return;
+    kursGesetzt.current = true;
+    const vorlage = emptyPlan(kurs, kurse);
+    setPlan((p) =>
+      p.courseIds.length > 0
+        ? p
+        : { ...p, courseIds: vorlage.courseIds, discipline: vorlage.discipline },
+    );
+  }, [geladen, kurse, searchParams]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

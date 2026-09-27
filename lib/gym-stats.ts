@@ -28,7 +28,8 @@ import {
   where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
-import { getWeekIdentifier, TRAINING_BLOCKS } from "./schedule";
+import { getWeekIdentifier } from "./schedule";
+import type { TrainingBlock } from "./types";
 
 /** Eine gelesene Teilnahme, auf das Nötige reduziert. */
 export interface ParticipationPoint {
@@ -123,12 +124,12 @@ export interface CourseLoad {
  * zurückmeldet, ist entweder unbeliebt oder niemand kennt den Knopf — beides
  * will ein Trainer sehen, und beides verschwände beim Weglassen.
  */
-export function courseLoad(points: ParticipationPoint[]): CourseLoad[] {
+export function courseLoad(points: ParticipationPoint[], kurse: TrainingBlock[]): CourseLoad[] {
   const counts = new Map<string, number>();
   for (const p of points) {
     counts.set(p.trainingBlockId, (counts.get(p.trainingBlockId) ?? 0) + 1);
   }
-  return TRAINING_BLOCKS.map((b) => ({
+  return kurse.map((b) => ({
     trainingBlockId: b.id,
     title: b.title,
     weekday: b.weekday,
@@ -196,7 +197,7 @@ export function memberGrowth(
   return out;
 }
 
-/** Wie viele der 24 Wochenkurse haben diese Woche Inhalte? */
+/** Wie viele Wochenkurse des Gyms haben diese Woche Inhalte? */
 export interface CoverageResult {
   withContent: number;
   total: number;
@@ -204,8 +205,8 @@ export interface CoverageResult {
   ratio: number;
 }
 
-export function weeklyCoverage(sessionCount: number): CoverageResult {
-  const total = TRAINING_BLOCKS.length;
+export function weeklyCoverage(sessionCount: number, kursZahl: number): CoverageResult {
+  const total = kursZahl;
   // Mehr gepflegte Einheiten als Kurse kann es geben, wenn Altdaten aus
   // gelöschten Kursen herumliegen. Dann wäre die Quote > 1 und der Ring
   // liefe über — deshalb gedeckelt.

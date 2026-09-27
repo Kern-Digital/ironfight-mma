@@ -30,6 +30,8 @@ import {
   courseTitlesOf,
   WEEKDAY_SHORT,
 } from "@/lib/schedule";
+import { useKursplan } from "@/lib/kursplan-context";
+import type { TrainingBlock } from "@/lib/types";
 import {
   listTrainerWorkoutPlans,
   planDurationSeconds,
@@ -62,11 +64,11 @@ const META_SIZE = "text-[10px] sm:text-[13px]";
     „Freigegeben" fällt dann weg (Leon 30.08.), die Farbe trägt es.
     KEINE Kopfzahl über alle (Leon 19.09.): ein Kurs gilt ganz, auch für
     spätere Mitglieder — gezählt werden Kurse (je Kursname) und Einzelne. */
-function audienceLine(plan: TrainerWorkoutPlan): {
+function audienceLine(plan: TrainerWorkoutPlan, alleKurse: TrainingBlock[]): {
   text: string;
   shared: boolean;
 } {
-  const kurse = courseTitlesOf(plan.audienceCourseIds).length;
+  const kurse = courseTitlesOf(alleKurse, plan.audienceCourseIds).length;
   // Altbestand ohne getrennte Einzelne: dort zählen nur die Kurse — außer
   // es gibt keine, dann sind alle Einzelne
   const einzeln =
@@ -102,18 +104,18 @@ interface KursGruppe {
  * still raus wie auf der Detailseite; wer danach ohne Kurs dasteht, landet in
  * der Sammelgruppe.
  */
-function nachKursen(plans: TrainerWorkoutPlan[]): KursGruppe[] {
+function nachKursen(plans: TrainerWorkoutPlan[], kurse: TrainingBlock[]): KursGruppe[] {
   // courseTitles() steht in Kursplan-Reihenfolge — die Einfüge-Reihenfolge
   // der Map ist damit die Reihenfolge der Gruppen.
   const gruppen = new Map<string, KursGruppe>(
-    courseTitles().map((t) => [t, { title: t, weekdays: [], plans: [] }]),
+    courseTitles(kurse).map((t) => [t, { title: t, weekdays: [], plans: [] }]),
   );
   const ohneKurs: TrainerWorkoutPlan[] = [];
 
   for (const plan of plans) {
     const titel = new Set<string>();
     for (const id of plan.courseIds) {
-      const block = blockById(id);
+      const block = blockById(kurse, id);
       if (!block) continue;
       const gruppe = gruppen.get(block.title)!;
       if (!gruppe.weekdays.includes(block.weekday)) {
@@ -198,9 +200,10 @@ function PlanZeile({
   plan: TrainerWorkoutPlan;
   onFreigabe: () => void;
 }) {
+  const { kurse } = useKursplan();
   const minutes = Math.round(planDurationSeconds(plan) / 60);
   const exercises = planExerciseCount(plan);
-  const audience = audienceLine(plan);
+  const audience = audienceLine(plan, kurse);
   return (
     <Link data-press="surface"
       href={`/trainer/plans/${plan.id}`}
@@ -296,7 +299,8 @@ export default function TrainerPlansPage() {
     }
   }
 
-  const gruppen = useMemo(() => (plans ? nachKursen(plans) : []), [plans]);
+  const { kurse } = useKursplan();
+  const gruppen = useMemo(() => (plans ? nachKursen(plans, kurse) : []), [plans, kurse]);
 
   async function handleAudienceSave(
     courseIds: string[],

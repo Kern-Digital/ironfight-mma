@@ -17,6 +17,9 @@
  * (z. B. Stil/Auslage im OpponentEditor) bleiben ohne clearable.
  * Tastatur: Pfeiltasten, Home/End, Enter, Escape; Klick außerhalb schließt.
  * STANDARD app-weit (Entscheidung 2026-08-21): keine nativen <select> mehr.
+ *
+ * `ariaLabel` (27.09.2026) benennt das Feld, wenn kein sichtbares Label
+ * darübersteht (z. B. der Raum je Uhrzeit im Kurs-Sheet).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -31,6 +34,7 @@ export default function Select({
   onChange,
   placeholder = "— wählen —",
   clearable = false,
+  ariaLabel,
 }: {
   value: string;
   options: SelectOption[];
@@ -38,6 +42,8 @@ export default function Select({
   placeholder?: string;
   /** Optionales Feld: Klick auf die markierte Option wählt ab (→ "") */
   clearable?: boolean;
+  /** Name des Felds für Screenreader, wenn kein Label darübersteht. */
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -110,6 +116,7 @@ export default function Select({
         ref={triggerRef}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel ? `${ariaLabel}: ${selected ? selected.label : placeholder}` : undefined}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onTriggerKeyDown}
         className="t-interactive flex min-h-hit w-full items-center justify-between gap-2 px-3.5 text-left"
