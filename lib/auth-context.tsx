@@ -28,10 +28,12 @@ import {
   ensureUserProfile,
   getUserProfile,
   setDisplayName as setProfileDisplayName,
+  setAvatar as setProfileAvatar,
   markOnboarded as markProfileOnboarded,
   markTrainerOnboarded as markProfileTrainerOnboarded,
 } from "./user-profile";
 import { hasAnyRight, NO_RIGHTS, rightsFromClaims, type RoleSet } from "./roles";
+import type { ProfilbildId } from "./profilbilder";
 import type { UserProfile } from "./types";
 
 type AuthContextValue = {
@@ -47,6 +49,8 @@ type AuthContextValue = {
   resetPassword: (email: string) => Promise<void>;
   logOut: () => Promise<void>;
   updateDisplayName: (name: string | null) => Promise<void>;
+  /** Profilbild wählen (`null` = Namenskürzel) — sofort gespeichert. */
+  updateAvatar: (avatar: ProfilbildId | null) => Promise<void>;
   finishOnboarding: () => Promise<void>;
   finishTrainerOnboarding: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -183,6 +187,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, refreshProfile],
   );
 
+  // Setzt den Wert erst lokal (die Auswahl springt sofort um), schreibt dann
+  // und rollt bei einem Fehler zurück. Kein refreshProfile(): Das würde den
+  // Ladezustand der ganzen Seite anwerfen — für ein einziges Feld.
+  const updateAvatar = useCallback(
+    async (avatar: ProfilbildId | null) => {
+      if (!user) return;
+      let vorher: ProfilbildId | null = null;
+      setProfile((prev) => {
+        vorher = prev?.avatar ?? null;
+        return prev ? { ...prev, avatar } : prev;
+      });
+      try {
+        await setProfileAvatar(user.uid, avatar);
+      } catch (err) {
+        setProfile((prev) => (prev ? { ...prev, avatar: vorher } : prev));
+        throw err;
+      }
+    },
+    [user],
+  );
+
   const finishOnboarding = useCallback(async () => {
     if (!user) return;
     await markProfileOnboarded(user.uid);
@@ -266,6 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       logOut: () => signOut(getFirebaseAuth()),
       updateDisplayName,
+      updateAvatar,
       finishOnboarding,
       finishTrainerOnboarding,
       refreshProfile,
@@ -278,6 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileLoading,
       redirectError,
       updateDisplayName,
+      updateAvatar,
       finishOnboarding,
       finishTrainerOnboarding,
       refreshProfile,

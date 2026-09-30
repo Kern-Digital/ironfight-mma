@@ -11,7 +11,8 @@ import { Reveal } from "@/components/motion";
 import { listAllUsers, type AdminUserEntry } from "@/lib/admin";
 import type { UserRole } from "@/lib/types";
 import { legacyRole } from "@/lib/roles";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Profilbild from "@/components/ui/Profilbild";
 
 // ─── Rollen-Konfiguration ──────────────────────────────────────────────────
 
@@ -86,16 +87,15 @@ function UserRow({
     >
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-display-ta text-sm font-black"
+        <Profilbild
+          avatar={entry.avatar}
+          kuerzel={initials(entry)}
           style={{
-            background: meta.bg,
+            background: entry.avatar ? undefined : meta.bg,
             border: `1px solid ${meta.border}`,
             color: meta.color,
           }}
-        >
-          {initials(entry)}
-        </div>
+        />
 
         {/* Info */}
         <div className="flex-1 min-w-0">

@@ -1,3 +1,5 @@
+import type { ProfilbildId } from "./profilbilder";
+
 /**
  * IronFight MMA — zentrale Types
  *
@@ -488,6 +490,11 @@ export interface UserProfile {
   displayName: string | null;
   /** Reserviert für spätere Community-Funktionen — eindeutig, optional */
   username?: string | null;
+  /**
+   * Gewähltes Profilbild aus der festen Auswahl (lib/profilbilder.ts).
+   * `null` = keins gewählt → überall steht das Namenskürzel.
+   */
+  avatar?: ProfilbildId | null;
   /**
    * Wer dieses Konto sehen darf — je Bereich eine Liste von Trainer-uids
    * (Leon 03.09.2026: „standardmäßig alle Trainer auf privat", getrennt nach

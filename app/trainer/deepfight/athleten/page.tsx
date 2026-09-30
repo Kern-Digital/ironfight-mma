@@ -86,6 +86,7 @@ import { listOpponentsForGym } from "@/lib/opponents";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Profilbild from "@/components/ui/Profilbild";
 
 const META_FONT: React.CSSProperties = {
   font: "var(--type-meta)",
@@ -140,19 +141,11 @@ function PersonRow({
         }
       />
 
-      <span
-        aria-hidden
-        className="pointer-events-none relative flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-        style={{
-          font: "var(--type-body-strong)",
-          letterSpacing: "var(--ls-label)",
-          background: "var(--accent-subtle)",
-          border: "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
-          color: "var(--accent-text)",
-        }}
-      >
-        {initialsOf(name)}
-      </span>
+      <Profilbild
+        avatar={entry.avatar}
+        kuerzel={initialsOf(name)}
+        className="pointer-events-none relative"
+      />
 
       <span
         className="pointer-events-none relative min-w-0 flex-1 truncate"

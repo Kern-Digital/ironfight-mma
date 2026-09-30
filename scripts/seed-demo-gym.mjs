@@ -89,6 +89,17 @@ const NACHNAMEN = [
 ];
 
 /**
+ * Profilbilder (lib/profilbilder.ts) — nach Vornamen aus zwei Töpfen, damit
+ * eine Lena nicht als Bär und ein Jonas nicht als Zora in der Liste steht.
+ */
+const WEIBLICH = new Set([
+  "Lena", "Mira", "Sina", "Alina", "Nele", "Emilia", "Frieda", "Maja", "Ida",
+  "Clara", "Romy", "Hanna", "Greta", "Nora", "Zoe", "Yara", "Selma", "Juna",
+]);
+const BILDER_W = ["rin", "zora", "lyn", "neris", "veya", "rook"];
+const BILDER_M = ["kael", "ivar", "fen", "koda", "orin", "nox", "mako", "elio"];
+
+/**
  * Deterministischer Pseudo-Zufall: Derselbe Aufruf liefert dieselbe Zahl.
  * So erzeugt ein zweiter Lauf dieselben Mitglieder statt einer zweiten Charge —
  * der Seeder ist idempotent, und die Kennzahlen springen nicht bei jedem Lauf.
@@ -155,6 +166,9 @@ async function seed(db, blocks) {
         // Damit sofort erkennbar ist, was Demo ist und was echte Mitglieder
         // sind — und damit `--clear` nicht die einzige Sicherung bleibt.
         isDemo: true,
+        avatar: WEIBLICH.has(vorname)
+          ? BILDER_W[i % BILDER_W.length]
+          : BILDER_M[i % BILDER_M.length],
         ...mirror,
       },
       { merge: true },

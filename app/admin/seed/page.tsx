@@ -17,7 +17,8 @@ import {
   type SeedResult,
 } from "@/lib/demo-seed";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Profilbild from "@/components/ui/Profilbild";
 
 type DemoCount = {
   workouts: number;
@@ -74,16 +75,7 @@ function StudentSeedCard({
     >
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-display-ta text-sm font-black"
-          style={{
-            background: "rgba(35,196,206,0.1)",
-            border: "1px solid rgba(35,196,206,0.35)",
-            color: "var(--ta-cyan)",
-          }}
-        >
-          {initialsOf(entry)}
-        </div>
+        <Profilbild avatar={entry.avatar} kuerzel={initialsOf(entry)} />
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span

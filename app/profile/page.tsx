@@ -16,7 +16,8 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import AchievementsPanel from "@/components/AchievementsPanel";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
-import { useAuth, useHasStaffShell } from "@/lib/auth-context";
+import { useAuth, useFighterName, useHasStaffShell } from "@/lib/auth-context";
+import { PROFILBILDER, profilbildSrc, type ProfilbildId } from "@/lib/profilbilder";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
 import { greetingFor } from "@/lib/greeting";
@@ -254,6 +255,150 @@ function FighterNameCard() {
   );
 }
 
+// ─── Profilbild (feste Auswahl, lib/profilbilder.ts) ───────────────────────
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
+function ProfilbildCard() {
+  const { profile, updateAvatar } = useAuth();
+  const fighterName = useFighterName();
+  const aktiv = profile?.avatar ?? null;
+  const [error, setError] = useState<string | null>(null);
+
+  async function waehle(id: ProfilbildId | null) {
+    if (id === aktiv) return;
+    setError(null);
+    try {
+      await updateAvatar(id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    }
+  }
+
+  return (
+    <ProfilbildCardBody
+      aktiv={aktiv}
+      kuerzel={initialsOf(fighterName)}
+      onWaehle={waehle}
+      error={error}
+    />
+  );
+}
+
+// Eine Kachel: ausgewählt = Akzent-Ring + Haken, sonst Haarlinie.
+function Kachel({
+  an,
+  label,
+  onClick,
+  children,
+}: {
+  an: boolean;
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={an}
+      aria-label={label}
+      title={label}
+      data-press
+      className="t-interactive relative aspect-square w-full overflow-hidden rounded-field"
+      style={{
+        border: an ? "2px solid var(--accent)" : "1px solid var(--line)",
+        background: "var(--surface-raised)",
+        transition: "border-color var(--dur-fast) var(--ease-out)",
+      }}
+    >
+      {children}
+      {an && (
+        <span
+          aria-hidden
+          className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-pill"
+          style={{ background: "var(--accent)", color: "var(--on-accent)" }}
+        >
+          <Icon name="check" size={12} strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function ProfilbildCardBody({
+  aktiv,
+  kuerzel,
+  onWaehle,
+  error,
+}: {
+  aktiv: ProfilbildId | null;
+  kuerzel: string;
+  onWaehle: (id: ProfilbildId | null) => Promise<void>;
+  error: string | null;
+}) {
+  return (
+    <div className="t-card flex flex-col gap-4 p-4 sm:p-6">
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-[repeat(15,minmax(0,1fr))]">
+        <Kachel
+          an={aktiv === null}
+          label="Initialen"
+          onClick={() => void onWaehle(null)}
+        >
+          <span
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              font: "var(--type-body-strong)",
+              letterSpacing: "var(--ls-label)",
+              background: "var(--accent-subtle)",
+              color: "var(--accent-text)",
+            }}
+          >
+            {kuerzel}
+          </span>
+        </Kachel>
+        {PROFILBILDER.map((b) => (
+          <Kachel
+            key={b.id}
+            an={aktiv === b.id}
+            label={b.name}
+            onClick={() => void onWaehle(b.id)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={profilbildSrc(b.id)}
+              alt=""
+              width={256}
+              height={256}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className="h-full w-full object-cover"
+            />
+          </Kachel>
+        ))}
+      </div>
+      {error && (
+        <div
+          className="rounded-field px-3.5 py-2.5"
+          style={{
+            font: "var(--type-sub)",
+            background: "color-mix(in oklab, var(--negative) 12%, transparent)",
+            border:
+              "1px solid color-mix(in oklab, var(--negative) 40%, transparent)",
+            color: "var(--negative)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Kurs-Abos ─────────────────────────────────────────────────────────────
 
 function SubscriptionsCard({ uid }: { uid: string }) {
@@ -397,7 +542,7 @@ function ProfileContent() {
               {greeting}
             </h1>
             <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Dein Name, App-Einstellungen, Kurs-Abos und Account-Infos.
+              Dein Bild, dein Name, App-Einstellungen, Kurs-Abos und Account-Infos.
             </p>
           </div>
           {/* Mobil: Theme-Umschalter im Seitenkopf (Desktop: in der Tab-Bar) */}
@@ -443,6 +588,15 @@ function ProfileContent() {
                 <Icon name="arrow-right" size={18} strokeWidth={2.2} />
               </span>
             </Link>
+
+            {/* Profilbild — volle Breite, auf dem Desktop eine Reihe */}
+            <section className="flex flex-col gap-3 lg:col-span-2">
+              <SectionHeader
+                title="Dein Fighter"
+                subtitle={`Wähl dein Profilbild aus ${PROFILBILDER.length} Figuren`}
+              />
+              <ProfilbildCard />
+            </section>
 
             {/* Fighter-Name */}
             <section className="flex flex-col gap-3">

@@ -17,6 +17,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getFirestoreDb } from "./firebase";
+import { readProfilbild, type ProfilbildId } from "./profilbilder";
 import { readShares, type ProfileShares } from "./profile-sharing";
 import { effectiveRights, readRoleSet, type RoleSet } from "./roles";
 import type { AthleteProfile } from "./types";
@@ -27,6 +28,8 @@ export type AdminUserEntry = {
   email: string | null;
   displayName: string | null;
   authProviderName: string | null;
+  /** Gewähltes Profilbild — `null` = Namenskürzel (lib/profilbilder.ts). */
+  avatar: ProfilbildId | null;
   /**
    * Rechte aus dem Abfrage-Spiegel am users-Dokument (Checkpoint 3,
    * lib/roles.ts) — Plattform-Rang eingerechnet.
@@ -95,6 +98,7 @@ function decodeStudentEntry(
     email: (data.email as string | null) ?? null,
     displayName: (data.displayName as string | null) ?? null,
     authProviderName: (data.authProviderName as string | null) ?? null,
+    avatar: readProfilbild(data.avatar),
     rights: effectiveRights(readRoleSet(data)),
     gymId: ((data.gymId as string | null | undefined) ?? null) || null,
     isDemo: data.isDemo === true,
@@ -203,6 +207,7 @@ export async function listAllUsers(): Promise<AdminUserEntry[]> {
       email: data.email ?? null,
       displayName: data.displayName ?? null,
       authProviderName: data.authProviderName ?? null,
+      avatar: readProfilbild(data.avatar),
       rights: effectiveRights(readRoleSet(data)),
       gymId: ((data.gymId as string | null | undefined) ?? null) || null,
       isDemo: data.isDemo === true,

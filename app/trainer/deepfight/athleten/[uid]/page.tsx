@@ -159,6 +159,7 @@ function AthleteDeepFightContent({ uid }: { uid: string }) {
         lane="wide"
         back={{ href: "/trainer/deepfight/athleten", label: "Athleten-Analysen" }}
         initials={entry ? initialsOf(entry) : undefined}
+        avatar={entry?.avatar}
         title={<DeepFightWordmark />}
         description={entry ? labelOf(entry) : undefined}
         aside={

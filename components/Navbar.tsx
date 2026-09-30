@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/theme-context";
 import DeepFightWordmark from "@/components/DeepFightWordmark";
 import Icon from "@/components/ui/Icon";
 import AppSuche from "@/components/shell/AppSuche";
+import Profilbild from "@/components/ui/Profilbild";
 
 /* ─── Symbole ────────────────────────────────────────────────────────────────
  * Hier standen zehn von Hand gemalte SVG-Pfade (rund 95 Zeilen). Sie sind
@@ -192,7 +193,7 @@ function initialsOf(name: string): string {
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, logOut } = useAuth();
+  const { user, profile, loading, logOut } = useAuth();
   const fighterName = useFighterName();
   const { theme, toggleTheme } = useTheme();
   // Ein Rollen-Set statt dreier Einzelvergleiche (Checkpoint 3,
@@ -519,18 +520,11 @@ export default function Navbar() {
                   {/* Die Plakette trug zwei feste rgba-Cyans. Beide leiten sich
                       jetzt aus dem Akzent ab — `color-mix` statt Alpha-Anhang,
                       wie im Token-Kopf vorgeschrieben. */}
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-field"
-                    style={{
-                      border:
-                        "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
-                      background: "var(--accent-subtle)",
-                      color: "var(--accent-text)",
-                      font: "var(--type-meta)",
-                    }}
-                  >
-                    {initialsOf(fighterName)}
-                  </span>
+                  <Profilbild
+                    avatar={profile?.avatar}
+                    kuerzel={initialsOf(fighterName)}
+                    groesse="sm"
+                  />
                   <span className="hidden lg:inline">{fighterName}</span>
                 </Link>
                 <button

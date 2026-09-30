@@ -29,7 +29,9 @@
  */
 
 import Icon, { type IconName } from "@/components/ui/Icon";
-import { SeitenZurueck } from "./KopfNavigation";
+import { SeitenZurueck } from "./KopfNavigation";
+import Profilbild from "@/components/ui/Profilbild";
+import type { ProfilbildId } from "@/lib/profilbilder";
 
 /**
  * Die Lesespur. Drei benannte Werte statt freier Klassen — sonst driften die
@@ -59,6 +61,7 @@ export default function PageHead({
   description,
   back,
   initials,
+  avatar,
   aside,
   children,
   lane = "standard",
@@ -76,6 +79,8 @@ export default function PageHead({
   back?: { href: string; label: string };
   /** Initialen-Kachel vor dem Titel (Athleten- und Analyse-Detailseiten). */
   initials?: string;
+  /** Profilbild statt der Initialen, wenn das Konto eins gewählt hat. */
+  avatar?: ProfilbildId | null;
   /** Rechte Seite: Kennzahl-Karte, Knöpfe oder was die Seite dort braucht. */
   aside?: React.ReactNode;
   /**
@@ -127,20 +132,7 @@ export default function PageHead({
 
           <div className="flex min-w-0 items-center gap-3">
             {initials && (
-              <span
-                aria-hidden
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-card"
-                style={{
-                  font: "var(--type-h2)",
-                  letterSpacing: "var(--ls-label)",
-                  background: "var(--accent-subtle)",
-                  border:
-                    "1px solid color-mix(in oklab, var(--accent) 40%, transparent)",
-                  color: "var(--accent-text)",
-                }}
-              >
-                {initials}
-              </span>
+              <Profilbild avatar={avatar} kuerzel={initials} groesse="lg" />
             )}
             <h1
               className="min-w-0"

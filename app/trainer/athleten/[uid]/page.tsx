@@ -373,6 +373,7 @@ function StudentDetailContent({ uid }: { uid: string }) {
         lane="wide"
         back={{ href: "/trainer/athleten", label: "Athletenliste" }}
         initials={initialsOf(entry)}
+        avatar={entry.avatar}
         title={displayLabel(entry)}
         description={`${entry.email ?? "—"} · Seit ${formatDate(entry.createdAt)}`}
       >

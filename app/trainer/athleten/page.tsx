@@ -59,7 +59,8 @@ import {
   matchesCourseFilter,
   type CourseMemberships,
 } from "@/lib/student-courses";
-import Link from "next/link";
+import Link from "next/link";
+import Profilbild from "@/components/ui/Profilbild";
 
 // ─── Gemeinsame Schnitte (wie auf /trainer, /verwaltung, /admin) ────────────
 
@@ -165,20 +166,7 @@ function StudentRow({
       className="t-card t-interactive student-row flex select-none items-center gap-3 p-3.5"
       style={{ textDecoration: "none", color: "inherit" }}
     >
-      <span
-        aria-hidden
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-        style={{
-          font: "var(--type-body-strong)",
-          letterSpacing: "var(--ls-label)",
-          background: "var(--accent-subtle)",
-          border:
-            "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
-          color: "var(--accent-text)",
-        }}
-      >
-        {initialsOf(entry)}
-      </span>
+      <Profilbild avatar={entry.avatar} kuerzel={initialsOf(entry)} />
       <span
         className="min-w-0 flex-1 truncate"
         style={{ font: "var(--type-body-strong)" }}

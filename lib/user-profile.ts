@@ -9,6 +9,7 @@ import {
 import type { User } from "firebase/auth";
 import { getFirestoreDb } from "./firebase";
 import { readShares, vollstaendig, type ProfileShares } from "./profile-sharing";
+import { readProfilbild, type ProfilbildId } from "./profilbilder";
 import { NO_RIGHTS, readRoleSet } from "./roles";
 import {
   DEFAULT_USER_SETTINGS,
@@ -86,6 +87,8 @@ type ProfileDoc = {
   authProviderName: string | null;
   displayName: string | null;
   username?: string | null;
+  /** ID aus lib/profilbilder.ts — gelesen über readProfilbild(). */
+  avatar?: string | null;
   /**
    * Abfrage-Spiegel des Rollen-Sets (siehe UserProfile.rights). Autoritativ
    * sind die Custom Claims; hier stehen die Felder nur, weil Claims nicht
@@ -150,6 +153,7 @@ export async function getUserProfile(
     authProviderName: data.authProviderName,
     displayName: data.displayName,
     username: data.username ?? null,
+    avatar: readProfilbild(data.avatar),
     // Aus dem SPIEGEL gelesen — er kann dem Claim nachhinken. Der
     // Auth-Context überschreibt das Feld direkt danach mit dem Wert aus dem
     // ID-Token; hier steht der beste Wert, den ein reiner Dokument-Leser hat.
@@ -188,6 +192,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       authProviderName: user.displayName ?? data.authProviderName,
       displayName: data.displayName,
       username: data.username ?? null,
+      avatar: readProfilbild(data.avatar),
       rights: readRoleSet(data as Record<string, unknown>),
       gymId: data.gymId ?? null,
       gymJoinedAt: data.gymJoinedAt?.toDate() ?? null,
@@ -229,6 +234,11 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
 export async function setDisplayName(uid: string, displayName: string | null) {
   const trimmed = displayName?.trim() || null;
   await setDoc(profileRef(uid), { displayName: trimmed, onboarded: true }, { merge: true });
+}
+
+/** Setzt das Profilbild (`null` = zurück aufs Namenskürzel). */
+export async function setAvatar(uid: string, avatar: ProfilbildId | null) {
+  await setDoc(profileRef(uid), { avatar }, { merge: true });
 }
 
 /** Markiert den Onboarding-Flow als abgeschlossen, ohne Namen zu setzen. */
