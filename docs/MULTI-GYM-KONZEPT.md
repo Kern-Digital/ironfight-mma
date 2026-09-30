@@ -29,6 +29,12 @@ Plattform-Admin (admin) — wenige Personen, gym-übergreifend, verwaltet die Ap
   denselben Platz konkurriert hätte. Eine Datei baut und liest sie:
   `lib/roles.ts` (Node-Zwilling: `scripts/lib/role-claims.mjs`).
 - **Ein User gehört genau EINEM Gym** (bewusste Vereinfachung für den Start).
+  > **Vorbereitet 30.09.2026:** `mitgliedsGyms(user)` in
+  > `lib/server/verify-user.ts` ist die Stelle, die später die
+  > Mitgliedschaften liest (heute: der Claim, ohne Default-Rückfall). Erste
+  > Nutzerin ist `POST /api/gym/trainer-auswahl`, deren Antwort schon nach Gym
+  > gruppiert ist. Beim Umbau Pflicht: Trainer-Recht JE GYM prüfen, nicht am
+  > Konto. Details: CLAUDE.md „TRAINER-AUSWAHL IM FREIGABE-SHEET".
 - `gymId` gehört in die **Custom Claims** (wie `role` heute), nicht nur ins
   Profil-Dokument — nur so ist die Trennung serverseitig hart.
 

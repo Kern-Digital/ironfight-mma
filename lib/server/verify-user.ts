@@ -111,6 +111,28 @@ export function userGymId(user: VerifiedUser): string {
 }
 
 /**
+ * Die Gyms, in denen der Aufrufer ECHT Mitglied ist — ohne jeden Rückfall.
+ *
+ * Anders als `userGymId()` fällt ein fehlender Claim hier NICHT aufs
+ * Default-Gym zurück: Ein Konto, das sich ohne Einladung registriert hat,
+ * gilt dort zwar als Mitglied des Default-Gyms (Bestandsregel, identisch zu
+ * firestore.rules), hat aber nie eine Einladung eingelöst. Wo eine Route
+ * Namen aus dem Gym herausgibt, reicht das nicht (Leon 30.09.2026, die
+ * Trainer-Auswahl im Freigabe-Sheet). Der Aufrufer muss zusätzlich
+ * `users/{uid}.gymId` gegen dieses Ergebnis halten.
+ *
+ * HEUTE GENAU EIN GYM (Konzept §1). Der Rückgabetyp ist trotzdem eine Liste:
+ * Kommt „Athlet in mehreren Gyms" (Gedächtnis athlet-mehrere-gyms), wird
+ * DIESE Funktion die Mitgliedschaften lesen — und jede Route, die sie nutzt,
+ * läuft ohne Umbau über alle Gyms. Keine zweite Kopie dieser Frage anlegen.
+ */
+export function mitgliedsGyms(user: VerifiedUser): string[] {
+  const claim = user.gymId?.trim();
+  if (!claim || claim === KEIN_GYM) return [];
+  return [claim];
+}
+
+/**
  * Darf dieser Aufrufer das Gym verwalten — einladen, Einladungen stoppen,
  * Rechte vergeben, Mitglieder und Protokoll lesen?
  *

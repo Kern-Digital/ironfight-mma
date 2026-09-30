@@ -23,11 +23,20 @@
  * vergibt dabei nur den Bereich DeepFight; Athletenprofil und Wettkämpfe sind
  * für die Trainer seines Gyms ohnehin offen (`bereicheFuerKonto`).
  *
- * EINE ABFRAGE FÜR BEIDE RICHTUNGEN: `listAllMembers(gymId)` liefert an jedem
- * Eintrag auch dessen `profileShares` — damit beantwortet dieselbe Liste
- * „wen gebe ich frei" UND „wer gibt mich frei", ohne einen zweiten
- * Lesevorgang. Sie lädt bewusst erst nach dem Rendern: Der Rest der Seite
- * soll darauf nicht warten.
+ * ZWEI WEGE ZUR NAMENSLISTE (seit 30.09.2026):
+ *   • STAB-KONTEN lesen `listAllMembers(gymId)` — die Regeln lassen Trainer
+ *     und Verwaltung die Mitgliederliste lesen. Dieselbe Liste trägt an jedem
+ *     Eintrag `profileShares` und beantwortet damit auch „wer gibt MICH
+ *     frei", ohne zweiten Lesevorgang.
+ *   • ATHLETEN dürfen die Mitgliederliste NICHT lesen (so gewollt). Sie holen
+ *     die Trainer über `POST /api/gym/trainer-auswahl` — uid, Name,
+ *     Profilbild, sonst nichts (lib/trainer-auswahl.ts). Bis zum 30.09. lief
+ *     auch der Athlet über `listAllMembers`, die Abfrage scheiterte still,
+ *     und das Sheet meldete „In deinem Gym gibt es gerade keinen Trainer".
+ *
+ * GELADEN, LEER UND GESCHEITERT SIND DREI ZUSTÄNDE (`status`): Ein Fehler
+ * darf nie wie eine leere Liste aussehen — genau das war der Fehler. Die
+ * Liste lädt erst nach dem Rendern; der Rest der Seite wartet nicht darauf.
  */
 
 import ProfileShareSheet from "@/components/ProfileShareSheet";
@@ -41,6 +50,8 @@ import {
 import { useAuth, useRights } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
 import { memberName } from "@/lib/members";
+import { ladeTrainerAuswahl } from "@/lib/trainer-auswahl";
+import type { ProfilbildId } from "@/lib/profilbilder";
 import {
   alleTrainerBereiche,
   bereicheFuer,
@@ -59,6 +70,12 @@ const BTN_FONT: React.CSSProperties = {
 
 export type GeteiltMitMir = { eintrag: StudentEntry; bereiche: ShareArea[] };
 
+/** Eine Zeile im Sheet — dieselbe Form für beide Wege zur Namensliste. */
+export type FreigabePerson = { uid: string; name: string; avatar: ProfilbildId | null };
+
+/** `ohne-gym`: Das Konto hat nie eine Einladung eingelöst — keine Trainer. */
+export type AuswahlStatus = "laedt" | "ok" | "ohne-gym" | "fehler";
+
 export default function ProfileShareButton() {
   const { user, profile, refreshProfile } = useAuth();
   const rights = useRights();
@@ -66,6 +83,9 @@ export default function ProfileShareButton() {
   const eigeneUid = user?.uid ?? "";
 
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
+  /** Nur Athleten-Weg: die Trainer aus der Route. */
+  const [auswahl, setAuswahl] = useState<FreigabePerson[] | null>(null);
+  const [status, setStatus] = useState<AuswahlStatus>("laedt");
   const [offen, setOffen] = useState(false);
 
   // Das Feld gehört dem Menschen: Der Auth-Context hält den gespeicherten
@@ -80,19 +100,38 @@ export default function ProfileShareButton() {
   const istStab = rights.trainer || rights.verwaltung || rights.admin;
 
   useEffect(() => {
-    if (!eigeneUid) return;
+    if (!user) return;
     let lebt = true;
-    listAllMembers(gymId)
-      .then((liste) => {
-        if (lebt) setMembers(liste);
-      })
-      .catch(() => {
-        if (lebt) setMembers([]);
-      });
+    setStatus("laedt");
+    if (istStab) {
+      listAllMembers(gymId)
+        .then((liste) => {
+          if (!lebt) return;
+          setMembers(liste);
+          setStatus("ok");
+        })
+        .catch(() => {
+          if (lebt) setStatus("fehler");
+        });
+    } else {
+      ladeTrainerAuswahl(user)
+        .then((gyms) => {
+          if (!lebt) return;
+          // Heute genau ein Gym. Kommen mehrere, stehen alle Trainer in
+          // einer Liste — die Freigabe gilt je Person, nicht je Gym
+          // (Gedächtnis athlet-mehrere-gyms).
+          const personen = gyms.flatMap((g) => g.trainer);
+          setAuswahl(personen.filter((p, i) => personen.findIndex((x) => x.uid === p.uid) === i));
+          setStatus(gyms.length === 0 ? "ohne-gym" : "ok");
+        })
+        .catch(() => {
+          if (lebt) setStatus("fehler");
+        });
+    }
     return () => {
       lebt = false;
     };
-  }, [eigeneUid, gymId]);
+  }, [user, gymId, istStab]);
 
   /**
    * Trainer des Gyms außer mir selbst — nur sie können überhaupt lesen.
@@ -102,17 +141,13 @@ export default function ProfileShareButton() {
    * Häkchen bei ihnen wäre ohnehin wirkungslos — `isAdmin()` steht in den
    * Regeln vor jeder Freigabe-Prüfung.
    */
-  const kollegen = useMemo(
-    () =>
-      (members ?? [])
-        .filter((m) => m.uid !== eigeneUid && isStaffEntry(m) && !isGhostAccount(m))
-        .sort((a, b) =>
-          memberName(a).localeCompare(memberName(b), "de", {
-            sensitivity: "base",
-          }),
-        ),
-    [members, eigeneUid],
-  );
+  const kollegen: FreigabePerson[] = useMemo(() => {
+    if (!istStab) return auswahl ?? [];
+    return (members ?? [])
+      .filter((m) => m.uid !== eigeneUid && isStaffEntry(m) && !isGhostAccount(m))
+      .map((m) => ({ uid: m.uid, name: memberName(m), avatar: m.avatar }))
+      .sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" }));
+  }, [istStab, auswahl, members, eigeneUid]);
 
   /**
    * Wer MICH freigegeben hat — die Gegenrichtung (Leons Wunsch 03.09.).
@@ -163,7 +198,7 @@ export default function ProfileShareButton() {
       <button
         type="button"
         onClick={() => setOffen(true)}
-        disabled={members === null}
+        disabled={status === "laedt"}
         aria-label="Profil teilen"
         className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 rounded-field px-5 disabled:opacity-50"
         style={{
@@ -202,6 +237,7 @@ export default function ProfileShareButton() {
         open={offen}
         shares={shares}
         kollegen={kollegen}
+        status={status}
         teilenMitMir={teilenMitMir}
         gymId={gymId}
         istStab={istStab}

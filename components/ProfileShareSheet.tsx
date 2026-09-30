@@ -25,18 +25,24 @@ import { Collapse } from "@/components/motion";
 import Icon from "@/components/ui/Icon";
 import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell } from "@/components/motion";
-import type { GeteiltMitMir } from "@/components/ProfileShareButton";
-import type { StudentEntry } from "@/lib/admin";
+import type {
+  AuswahlStatus,
+  FreigabePerson,
+  GeteiltMitMir,
+} from "@/components/ProfileShareButton";
+import Profilbild from "@/components/ui/Profilbild";
 import { memberName } from "@/lib/members";
 import Link from "next/link";
 import {
   SHARE_AREAS,
   alleTrainerBereiche,
+  altlasten,
   bereicheFuer,
   bereicheFuerKonto,
   gleicheShares,
   mitBereich,
   mitGym,
+  ohneAltlasten,
   satzFuerPerson,
   vollstaendig,
   type ProfileShares,
@@ -118,6 +124,7 @@ function BereichChip({
 function ShareSheetInhalt({
   shares,
   kollegen,
+  status,
   teilenMitMir,
   gymId,
   istStab,
@@ -136,7 +143,14 @@ function ShareSheetInhalt({
    * `isGhostAccount` in lib/admin.ts). Deshalb behandelt dieses Sheet jede
    * Zeile gleich: Wer hier steht, ist ein Kollege im Gym.
    */
-  kollegen: StudentEntry[];
+  kollegen: FreigabePerson[];
+  /**
+   * Ob die Namensliste geladen ist. Nur bei `ok` ist eine leere Liste
+   * wirklich leer — bei `fehler` wissen wir es nicht, und das Sheet sagt
+   * das auch so (Fehler bis 30.09.2026: „keinen Trainer", obwohl drei da
+   * waren).
+   */
+  status: AuswahlStatus;
   /**
    * Die GEGENRICHTUNG: Kollegen, die MIR etwas freigegeben haben.
    *
@@ -202,6 +216,13 @@ function ShareSheetInhalt({
       setSaving(false);
     }
   }
+
+  // Altlasten nur aus einer GELADENEN Liste — sonst wäre jede Freigabe eine.
+  const alt =
+    status === "ok"
+      ? altlasten(entwurf, kollegen.map((k) => k.uid), [gymId])
+      : { uids: [], gyms: [] };
+  const altAnzahl = alt.uids.length + alt.gyms.length;
 
   const anzahl = kollegen.filter(
     (k) => bereicheFuer(entwurf, k.uid, gymId).length > 0,
@@ -310,14 +331,21 @@ function ShareSheetInhalt({
             </div>
 
             {kollegen.length === 0 ? (
-              <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                {istStab
-                  ? "In deinem Gym trainiert gerade kein zweiter Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."
-                  : "In deinem Gym gibt es gerade keinen Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."}
+              <p
+                role={status === "fehler" ? "alert" : undefined}
+                style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+              >
+                {status === "fehler"
+                  ? "Die Namen deiner Trainer laden gerade nicht. Oben gibst du trotzdem alle Trainer deines Gyms frei."
+                  : status === "ohne-gym"
+                    ? "Tritt mit dem Einladungslink deines Gyms bei, dann stehen hier deine Trainer."
+                    : istStab
+                      ? "In deinem Gym trainiert gerade kein zweiter Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."
+                      : "In deinem Gym gibt es gerade keinen Trainer. Sobald jemand das Trainer-Häkchen bekommt, steht er hier."}
               </p>
             ) : (
               kollegen.map((kollege) => {
-                const name = memberName(kollege);
+                const name = kollege.name;
                 // Namentlich ODER über „alle Trainer" — der Satz sagt, was gilt.
                 const aktive = bereicheFuer(entwurf, kollege.uid, gymId);
                 const offen = offenerKollege === kollege.uid;
@@ -338,20 +366,7 @@ function ShareSheetInhalt({
                       data-press="quiet"
                       className="t-interactive -m-1 flex items-center gap-3 rounded-field p-1 text-left"
                     >
-                      <span
-                        aria-hidden
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-field"
-                        style={{
-                          font: "var(--type-body-strong)",
-                          letterSpacing: "var(--ls-label)",
-                          background: "var(--accent-subtle)",
-                          border:
-                            "1px solid color-mix(in oklab, var(--accent) 35%, transparent)",
-                          color: "var(--accent-text)",
-                        }}
-                      >
-                        {initialen(name)}
-                      </span>
+                      <Profilbild avatar={kollege.avatar} kuerzel={initialen(name)} />
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span
                           className="truncate"
@@ -425,6 +440,37 @@ function ShareSheetInhalt({
                   </div>
                 );
               })
+            )}
+
+            {/* ─── Altlasten: Freigaben, die gerade niemanden erreichen ──────
+                (Leon 30.09.2026). Ohne Namen — siehe `altlasten()` in
+                lib/profile-sharing.ts. „Entfernen" ändert nur den Entwurf;
+                gespeichert wird wie immer mit „Speichern". */}
+            {altAnzahl > 0 && (
+              <div
+                className="flex flex-col gap-3 rounded-field p-3.5"
+                style={{ background: "var(--surface-raised)", border: "1px solid var(--line)" }}
+              >
+                <span style={{ font: "var(--type-sub)", color: "var(--text-2)" }}>
+                  {altAnzahl === 1
+                    ? "1 frühere Freigabe geht an einen Trainer oder ein Gym, zu dem du nicht mehr gehörst. Kommt er zurück, gilt sie wieder."
+                    : `${altAnzahl} frühere Freigaben gehen an Trainer oder Gyms, zu denen du nicht mehr gehörst. Kommt jemand zurück, gelten sie wieder.`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEntwurf((v) => ohneAltlasten(v, alt))}
+                  disabled={saving}
+                  className="t-interactive inline-flex min-h-hit items-center justify-center gap-2 self-start rounded-field px-4 disabled:opacity-50"
+                  style={{
+                    ...BTN_FONT,
+                    background: "var(--surface-card)",
+                    border: "1px solid var(--line-strong)",
+                    color: "var(--text-body)",
+                  }}
+                >
+                  Entfernen
+                </button>
+              </div>
             )}
 
             {/* ─── Und was umgekehrt bei mir ankommt ─────────────────────── */}
@@ -522,7 +568,8 @@ export default function ProfileShareSheet({
 }: {
   open: boolean;
   shares: ProfileShares;
-  kollegen: StudentEntry[];
+  kollegen: FreigabePerson[];
+  status: AuswahlStatus;
   teilenMitMir: GeteiltMitMir[];
   gymId: string;
   istStab: boolean;

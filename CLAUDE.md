@@ -783,6 +783,87 @@ Sperre (Deny-by-Default, Konzept §3).
   das Gym-Protokoll, nur die Verwaltung liest, kein Postfach) · Schritt 4
   Trainer mit „Trainer"-Vermerk in der Athletenliste (bewusst zuletzt).
 
+### TRAINER-AUSWAHL IM FREIGABE-SHEET (30.09.2026, Leon: „ja dann bau es so. und documentiere alles")
+**Die Rechte, die NICHT angefasst werden (Leon 30.09.: „dies sollte auch
+nicht geändert werden"):** Ein Athlet liest nur sein eigenes users-Dokument,
+NICHT die Mitgliederliste seines Gyms (`match /users/{uid}` → `allow read`
+nur für sich, Admin, Trainer/Verwaltung desselben Gyms). Athletenprofil und
+Wettkämpfe eines Athleten sehen die Trainer seines Gyms immer; freigeben muss
+ein Athlet nur **DeepFight** (Kampfprofil + Analysen) — ohne Freigabe kann ihn
+niemand analysieren. `bereicheFuerKonto` zeigt ihm deshalb nur diesen Bereich.
+
+**Der Fehler bis 30.09.:** `ProfileShareButton` lud die Namen für JEDEN über
+`listAllMembers(gymId)`. Beim Athleten scheiterte die Abfrage an den Regeln,
+das `.catch` setzte eine leere Liste, und das Sheet schrieb „In deinem Gym
+gibt es gerade keinen Trainer" — Tidal Athletics hatte drei. „Alle Trainer
+deines Gyms" funktionierte, aber einzelne Trainer konnte kein Athlet wählen.
+
+**Die Lösung — eine Route, die Regeln bleiben gleich:**
+`POST /api/gym/trainer-auswahl` (`app/api/gym/trainer-auswahl/route.ts`,
+Client `lib/trainer-auswahl.ts`). Antwort
+`{ gyms: [{ gymId, name, trainer: [{ uid, name, avatar }] }] }`.
+Stab-Konten laden weiter über `listAllMembers` (sie brauchen die Liste auch
+für „Mit dir geteilt"), Athleten über die Route. Das ausführliche
+Sicherheitsmodell steht im Kopf der Route; hier die Punkte, die man beim
+Ändern NIE verlieren darf:
+
+| Szenario | Schutz |
+|---|---|
+| nicht angemeldet / kaputtes Token | 401 (`verifyUser`) |
+| fremdes Gym abfragen | Route liest KEINE Eingabe; Gym nur aus dem Token-Claim (setzt nur das Admin-SDK). Ein Body mit `gymId` wird ignoriert (gemessen). |
+| Selbstanmeldung ohne Einladung | `userGymId()` fällt ohne Claim aufs Default-Gym zurück — hier NICHT: `mitgliedsGyms()` (lib/server/verify-user.ts) kennt keinen Rückfall, und Claim UND `users/{uid}.gymId` müssen übereinstimmen. Sonst `{ gyms: [] }`. Produktion 30.09.: genau ein solches Konto. |
+| E-Mail-Leck | eigene Namensregel `displayName → authProviderName → „Trainer"`. NIE `memberName()` — die fällt auf die E-Mail zurück. Antwort trägt je Trainer genau `uid`, `name`, `avatar`. |
+| Liste zeigt Leute, die gar nicht lesen dürfen | Vorauswahl über den Spiegel (`gymId` + `trainer` am Dokument, Claims sind nicht abfragbar), dann Prüfung gegen die CLAIMS per `getUsers`: Trainer-Recht, KEIN Admin, `claims.gymId` = Gym, Konto nicht gesperrt. Genau die Bedingung von `canAccessMemberData`. Reine Verwaltung, Ghost-Admins, Demo-Dokumente ohne Login, gesperrte Konten und nachhinkende Spiegel fallen raus. |
+| Namen zu beliebigen uids erfragen | Die Route schlägt NIE Namen zu uids aus den eigenen `profileShares` nach — sonst schriebe jemand eine fremde uid in sein Dokument und erführe den Namen jedes Kontos der Plattform. Altlasten stehen im Sheet deshalb nur als Anzahl. |
+| CDN-Zwischenspeicher | POST + `Cache-Control: no-store` |
+| Ladefehler = „keine Trainer" | `AuswahlStatus` `laedt / ok / ohne-gym / fehler` im Button; das Sheet hat für jeden Zustand einen eigenen Satz. Eine leere Liste gilt nur bei `ok` als leer. |
+
+**ALTLASTEN** (`altlasten()` / `ohneAltlasten()` in lib/profile-sharing.ts):
+Namentliche Freigaben an jemanden, der nicht mehr als Trainer zur Auswahl
+steht, und „alle Trainer" eines Gyms, zu dem man nicht mehr gehört. Sie
+wirken nicht (Regeln verlangen Gym + Trainer-Recht), WACHEN ABER WIEDER AUF,
+wenn die Person zurückkommt — und standen vorher unsichtbar im Dokument. Das
+Sheet zeigt ihre Anzahl mit „Entfernen"; berechnet NUR aus einer erfolgreich
+geladenen Liste (sonst wäre bei einem Ladefehler jede Freigabe eine Altlast).
+
+**ATHLET IN MEHREREN GYMS** (heute gesperrt, Konzept §1; Gedächtnis
+`athlet-mehrere-gyms`): Die Antwort ist schon nach Gym gruppiert, die Gyms
+kommen aus `mitgliedsGyms()` — die EINE Stelle, die später die
+Mitgliedschaften liest (keine weitere Kopie der Ein-Gym-Annahme anlegen). Der
+Button legt heute alle Trainer in eine Liste; die Freigabe gilt je Person
+(Leons Festlegung: Gyms nur als Gruppierung in der Anzeige). **Pflicht beim
+Umbau:** Das Trainer-Recht muss dann JE GYM geprüft werden — heute prüft die
+Route den kontoweiten Claim. Sonst stünde jemand, der im MMA-Gym Trainer und
+im Sambo-Gym nur Athlet ist, in der Sambo-Liste als Trainer. „Alle Trainer
+deines Gyms" braucht dann eine Karte je Gym (`shares.gyms` ist schon eine
+Liste). Und: Altlasten zählen Gyms gegen die EIGENEN Gyms — das Sheet
+bekommt dann die ganze Liste statt `[gymId]`.
+
+**Messung:** `scripts/mess-trainer-auswahl.mjs` (eigene Prüf-Gyms A/B, zehn
+Prüfkonten inkl. Verwaltung, Admin, Spiegel-ohne-Claim, gesperrt, ohne Gym,
+Claim≠Dokument, dazu ein Demo-Dokument; räumt alles weg). 39/39 hell und
+dunkel am 30.09.2026 (dreimal hintereinander) — inklusive des echten
+Regel-Beweises: nach der Namens-Freigabe liest Anna das Kampfprofil per REST
+(200), der andere Trainer nicht (403) — und des Stab-Wegs (Trainersicht mit
+„Mit dir geteilt"). `NUR_API=1` ohne Browser. Ein Absturz im Skript zählt als
+FEHLER (Exit-Code 1), nie als bestanden. Bilder in `../abnahme-trainer-auswahl/`.
+**Messfalle:** Auf /kampfprofil geht ein Klick in der ersten Sekunde nach dem
+Laden verloren bzw. das Sheet schließt sich wieder (die Seite baut sich nach
+dem Laden einmal neu auf) — das Skript wartet deshalb `networkidle` + 1,5 s.
+
+**Beobachtet am Stab-Weg (Bestand, bewusst NICHT geändert):** Die
+Kollegenliste der Trainer filtert über den Spiegel am Dokument
+(`isStaffEntry` = `rights.trainer`), nicht über die Claims — ein Konto mit
+nachhinkendem Spiegel oder ein gesperrtes Konto steht dort. Ohne Namen zeigt
+sie die E-Mail (`memberName`); Trainer dürfen die E-Mail ohnehin lesen.
+
+**Offen (bewusst nicht in diesem Schritt):** Der Default-Gym-Rückfall in
+`userGymId()` (Server wie Regeln) lässt ein Konto OHNE gymId-Claim lesen, was
+Mitglieder von Tidal Athletics lesen (z. B. den aktiven Wochenplan). Umgekehrt
+sehen die Trainer es nicht: `sameGym(d)` vergleicht `d.gymId`, und das fehlt
+an seinem Dokument. Bestandsverhalten, eine eigene Entscheidung (Leon
+vorlegen) — diese Route folgt dem Rückfall ausdrücklich NICHT.
+
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
 - **Das Konto gehört dem Menschen.** Darin liegen seine Workouts, sein

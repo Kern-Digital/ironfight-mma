@@ -225,6 +225,58 @@ export function mitGym(
 }
 
 /**
+ * ALTLASTEN (Leon 30.09.2026): Freigaben, die gespeichert sind, aber gerade
+ * niemanden erreichen — namentlich an jemanden, der nicht mehr als Trainer
+ * zur Auswahl steht (Gym verlassen, Häkchen verloren), oder „alle Trainer"
+ * eines Gyms, in dem man nicht mehr ist.
+ *
+ * Sie wirken heute nicht (die Regeln verlangen dasselbe Gym und das
+ * Trainer-Recht), aber sie WACHEN WIEDER AUF: Kommt der Trainer zurück oder
+ * zählen später mehrere Gyms, gilt die alte Freigabe erneut. In der
+ * Namensliste steht die Person nicht mehr — ohne diesen Weg könnte man sie
+ * nie zurücknehmen. Namen gibt es dazu bewusst nicht (Begründung im Kopf
+ * von app/api/gym/trainer-auswahl/route.ts), nur die Anzahl.
+ *
+ * `bekannteUids` MUSS eine erfolgreich geladene Liste sein — eine leere,
+ * weil das Laden scheiterte, machte jede Freigabe zur Altlast.
+ */
+export function altlasten(
+  shares: ProfileShares,
+  bekannteUids: string[],
+  eigeneGyms: string[],
+): { uids: string[]; gyms: string[] } {
+  const uids: string[] = [];
+  const gyms: string[] = [];
+  for (const b of SICHTBARE_BEREICHE) {
+    for (const uid of shares[b]?.uids ?? []) {
+      if (!bekannteUids.includes(uid) && !uids.includes(uid)) uids.push(uid);
+    }
+    for (const g of shares[b]?.gyms ?? []) {
+      if (!eigeneGyms.includes(g) && !gyms.includes(g)) gyms.push(g);
+    }
+  }
+  return { uids, gyms };
+}
+
+/** Entfernt die Altlasten aus ALLEN Bereichen. */
+export function ohneAltlasten(
+  shares: ProfileShares,
+  weg: { uids: string[]; gyms: string[] },
+): ProfileShares {
+  const naechste: ProfileShares = { ...shares };
+  for (const b of SICHTBARE_BEREICHE) {
+    const e = shares[b];
+    if (!e) continue;
+    naechste[b] = {
+      ...e,
+      uids: e.uids.filter((u) => !weg.uids.includes(u)),
+      gyms: e.gyms.filter((g) => !weg.gyms.includes(g)),
+    };
+  }
+  return naechste;
+}
+
+/**
  * Was am Ende GESPEICHERT wird: jeder Bereich als vollständiger Eintrag,
  * auch leer. Ein fehlender Bereich müsste sonst als „unverändert" gelten,
  * und eine zurückgenommene Freigabe bliebe stehen — dasselbe Argument wie
