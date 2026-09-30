@@ -1483,11 +1483,208 @@ die verwaltungsebene kurse bearbeiten" (geprüft wird das Häkchen).
   22/22, 0 Konsolenfehler. **Die große Regression (`mess-gameplan.mjs`) lief
   nach TimePicker und Raumknöpfen NICHT mehr** — Leon hat den Lauf
   abgebrochen; vor dem Commit nachholen.
+- **MEHRERE WOCHENPLÄNE, GENAU EINER AKTIV (Leon 27.09.2026 abends):** „in
+  der verwaltungsebene mehrere wochenpläne für ferien etc. bauen kann aber
+  immer nur einen aktiviere. den aktivierten sehen dann trainer und athleten
+  … es muss aber immer ein plan aktiv sein also soll ich nicht pausieren
+  jedoch bei allen plänen aktivieren klicken können so das ich pro plan nur
+  einen button habe". Leons Antworten: **Duplikat behält die Termin-IDs**
+  (Abos, Rückmeldungen, Freigaben laufen weiter; IDs sind je PLAN eindeutig,
+  nicht je Gym) · **„aktiv ab (Datum)" gleich mitbauen**.
+  - **Oberfläche** `/verwaltung/wochenplan`: Leiste „Wochenpläne", je Plan
+    Name + Unterzeile (Kurse, „Aktiv ab 14. Juli") und GENAU EIN Knopf
+    „Aktivieren" bzw. „Aktiv" (gefüllt, `disabled`). Tipp auf den Namen
+    zeigt den Plan im Raster (Rahmen = gewählt, getrennt von aktiv).
+    Darunter Name des gewählten Plans + „Bearbeiten" (`components/
+    PlanSheet.tsx`: Name, „Automatisch aktivieren" als `<input
+    type="date">`, Löschen; beim aktiven Plan gesperrt mit Satz). „Neuer
+    Plan" = PlanSheet mit Vorlage (Standard: gewählter Plan, „Leer starten"
+    als Ausnahme). Nicht aktiver Plan gewählt → Hinweis „Deine Trainer und
+    Athleten sehen gerade „…"".
+  - **Lesen:** Trainer/Athleten weiter `useKursplan` (aktiv == true). Die
+    Verwaltung: `useWochenplaene(gymId, an)` in `lib/wochenplaene.ts` (alle
+    Pläne, live). KursSheet und RaeumeSheet lesen NICHT mehr useKursplan,
+    sondern bekommen den gewählten Plan als Props.
+  - **Route** `/api/gym/kurse`: `kurs-speichern`/`kurs-loeschen` brauchen
+    `planId` (nur ein Gym OHNE Plan darf sie weglassen → erster Plan,
+    aktiv). Neu: `plan-anlegen` ({name, vorlagePlanId, aktivAb}),
+    `plan-aendern` ({planId, name, aktivAb}), `plan-loeschen` (aktiver → 400),
+    `plan-aktivieren` (alle anderen `aktiv:false` in DERSELBEN Transaktion).
+    Jede Aktion liest ALLE Pläne des Gyms in der Transaktion
+    (`lib/server/wochenplan.ts`: `plaeneLesenTx` · `wechselAnwenden` ·
+    `plaeneSchreibenTx`). **Räume gehören dem Gym:** `raum-*` ändern alle
+    Pläne zugleich. Höchstens `PLAENE_MAX` = 12.
+  - **GRUNDPLAN UND ZEITRAUM (Leon 27.09. abends: „pläne auch für einen
+    gewissen zeitraum auswählen … nichts passieren kann das einen fehler im
+    ablauf hervor ruft"; ersetzt das einmalige `aktivAb` vom Nachmittag):**
+    Felder `grundplan`, `zeitraumVon`, `zeitraumBis` (deutsche Kalendertage,
+    beide eingeschlossen, `tagSchluessel()` aus lib/guthaben.ts). GENAU EIN
+    Grundplan = der zuletzt aktivierte; er gilt, wenn kein Zeitraum läuft,
+    trägt nie einen Zeitraum, ist nicht löschbar. Ein anderer Plan mit
+    Von–Bis gilt nur darin; nur Von = „ab dann dauerhaft", er wird an dem
+    Tag Grundplan. **Aktiv ist eine RECHNUNG, kein Ereignis:**
+    `planStandRechnen(plaene, heute)` (lib/kursplan.ts) — 1. abgelaufene
+    Zeiträume weg, 2. erreichter Start ohne Ende → Grundplan (jüngster),
+    3. sonst Grundplan-Feld, Altbestand: aktiver ohne laufenden Zeitraum,
+    sonst erster, 4. aktiv = laufender Zeitraum, sonst Grundplan.
+    Idempotent: zweimal rechnen ändert nichts, ein verpasster Tag wird beim
+    nächsten Rechnen richtig. `zeitraumPruefen` lehnt ab: Überschneidung
+    (beide Tage zählen), zwei Starts ohne Ende am selben Tag, Beginn vor
+    heute (außer ein LAUFENDER Zeitraum behält seinen Beginn), Ende vor
+    Beginn/vor heute, länger als 365 Tage, mehr als 2 Jahre voraus,
+    Zeitraum am Grundplan. „Aktivieren" = Plan wird Grundplan, ein LAUFENDER
+    Zeitraum eines anderen endet, künftige bleiben. `plan-loeschen` lehnt
+    aktiv UND Grundplan ab. Die Route rechnet am Anfang (nachholen) und am
+    Ende (Zeitraum ab heute gilt sofort). Oberfläche: Karte „Grundplan" /
+    „Grundplan, wieder ab …" / „7. Oktober – 17. Oktober" / „bis 17.
+    Oktober" / „ab …"; PlanSheet „Zeitraum" mit Von + „Bis (optional)",
+    beim Grundplan statt Feldern ein Satz; beim laufenden ist Von gesperrt.
+  - **NACHFOLGEPLAN + KALENDER (Leon 27.09. spät: „wenn ich ein enddatum
+    setze soll ein neues feld auftauchen mit nachfolge plan. auserdem nutze
+    für einen zeitraum diesen kalender version, überprüe aber ob sich da
+    etwas eigeschlichen hat"):** Feld `nachfolgerId` (null = zurück zum
+    Grundplan, nur mit `zeitraumBis`). Am Tag nach dem Ende wird der
+    Nachfolger GRUNDPLAN (Schritt 1 in `planStandRechnen`, jüngster Wechsel
+    gewinnt). Regeln (`zeitraumPruefen`): nie der Plan selbst, nur ein Plan
+    OHNE eigenen Zeitraum, Grundplan-Wahl = null, ein Plan, der Nachfolger
+    ist, bekommt keinen Zeitraum, an keinem Tag zwei Grundplan-Wechsel;
+    `plan-loeschen` lehnt einen Nachfolger ab; ein fehlender/kaputter
+    Nachfolger fällt still auf den Grundplan zurück. PlanSheet „Zeitraum":
+    drei Knöpfe „Kein Zeitraum · Ab einem Tag · Von – Bis", darunter der
+    Kalender; erst MIT Ende erscheint „Danach gilt" (Select: „X
+    (Grundplan)" + Pläne ohne Zeitraum). Tage anderer Zeiträume sind im
+    Kalender GESPERRT (durchgestrichen), eine Überschneidung lässt sich gar
+    nicht antippen; beim laufenden Zeitraum nur „Letzter Tag". Karten:
+    „7. Oktober – 17. Oktober, danach „Y“" / „ab 18. Oktober nach „X“".
+    **Kalender = `components/ui/Kalender.tsx`** (`Kalender`,
+    `ZeitraumKalender`) auf `react-aria-components` 1.21.1 +
+    `@internationalized/date` 3.12.4 (exakt gepinnt, Adobe, Registry
+    geprüft; „heute geändert" war nur der nightly-Tag). Aus Leons Vorlage
+    `calendar-rac.tsx` (Origin UI) entfernt, was sich eingeschlichen hatte:
+    shadcn-Farbklassen (`bg-primary`, `bg-accent` = hier Volltürkis,
+    `text-muted-foreground` … — existieren hier nicht, Tailwind lässt sie
+    STILL weg), `bg-red-100` fest, `ChevronLeftIcon size strokeWidth` aus
+    @radix-ui/react-icons (Props gibt es dort nicht → Typfehler; Paket NICHT
+    installiert, stattdessen Icon-Registry `chevron-left/-right` neu), `cn`
+    aus `@/lib/utils` (fehlt, kein shadcn), „heute" in Geräte-Zeitzone
+    (jetzt `Europe/Berlin`), Sprache des Browsers (jetzt `I18nProvider
+    de-DE`), 36-px-Zellen (jetzt 44), Demo mit Außenlink. Kein Schadcode.
+    Aussehen per CSS in globals.css, Abschnitt KALENDER (`.kal-*`, Zustände
+    als data-Attribute von react-aria). Zellen tragen `data-datum`
+    (Messskripte). **Falle 74:** `npm install` brach an ENOTEMPTY ab
+    (Dateisperre) und hinterließ react-aria OHNE package.json — danach
+    `npm install` erneut und Versionen aus `node_modules/*/package.json`
+    prüfen. **Falle 75:** In `String.replace` ist `$\`` „alles vor der
+    Fundstelle" — ein Template mit `${x}$\`` im Ersatztext verdoppelt die
+    Datei. Ersatz als Funktion übergeben.
+    Gemessen: `tmp-mess-zeitraum.mjs` **449/449** (Nachfolger Tag für Tag,
+    Lauf alle 1/4/30 Tage), `tmp-mess-kurse.mjs` **101/101** (Abschnitt 5
+    Nachfolger), `tmp-blick-kurse.mjs ablauf` **49/49** (1 Konsoleneintrag =
+    die absichtliche 400 beim Nachfolger-Löschen).
+  - **Drei Wege rechnen den Stand** (`standAbgleichen`, lib/server/
+    wochenplan.ts, liest erst ohne Transaktion, schreibt nur bei
+    Abweichung): (1) **Nacht-Job** `GET /api/cron/wochenplan`, `vercel.json`
+    `15 23 * * *` UTC (= 00:xx Winter / 01:xx Sommer), nur mit
+    `Authorization: Bearer $CRON_SECRET` — ohne CRON_SECRET 503. (2) **Täglicher
+    Abgleich** `POST /api/gym/wochenplan-stand` (jedes Mitglied, eigener
+    Gym): `KursplanProvider` ruft ihn einmal am Tag je Gerät
+    (localStorage `ta-wochenplan-abgleich-{gymId}`, in try/catch) — das
+    Sicherheitsnetz, falls der Job nicht läuft. (3) jede Verwaltungs-Aktion.
+    Lokal steht ein `CRON_SECRET` in `.env.local` (27.09.); **in Vercel
+    fehlt es noch**. Beweis der Rechnung: `scripts/tmp-mess-zeitraum.mjs`
+    **432/432** (Tag für Tag über 4 Monate, täglich vs. nur jede 5. Nacht
+    vs. Monate ohne Lauf — immer derselbe Plan, genau 1 aktiv, genau 1
+    Grundplan).
+  - **Regel (DEPLOYT 27.09., Leon „Ja, deployen"):** `schedulePlans` lesen
+    `canManageGymId(gymId) || (userGymId() == gymId && resource.data.aktiv
+    == true)`, `write: if false`.
+  - Nach Grundplan/Zeitraum: `tmp-mess-kurse.mjs` **91/91** (Abschnitt 4:
+    Zeitraum ab heute gilt sofort, Grundplan-Löschen 400, Zeitraum am
+    Grundplan 400, Überschneidung 400, laufenden kürzen, abgelaufener
+    Zeitraum → Abgleich durch einen ATHLETEN schaltet zurück, zweiter
+    Abgleich ändert nichts, Aktivieren beendet laufenden Zeitraum und lässt
+    künftigen stehen), `tmp-blick-kurse.mjs ablauf` **43/43**.
+  - Gemessen vorher: `tmp-mess-kurse.mjs` **72/72** (Duplikat mit IDs, Kurs-Aktion
+    trifft nur ihren Plan, Räume in allen Plänen, zwei Aktivierungen
+    zugleich → genau einer aktiv, aktiven löschen → 400, aktiv ab heute →
+    400, Nachholen bei der nächsten Aktion, Nacht-Job schaltet und lässt
+    Tidal in Ruhe, Athlet liest inaktiven Plan 403 / listet alle 403,
+    Verwaltung 200), `tmp-blick-kurse.mjs ablauf` **34/34** (duplizieren,
+    im Ferienplan löschen, aktivieren, /schedule zeigt den neuen Plan,
+    zurück, löschen), 0 Konsolenfehler, Querüberlauf 0 px auf 1440 und 390.
+    Bilder `D:\Tidal-Athletics\abnahme-kurse\wp-*.png`.
+  - **Falle 73:** `mess-gameplan.mjs` braucht `--experimental-transform-types
+    --import ./scripts/lib/ts-loader-register.mjs`, sonst
+    `ERR_MODULE_NOT_FOUND '@/lib'`.
+- **RAUMFILTER ALS GOO-AUSWAHL (Leon 27.09.2026):** „die nichtausgewählten
+  alle in einem rahmen … hoover … größer und markanter, klicke ich darauf
+  animiert es schön ähnlich wie bei der suchleiste und der neue ausgewählte
+  text steht in seiner separaten box". Baustein
+  `components/motion/GooAuswahl.tsx` (Export aus components/motion): alle
+  Optionen in EINER Reihe mit festem key, die gewählte vorn (17 px, 48 px,
+  Akzent), die übrigen klein (13 px) auf einem gemessenen Rahmen, der mit
+  derselben Feder gleitet; Goo-Filter der Suchleiste nur während des
+  Wechsels; mobil steht die Wahl in eigener Zeile (sonst läge der
+  umbrechende Rahmen hinter der Box). **Falle 73:** Ein `setState` im
+  `useLayoutEffect` (Rahmen messen) rendert sofort ein zweites Mal —
+  framer-motion misst die Knöpfe dann schon am Ziel, und die
+  `layout`-Animation läuft von Ziel zu Ziel, also GAR NICHT (gemessen:
+  transform blieb `none`). Rahmen und Filter laufen deshalb über
+  `useMotionValue` + `animate()` und direkt am DOM-Element. **Falle 74:**
+  Knöpfe in einen ANDEREN Eltern-Container umhängen (Box ↔ Rahmen) baut sie
+  neu, `layoutId` fand die alte Lage nicht — die Wahl sprang. **Falle 75:**
+  Animation per Screenshot messen täuscht (eine Aufnahme dauert 100–250 ms);
+  `page.clock.install()` + `runFor(ms)` hält die Uhr an.
 - **Offen danach:** Trainer-Auslastung im Verwaltungs-Dashboard (Backlog b,
   Kapazitätsplanung, kein Ranking) · „Kampfart über den Kurs" (Roadmap P3
   Schritt 14) · Trainer im Kursplan der Athleten anzeigen · Leons 22 Kurse
   ohne Trainer zuweisen (macht er selbst unter /verwaltung/wochenplan, sobald
   gepusht).
+
+### WOCHENPLAN NEU GESTALTET (28.09.2026, Entwurf B)
+
+Leon: „besser verständlich … organischer, intuitiver … alles gleich groß, die
+Überschrift Wochenplan doppelt, zu viele einzelne Rahmen". Drei Entwürfe
+gebaut, **Leon wählte B**; die Seite `app/verwaltung/wochenplan/page.tsx` ist
+jetzt B, die Teile liegen in `components/wochenplan/`:
+- `useWochenplanDaten.tsx` — ALLE Logik (Pläne, Trainer, Räume, offene Kurse,
+  Aktivieren, Hinweis-Sätze, Sheets); die Seite ist nur Aussehen.
+- Seite: Pläne links als Liste (Punkt = gilt jetzt, atmet), Planname groß als
+  einziger Titel, **„Aktivieren" beim angesehenen Plan** (`components/ui/
+  HakenKnopf` — Star-Button-Vorlage nachgebaut: heller Rand, Hover Haken ×15,
+  Klick hellblau; „Gilt jetzt" in derselben Füllung). Umschalter **Kalender |
+  Zeilen** (localStorage `ta-wochenplan-ansicht`). Kalender: Uhrzeit-Achse
+  96 px/h, Stunden ohne Kurs ab zwei gefaltet; Überschneidung: Beginn ≤ 30 min
+  auseinander = NEBENEINANDER, später hinein = 40 % eingerückt darüber.
+  Zeilen: `WocheZeilen.tsx` (ein Tag je Zeile, Kapseln auf quer liegender
+  Achse, Überschneidung = eigene Spur, Bahn 16 px hinter dem Tagesnamen).
+- Fehlendes = **oranges Dreieck** (`--dreieck`, eigene Farbe — `--warning` ist
+  gelb); „N Kurse ohne Trainer" ist ein Schalter, der den Rest dimmt.
+- `PlusZeiger.tsx`: Plus in `--accent` NEBEN dem Zeiger über freien Stellen
+  (nicht ersetzen — Leon), rAF, kein Filter (drop-shadow ruckelte).
+- Heutiger Tag ohne Fläche (Leon), nur der Name in Akzentfarbe.
+- **GooAuswahl** (Raumfilter, `components/motion`): Box + Hals + Rahmen als EIN
+  SVG-Pfad mit EINEM Strich (vorher drei Teile → Doppelnähte, „unterschiedliche
+  Strichstärken"), Kanten auf x,5; Hals = lange S-Kurven (ABSTAND 44), Blau voll
+  bis zur Mitte der Engstelle; kein Goo-Filter mehr (fraß 1-px-Kanten); Namen
+  kreuzen sich nicht (neuer gleitet von rechts, Breite nur vom neuen Namen);
+  Hover = feine Akzentlinie statt Kasten. FALLE: framer 12.40 AnimatePresence
+  liest `props.ref` → React-18-Warnung — Optionen per `data-goo-option` messen.
+- Export PDF/PNG/JPG: Fenster 3e (`WochenplanExport`, `WochenplanDruck`,
+  `lib/wochenplan-export.ts`, html-to-image 1.11.13 + jspdf 4.2.1), Knopf
+  „Herunterladen" RECHTS UNTER der Woche (`data-export-knopf`).
+- **Zweite Runde (Leon 28.09. abends):** „Planen" neben „Aktivieren"
+  (`data-plan-planen`, nicht beim Grundplan) — `PlanSheet` hat drei Aufgaben:
+  `neu` (Name + Vorlage, KEIN Zeitraum mehr), `plan` (Name, Löschen — Stift),
+  `planen` (Zeitraum + Nachfolger). Räume-Knopf rechts weg → Schichten-Zeichen
+  mit Plus am ENDE des Raumfilters (`GooAuswahl` Prop `ende`, `data-goo-zusatz`,
+  am Handy ausgeblendet und als „Räume · n" darunter; ohne Filter allein mit
+  Wort). „Kurs anlegen" (voll) neben Kalender | Zeilen. Leerer Plan: Achse faltet
+  ohne Kurse nicht (volle leere Woche 16–21 Uhr). Test 50/50.
+- Test: `BASE=http://localhost:3000 node --use-system-ca scripts/tmp-blick-kurse.mjs
+  auf|ablauf|zu` — 49/49 (Plan-Liste auf B umgestellt, Zahlen aus der Kopie,
+  weil Leons Plan sich ändert). Bilderserien von Animationen:
+  `scripts/tmp-blick-entwurf.mjs` mit `FILM="Raum 2"`.
 
 ### Route-Schutz (zweischichtig)
 - **Drei Bereiche, drei Rechte, GETRENNTE Adressen** (seit Checkpoint 3):
