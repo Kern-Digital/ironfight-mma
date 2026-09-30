@@ -276,6 +276,16 @@ Nachkauf weiter. Der Plan mit allen Belegen: Artifact „Das zweite Gym"
 
 ## 7. Wochenplan (Mehrplan-Modell)
 
+> **GEBAUT 27.09.2026** (Leon: „pro plan nur einen button"): mehrere Pläne,
+> genau einer aktiv, Duplikat behält die Termin-IDs, aktiver Plan nicht
+> löschbar, Räume gelten für alle Pläne. Statt „aktiv ab" gibt es seit
+> demselben Abend GRUNDPLAN + ZEITRAUM (Von–Bis, danach wieder der
+> Grundplan; nur Von = ab dann dauerhaft) — aktiv ist eine Rechnung aus dem
+> Tag, abgeglichen durch Nacht-Job, täglichen Abgleich und jede Aktion.
+> Abweichung vom Text unten: Kurse legt nur die Verwaltung an (Leon
+> 26.09.), Trainer pflegen weiter die Inhalte der Stunden. Tages-Ausnahmen
+> sind noch nicht gebaut. Details: CLAUDE.md „KURSPLAN JE GYM".
+
 - Verwaltung kann MEHRERE benannte Wochenpläne halten („Normalbetrieb",
   „Sommerferien 2026", …) — **genau EINER ist aktiv**, serverseitig atomar
   erzwungen (Aktivieren von B deaktiviert A im selben Schreibvorgang; nie 0

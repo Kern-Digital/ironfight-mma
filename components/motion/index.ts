@@ -24,5 +24,7 @@ export { Reveal } from "./Reveal";
 export { RollZahl } from "./RollZahl";
 export { WortReveal } from "./WortReveal";
 export { SheetShell, useLetzterWert } from "./SheetShell";
+export { GooAuswahl } from "./GooAuswahl";
+export type { GooOption } from "./GooAuswahl";
 export { useMotionCapability } from "./useMotionCapability";
 export type { MotionCapability } from "./useMotionCapability";

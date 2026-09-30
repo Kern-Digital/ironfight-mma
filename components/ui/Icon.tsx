@@ -52,6 +52,9 @@ export type IconName =
   | "sun"
   | "chevron-down"
   | "chevron-up"
+  | "chevron-left"
+  | "chevron-right"
+  | "einladen"
   | "play"
   | "pause"
   | "fast-forward"
@@ -67,7 +70,9 @@ export type IconName =
   | "panel-left"
   | "logout"
   | "settings"
-  | "hash";
+  | "hash"
+  // Anheften der Sidebar (30.09.2026)
+  | "pin";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -241,6 +246,35 @@ const PATHS: Record<IconName, React.ReactNode> = {
   x: <path d="M6 6l12 12M18 6 6 18" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
   "chevron-up": <path d="m6 15 6-6 6 6" />,
+  "chevron-left": <path d="m15 6-6 6 6 6" />,
+  "chevron-right": <path d="m9 6 6 6-6 6" />,
+  // Neue Einladung (Mitglieder-Seite, 29.09.2026): zwei Personen und ein
+  // Plus — „das Team wächst". Leon hat es aus fünf Richtungen gewählt
+  // (Brief, Papierflieger, Tür, Link, zwei Personen). Verworfen davor:
+  // Person mit Plus im Kreis („pot hässlich"), Eintrittskarte („Ticket").
+  // Die hintere Person steht HÖHER und weiter rechts (Leon: „von der Höhe
+  // versetzt, damit man es noch mehr sieht") — mit eigenem Kopf und eigener
+  // Schulter statt eines halben Kopfbogens. Das Plus sitzt rechts unten mit
+  // Abstand zur Schulter.
+  einladen: (
+    <>
+      <circle cx="8" cy="10" r="3" />
+      <path d="M2.5 21a5.5 5.5 0 0 1 11 0" />
+      {/* Klassen als Griffe für die Hover-Bewegung auf der Mitglieder-Seite
+          (.mitglieder-einladen in globals.css); ohne sie ruht alles. */}
+      <g className="icon-hinten">
+        <circle cx="14.5" cy="5.5" r="2.6" />
+        <path d="M12.6 11.2c2.6-.8 5.2.2 6.2 2.2" />
+      </g>
+      {/* Eigene Farbe über --icon-zusatz (Leon: „das Plus weiß"); ohne die
+          Variable bleibt es in der Farbe des Icons. */}
+      <path
+        className="icon-zusatz"
+        d="M20 17v5M17.5 19.5h5"
+        style={{ stroke: "var(--icon-zusatz, currentColor)" }}
+      />
+    </>
+  ),
   warn: (
     <>
       <path d="M12 4 2.8 19.5h18.4L12 4Z" />
@@ -389,6 +423,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   // Rahmen mit abgeteilter linker Spalte — Menü ein-/ausblenden
+  // Reißzwecke — Sidebar anheften
+  pin: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
   "panel-left": (
     <>
       <rect x="3" y="4.5" width="18" height="15" rx="2.5" />

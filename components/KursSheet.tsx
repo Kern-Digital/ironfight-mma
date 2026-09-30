@@ -24,8 +24,10 @@
  * DIESES Gyms ist. Die Feldprüfung läuft hier vorab, damit der Satz unter
  * dem Knopf steht, bevor jemand auf den Server wartet.
  *
- * Nach dem Speichern braucht das Sheet nichts neu zu laden: Der Kursplan
- * kommt live (useKursplan), der Wochenplan dahinter steht von selbst neu da.
+ * Das Sheet arbeitet in dem Plan, den die Verwaltung gerade gewählt hat
+ * (`plan`, Leon 27.09.: mehrere Wochenpläne) — nicht zwingend im aktiven.
+ * Nach dem Speichern braucht es nichts neu zu laden: Die Pläne kommen live
+ * (useWochenplaene), der Wochenplan dahinter steht von selbst neu da.
  */
 
 import Icon from "@/components/ui/Icon";
@@ -47,8 +49,8 @@ import {
   ueberschneidungen,
   type KursEingabe,
   type KursGruppe,
+  type Raum,
 } from "@/lib/kursplan";
-import { useKursplan } from "@/lib/kursplan-context";
 import { WEEKDAY_LABELS, WEEKDAY_SHORT } from "@/lib/schedule";
 import TimePicker from "@/components/ui/TimePicker";
 import { DISCIPLINE_LABEL, type Discipline, type TrainingBlock } from "@/lib/types";
@@ -75,6 +77,17 @@ const FELD: React.CSSProperties = {
   outline: "none",
 };
 
+/**
+ * Der Plan, in dem das Sheet arbeitet (Leon 27.09.: mehrere Wochenpläne).
+ * `id` null = das Gym hat noch keinen Plan; der erste Kurs legt ihn an.
+ */
+export interface KursSheetPlan {
+  id: string | null;
+  name: string;
+  kurse: TrainingBlock[];
+  raeume: Raum[];
+}
+
 /** Was das Sheet öffnet: einen bestehenden Kurs (per Name) oder einen neuen. */
 export type KursSheetZiel = { art: "neu"; weekday?: number } | { art: "kurs"; titel: string };
 
@@ -99,16 +112,18 @@ function aufzaehlung(namen: string[]): string {
 
 function KursInhalt({
   ziel,
+  plan,
   trainer,
   onClose,
 }: {
   ziel: KursSheetZiel;
+  plan: KursSheetPlan;
   /** Mitglieder DIESES Gyms mit Trainer-Häkchen; null = lädt noch. */
   trainer: StudentEntry[] | null;
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const { kurse, raeume } = useKursplan();
+  const { kurse, raeume } = plan;
 
   // Die Termine des Kurses, EINMAL beim Öffnen gelesen — ändert jemand
   // anderes den Plan, während das Formular offen ist, bleibt die Eingabe.
@@ -253,7 +268,7 @@ function KursInhalt({
       setFehler(`Einen Kurs „${belegt.title}" gibt es schon. Öffne ihn und tipp dort den Tag dazu.`);
       return;
     }
-    if (await senden({ aktion: "kurs-speichern", alterTitel, kurs: eingabe() })) onClose();
+    if (await senden({ aktion: "kurs-speichern", planId: plan.id, alterTitel, kurs: eingabe() })) onClose();
   }
 
   async function loeschen() {
@@ -263,7 +278,7 @@ function KursInhalt({
       setFehler(null);
       return;
     }
-    if (await senden({ aktion: "kurs-loeschen", titel: alterTitel })) onClose();
+    if (await senden({ aktion: "kurs-loeschen", planId: plan.id, titel: alterTitel })) onClose();
     else setLoeschenFragen(false);
   }
 
@@ -334,7 +349,7 @@ function KursInhalt({
           />
           <span className="t-sheet-title max-w-full truncate">{alterTitel ?? "Neuer Kurs"}</span>
           <span className="max-w-full truncate" style={{ ...META_FONT, color: "var(--text-3)" }}>
-            {alterTitel ? termineKurz(alteTermine) : "Wochenplan"}
+            {alterTitel ? termineKurz(alteTermine) : plan.name}
           </span>
         </div>
         <XKnopf
@@ -676,11 +691,13 @@ function KursInhalt({
 
 export default function KursSheet({
   ziel,
+  plan,
   trainer,
   onClose,
 }: {
   /** null heißt geschlossen. */
   ziel: KursSheetZiel | null;
+  plan: KursSheetPlan;
   trainer: StudentEntry[] | null;
   onClose: () => void;
 }) {
@@ -689,7 +706,11 @@ export default function KursSheet({
   const zeigen = useLetzterWert(ziel);
   // Ein neuer Schlüssel je Ziel: Öffnet die Verwaltung nacheinander zwei
   // Kurse, startet das Formular jedes Mal mit den Werten DIESES Kurses.
-  const schluessel = zeigen ? (zeigen.art === "kurs" ? `kurs-${zeigen.titel}` : `neu-${zeigen.weekday ?? ""}`) : "zu";
+  // Der Plan gehört mit in den Schlüssel: Derselbe Kurs in zwei Plänen sind
+  // zwei Formulare.
+  const schluessel = zeigen
+    ? `${plan.id ?? "erster"}-${zeigen.art === "kurs" ? `kurs-${zeigen.titel}` : `neu-${zeigen.weekday ?? ""}`}`
+    : "zu";
   return (
     <SheetShell
       open={ziel !== null}
@@ -703,7 +724,7 @@ export default function KursSheet({
         boxShadow: "var(--glass-shadow)",
       }}
     >
-      {zeigen && <KursInhalt key={schluessel} ziel={zeigen} trainer={trainer} onClose={onClose} />}
+      {zeigen && <KursInhalt key={schluessel} ziel={zeigen} plan={plan} trainer={trainer} onClose={onClose} />}
     </SheetShell>
   );
 }

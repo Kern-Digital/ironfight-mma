@@ -19,6 +19,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./auth-context";
 import { KEIN_GYM, resolveGymId } from "./gym";
+import { tagSchluessel } from "./guthaben";
 import { kurseLesen, raeumeLesen, type Raum } from "./kursplan";
 import type { TrainingBlock } from "./types";
 
@@ -89,6 +90,39 @@ export function KursplanProvider({ children }: { children: React.ReactNode }) {
     return () => {
       lebt = false;
       abbestellen?.();
+    };
+  }, [user, gymId, profileLoading]);
+
+  // TÄGLICHER ABGLEICH (Leon 27.09.: Pläne für einen Zeitraum, „nichts
+  // passieren kann das einen fehler im ablauf hervor ruft"). Einmal am Tag
+  // je Gerät bittet die App den Server, die Pläne mit dem heutigen Tag
+  // abzugleichen — falls der Nacht-Job einen Wechsel verpasst hat. Der neue
+  // Plan kommt danach von selbst über das Abo oben. Fehler bleiben still:
+  // Das Netz ist ein zweites, nicht das einzige.
+  useEffect(() => {
+    if (profileLoading || !user || gymId === KEIN_GYM) return;
+    const heute = tagSchluessel();
+    const schluessel = `ta-wochenplan-abgleich-${gymId}`;
+    try {
+      if (localStorage.getItem(schluessel) === heute) return;
+    } catch {
+      /* ohne Speicher: dann eben bei jedem Start */
+    }
+    let lebt = true;
+    (async () => {
+      const res = await fetch("/api/gym/wochenplan-stand", {
+        method: "POST",
+        headers: { authorization: `Bearer ${await user.getIdToken()}` },
+      });
+      if (!lebt || !res.ok) return;
+      try {
+        localStorage.setItem(schluessel, heute);
+      } catch {
+        /* egal */
+      }
+    })().catch(() => {});
+    return () => {
+      lebt = false;
     };
   }, [user, gymId, profileLoading]);
 

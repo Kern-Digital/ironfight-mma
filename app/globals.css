@@ -4628,3 +4628,63 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
 @media (prefers-reduced-motion: reduce) {
   .x-knopf__zeichen, .x-knopf__wort { transition: none; }
 }
+
+/* ── KALENDER (components/ui/Kalender.tsx, react-aria-components) ──────────
+   Leon 27.09.2026: Zeitraum-Kalender nach der Vorlage calendar-rac. Farben
+   aus den Tokens der App statt der shadcn-Klassen der Vorlage (die gibt es
+   hier nicht). Zustände setzt react-aria als data-Attribute. Zellen 44 px,
+   ohne Abstand — so läuft ein gewählter Zeitraum als durchgehendes Band. */
+.kal-rahmen {
+  align-self: flex-start; max-width: 100%; padding: 8px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-raised);
+}
+.kal-raster { border-collapse: collapse; }
+.kal-raster td, .kal-raster th { padding: 0; }
+.kal-nav {
+  display: flex; width: var(--hit-min); height: var(--hit-min);
+  align-items: center; justify-content: center;
+  border-radius: var(--r-md); color: var(--text-3); outline-offset: 2px;
+  transition: background-color .15s, color .15s;
+}
+.kal-nav[data-hovered] { background: var(--surface-raised); color: var(--text-1); }
+.kal-nav[data-focus-visible] { outline: 2px solid var(--accent); }
+.kal-nav[data-disabled] { opacity: .3; }
+.kal-kopfzelle {
+  width: var(--hit-min); height: 2rem;
+  font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--text-3);
+}
+.kal-zelle {
+  position: relative; display: flex; width: var(--hit-min); height: var(--hit-min);
+  align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+  font: 500 14px/1 var(--font-archivo), system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  color: var(--text-1); outline-offset: 2px; cursor: pointer;
+  transition: background-color .15s, color .15s, border-radius .15s;
+}
+.kal-zelle[data-outside-month] { visibility: hidden; }
+.kal-zelle[data-hovered] { background: var(--surface-raised); }
+.kal-zelle[data-disabled], .kal-zelle[data-unavailable] { pointer-events: none; opacity: .3; }
+.kal-zelle[data-unavailable] { text-decoration: line-through; }
+.kal-zelle[data-focus-visible] { z-index: 1; outline: 2px solid var(--accent); }
+.kal-zelle[data-selected] { background: var(--accent); color: var(--on-accent); }
+/* Zeitraum: Anfang und Ende voll, die Tage dazwischen hell */
+.kal-bereich .kal-zelle[data-selected] { background: var(--accent-subtle); color: var(--accent-text); border-radius: 0; }
+.kal-bereich .kal-zelle[data-selection-start],
+.kal-bereich .kal-zelle[data-selection-end] { background: var(--accent); color: var(--on-accent); }
+.kal-bereich .kal-zelle[data-selection-start] { border-start-start-radius: var(--r-md); border-end-start-radius: var(--r-md); }
+.kal-bereich .kal-zelle[data-selection-end] { border-start-end-radius: var(--r-md); border-end-end-radius: var(--r-md); }
+.kal-bereich .kal-zelle[data-invalid] { background: var(--surface-raised); color: var(--negative); }
+/* Heute: ein Punkt unter der Zahl — auf voller Fläche in der Gegenfarbe */
+.kal-heute::after {
+  content: ""; position: absolute; bottom: 7px; left: 50%;
+  width: 4px; height: 4px; margin-left: -2px; border-radius: 999px;
+  background: var(--accent); pointer-events: none;
+}
+.kal-heute[data-selected]::after { background: var(--on-accent); }
+.kal-bereich .kal-heute[data-selected]:not([data-selection-start]):not([data-selection-end])::after { background: var(--accent-text); }
+@media (prefers-reduced-motion: reduce) {
+  .kal-nav, .kal-zelle { transition: none; }
+}
+

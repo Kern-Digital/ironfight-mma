@@ -12,7 +12,8 @@
  * Jetzt hat jedes Gym seinen eigenen Plan:
  *
  *   gyms/{gymId}/schedulePlans/{planId}
- *     { name, aktiv: true, kurse: TrainingBlock[], geaendertAm, geaendertVon }
+ *     { name, aktiv, aktivAb, kurse: TrainingBlock[], raeume, angelegtAm,
+ *       geaendertAm, geaendertVon }
  *
  * ─── WARUM EIN DOKUMENT MIT EINER LISTE ─────────────────────────────────────
  *
@@ -21,12 +22,29 @@
  * Unter-Sammlung wären 24. Eine Woche mit 60 Kursen wiegt ein paar Kilobyte,
  * das Dokument fasst ein Mebibyte.
  *
- * ─── WARUM SCHON „schedulePlans" (MEHRZAHL) ─────────────────────────────────
+ * ─── MEHRERE WOCHENPLÄNE, GENAU EINER AKTIV (Leon 27.09.2026) ───────────────
  *
- * Konzept §7: mehrere benannte Wochenpläne („Sommerferien"), genau einer
- * aktiv. Leon hat das am 20.09. auf später gelegt — die Oberfläche dafür
- * kommt nicht jetzt. Die DATEN stehen aber schon so, dass ein zweiter Plan
- * nur dazukommt: Gelesen wird immer der Plan mit `aktiv == true`.
+ * „in der verwaltungsebene mehrere wochenpläne für ferien etc. bauen kann
+ * aber immer nur einen aktiviere. den aktivierten sehen dann trainer und
+ * athleten … es muss aber immer ein plan aktiv sein also soll ich nicht
+ * pausieren jedoch bei allen plänen aktivieren klicken können so das ich pro
+ * plan nur einen button habe". Konzept §7.
+ *
+ *   · Trainer und Athleten lesen NUR den Plan mit `aktiv == true` (Regel und
+ *     useKursplan). Die Verwaltung liest alle (useWochenplaene).
+ *   · Aktivieren löst den bisherigen Plan ab — serverseitig in EINER
+ *     Transaktion, nie null und nie zwei aktive. Kein Pausieren.
+ *   · Duplizieren ist der Standardweg. Die Termine behalten dabei ihre IDs
+ *     (Leon 27.09.: „IDs behalten") — „MMA Teens Mi 16:00" ist im Ferienplan
+ *     derselbe Termin, Kurs-Abos und Plan-Freigaben laufen weiter. IDs sind
+ *     damit je PLAN eindeutig, nicht je Gym.
+ *   · GRUNDPLAN UND ZEITRAUM (Leon 27.09. abends, „für einen gewissen
+ *     zeitraum"): Der Grundplan gilt, wenn kein Zeitraum läuft; ein Plan mit
+ *     Zeitraum gilt nur darin. Welcher Plan aktiv ist, RECHNET
+ *     `planStandRechnen` aus dem Tag — unten bei `Wochenplan` erklärt.
+ *   · Räume gehören dem GYM, nicht dem Plan: Sie stehen an jedem Plan-Dokument
+ *     gleich, und die Raum-Aktionen ändern alle Pläne zugleich. Die Matte zieht
+ *     in den Ferien nicht um.
  *
  * ─── RÄUME (Leon 27.09.2026) ────────────────────────────────────────────────
  *
@@ -418,4 +436,360 @@ export function ueberschneidungen(
     }
   }
   return { raum, trainer };
+}
+
+// ─── MEHRERE WOCHENPLÄNE (Leon 27.09.2026) ──────────────────────────────────
+
+/** Höchstens so viele Pläne je Gym — Normalbetrieb, Ferien, Feiertage … */
+export const PLAENE_MAX = 12;
+export const PLANNAME_MAX = 40;
+
+/**
+ * Ein Wochenplan, wie die Verwaltung ihn sieht.
+ *
+ * ─── GRUNDPLAN UND ZEITRAUM (Leon 27.09.2026 abends) ────────────────────────
+ *
+ * „das man pläne auch für einen gewissen zeitraum auswählen kann. ich möchte
+ * das hierbei aber nichts passieren kann das einen fehler im ablauf hervor
+ * ruft."
+ *
+ *   · GENAU EIN Plan ist der GRUNDPLAN: der zuletzt aktivierte. Er gilt,
+ *     wann immer kein Zeitraum läuft. Er trägt nie einen Zeitraum und lässt
+ *     sich nicht löschen — die Woche hat so immer etwas, wohin sie
+ *     zurückfällt.
+ *   · Jeder andere Plan kann EINEN Zeitraum tragen (`zeitraumVon` bis
+ *     `zeitraumBis`, deutsche Kalendertage, beide eingeschlossen). In dieser
+ *     Zeit ist er aktiv, danach wieder der Grundplan. Ohne Ende („ab 14.
+ *     Juli") wird er an dem Tag selbst zum Grundplan.
+ *   · WELCHER PLAN AKTIV IST, IST EINE RECHNUNG, KEIN EREIGNIS:
+ *     `planStandRechnen` leitet aus dem heutigen Tag und den Plänen den
+ *     ganzen Stand ab. Nacht-Job, jede Verwaltungs-Aktion und der tägliche
+ *     Abgleich beim Öffnen der App rechnen dasselbe. Verpasst einer, holt der
+ *     nächste es nach; zweimal rechnen ändert nichts.
+ *   · Was den Ablauf stören könnte, lehnt `zeitraumPruefen` schon beim
+ *     Speichern ab: Überschneidungen, Vergangenes, Ende vor Beginn, länger
+ *     als ein Jahr, ein Zeitraum am Grundplan.
+ */
+export interface Wochenplan {
+  id: string;
+  name: string;
+  /**
+   * Der GESPEICHERTE Stand, den Trainer und Athleten lesen (Regel und
+   * useKursplan fragen `aktiv == true`). Er folgt aus `planStandRechnen`.
+   */
+  aktiv: boolean;
+  grundplan: boolean;
+  zeitraumVon: string | null;
+  /** null bei `zeitraumVon` = „ab diesem Tag dauerhaft". */
+  zeitraumBis: string | null;
+  /**
+   * Welcher Plan nach dem Ende dauerhaft gilt (Leon 27.09.: „wenn ich ein
+   * enddatum setze soll ein neues feld auftauchen mit nachfolge plan").
+   * null = zurück zum Grundplan. Nur mit `zeitraumBis`.
+   */
+  nachfolgerId: string | null;
+  kurse: TrainingBlock[];
+  raeume: Raum[];
+  /** Für eine feste Reihenfolge: Aktivieren soll die Pläne nicht umsortieren. */
+  angelegtMs: number;
+}
+
+const TAG_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function tagAlsUtc(tag: string): Date | null {
+  const m = TAG_RE.exec(tag);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  // 2026-02-31 rollt in den März — dann war es kein Tag.
+  return d.getUTCDate() === Number(m[3]) && d.getUTCMonth() === Number(m[2]) - 1 ? d : null;
+}
+
+function gueltigerTag(x: unknown): string | null {
+  return typeof x === "string" && tagAlsUtc(x) ? x : null;
+}
+
+/** „2026-07-14" + n Tage → „2026-07-…". */
+export function tagPlus(tag: string, tage: number): string {
+  const d = tagAlsUtc(tag) ?? new Date();
+  d.setUTCDate(d.getUTCDate() + tage);
+  return d.toISOString().slice(0, 10);
+}
+
+function tageZwischen(von: string, bis: string): number {
+  const a = tagAlsUtc(von);
+  const b = tagAlsUtc(bis);
+  return a && b ? Math.round((b.getTime() - a.getTime()) / 86_400_000) : 0;
+}
+
+/** „14. Juli", in einem anderen Jahr als `heute` „14. Juli 2027". */
+export function tagText(tag: string, heute?: string): string {
+  const d = tagAlsUtc(tag);
+  if (!d) return tag;
+  const mitJahr = !heute || heute.slice(0, 4) !== tag.slice(0, 4);
+  return d.toLocaleDateString("de-DE", {
+    day: "numeric",
+    month: "long",
+    ...(mitJahr ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  });
+}
+
+/** Liest ein Plan-Dokument. Fehlende Felder bekommen den Standard. */
+export function planLesen(id: string, d: Record<string, unknown>): Wochenplan {
+  const angelegt = d.angelegtAm as { toMillis?: () => number } | undefined;
+  // `aktivAb` war die Fassung vom 27.09. nachmittags (ein Starttag ohne
+  // Ende). Sie zählt nur, solange das Dokument noch kein `zeitraumVon` hat —
+  // danach schreibt jede Aktion die neuen Felder.
+  const von = "zeitraumVon" in d ? gueltigerTag(d.zeitraumVon) : gueltigerTag(d.aktivAb);
+  return {
+    id,
+    name: typeof d.name === "string" && d.name ? d.name : KURSPLAN_STANDARD_NAME,
+    aktiv: d.aktiv === true,
+    grundplan: d.grundplan === true,
+    zeitraumVon: von,
+    zeitraumBis: von ? gueltigerTag(d.zeitraumBis) : null,
+    nachfolgerId:
+      von && gueltigerTag(d.zeitraumBis) && typeof d.nachfolgerId === "string" && d.nachfolgerId ? d.nachfolgerId : null,
+    kurse: kurseLesen(d.kurse),
+    raeume: raeumeLesen(d.raeume),
+    angelegtMs: angelegt?.toMillis?.() ?? 0,
+  };
+}
+
+/** Feste Reihenfolge der Pläne: nach Anlage, dann nach Name. */
+export function plaeneSortieren<T extends Pick<Wochenplan, "angelegtMs" | "name">>(plaene: T[]): T[] {
+  return plaene.slice().sort((a, b) => a.angelegtMs - b.angelegtMs || a.name.localeCompare(b.name, "de"));
+}
+
+/** Bereinigt einen Plannamen oder liefert den Satz, warum er nicht geht. */
+export function plannamePruefen(
+  roh: unknown,
+  andere: Pick<Wochenplan, "name">[],
+): { name: string } | { fehler: string } {
+  const name = typeof roh === "string" ? roh.trim().replace(/\s+/g, " ") : "";
+  if (!name) return { fehler: "Gib dem Plan einen Namen." };
+  if (name.length > PLANNAME_MAX) return { fehler: `Der Name ist zu lang. Bleib unter ${PLANNAME_MAX} Zeichen.` };
+  if (andere.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+    return { fehler: `Einen Plan „${name}" gibt es schon.` };
+  }
+  return { name };
+}
+
+/** Höchstens so lang dauert ein Zeitraum. */
+export const ZEITRAUM_MAX_TAGE = 365;
+
+/** Was das Sheet für einen Zeitraum schickt. `nachfolgerId` null = Grundplan. */
+export interface ZeitraumEingabe {
+  von: unknown;
+  bis: unknown;
+  nachfolgerId?: unknown;
+}
+
+type PlanFuerPruefung = Pick<Wochenplan, "id" | "name" | "grundplan" | "zeitraumVon" | "zeitraumBis" | "nachfolgerId">;
+
+/**
+ * An welchen Tagen welcher Plan Grundplan wird: ein Start ohne Ende (am
+ * Beginn) und ein Zeitraum mit Nachfolger (am Tag nach dem Ende).
+ */
+function grundplanWechsel(p: PlanFuerPruefung, alle: Pick<Wochenplan, "id" | "name">[]): { tag: string; ziel: string }[] {
+  const out: { tag: string; ziel: string }[] = [];
+  if (p.zeitraumVon && !p.zeitraumBis) out.push({ tag: p.zeitraumVon, ziel: p.name });
+  if (p.zeitraumBis && p.nachfolgerId) {
+    const n = alle.find((x) => x.id === p.nachfolgerId);
+    if (n) out.push({ tag: tagPlus(p.zeitraumBis, 1), ziel: n.name });
+  }
+  return out;
+}
+
+/**
+ * Prüft einen Zeitraum samt Nachfolger, bevor er gespeichert wird. Beide
+ * Tage leer heißt: kein Zeitraum. Browser und Server rechnen dieselbe
+ * Prüfung (Leon 27.09.: „nichts passieren kann das einen fehler im ablauf
+ * hervor ruft").
+ *
+ *   · Der Grundplan bekommt keinen Zeitraum — er gilt ohnehin, wenn keiner
+ *     läuft. Ebenso kein Plan, der einem anderen NACHFOLGT: Er soll nach
+ *     dessen Ende dauerhaft gelten.
+ *   · Beginn ab heute; nur ein schon LAUFENDER Zeitraum behält seinen
+ *     Beginn in der Vergangenheit (sein Ende darf man verschieben).
+ *   · Ende ab heute, nicht vor dem Beginn, höchstens ein Jahr danach.
+ *   · Zwei Zeiträume mit Ende überschneiden sich nie.
+ *   · NACHFOLGER (Leon 27.09.: „wenn ich ein enddatum setze soll ein neues
+ *     feld auftauchen mit nachfolge plan"): nur mit Ende; nie der Plan
+ *     selbst; nur ein Plan OHNE eigenen Zeitraum; null oder der Grundplan
+ *     heißt „zurück zum Grundplan".
+ *   · An keinem Tag wechselt der Grundplan zweimal (Start ohne Ende oder
+ *     Tag nach einem Ende mit Nachfolger) — sonst gäbe es zwei Kandidaten.
+ */
+export function zeitraumPruefen(
+  eingabe: ZeitraumEingabe,
+  heute: string,
+  plan: Pick<Wochenplan, "id" | "grundplan" | "zeitraumVon"> | null,
+  andere: PlanFuerPruefung[],
+): { von: string | null; bis: string | null; nachfolgerId: string | null } | { fehler: string } {
+  const leer = (x: unknown) => x === null || x === undefined || x === "";
+  if (leer(eingabe.von) && leer(eingabe.bis)) return { von: null, bis: null, nachfolgerId: null };
+  if (plan?.grundplan) {
+    return {
+      fehler: "Dein Grundplan gilt immer, wenn kein Zeitraum läuft. Gib den Zeitraum dem Plan, der nur zeitweise gelten soll.",
+    };
+  }
+  const vorgaenger = plan ? andere.find((o) => o.nachfolgerId === plan.id && o.zeitraumBis) : undefined;
+  if (vorgaenger) {
+    return {
+      fehler: `Nach „${vorgaenger.name}“ gilt dieser Plan dauerhaft, deshalb bekommt er keinen eigenen Zeitraum. Wähl dort erst einen anderen Nachfolger.`,
+    };
+  }
+  if (leer(eingabe.von)) return { fehler: "Wähl, ab wann der Plan gilt." };
+  const von = gueltigerTag(eingabe.von);
+  if (!von) return { fehler: "Wähl den Beginn aus dem Kalender." };
+  let bis: string | null = null;
+  if (!leer(eingabe.bis)) {
+    bis = gueltigerTag(eingabe.bis);
+    if (!bis) return { fehler: "Wähl das Ende aus dem Kalender." };
+  }
+  const laeuftSchon = plan?.zeitraumVon === von && von <= heute;
+  if (von < heute && !laeuftSchon) return { fehler: "Wähl einen Beginn ab heute." };
+  if (von > tagPlus(heute, 730)) return { fehler: "Wähl einen Beginn in den nächsten zwei Jahren." };
+  if (bis !== null) {
+    if (bis < von) return { fehler: "Das Ende liegt vor dem Beginn." };
+    if (bis < heute) return { fehler: "Das Ende liegt in der Vergangenheit. Wähl ein Ende ab heute." };
+    if (tageZwischen(von, bis) > ZEITRAUM_MAX_TAGE) return { fehler: "Ein Zeitraum dauert höchstens ein Jahr." };
+  }
+
+  // Nachfolger — nur mit Ende. Der Grundplan als Wahl heißt dasselbe wie keine.
+  let nachfolgerId: string | null = null;
+  if (bis !== null && !leer(eingabe.nachfolgerId)) {
+    const n = andere.find((o) => o.id === eingabe.nachfolgerId);
+    if (plan && eingabe.nachfolgerId === plan.id) return { fehler: "Ein Plan folgt nicht auf sich selbst. Wähl einen anderen." };
+    if (!n) return { fehler: "Diesen Plan gibt es nicht mehr. Wähl einen anderen Nachfolger." };
+    if (!n.grundplan) {
+      if (n.zeitraumVon) {
+        return { fehler: `„${n.name}“ hat selbst einen Zeitraum. Als Nachfolger passt ein Plan ohne Zeitraum.` };
+      }
+      nachfolgerId = n.id;
+    }
+  }
+
+  for (const p of andere) {
+    if (bis !== null && p.zeitraumVon && p.zeitraumBis !== null && von <= p.zeitraumBis && p.zeitraumVon <= bis) {
+      return {
+        fehler: `Vom ${tagText(p.zeitraumVon, heute)} bis ${tagText(p.zeitraumBis, heute)} gilt schon „${p.name}“. Wähl einen Zeitraum davor oder danach.`,
+      };
+    }
+  }
+  const alle = [...andere, ...(plan ? [{ id: plan.id, name: "" }] : [])];
+  const meine = grundplanWechsel(
+    { id: plan?.id ?? "", name: "", grundplan: false, zeitraumVon: von, zeitraumBis: bis, nachfolgerId },
+    alle,
+  );
+  for (const p of andere) {
+    for (const w of grundplanWechsel(p, alle)) {
+      if (meine.some((m) => m.tag === w.tag)) {
+        return { fehler: `Am ${tagText(w.tag, heute)} wird schon „${w.ziel}“ dein Grundplan. Wähl einen anderen Tag.` };
+      }
+    }
+  }
+  return { von, bis, nachfolgerId };
+}
+
+/** Der Stand eines Plans, wie ihn `planStandRechnen` für heute ableitet. */
+export interface PlanStand {
+  aktiv: boolean;
+  grundplan: boolean;
+  zeitraumVon: string | null;
+  zeitraumBis: string | null;
+  nachfolgerId: string | null;
+}
+
+type PlanFuerStand = Pick<
+  Wochenplan,
+  "id" | "name" | "aktiv" | "grundplan" | "zeitraumVon" | "zeitraumBis" | "nachfolgerId" | "angelegtMs"
+>;
+
+/**
+ * DER GANZE STAND FÜR HEUTE — eine reine Rechnung aus dem Tag und den Plänen.
+ * Nacht-Job, Server-Route, täglicher Abgleich und die Anzeige der Verwaltung
+ * rufen sie gleich auf. Sie liefert immer genau einen aktiven Plan und genau
+ * einen Grundplan, solange es überhaupt einen Plan gibt.
+ *
+ *   0. Ein Nachfolger, den es nicht (mehr) gibt oder der der Plan selbst
+ *      ist, zählt als „zurück zum Grundplan". Ohne Ende kein Nachfolger.
+ *   1. Zeiträume, deren Ende vorbei ist, fallen weg. Hatten sie einen
+ *      Nachfolger, wird der am Tag nach dem Ende Grundplan.
+ *   2. Ein erreichter Start ohne Ende macht seinen Plan am Beginn zum
+ *      Grundplan. Aus 1 und 2 gewinnt der JÜNGSTE Wechsel; alle sind danach
+ *      verbraucht.
+ *   3. Sonst bleibt der Grundplan. Fehlt er (Altbestand ohne das Feld),
+ *      wird es der aktive Plan ohne laufenden Zeitraum, sonst der erste.
+ *   4. Aktiv ist der Plan, dessen Zeitraum heute läuft — sonst der
+ *      Grundplan.
+ */
+export function planStandRechnen(
+  plaene: PlanFuerStand[],
+  heute: string,
+): { aktivId: string | null; grundplanId: string | null; stand: Map<string, PlanStand> } {
+  const sortiert = plaeneSortieren(plaene);
+  const ids = new Set(sortiert.map((p) => p.id));
+  const stand = new Map<string, PlanStand>(
+    sortiert.map((p) => [
+      p.id,
+      {
+        aktiv: p.aktiv,
+        grundplan: p.grundplan,
+        zeitraumVon: p.zeitraumVon,
+        zeitraumBis: p.zeitraumBis,
+        nachfolgerId: p.nachfolgerId,
+      },
+    ]),
+  );
+  if (sortiert.length === 0) return { aktivId: null, grundplanId: null, stand };
+  const s = (id: string) => stand.get(id)!;
+  const laeuft = (x: PlanStand) =>
+    x.zeitraumVon !== null && x.zeitraumBis !== null && x.zeitraumVon <= heute && heute <= x.zeitraumBis;
+
+  // 0. Nachfolger nur mit Ende, nur auf einen anderen, vorhandenen Plan
+  for (const p of sortiert) {
+    const x = s(p.id);
+    if (x.nachfolgerId !== null && (x.zeitraumBis === null || x.nachfolgerId === p.id || !ids.has(x.nachfolgerId))) {
+      x.nachfolgerId = null;
+    }
+  }
+
+  // 1. + 2. Wechsel des Grundplans, die heute erreicht sind
+  const wechsel: { id: string; tag: string; rang: number }[] = [];
+  sortiert.forEach((p, rang) => {
+    const x = s(p.id);
+    if (x.zeitraumBis !== null && x.zeitraumBis < heute) {
+      if (x.nachfolgerId) wechsel.push({ id: x.nachfolgerId, tag: tagPlus(x.zeitraumBis, 1), rang });
+      x.zeitraumVon = null;
+      x.zeitraumBis = null;
+      x.nachfolgerId = null;
+    } else if (x.zeitraumVon !== null && x.zeitraumBis === null && x.zeitraumVon <= heute) {
+      wechsel.push({ id: p.id, tag: x.zeitraumVon, rang });
+      x.zeitraumVon = null;
+    }
+  });
+  const juengster = wechsel.sort((a, b) => b.tag.localeCompare(a.tag) || a.rang - b.rang)[0];
+  let grund: PlanFuerStand | null = juengster ? (sortiert.find((p) => p.id === juengster.id) ?? null) : null;
+
+  // 3. Grundplan
+  grund ??= sortiert.find((p) => s(p.id).grundplan) ?? null;
+  grund ??= sortiert.find((p) => s(p.id).aktiv && !laeuft(s(p.id))) ?? sortiert[0];
+  for (const p of sortiert) s(p.id).grundplan = p.id === grund.id;
+  Object.assign(s(grund.id), { zeitraumVon: null, zeitraumBis: null, nachfolgerId: null });
+
+  // 4. Aktiv
+  const laufend = sortiert
+    .filter((p) => p.id !== grund!.id && laeuft(s(p.id)))
+    .sort((a, b) => s(b.id).zeitraumVon!.localeCompare(s(a.id).zeitraumVon!));
+  const aktivId = laufend[0]?.id ?? grund.id;
+  for (const p of sortiert) s(p.id).aktiv = p.id === aktivId;
+
+  return { aktivId, grundplanId: grund.id, stand };
+}
+
+/** Läuft der Zeitraum dieses Plans heute? */
+export function zeitraumLaeuft(p: Pick<Wochenplan, "zeitraumVon" | "zeitraumBis">, heute: string): boolean {
+  return p.zeitraumVon !== null && p.zeitraumBis !== null && p.zeitraumVon <= heute && heute <= p.zeitraumBis;
 }

@@ -5,8 +5,9 @@
  * das es gyms gibt die verschiedene räume haben"; gepflegt im Wochenplan).
  *
  * Geschrieben wird über `/api/gym/kurse` (`raum-anlegen` / `raum-umbenennen`
- * / `raum-loeschen`). Die Liste kommt live aus useKursplan — nach dem
- * Speichern steht sie von selbst neu da.
+ * / `raum-loeschen`). Räume gehören dem GYM: Die Route ändert sie in allen
+ * Wochenplänen zugleich (Leon 27.09.: mehrere Pläne). Die Liste kommt live
+ * aus useWochenplaene — nach dem Speichern steht sie von selbst neu da.
  *
  * Ab ZWEI Räumen steht der Raum an jedem Kurs (Wochenplan und Kursplan der
  * Athleten). Ein Gym mit einem Raum braucht die Angabe nicht.
@@ -17,7 +18,7 @@ import XKnopf from "@/components/ui/XKnopf";
 import { SheetShell } from "@/components/motion";
 import { useAuth } from "@/lib/auth-context";
 import { RAUMNAME_MAX, type Raum } from "@/lib/kursplan";
-import { useKursplan } from "@/lib/kursplan-context";
+import type { TrainingBlock } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 const BTN_FONT: React.CSSProperties = {
@@ -115,9 +116,20 @@ function RaumZeile({
   );
 }
 
-export default function RaeumeSheet({ offen, onClose }: { offen: boolean; onClose: () => void }) {
+export default function RaeumeSheet({
+  offen,
+  onClose,
+  raeume,
+  kurse,
+}: {
+  offen: boolean;
+  onClose: () => void;
+  /** Die Räume des Gyms — sie stehen an jedem Plan gleich. */
+  raeume: Raum[];
+  /** Die Kurse des gewählten Plans, für die Zahl je Raum. */
+  kurse: TrainingBlock[];
+}) {
   const { user } = useAuth();
-  const { raeume, kurse } = useKursplan();
   const [neuName, setNeuName] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);

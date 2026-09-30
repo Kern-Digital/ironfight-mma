@@ -517,7 +517,11 @@ service cloud.firestore {
       // der mit aktiv == true (lib/kursplan.ts). Bis zum 26.09. standen die
       // Kurse als Konstante im Code und JEDES Gym sah dieselbe Woche.
       //
-      // LESEN: jedes Mitglied des Gyms — der Kursplan ist fuer Athleten da.
+      // LESEN (seit 27.09.2026, mehrere Wochenplaene, Leon: „den aktivierten
+      // sehen dann trainer und athleten etc. nur die anderen in der
+      // verwaltung sehen die anderen wochenpläne"): Mitglieder des Gyms NUR
+      // den aktiven Plan, die Verwaltung alle. Die Abfrage von useKursplan
+      // filtert where("aktiv","==",true) — damit bleibt sie beweisbar.
       // SCHREIBEN: niemand per Client. Kurse anlegen und Trainer zuweisen
       // laeuft ueber /api/gym/kurse (Admin-SDK), das die Verwaltung prueft
       // und dass jeder Kurs mindestens einen Trainer DIESES Gyms hat. Eine
@@ -525,7 +529,8 @@ service cloud.firestore {
       // in fremden users-Dokumenten).
       match /schedulePlans/{planId} {
         allow read: if request.auth != null
-                    && (isAdmin() || userGymId() == gymId);
+                    && (canManageGymId(gymId)
+                        || (userGymId() == gymId && resource.data.aktiv == true));
         allow write: if false;
       }
 

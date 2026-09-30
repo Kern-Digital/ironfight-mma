@@ -1,0 +1,27 @@
+/* Das Plus neben dem Mauszeiger (PlusZeiger.tsx): ein kleiner runder Knopf
+ * in Gym-Farbe. Deckend statt Schatten-Filter — ein Filter auf einem
+ * bewegten Element wird bei jedem Bild neu gerechnet und hat geruckelt. */
+.plus {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 2px var(--surface-card);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+  transition: opacity 120ms var(--ease-out);
+}
+@media (hover: none) {
+  .plus {
+    display: none;
+  }
+}

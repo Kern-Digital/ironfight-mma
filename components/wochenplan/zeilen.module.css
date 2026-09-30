@@ -1,0 +1,273 @@
+/* DIE WOCHE IN ZEILEN (components/wochenplan/WocheZeilen.tsx) — ein Tag je
+ * Zeile, die Kurse als Kapseln auf einer quer liegenden Uhrzeit-Achse.
+ * Entstanden als Entwurf C (28.09.2026), seit Leons Wahl von Entwurf B die
+ * Ansicht „Zeilen" im Wochenplan. `--dreieck` setzt die Seite
+ * (wochenplan.module.css). */
+
+.wocheHuelle {
+  container-type: inline-size;
+  container-name: wochenzeilen;
+}
+
+/* DAS ORANGE DREIECK (Leon 28.09.: „da wo noch etwas fehlt … soll mit einem
+ * orangenem dreieck angezeigt werden"). Eigene Farbe, denn --warning ist
+ * gelb (Farbton 90) und im Hellen zu blass. Hell dunkler, damit das Zeichen
+ * auf Weiß die 3:1 für Grafiken schafft. */
+.dreieck {
+  display: inline-flex;
+  flex: none;
+  color: var(--dreieck);
+}
+
+/* ─── Die Woche: ein Tag je Zeile ────────────────────────────────────── */
+
+.woche {
+  position: relative;
+  border-radius: var(--r-xl);
+  background: color-mix(in oklab, var(--surface-card) 80%, transparent);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+.achsZeile,
+.tag {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.achsZeile {
+  display: none;
+}
+.tag + .tag {
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+}
+.tagKopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px 6px;
+}
+.tagName {
+  max-width: 100%;
+  font: 700 15px/1.2 var(--font-body);
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tag[data-heute] .tagName {
+  color: var(--accent-text);
+}
+.tagZahl {
+  font: 400 12px/1.2 var(--font-body);
+  color: var(--text-3);
+}
+.tagPlus {
+  display: none;
+}
+
+/* Schmal: die Kurse als Liste untereinander. */
+.bahn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 14px;
+}
+.linie,
+.lueckeStreifen {
+  display: none;
+}
+.frei {
+  padding: 2px 4px;
+  font: var(--type-sub);
+  color: var(--text-3);
+}
+
+.kapsel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px 7px 12px;
+  border: 0;
+  border-left: 3px solid var(--farbe);
+  border-radius: 6px var(--r-md) var(--r-md) 6px;
+  background: color-mix(in oklab, var(--farbe) 13%, var(--surface-card));
+  text-align: left;
+  color: var(--text-1);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    opacity var(--dur-med) var(--ease-out);
+}
+.kapsel:hover,
+.kapsel:focus-visible {
+  z-index: 5;
+  box-shadow: var(--shadow-pop);
+  outline: none;
+}
+.kapsel:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.kapsel[data-offen] {
+  background: color-mix(in oklab, var(--farbe) 6%, var(--surface-card));
+}
+.kapsel[data-gedimmt] {
+  opacity: 0.3;
+}
+.kZeile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font:
+    500 11px/1.2 var(--font-mono),
+    ui-monospace,
+    monospace;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kTrainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 11px/1.2 var(--font-body);
+  color: var(--text-3);
+}
+.kTrainer[data-fehlt] {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.kTitel {
+  font: 700 13px/1.2 var(--font-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+/* Breit: die Woche als Zeilen mit Uhrzeit-Achse. */
+@container wochenzeilen (min-width: 900px) {
+  .achsZeile,
+  .tag {
+    grid-template-columns: 124px minmax(0, 1fr);
+  }
+  .achsZeile {
+    display: grid;
+    border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  }
+  .achse {
+    position: relative;
+    height: 34px;
+    margin: 0 16px;
+  }
+  .stunde {
+    position: absolute;
+    bottom: 9px;
+    transform: translateX(-50%);
+    font:
+      500 11px/1 var(--font-mono),
+      ui-monospace,
+      monospace;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+  .tagKopf {
+    position: relative;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 16px;
+  }
+  .tagPlus {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: 600 12px/1 var(--font-body);
+    color: var(--text-3);
+    cursor: pointer;
+    min-height: 24px;
+  }
+  .tagPlus:hover {
+    color: var(--accent-text);
+  }
+  @media (hover: hover) {
+    .tagPlus {
+      opacity: 0;
+    }
+    .tag:hover .tagPlus,
+    .tagPlus:focus-visible {
+      opacity: 1;
+    }
+  }
+  /* LUFT ZUM TAGESNAMEN (Leon 28.09.: „bei donnerstag ist der kurs dahinter
+     zu nah dran … immer genug abstand"). Die Bahn beginnt 16 px hinter der
+     Tages-Spalte; ein Kurs um 10:00 steht damit nie am Namen. Gemessen in
+     scripts/tmp-blick-entwurf.mjs (Abstand je Tag ≥ 24 px). */
+  .bahn {
+    display: block;
+    position: relative;
+    margin: 8px 16px 8px 16px;
+    padding: 0;
+  }
+
+  .linie {
+    display: block;
+    position: absolute;
+    top: -8px;
+    bottom: -8px;
+    width: 1px;
+    background: color-mix(in oklab, var(--line) 55%, transparent);
+    pointer-events: none;
+  }
+  .lueckeStreifen {
+    display: block;
+    position: absolute;
+    top: -8px;
+    bottom: -8px;
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--line) 55%, transparent) 0 1px,
+      transparent 1px 7px
+    );
+    pointer-events: none;
+  }
+  .bahn {
+    height: var(--bahn-h);
+  }
+  .frei {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  /* Lage kommt als Variablen: schmal gelten sie nicht, dort fließt die Liste. */
+  .kapsel {
+    position: absolute;
+    left: var(--x);
+    width: var(--w);
+    top: var(--y);
+    height: var(--kh);
+    z-index: 1;
+  }
+}
+
+/* Kurze Kurse (45 min) sind schmal: dort bleibt vom Trainer nur das Zeichen,
+   der volle Name steht im Tooltip und im Kurs-Sheet. */
+.kapsel {
+  container-type: inline-size;
+}
+@container (max-width: 120px) {
+  .kTrainerText {
+    display: none;
+  }
+}

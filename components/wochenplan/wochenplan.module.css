@@ -1,0 +1,755 @@
+/* WOCHENPLAN DER VERWALTUNG (app/verwaltung/wochenplan/page.tsx) — aus
+ * Entwurf B „Zeitachse" (28.09.2026, von Leon gewählt).
+ *
+ * Die Woche als Kalender mit Uhrzeit-Achse: Ein Kurs ist so hoch, wie er
+ * lang ist, Lücken und Überschneidungen sieht man, ohne Uhrzeiten zu lesen.
+ * Die Pläne stehen links als ruhige Liste (auf schmalen Flächen oben), der
+ * gewählte Plan trägt rechts seinen Namen groß — das ist der einzige Titel. */
+
+.seite {
+  --dreieck: oklch(0.77 0.16 58);
+  container-type: inline-size;
+  container-name: wochenplan-seite;
+  min-height: 100vh;
+  padding-bottom: 3rem;
+  background: var(--surface-page);
+  color: var(--text-body);
+}
+
+:global([data-theme="light"]) .seite {
+  --dreieck: oklch(0.64 0.18 48);
+}
+
+/* DAS ORANGE DREIECK (Leon 28.09.: „da wo noch etwas fehlt … soll mit einem
+ * orangenem dreieck angezeigt werden"). Eigene Farbe, denn --warning ist
+ * gelb (Farbton 90) und im Hellen zu blass. Hell dunkler, damit das Zeichen
+ * auf Weiß die 3:1 für Grafiken schafft. */
+.dreieck {
+  display: inline-flex;
+  flex: none;
+  color: var(--dreieck);
+}
+
+.aufbau {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 16px 1rem 0;
+}
+
+/* ─── Pläne ──────────────────────────────────────────────────────────── */
+
+.plaene {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: -4px;
+  padding: 2px 4px 6px;
+}
+.plaene::-webkit-scrollbar {
+  display: none;
+}
+.plaeneTitel {
+  display: none;
+  padding: 4px 14px 10px;
+  font: var(--type-meta);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.plan {
+  flex: none;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 11px 16px 11px 12px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: none;
+  text-align: left;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-med) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.plan:hover {
+  color: var(--text-1);
+  background: color-mix(in oklab, var(--surface-raised) 45%, transparent);
+}
+.plan:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.plan[aria-pressed="true"] {
+  color: var(--text-1);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--glass-highlight) 45%, transparent),
+      transparent 60%
+    ),
+    color-mix(in oklab, var(--surface-card) 75%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--accent) 12%, var(--glass-border));
+}
+.planPunkt {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+/* Der aktive Plan: der Punkt atmet leise (Leon 28.09.: „leicht animiert").
+   Ein Ring löst sich und verblasst — kein Blinken. */
+.planPunkt[data-aktiv] {
+  background: var(--accent);
+  animation: punktAtmen 2.4s var(--ease-out) infinite;
+}
+@keyframes punktAtmen {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 50%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .planPunkt[data-aktiv] {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+  }
+}
+.planName {
+  font: 700 15px/1.25 var(--font-body);
+  white-space: nowrap;
+}
+.planUnter {
+  grid-column: 2;
+  font: 400 13px/1.3 var(--font-body);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.planUnter[data-aktiv] {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.planNeu {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: none;
+  font: 600 14px/1 var(--font-body);
+  color: var(--text-3);
+  cursor: pointer;
+}
+.planNeu:hover {
+  color: var(--accent-text);
+}
+
+/* ─── Kopf des gewählten Plans ──────────────────────────────────────── */
+
+.kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+  padding: 10px 2px 18px;
+}
+.kopfText {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.kopfNameZeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* Aktivieren neben dem Namen; der Tipp öffnet das Popup (Leon 29.09.) */
+.aktivGruppe {
+  display: inline-flex;
+  align-items: stretch;
+  margin-left: 8px;
+}
+/* Schmal bricht der Knopf unter den Namen — dann bündig links. */
+@media (max-width: 639px) {
+  .aktivGruppe {
+    margin-left: 0;
+  }
+}
+.kopfName {
+  font: 700 28px/1.1 var(--font-body);
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.kopfSatz {
+  max-width: 68ch;
+  font: var(--type-sub);
+  color: var(--text-2);
+}
+
+/* „Gilt jetzt" trägt DIESELBE hellblaue Füllung wie der geklickte
+   Aktivieren-Knopf (components/ui/HakenKnopf, --fuellung): Leon 28.09.
+   „wenn ich darauf klicke soll das feld komplett hellblau werden" — das
+   Aktivieren ist in Bruchteilen einer Sekunde fertig, also bleibt das Feld
+   einfach hellblau stehen, statt kurz aufzublitzen. */
+.giltJetzt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px 0 18px;
+  border: 1.5px solid transparent;
+  border-radius: var(--r-pill);
+  background: oklch(0.87 calc(var(--accent-c) * 0.85) var(--accent-h));
+  color: oklch(0.3 calc(var(--accent-c) * 0.7) var(--accent-h));
+  font: 700 14px/1 var(--font-body);
+  animation: fuellen 320ms var(--ease-out);
+}
+/* Läuft ein Zeitraum, öffnet „Gilt jetzt" das Popup — dort verschiebst du das Ende. */
+button.giltJetzt {
+  cursor: pointer;
+}
+button.giltJetzt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Beobachtungen („N Kurse ohne Trainer") rechts auf Höhe von „Aktivieren",
+   über „Kurs anlegen" (Leon 29.09.). Schmal rutschen sie in eine eigene Zeile. */
+.meldungen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+@media (max-width: 639px) {
+  .meldungen {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
+@keyframes fuellen {
+  from {
+    background: transparent;
+    border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .giltJetzt {
+    animation: none;
+  }
+}
+
+.iconKnopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.iconKnopf:hover {
+  color: var(--text-1);
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+}
+
+.leise {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  font: 600 14px/1 var(--font-body);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.leise:hover {
+  color: var(--text-1);
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+}
+.leise:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: none;
+}
+.leise[aria-pressed="true"] {
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+.voll {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 14px/1 var(--font-body);
+  box-shadow: var(--accent-glow);
+  cursor: pointer;
+}
+.voll:disabled {
+  opacity: 0.6;
+}
+
+.werkzeug {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.werkzeugLinks,
+.werkzeugRechts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Tageswahl (nur schmal) ────────────────────────────────────────── */
+
+.tagWahl {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 10px;
+}
+.tagWahl::-webkit-scrollbar {
+  display: none;
+}
+.tagWahlKnopf {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 44px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: none;
+  color: var(--text-2);
+  font: 700 14px/1 var(--font-body);
+  cursor: pointer;
+}
+.tagWahlKnopf small {
+  font: 400 11px/1 var(--font-body);
+  color: var(--text-3);
+}
+.tagWahlKnopf[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+/* ─── Kalender ──────────────────────────────────────────────────────── */
+
+.kalender {
+  --spalten: 44px repeat(7, minmax(0, 1fr));
+  border-radius: var(--r-xl);
+  background: color-mix(in oklab, var(--surface-card) 80%, transparent);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+.kalKopf,
+.kalKoerper {
+  display: grid;
+  grid-template-columns: var(--spalten);
+}
+.kalKopf {
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+}
+.kopfZelle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 12px 6px 10px 12px;
+  min-width: 0;
+}
+.kopfTag {
+  font: 700 14px/1.2 var(--font-body);
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kopfZelle[data-heute] .kopfTag {
+  color: var(--accent-text);
+}
+.kopfPlus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.kopfPlus:hover {
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+@media (hover: hover) {
+  .kopfPlus {
+    position: absolute;
+    right: 4px;
+    opacity: 0;
+    background: var(--surface-card);
+  }
+  .kopfZelle:hover .kopfPlus,
+  .kopfPlus:focus-visible {
+    opacity: 1;
+  }
+}
+
+.achse {
+  position: relative;
+}
+.stunde {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  font:
+    500 11px/1 var(--font-mono),
+    ui-monospace,
+    monospace;
+  color: var(--text-3);
+}
+
+.spalte {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+}
+/* Über einer freien Stelle steht das Plus in Gym-Farbe NEBEN dem normalen
+   Zeiger (PlusZeiger.tsx) — Leon 28.09.: „nicht ersetzen, zusätzlich". */
+.kalKoerper {
+  position: relative;
+}
+.linien {
+  position: absolute;
+  inset: 0 0 0 44px;
+  pointer-events: none;
+}
+.linie {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in oklab, var(--line) 55%, transparent);
+}
+/* Die gefaltete Lücke: feine Schraffur, damit man sieht, dass hier Zeit
+   fehlt und nicht nur eine Linie. */
+.luecke {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--line) 55%, transparent) 0 1px,
+    transparent 1px 7px
+  );
+  border-block: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+}
+
+.jetzt {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 3;
+}
+.jetzt::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px 4px 8px;
+  border: 0;
+  border-left: 3px solid var(--farbe);
+  border-radius: 4px var(--r-sm) var(--r-sm) 4px;
+  background: color-mix(in oklab, var(--farbe) 15%, var(--surface-card));
+  text-align: left;
+  color: var(--text-1);
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 1;
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    opacity var(--dur-med) var(--ease-out);
+}
+.block:hover,
+.block:focus-visible {
+  z-index: 9 !important;
+  box-shadow: var(--shadow-pop);
+  outline: none;
+}
+.block:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+/* Ohne Trainer: blasser, das Wort „+ Trainer" trägt die Aussage. */
+.block[data-offen] {
+  background: color-mix(in oklab, var(--farbe) 7%, var(--surface-card));
+}
+.block[data-gedimmt] {
+  opacity: 0.3;
+}
+.bZeit {
+  font:
+    500 11px/1.2 var(--font-mono),
+    ui-monospace,
+    monospace;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.bTitel {
+  font: 700 13px/1.2 var(--font-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+.bZeile {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 400 12px/1.25 var(--font-body);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bZeile[data-fehlt] {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.leer {
+  padding: 24px 2px;
+  max-width: 60ch;
+  font: var(--type-sub);
+  color: var(--text-2);
+}
+.fehler {
+  padding: 0 2px 12px;
+  font: var(--type-sub);
+  color: var(--negative);
+}
+
+/* SCHMAL: ein Tag auf einmal, die Tageswahl darüber. */
+@container wochenplan-seite (max-width: 759px) {
+  .kalender {
+    --spalten: 44px minmax(0, 1fr);
+  }
+  .kopfZelle:not([data-gewaehlt]),
+  .spalte:not([data-gewaehlt]) {
+    display: none;
+  }
+  .kalKopf {
+    display: none;
+  }
+}
+@container wochenplan-seite (min-width: 760px) {
+  .tagWahl {
+    display: none;
+  }
+}
+
+/* BREIT: Pläne links als Liste, Kalender rechts. */
+@container wochenplan-seite (min-width: 1240px) {
+  .aufbau {
+    grid-template-columns: 212px minmax(0, 1fr);
+    gap: 24px;
+    padding: 20px 1.5rem 0;
+    align-items: start;
+  }
+  .plaene {
+    position: sticky;
+    top: 88px;
+    flex-direction: column;
+    overflow: visible;
+    margin: 0;
+    padding: 6px 0 0;
+  }
+  .plaeneTitel {
+    display: block;
+  }
+  .plan {
+    width: 100%;
+  }
+  .planName,
+  .planUnter {
+    white-space: normal;
+  }
+  .planNeu {
+    margin-top: 6px;
+  }
+}
+
+/* ─── Umschalter „Ansicht" (Leon 28.09.: B und C in einer Seite) ─────────
+ * Zwei Knöpfe in einer leisen Kapsel; der gewählte liegt auf Glas wie im
+ * Kopfbalken. Bewusst KEINE Goo-Auswahl — die steht daneben als Raumfilter,
+ * und zwei gleich aussehende Bedienelemente läsen sich als eines. */
+.ansicht {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+}
+.ansichtKnopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  font: 600 13px/1 var(--font-body);
+  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    background var(--dur-med) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ansichtKnopf:hover {
+  color: var(--text-1);
+}
+.ansichtKnopf:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ansichtKnopf[aria-checked="true"] {
+  color: var(--accent-text);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--glass-highlight) 45%, transparent),
+      transparent 60%
+    ),
+    var(--surface-card);
+  box-shadow: 0 1px 4px -1px color-mix(in oklab, var(--text-1) 18%, transparent);
+}
+
+/* ─── Räume-Zeichen (Leon 28.09.: am Ende des Raumfilters) ──────────────
+ * Schichten mit kleinem Plus. Im Filter ein runder Knopf ohne Fläche —
+ * Hover wie die Räume davor: Schrift/Zeichen hell, kein Kasten. */
+/* Räume-Zeichen in der Nase des Raumfilters (Leon 29.09.): den Rahmen
+   zeichnet GooAuswahl, das Plus erscheint erst beim Überfahren. */
+.raumKnopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.raumKnopf:hover,
+.raumKnopf:focus-visible {
+  color: var(--accent-text);
+  transform: scale(1.06);
+}
+.raumKnopf:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.raumZeichen {
+  position: relative;
+  display: inline-flex;
+}
+.raumPlus {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 1.5px var(--surface-raised);
+  opacity: 0;
+  scale: 0.4;
+  transition:
+    opacity 160ms var(--ease-out),
+    scale 220ms var(--ease-out);
+}
+.raumKnopf:hover .raumPlus,
+.raumKnopf:focus-visible .raumPlus {
+  opacity: 1;
+  scale: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .raumPlus {
+    transition: none;
+  }
+}
+
+/* Herunterladen rechts unter der Woche */
+.unten {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}

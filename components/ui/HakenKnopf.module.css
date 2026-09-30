@@ -1,0 +1,103 @@
+/* HAKEN-KNOPF (components/ui/HakenKnopf.tsx) — Maße wie die übrigen
+ * Pillen-Knöpfe (44 px), Bewegung nach Leons Star-Button-Vorlage. */
+
+.knopf {
+  /* Hellblau = Gym-Akzent, stark aufgehellt; die Schrift darauf dunkel —
+     in beiden Themes gleich, denn die Fläche ist in beiden hell. */
+  /* Aus Farbton und Sättigung des Akzents gerechnet — Weiß-Mischen
+     entsättigt und wirkt im Hellen grau (28.09. im Bild geprüft). */
+  --fuellung: oklch(0.87 calc(var(--accent-c) * 0.85) var(--accent-h));
+  --auf-fuellung: oklch(0.3 calc(var(--accent-c) * 0.7) var(--accent-h));
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px 0 18px;
+  overflow: hidden;
+  border: 1.5px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--accent-text);
+  font: 700 14px/1 var(--font-body);
+  cursor: pointer;
+  isolation: isolate;
+  transition:
+    background 280ms var(--ease-out),
+    border-color 280ms var(--ease-out),
+    color 200ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.knopf:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Linke Hälfte: rechts gerade Kante, dort schließt der zweite Teil an. */
+.knopf[data-teil] {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 12px;
+}
+.knopf:active {
+  transform: scale(0.94);
+}
+.knopf:disabled:not([data-laeuft]) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.text {
+  position: relative;
+  z-index: 1;
+  transition: transform 300ms var(--ease-out);
+}
+
+.haken {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: color-mix(in oklab, var(--accent) 38%, transparent);
+  transition:
+    transform 500ms var(--ease-out),
+    color 300ms var(--ease-out);
+}
+
+/* Überfahren: Schrift rückt nach rechts, der Haken wächst über den Knopf. */
+@media (hover: hover) {
+  .knopf:not(:disabled):hover {
+    color: var(--text-1);
+    border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+  }
+  .knopf:not(:disabled):hover .text {
+    transform: translateX(16px);
+  }
+  .knopf:not(:disabled):hover .haken {
+    transform: translateX(-40px) scale(15);
+  }
+}
+
+/* Geklickt: das Feld wird komplett hellblau, der Haken steht klein daneben. */
+.knopf[data-laeuft] {
+  background: var(--fuellung);
+  border-color: var(--fuellung);
+  color: var(--auf-fuellung);
+}
+.knopf[data-laeuft] .text {
+  transform: none;
+}
+.knopf[data-laeuft] .haken {
+  transform: none;
+  color: var(--auf-fuellung);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text,
+  .haken {
+    transition: none;
+  }
+  .knopf:not(:disabled):hover .text,
+  .knopf:not(:disabled):hover .haken {
+    transform: none;
+  }
+}
