@@ -26,6 +26,7 @@ export { CountingNumber } from "./CountingNumber";
 export { WortReveal } from "./WortReveal";
 export { SheetShell, useLetzterWert } from "./SheetShell";
 export { GooAuswahl } from "./GooAuswahl";
+export { GleitMarke } from "./GleitMarke";
 export type { GooOption } from "./GooAuswahl";
 export { useMotionCapability } from "./useMotionCapability";
 export type { MotionCapability } from "./useMotionCapability";

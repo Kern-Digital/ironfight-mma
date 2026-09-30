@@ -24,8 +24,12 @@
 export default function DeepFightWordmark({
   className,
   shimmer = false,
+  textClassName,
 }: {
   className?: string;
+  /** Nur am Schriftzug — die eingeklappte Sidebar blendet ihn aus, das
+      Funkeln bleibt als Symbol stehen. */
+  textClassName?: string;
   /** Funkeln als Maske: weiß, mit langsam wanderndem Regenbogen darin. */
   shimmer?: boolean;
 }) {
@@ -43,7 +47,7 @@ export default function DeepFightWordmark({
           style={{ transform: "translateY(-0.04em)" }}
         />
       )}
-      <span>DeepFight</span>
+      <span className={textClassName}>DeepFight</span>
     </span>
   );
 }

@@ -142,7 +142,7 @@ export default function StaffHeader() {
       // FREISTEHEND UND AUS GLAS (Leon 01.09.): `t-glass` bringt Milchglas,
       // Rahmen und Schatten aus dem Token-System mit; überschrieben wird nur
       // der Radius, weil die Hülle ihren eigenen, größeren hat.
-      className="t-glass sticky z-30 hidden shrink-0 items-center gap-4 lg:flex"
+      className="hd-folgt t-glass sticky z-30 hidden shrink-0 items-center gap-4 lg:flex"
       style={{
         top: "var(--shell-gap)",
         height: "var(--hd-h)",
@@ -152,6 +152,11 @@ export default function StaffHeader() {
         // Abstand bewusst größer als die anderen: Der Inhalt soll nicht am Kopf
         // kleben („das Hauptfeld soll etwas nach unten").
         margin: "var(--shell-gap) var(--shell-gap) calc(var(--shell-gap) * 4)",
+        // DER KOPF FOLGT DER LEISTE (Leon 30.09.): Klappt sie aus, weicht
+        // sein linker Rand um genau ihren Zuwachs zurück, klappt sie ein,
+        // zieht er nach — der Abstand zwischen beiden bleibt `--shell-gap`.
+        // Die Rechnung steht in globals.css (`.staff-huelle`).
+        marginLeft: "var(--hd-links, var(--shell-gap))",
         padding: "0 var(--hd-pad-x)",
         borderRadius: "var(--r-shell)",
       }}

@@ -21,12 +21,14 @@
  *     Leichtigkeit kommt aus dem Abstand ringsum — kurzzeitig lag sie ganz
  *     ohne eigene Fläche auf dem Seitengrund, was für ein schwebendes Element
  *     nicht geht.
- *  2. AKTIV ALS GLAS-LUPE (Stand 02.09., dritte Runde): Der aktive Punkt
- *     ist eine Kapsel im Stil der iOS-Textlupe (.sb-loupe in globals.css) —
- *     Milchglas, kräftiger Ring, größere Schrift, leichter Zoom, OHNE
- *     Akzent-Balken (Leon: „mache den farbigen Balken links weg"; er wurde
- *     auf dem Gruppentitel zudem automatisch kleiner, weil er an der
- *     Zeilenhöhe hing). Davor galt kurz „2-px-Balken statt Kasten" (01.09.).
+ *  2. AKTIV ALS GLEITENDES FARBFELD (Leon 30.09., nach zwei Runden mit je
+ *     drei Vorschlägen: „E sieht gut aus", Schrift „noch größer"): Das Feld
+ *     ist in der Bereichsfarbe getönt, läuft nach rechts aus, ragt wie die
+ *     erste Lupe ein Stück über die Nachbarn hinaus, trägt die Schrift in
+ *     20 px — und GLEITET beim Seitenwechsel von der alten zur neuen Zeile
+ *     (components/motion/GleitMarke, Aussehen `.sb-marke` in globals.css).
+ *     Vorher (02.09.–30.09.) eine Glas-Lupe mit Akzentring, Glühen und
+ *     Zoom; davor kurz ein 2-px-Balken (01.09.).
  *  3. KONTO STATT GYM OBEN LINKS. Der Gym-Name steht jetzt im Header
  *     (`StaffHeader`) — Leons Entscheidung; der Sidebar-Kopf gehört dem
  *     Menschen. Klick öffnet das Panel mit Einstellungen und Abmelden.
@@ -51,8 +53,12 @@
  * eigene Adresse tragen die Unterscheidung mit.
  *
  * WEITERE ABWEICHUNGEN VON DER VORLAGE (Spec §5, mit Leon geklärt 01.09.):
- *  • KEIN EINKLAPPEN. In der Vorlage sitzt der Knopf im Header — Leon
- *    vermisst die Funktion nicht. Auf dem Handy geht die Schublade auf und zu.
+ *  • EINKLAPPEN OHNE KNOPF (Leon 30.09.2026, vorher gar keins): Am Desktop
+ *    steht die Leiste als Symbolspalte und klappt beim Überfahren aus, der
+ *    Kopf zieht mit (StaffShell, `.staff-huelle` in globals.css). Hier
+ *    tragen Beschriftungen deshalb `sb-text` — eingeklappt blenden genau die
+ *    aus — und die Überschriften ein `sb-rail-zeichen` für die schmale
+ *    Fassung. Auf dem Handy geht die Schublade auf und zu wie bisher.
  *  • KEIN GYM-WECHSLER. Ein Konto gehört genau EINEM Gym (Konzept §1).
  *  • KEIN TASTENKÜRZEL-FELD. Eine app-weite Suche (⌘K) gibt es nicht.
  *  • RECHTSZEILE UNTEN. Mit dem Footer verliert die App ihren einzigen Platz
@@ -75,8 +81,10 @@ import {
 import { useTheme } from "@/lib/theme-context";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { GleitMarke } from "@/components/motion";
 import AppSuche from "./AppSuche";
+import Profilbild from "@/components/ui/Profilbild";
 
 /** Zeilenbild aller Menüpunkte — Maße ausschließlich aus den Tokens.
     Ränder und Polsterung stehen mit in der Transition, weil das AKTIVE Feld
@@ -122,29 +130,38 @@ function useHover() {
 function rowStyle(active: boolean, hover: boolean): React.CSSProperties {
   return {
     ...ROW_BASE,
-    font: active ? "var(--type-nav-active)" : "var(--type-nav)",
-    // Aktiv ist seit dem 02.09. ein FELD, seit demselben Abend als
-    // GLAS-LUPE (Leons iOS-Vorlage): Fläche, Ring, Schatten und der leichte
-    // Zoom kommen aus der Klasse .sb-loupe (globals.css) — hier stehen nur
-    // die Maße des Aufpoppens. Fläche und Schatten dürfen im Aktiv-Fall
-    // NICHT inline gesetzt werden, Inline schlüge die Klasse.
+    // DIE OFFENE SEITE STEHT GRÖSSER (Leon 30.09., zweite Runde: „wie am
+    // Anfang so ähnlich — die aktuell ausgewählte soll schriftlich größer
+    // geschrieben sein"). Wie bei der ersten Lupe ploppt das Feld über
+    // negative Seitenränder ein Stück über die Nachbarn hinaus; Fläche und
+    // Kante trägt die gleitende Marke (`.sb-marke`), nicht die Zeile.
+    font: active ? "var(--type-nav-aktuell)" : "var(--type-nav)",
     ...(active
       ? {
           margin: "0 calc(var(--sb-pop) * -1)",
           padding:
             "calc(var(--sb-row-y) + 2px) calc(var(--sb-row-x) + var(--sb-pop))",
-          // Eine Stufe runder als ruhende Zeilen — die Rundung des
-          // Redesigns, keine Kapsel (Leons Revision 02.09.).
           borderRadius: "var(--r-nav-lg)",
-          // Alle Zeilen sind position:relative — ohne z-Index läge der
-          // Lupen-Schatten unter der jeweils NÄCHSTEN Zeile im Baum.
-          zIndex: 1,
         }
-      : {
-          background: hover ? "var(--sb-hover)" : "transparent",
-        }),
+      : null),
+    // Die Marke liegt mit z-index -1 IN der Zeile; `isolation` hält sie
+    // über dem Grund der Rubrik und unter Symbol und Schrift.
+    isolation: "isolate",
+    background: !active && hover ? "var(--sb-hover)" : "transparent",
     color: active ? "var(--accent-text)" : "var(--text-2)",
   };
+}
+
+/** Welche gleitende Marke diese Liste benutzt — Leiste, Schublade und
+    Konto-Panel haben je eine eigene, sonst flöge die Marke zwischen ihnen
+    hin und her. */
+const MarkeKontext = createContext("sb-marke");
+
+/** Die Marke der offenen Seite (components/motion/GleitMarke). */
+function Marke() {
+  const id = useContext(MarkeKontext);
+  const pathname = usePathname();
+  return <GleitMarke id={id} folge={pathname} />;
 }
 
 /**
@@ -158,15 +175,25 @@ function RowFace({ item, active }: { item: ShellNavItem; active: boolean }) {
   if (item.wordmark) {
     return (
       <span className="flex min-w-0 flex-1 items-center">
-        <DeepFightWordmark className="!gap-[16px] truncate" />
+        {/* Das Funkeln ist ~14 px breit, die Symbole 20: 3 px Einzug stellen
+            es auf dieselbe Mitte (eingeklappt sieht man genau das), 13 px
+            Abstand halten den Schriftzug auf der Textkante 30 px.
+            GEKÜRZT WIRD NUR DER SCHRIFTZUG, nie die ganze Marke: Eingeklappt
+            wächst das Funkeln über seine Box hinaus, und ein `truncate` an
+            der Marke schnitt es ab (Leon 30.09.: „das AI-Symbol ist
+            abgeschnitten"). */}
+        <DeepFightWordmark
+          className="sb-wortmarke min-w-0 !gap-[13px] [&>img]:ml-[3px]"
+          textClassName="sb-text min-w-0 truncate"
+        />
       </span>
     );
   }
   return (
     <>
       <span
-        className="flex shrink-0 items-center"
-        style={{ color: active ? "var(--accent-text)" : "var(--text-3)" }}
+        className="sb-symbol flex shrink-0 items-center"
+        style={{ color: active ? "var(--accent-text)" : "var(--sb-symbol)" }}
       >
         <Icon
           name={item.icon ?? "hash"}
@@ -174,7 +201,7 @@ function RowFace({ item, active }: { item: ShellNavItem; active: boolean }) {
           strokeWidth={1.5}
         />
       </span>
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <span className="sb-text min-w-0 flex-1 truncate">{item.label}</span>
     </>
   );
 }
@@ -196,10 +223,11 @@ function NavRow({
       href={item.href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
-      className={`flex items-center${active ? " sb-loupe" : ""}`}
+      className="flex items-center"
       style={{ ...rowStyle(active, hover), gap: "var(--sb-gap)" }}
       {...handlers}
     >
+      {active && <Marke />}
       <RowFace item={item} active={active} />
     </Link>
   );
@@ -239,10 +267,11 @@ function NavGroupRow({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`flex w-full items-center text-left${marked ? " sb-loupe" : ""}`}
+        className="flex w-full items-center text-left"
         style={{ ...rowStyle(marked, hover), gap: "var(--sb-gap)" }}
         {...handlers}
       >
+        {marked && <Marke />}
         <RowFace item={item} active={childActive} />
         {/* Aufklapp-Zeichen, KEIN Pfeil: Ein „→" liest sich als „dorthin
             gehen", und die Zeile führt nirgendwohin — sie klappt auf. Der
@@ -250,7 +279,7 @@ function NavGroupRow({
             (nach unten) auf das, was darunter steht. */}
         <span
           aria-hidden
-          className="shrink-0"
+          className="sb-text shrink-0"
           style={{
             color: "var(--text-3)",
             transform: open ? "rotate(0deg)" : "rotate(-90deg)",
@@ -315,17 +344,18 @@ function ChildRow({
       href={href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
-      className={`flex items-center${active ? " sb-loupe" : ""}`}
+      className="flex items-center"
       style={{ ...rowStyle(active, hover), gap: "var(--sb-gap)" }}
       {...handlers}
     >
+      {active && <Marke />}
       <span
-        className="flex shrink-0 items-center"
-        style={{ color: active ? "var(--accent-text)" : "var(--text-3)" }}
+        className="sb-symbol flex shrink-0 items-center"
+        style={{ color: active ? "var(--accent-text)" : "var(--sb-symbol)" }}
       >
         <Icon name="hash" size={20} strokeWidth={1.5} />
       </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="sb-text min-w-0 flex-1 truncate">{label}</span>
     </Link>
   );
 }
@@ -338,8 +368,9 @@ function ChildRow({
  *    offen. Sie sind keine Rubriken, sondern das eigene Konto.
  *  • Rechte-Gruppe MIT Übersichtsseite (`href`) — der TITEL SELBST ist der
  *    Weg zum Bereichs-Dashboard (Leon 01.09. abends: „Übersicht" fällt als
- *    Menüpunkt weg), und der Klick klappt die Rubrik zugleich auf. Der
- *    kleine Pfeil ist die Erkennbarkeit — auf dem Handy gibt es kein Hover.
+ *    Menüpunkt weg), und der Klick klappt die Rubrik zugleich auf. Seit
+ *    30.09. OHNE Pfeil und eine Stufe größer (Leon: „sieht etwas klein aus
+ *    … die Pfeile weg") — die getönte Rubrik-Fläche ist Zeichen genug.
  *  • Rechte-Gruppe OHNE Übersichtsseite (Verwaltung/Plattform, bis ihre
  *    Dashboards gebaut sind) — der Klick klappt nur auf und zu (Winkel
  *    statt Pfeil: die Zeile führt noch nirgendwohin). Sobald die Seiten
@@ -369,10 +400,40 @@ function GroupHeading({
 }) {
   const { hover, handlers } = useHover();
   if (!group.label) return null;
-  if (!group.area) return <div style={HEADING}>{group.label}</div>;
+  // Eingeklappt steht über einer persönlichen Gruppe ein kurzer Strich statt
+  // der Überschrift — er trennt, ohne einen Namen zu behaupten. Die Höhe der
+  // Zeile bleibt, damit kein Symbol darunter beim Klappen springt.
+  if (!group.area)
+    return (
+      <div style={{ ...HEADING, position: "relative" }}>
+        <span className="sb-text block overflow-hidden">{group.label}</span>
+        <span aria-hidden className="sb-rail-zeichen">
+          <span
+            style={{
+              width: "16px",
+              height: "1.5px",
+              borderRadius: "1px",
+              background: "var(--line)",
+            }}
+          />
+        </span>
+      </div>
+    );
+
+  // Eingeklappt trägt eine Rechte-Rubrik ihren Anfangsbuchstaben auf der
+  // Symbolspalte — in ihrer Bereichsfarbe, aber nie NUR über die Farbe
+  // unterschieden (T, V, P).
+  const railZeichen = (
+    <span aria-hidden className="sb-rail-zeichen" style={{ letterSpacing: 0 }}>
+      {group.label.slice(0, 1)}
+    </span>
+  );
 
   const base: React.CSSProperties = {
     ...HEADING,
+    // Rubrik-Titel eine Stufe über den persönlichen Überschriften (Leon
+    // 30.09.: „das Textfeld Verwaltung sieht etwas klein aus").
+    font: "var(--type-nav-rubrik)",
     position: "relative",
     padding: "6px var(--sb-row-x)",
     marginTop: "-6px",
@@ -395,44 +456,37 @@ function GroupHeading({
           onPeek(group.id);
           onNavigate?.();
         }}
-        className={`flex items-center justify-between gap-2${active ? " sb-loupe" : ""}`}
+        className="flex items-center justify-between gap-2"
         style={{
           ...base,
+          isolation: "isolate",
           color: active
             ? "var(--accent-text)"
             : hover
               ? "var(--text-body)"
               : "var(--text-label)",
-          // Auf der eigenen Übersichtsseite ist der TITEL das aktive Feld —
-          // dieselbe Glas-Lupe wie bei den Menüpunkten (.sb-loupe), mit
-          // derselben seitlichen Ausdehnung. Er ragt dabei bewusst über die
-          // getönte Rubrik-Box hinaus, genau wie die gepoppten Zeilen.
+          // Auf der eigenen Übersichtsseite wird der TITEL zum Feld — in der
+          // Höhe einer aktiven Menüzeile (Leons Einwand 02.09.: „wenn ich
+          // auf Trainer klicke, verliert der Rahmen an Höhe"). Es schließt
+          // oben BÜNDIG mit der Rubrik-Box ab (-8 px = ihre obere
+          // Polsterung) und seitlich mit ihren Kanten (--sb-pop ist in den
+          // Boxen 0) — Leon 30.09.: „der Rahmen des Ausgewählten passt nicht
+          // mit dem Rahmen darunter zusammen", als es 2 px darüber hinausragte.
           ...(active
             ? {
-                // PRAKTISCH DIESELBE HÖHE WIE EINE AKTIVE MENÜZEILE (Leons
-                // Einwand 02.09.: „wenn ich auf Trainer klicke, verliert
-                // der Rahmen an Höhe"): Der Titel ist flacher als eine
-                // Zeile — ohne diese Polsterung wäre seine Lupe niedriger
-                // als die, von der man gerade kommt. Oben bewusst 2 px
-                // weniger als unten: Der negative obere Rand hält den Text
-                // an seinem Platz, und ein voller Auszug nach oben drückte
-                // die Lupe ans Konto-Feld darüber (Leons zweiter Einwand).
-                margin: "-10px calc(var(--sb-pop) * -1) 0",
+                margin: "-8px calc(var(--sb-pop) * -1) 0",
                 padding:
-                  "10px calc(var(--sb-row-x) + var(--sb-pop)) calc(var(--sb-row-y) + 2px)",
+                  "8px calc(var(--sb-row-x) + var(--sb-pop)) calc(var(--sb-row-y) + 2px)",
                 borderRadius: "var(--r-nav-lg)",
-                // Auch der Titel liest sich in der Lupe eine Stufe größer.
                 font: "var(--type-nav-heading-active)",
-                zIndex: 1,
               }
             : null),
         }}
         {...handlers}
       >
-        <span className="min-w-0 truncate">{group.label}</span>
-        <span aria-hidden className="flex shrink-0 items-center">
-          <Icon name="arrow-right" size={14} strokeWidth={2.2} />
-        </span>
+        {active && <Marke />}
+        <span className="sb-text min-w-0 truncate">{group.label}</span>
+        {railZeichen}
       </Link>
     );
   }
@@ -449,10 +503,10 @@ function GroupHeading({
       }}
       {...handlers}
     >
-      <span className="min-w-0 truncate">{group.label}</span>
+      <span className="sb-text min-w-0 truncate">{group.label}</span>
       <span
         aria-hidden
-        className="flex shrink-0 items-center"
+        className="sb-text flex shrink-0 items-center"
         style={{
           transform: open ? "rotate(0deg)" : "rotate(-90deg)",
           transition: "transform 200ms var(--ease-out)",
@@ -460,6 +514,7 @@ function GroupHeading({
       >
         <Icon name="chevron-down" size={15} strokeWidth={2} />
       </span>
+      {railZeichen}
     </button>
   );
 }
@@ -483,10 +538,10 @@ function ActionRow({
       style={{ ...rowStyle(false, hover), gap: "var(--sb-gap)" }}
       {...handlers}
     >
-      <span className="flex shrink-0 items-center" style={{ color: "var(--text-3)" }}>
+      <span className="flex shrink-0 items-center" style={{ color: "var(--sb-symbol)" }}>
         <Icon name={icon} size={20} strokeWidth={1.5} />
       </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="sb-text min-w-0 flex-1 truncate">{label}</span>
     </button>
   );
 }
@@ -511,9 +566,11 @@ function personInitials(name: string): string {
 function AccountBlock({
   onNavigate,
   onLogout,
+  onPanel,
 }: {
   onNavigate?: () => void;
   onLogout: () => void;
+  onPanel?: (offen: boolean) => void;
 }) {
   const pathname = usePathname();
   const { profile } = useAuth();
@@ -521,11 +578,19 @@ function AccountBlock({
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const { hover, handlers } = useHover();
+  const markeId = useContext(MarkeKontext);
 
   const name = profile?.displayName?.trim() || "Fighter";
 
   // Ein Seitenwechsel schließt das Panel — sonst stünde es über der neuen Seite.
   useEffect(() => setOpen(false), [pathname]);
+
+  // Solange das Panel offen ist, bleibt die Desktop-Leiste ausgeklappt —
+  // sonst klappte sie unter dem Panel weg, sobald die Maus kurz über ihren
+  // Rand rutscht.
+  useEffect(() => {
+    onPanel?.(open);
+  }, [open, onPanel]);
 
   // Klick daneben und Escape schließen. Ohne das bliebe das Panel offen, bis
   // jemand zufällig wieder den Konto-Block trifft.
@@ -554,26 +619,28 @@ function AccountBlock({
         aria-haspopup="menu"
         className="flex w-full items-center gap-3 text-left"
         style={{
-          padding: "8px",
+          // Links rückt das Profilbild eingeklappt auf die Mitte der
+          // Symbolspalte (`--sb-konto-x`, globals.css `.staff-huelle`).
+          padding: "8px 8px 8px var(--sb-konto-x, 8px)",
           borderRadius: "var(--r-nav-lg)",
           background: open || hover ? "var(--sb-hover)" : "transparent",
-          transition: "background-color 200ms var(--ease-out)",
+          transition:
+            "background-color 200ms var(--ease-out), padding 260ms var(--ease-out)",
         }}
         {...handlers}
       >
-        <span
-          aria-hidden
-          className="flex h-10 w-10 shrink-0 items-center justify-center"
+        <Profilbild
+          avatar={profile?.avatar}
+          kuerzel={personInitials(name)}
           style={{
             borderRadius: "var(--r-nav)",
             background: "var(--accent)",
+            border: "none",
             color: "var(--on-accent)",
             font: "600 15px/1 var(--font-body)",
           }}
-        >
-          {personInitials(name)}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        />
+        <span className="sb-text flex min-w-0 flex-1 flex-col gap-0.5">
           <span
             className="truncate"
             style={{ font: "var(--type-nav-active)", color: "var(--text-body)" }}
@@ -589,7 +656,7 @@ function AccountBlock({
         </span>
         <span
           aria-hidden
-          className="shrink-0"
+          className="sb-text shrink-0"
           style={{
             color: "var(--text-3)",
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
@@ -614,6 +681,7 @@ function AccountBlock({
             animation: "sb-pop 100ms var(--ease-out)",
           }}
         >
+          <MarkeKontext.Provider value={`${markeId}-konto`}>
           <div className="flex flex-col gap-0.5">
             {SHELL_ACCOUNT_ITEMS.map((item) => (
               <NavRow
@@ -636,6 +704,7 @@ function AccountBlock({
                 keiner. */}
             <ActionRow icon="logout" label="Abmelden" onClick={onLogout} />
           </div>
+          </MarkeKontext.Provider>
         </div>
       )}
     </div>
@@ -658,9 +727,17 @@ function groupContains(group: ShellNavGroup, pathname: string): boolean {
 
 export default function StaffSidebar({
   onNavigate,
+  onPanel,
+  angeheftet = false,
+  onAnheften,
 }: {
   /** Schließt die Schublade auf dem Handy. Am Desktop nicht gesetzt. */
   onNavigate?: () => void;
+  /** Meldet das offene Konto-Panel — hält die Desktop-Leiste ausgeklappt. */
+  onPanel?: (offen: boolean) => void;
+  /** Nur am Desktop mit Maus: Leiste angeheftet? Fehlt → kein Knopf. */
+  angeheftet?: boolean;
+  onAnheften?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -724,6 +801,7 @@ export default function StaffSidebar({
   }
 
   return (
+    <MarkeKontext.Provider value={onNavigate ? "sb-marke-schublade" : "sb-marke-leiste"}>
     <div
       className="flex h-full w-full flex-col"
       // KEINE eigene Fläche mehr: Das Glas sitzt am Behälter (Sidebar am
@@ -731,7 +809,7 @@ export default function StaffSidebar({
       // noch eine deckende Farbe, wäre die Milchscheibe darunter wirkungslos.
       style={{ padding: "var(--sb-pad)" }}
     >
-      <AccountBlock onNavigate={onNavigate} onLogout={handleLogout} />
+      <AccountBlock onNavigate={onNavigate} onLogout={handleLogout} onPanel={onPanel} />
 
       {/* NUR IN DER SCHUBLADE (Handy): die Suche der ganzen App (Leon
           19.09.2026). Am Desktop sitzt sie als Lupe im Kopf der Hülle —
@@ -861,22 +939,65 @@ export default function StaffSidebar({
             Symbol darin ist mit 26 px bewusst deutlich größer als die 18 px
             der Menüzeilen, damit es als Schalter und nicht als Menüpunkt
             gelesen wird. */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={
-            theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
-          }
-          className="t-interactive flex h-11 w-11 items-center justify-center"
+        {/* Der Einzug sitzt an einer Hülle und nicht am Knopf: `t-interactive`
+            bringt eine eigene Transition mit, die ein Inline-Wert ersetzen
+            würde. Symbolmitte = Mitte der Menü-Symbole, offen wie
+            eingeklappt. */}
+        <div
+          className="flex items-center justify-between"
           style={{
-            borderRadius: "var(--r-nav)",
-            color: "var(--text-2)",
-            marginLeft: "calc(var(--sb-row-x) - 10px)",
+            paddingLeft: "calc(var(--sb-row-x) - 12px)",
+            // Rechts auf der Kante der Pfeile in den Rubrik-Titeln.
+            paddingRight: "4px",
+            transition: "padding-left 260ms var(--ease-out)",
           }}
         >
-          <Icon name={theme === "dark" ? "sun" : "moon"} size={28} strokeWidth={1.6} />
-        </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "dark" ? "Helles Design aktivieren" : "Dunkles Design aktivieren"
+            }
+            className="t-interactive flex h-11 w-11 items-center justify-center"
+            style={{
+              borderRadius: "var(--r-nav)",
+              color: "var(--text-2)",
+            }}
+          >
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={28} strokeWidth={1.6} />
+          </button>
+          {/* ANHEFTEN (Leon 30.09.2026): Angeheftet bleibt die Leiste offen,
+              und die Seiten rücken zur Seite und nutzen den Rest — statt dass
+              sie beim Überfahren über dem Inhalt liegt. Er steht nur, wenn
+              die Leiste offen ist (eingeklappt blendet `sb-text` ihn aus);
+              schräg heißt „lose", aufrecht und in Akzentfarbe „angeheftet". */}
+          {onAnheften && (
+            <button
+              type="button"
+              onClick={onAnheften}
+              aria-pressed={angeheftet}
+              aria-label={angeheftet ? "Menü lösen" : "Menü anheften"}
+              title={angeheftet ? "Menü lösen" : "Menü anheften"}
+              className="sb-text t-interactive flex h-9 w-9 shrink-0 items-center justify-center"
+              style={{
+                borderRadius: "var(--r-nav)",
+                color: angeheftet ? "var(--accent-text)" : "var(--sb-symbol)",
+              }}
+            >
+              <span
+                className="flex"
+                style={{
+                  transform: angeheftet ? "rotate(0deg)" : "rotate(45deg)",
+                  transition: "transform 260ms var(--ease-pop)",
+                }}
+              >
+                <Icon name="pin" size={18} strokeWidth={1.8} />
+              </span>
+            </button>
+          )}
+        </div>
         <p
+          className="sb-text overflow-hidden"
           style={{
             padding: "10px var(--sb-row-x) 0",
             font: "var(--type-nav-meta)",
@@ -888,5 +1009,6 @@ export default function StaffSidebar({
         </p>
       </div>
     </div>
+    </MarkeKontext.Provider>
   );
 }

@@ -443,7 +443,24 @@
    eine Idee massiger: Breite 288 → 304, Menü-Typo 15 → 16, Symbole 18 → 20,
    Kopf 56 → 64. Bewusst EINE Stufe, nicht zwei — „es fehlt nicht viel". */
 :root {
-  --sb-w: 304px;            /* Sidebar-Breite (war 260 → 288) */
+  --sb-w: 304px;            /* Sidebar-Breite offen (war 260 → 288) */
+  /* EINGEKLAPPT (Leon 30.09.): die Symbolspalte — erst 80 px, am selben Tag
+     auf Leons Wunsch „noch etwas breiter" 88 px. NUR diese Zahl ändern: Die
+     Einzüge darunter rechnen sich daraus, damit Symbole (20 px) und
+     Profilbild (40 px) immer auf der Mitte der Spalte stehen. */
+  --sb-w-rail: 88px;
+  /* Eingeklappt stehen die Symbole GRÖSSER (Leon 30.09.) — als Vergrößerung
+     über `scale`, nicht über die Box: Wüchse die Box, würde jede Zeile
+     höher und alles darunter spränge beim Klappen. 20 px × 1,4 = 28 px (erst 1,2 — Leon: „auch größer"). */
+  --sb-symbol-rail: 1.4;
+  --sb-row-x-rail: calc((var(--sb-w-rail) - var(--sb-pad) * 2 - var(--sb-icon)) / 2);
+  --sb-konto-x-rail: calc((var(--sb-w-rail) - var(--sb-pad) * 2 - 40px) / 2);
+  /* Die Bewegung der Leiste UND des Kopfs, der ihr folgt — EINE Kurve für
+     beide, sonst liefe der Abstand zwischen ihnen mitten in der Bewegung
+     auseinander. Weich auslaufend, ohne Überschwingen: Eine Breite, die
+     nachfedert, bricht bei jedem Schwinger die Zeilen neu um. */
+  --ease-shell: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-shell: 340ms;
   --sb-pad: 12px;           /* Innenabstand */
   --sb-row-y: 10px;         /* Zeilenpolsterung senkrecht (war 7 → 9) */
   --sb-row-x: 12px;         /* Zeilenpolsterung waagerecht (war 10) */
@@ -452,11 +469,8 @@
   --r-nav: 8px;             /* Menüpunkt, Panel-Zeile (war 6) */
   --r-nav-lg: 10px;         /* Konto-Zeile, Aufklapp-Panel (war 8) */
   --r-kbd: 4px;             /* Tastenkürzel-Feld (vorerst ungenutzt, §5.3) */
-  /* Das aufgeploppte Feld des AKTIVEN Menüpunkts (Leon 02.09.: „ein
-     kleines bisschen größer aufploppen, solange ich darin bin" — Optik als
-     Glas-Lupe, siehe .sb-loupe weiter unten). Es wächst über negative
-     Seitenränder um --sb-pop über die Nachbarzeilen hinaus und zoomt
-     zusätzlich leicht (scale in .sb-loupe). */
+  /* Das Feld der OFFENEN Seite ploppt um --sb-pop über die Nachbarzeilen
+     hinaus (Leon 02.09., am 30.09. bestätigt: „wie am Anfang"). */
   --sb-pop: 3px;
   /* Freiraum, den Menü-Scroller und Klapp-Behälter dem gepoppten Feld
      lassen: Beide sind CLIP-KANTEN (overflow) — ohne diesen ausgleichenden
@@ -470,7 +484,12 @@
      Zeilen (Leon 02.09.) — das ist die eigentliche Vergrößerung der Lupe;
      das scale(1.02) obendrauf liefert nur den Zoom-Moment. */
   --type-nav-active: 500 17px/1.25 var(--font-body);
-  --type-nav-heading-active: 600 17px/1.2 var(--font-body);
+  --type-nav-heading-active: 600 20px/1.2 var(--font-body);
+  /* Die OFFENE Seite in der Sidebar: deutlich größer als die ruhenden
+     16-px-Zeilen (Leon 30.09.: „schriftlich größer", dann „noch größer" —
+     18 → 20 px). Zeilenhöhe fest auf 22 px, damit das Feld nur um wenige
+     Pixel wächst und die Nachbarn kaum rücken. */
+  --type-nav-aktuell: 600 20px/22px var(--font-body);
   /* GRÖSSER ALS DIE PUNKTE DARUNTER (Leon 01.09.: „ich versteh nicht, wieso du
      die Texte darunter größer als die eigentliche Überschrift machst"). Vorher
      stand hier 11 px über 15-px-Zeilen — eine Überschrift, die kleiner ist als
@@ -479,7 +498,17 @@
      aber deutlich darüber. Die gedämpfte Farbe (--text-label) hält sie
      trotzdem im Hintergrund. */
   --type-nav-heading: 600 16px/1.2 var(--font-body);
+  /* Die Titel der Rechte-Rubriken (Trainer, Verwaltung, Plattform) — eine
+     Stufe größer als „Mein Training"/„Lernen" (Leon 30.09.: „sieht etwas
+     klein aus"). Auf der eigenen Übersichtsseite gilt
+     --type-nav-heading-active (20 px). */
+  --type-nav-rubrik: 600 18px/1.2 var(--font-body);
   --type-nav-meta: 400 13px/1.2 var(--font-body);
+  /* Farbe der Menü-Symbole. Im Dunkeln die gedämpfte dritte Stufe; im
+     Hellen war die zu blass (Leon 30.09.: „können noch dunkler werden") —
+     dort tragen die Symbole dieselbe Stufe wie ihre Beschriftung, siehe
+     :root[data-theme="light"] direkt unter diesem Block. */
+  --sb-symbol: var(--text-3);
   /* Bei 15 px trägt die Laufweite der Vorlage (0.025em) zu weit auf — sie
      war für 13 px gedacht. Überschriften bleiben weit, sie sind Versalien. */
   --ls-nav: 0.01em;
@@ -981,7 +1010,7 @@ header:has([data-app-suche="kopf"] [data-open]) .kopf-neben {
 }
 /* DIE GLAS-KAPSEL HINTER DEM GEWÄHLTEN EINTRAG (Leon 19.09.2026: „etwas wie
  * links in der Navbar, aber dezenter … nicht genau gleich, aber passend").
- * Material der Sidebar-Lupe (`.sb-loupe`): Milchglas mit Lichtkante oben und
+ * Material der früheren Sidebar-Lupe (bis 30.09.): Milchglas mit Lichtkante oben und
  * eine Haarlinie, die den Akzent mit der Glaskante mischt. Leiser als dort:
  * Leon 19.09.2026, zweiter Blick: „noch dezenter" — Akzentanteil im Ring 8 %
  * (Sidebar 28 %), Fläche 18 %, Lichtkante gedämpft, KEIN
@@ -2200,33 +2229,170 @@ header:has([data-app-suche="kopf"] [data-open]) .kopf-neben {
   mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
 }
 
-/* Das AKTIVE Feld der Sidebar als GLAS-LUPE (Leon 02.09., Vorlage: die
-   iOS-Textlupe beim Textauswählen): Milchglas über dem Menü, Randring mit
-   Lichtkante oben, weicher Schatten und ein leichter Zoom. Fläche, Ring und
-   Schatten kommen aus den Glas-Tokens des Systems und folgen damit beiden
-   Themes und jedem Gym-Akzent. Der Ring liegt als Innen-Schatten an und
-   nicht als border — ein Rahmen würde die Zeile um seine Breite verschieben.
-   Ränder, Polsterung und transform stehen in der Zeilen-Transition
-   (StaffSidebar, ROW_BASE), damit die Lupe mit der Feder-Kurve aufploppt. */
-.sb-loupe {
-  background:
-    linear-gradient(180deg, var(--glass-highlight), transparent 55%),
-    color-mix(in oklab, var(--surface-raised) 45%, transparent);
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  /* Der Rahmen spricht die Sprache des Redesigns, nicht Apples (Leons
-     Revision 02.09., zweite Korrektur: „noch bisschen too much — reduziere
-     etwas"): eine feine Haarlinie, die den Akzent mit der Glas-Kante
-     mischt, die bekannte Lichtkante oben und NUR das weiche Akzent-Glühen
-     der Primär-Knöpfe (--accent-glow) — der große Glas-Schatten ist raus,
-     er machte aus der Zeile eine schwebende Karte. In den Rechte-Rubriken
-     färbt sich die Kante über data-area automatisch mit (Bernstein/Karmin).
-     Kein border — der würde die Zeile um seine Breite verschieben. */
+/* DIE OFFENE SEITE IN DER SIDEBAR — DAS FARBFELD (Leon 30.09.2026).
+   Geschichte: 02.09. Glas-Lupe mit Akzentring und Glühen → 30.09. „gefällt
+   mir nicht so" → drei flache Marken (Kapsel, Symbol-Chip, Lichtpunkt):
+   „alle 3 nicht gut, eher wie am Anfang, Schrift größer" → drei Felder
+   (Milchglas-Karte, Farbfeld, Verlaufskante): „E sieht gut aus".
+   Ein FELD um die ganze Zeile, das ein Stück über die Nachbarn hinausragt
+   (Zeile: --sb-pop, rowStyle), mit großer Schrift (--type-nav-aktuell). Es
+   ist in der Bereichsfarbe getönt — Gym-Akzent, Verwaltung Bernstein,
+   Plattform Karmin, über data-area von selbst — und läuft nach rechts aus:
+   am Symbol kräftig, am Zeilenende leise. Keine Kante, nur eine Lichtkante
+   oben und ein Schein in derselben Farbe darunter. Beim Seitenwechsel
+   GLEITET es zur neuen Zeile (components/motion/GleitMarke); eingeklappt
+   ist es das Quadrat um das große Symbol. */
+.sb-marke {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-nav-lg);
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--accent) 34%, transparent),
+    color-mix(in oklab, var(--accent) 10%, transparent)
+  );
   box-shadow:
-    inset 0 0 0 1px color-mix(in oklab, var(--accent) 28%, var(--glass-border)),
-    inset 0 1px 0 var(--glass-highlight),
-    var(--accent-glow);
-  transform: scale(1.01);
+    inset 0 1px 0 color-mix(in oklab, var(--accent-text) 25%, transparent),
+    0 8px 18px -10px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
+/* ─── DIE LEISTE KLAPPT EIN (Leon 30.09.2026) ────────────────────────────────
+ *
+ * „Wenn man drüber hovert, klappt sie aus — ohne Maus verkürzt sie sich, und
+ * die Leiste oben zieht nach, so dass der Abstand zwischen beiden immer gleich
+ * bleibt."
+ *
+ * DREI ZUSTÄNDE am Behälter der Hülle (`data-sb`, gesetzt in StaffShell):
+ *   zu    — Symbolspalte, der Kopf reicht bis an sie heran
+ *   offen — beim Überfahren ausgeklappt ÜBER dem Inhalt, der Kopf weicht um
+ *           genau die Differenz zurück
+ *   fest  — angeheftet (Knopf unten in der Leiste) oder ein Gerät ohne Maus:
+ *           Die Leiste steht offen IM FLUSS, die Seiten rücken zur Seite
+ *
+ * BEIM ÜBERFAHREN BEWEGT SICH DER INHALT NIE. Im Fluss steht dann die Breite
+ * der Symbolspalte (`--sb-platz`); die offene Leiste legt sich DARÜBER. Liefe
+ * der Inhalt mit, sprängen Text und Karten bei jedem zufälligen Streifen des
+ * Menüs hin und her. Nur der Kopf folgt — über seinen linken Rand, den
+ * `--hd-links` rechnet. Erst das bewusste Anheften gibt den Seiten die Breite.
+ */
+:root[data-theme="light"] { --sb-symbol: var(--text-2); }
+
+/* IN DEN GETÖNTEN RUBRIK-BOXEN ragt das Feld der offenen Seite NICHT über
+   den Rand (Leon 30.09.: „der Rahmen des Ausgewählten passt nicht mit dem
+   Rahmen darunter zusammen"). Zwei Kanten, die 3 px nebeneinander laufen,
+   lesen sich als Versehen; bündig wird das Feld zum Band der Box. In den
+   persönlichen Gruppen ohne Box bleibt das Aufploppen. */
+.sb-leiste [data-area],
+[role="dialog"] [data-area] { --sb-pop: 0px; }
+
+.staff-huelle {
+  --sb-platz: var(--sb-w-rail);
+  --sb-jetzt: var(--sb-w-rail);
+  --hd-links: calc(var(--shell-gap) + var(--sb-jetzt) - var(--sb-platz));
+}
+.staff-huelle[data-sb="offen"] { --sb-jetzt: var(--sb-w); }
+.staff-huelle[data-sb="fest"] {
+  --sb-platz: var(--sb-w);
+  --sb-jetzt: var(--sb-w);
+}
+
+.sb-leiste {
+  width: var(--sb-jetzt);
+  transition:
+    width var(--dur-shell) var(--ease-shell),
+    box-shadow var(--dur-shell) var(--ease-shell);
+}
+/* Offen liegt sie ÜBER dem Inhalt — der tiefere Schatten sagt das. */
+.staff-huelle[data-sb="offen"] .sb-leiste {
+  box-shadow: var(--shadow-pop), inset 0 1px 0 var(--glass-highlight);
+}
+.hd-folgt {
+  transition: margin-left var(--dur-shell) var(--ease-shell);
+}
+/* Beim Anheften wächst der Platz im Fluss mit derselben Kurve, mit der der
+   Kopf seinen Rand zurücknimmt — die Kante des Kopfs bleibt dabei stehen,
+   nur der Inhalt rückt einmal zur Seite. */
+.sb-platz {
+  transition: width var(--dur-shell) var(--ease-shell);
+}
+
+/* Eingeklappt rücken die Zeilen ein, bis das Symbol mittig steht. Die Zeilen
+   tragen `padding` schon in ihrer Transition (ROW_BASE) — der Tausch des
+   Tokens bewegt sie also mit. */
+.staff-huelle[data-sb="zu"] .sb-leiste {
+  --sb-row-x: var(--sb-row-x-rail);
+  --sb-konto-x: var(--sb-konto-x-rail);
+}
+
+/* Die Symbole wachsen eingeklappt. `scale` statt `transform`: Das Funkeln
+   der Wortmarke trägt schon ein Inline-`transform`, das sonst verloren
+   ginge. */
+.sb-leiste .sb-symbol,
+.sb-leiste .sb-wortmarke > img {
+  transition: scale var(--dur-shell) var(--ease-shell);
+}
+.staff-huelle[data-sb="zu"] .sb-leiste .sb-symbol,
+.staff-huelle[data-sb="zu"] .sb-leiste .sb-wortmarke > img,
+.staff-huelle[data-sb="zu"] .sb-leiste .sb-rail-zeichen {
+  scale: var(--sb-symbol-rail);
+}
+
+/* Beschriftungen blenden aus, das Symbol bleibt. Beim Zuklappen gehen sie
+   SOFORT, beim Aufklappen erst, wenn Platz da ist — sonst liefe der Text
+   sichtbar gegen die wandernde Kante. `clip` statt „…": Die Schrift wird von
+   der Kante freigelegt und nicht Buchstabe um Buchstabe ersetzt. */
+.sb-text {
+  white-space: nowrap;
+  text-overflow: clip;
+  transition: opacity 200ms var(--ease-out) 110ms;
+}
+.staff-huelle[data-sb="zu"] .sb-leiste .sb-text {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease-out);
+}
+
+/* Das Gegenstück: Zeichen, die NUR eingeklappt stehen — der Anfangsbuchstabe
+   einer Rechte-Rubrik, der Strich über einer persönlichen Gruppe. Sie sitzen
+   auf der Symbolspalte, damit die Leiste auch schmal eine Ordnung hat. */
+.sb-rail-zeichen {
+  position: absolute;
+  top: 50%;
+  left: var(--sb-row-x);
+  width: var(--sb-icon);
+  display: flex;
+  justify-content: center;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 160ms var(--ease-out),
+    left var(--dur-shell) var(--ease-shell),
+    scale var(--dur-shell) var(--ease-shell);
+}
+/* In den getönten Rubrik-Boxen sitzt der Titel 2 px über der Mitte (oben
+   8 px Polsterung, unten 6) — der Buchstabe rückt auf die Mitte der Box. */
+[data-area] .sb-rail-zeichen {
+  top: calc(50% + 2px);
+}
+.staff-huelle[data-sb="zu"] .sb-leiste .sb-rail-zeichen {
+  opacity: 1;
+  transition:
+    opacity 200ms var(--ease-out) 120ms,
+    left var(--dur-shell) var(--ease-shell),
+    scale var(--dur-shell) var(--ease-shell);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-leiste,
+  .sb-platz,
+  .hd-folgt,
+  .sb-text,
+  .sb-rail-zeichen,
+  .sb-leiste .sb-symbol,
+  .sb-leiste .sb-wortmarke > img { transition: none !important; }
 }
 
 @keyframes sb-pop {
@@ -3704,6 +3870,9 @@ h1, h2 { overflow-wrap: anywhere; }
  *
  * WARUM CONTAINER-QUERIES UND KEINE BILDSCHIRM-UMBRUCHPUNKTE: Ob sieben
  * Spalten passen, hängt nicht am Fenster, sondern am Platz NEBEN der Sidebar.
+ * (Seit 30.09. steht sie eingeklappt im Fluss und kostet nur noch 92 px —
+ * `--sb-w-rail` + `--shell-gap`; die Zahlen unten sind der Stand davor, die
+ * Abfrage misst ohnehin die Fläche.)
  * Die kostet 328 px (`--sb-w` + `--shell-gap`), und dieselben 1100 px Fenster
  * heißen für einen Athleten 1100 px Inhalt und für einen Trainer 772 px.
  * Gemessen am 02.09.: bei 1100 px Fenster in der Hülle stand das Raster mit

@@ -32,7 +32,9 @@ import StaffHeader from "@/components/shell/StaffHeader";
 import { KopfNavigationProvider } from "@/components/shell/KopfNavigation";
 import StaffSidebar from "@/components/shell/StaffSidebar";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const ANGEHEFTET_KEY = "ta-sidebar-angeheftet";
 
 export default function StaffShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -60,6 +62,63 @@ export default function StaffShell({ children }: { children: React.ReactNode }) 
     };
   }, [drawerOpen]);
 
+  // ─── Ein- und Ausklappen der Leiste (Leon 30.09.2026) ─────────────────────
+  // Offen ist sie, solange die Maus darauf steht, die Tastatur in ihr
+  // arbeitet oder ihr Konto-Panel offen ist. Mit HOVER-ABSICHT: Sie öffnet
+  // erst nach einem kurzen Verweilen und schließt mit etwas Nachlauf. Wer
+  // die Maus nur über den linken Rand zieht, soll kein Menü aufreißen, und
+  // wer kurz über die Kante rutscht, soll es nicht verlieren.
+  const leisteRef = useRef<HTMLElement>(null);
+  const [maus, setMaus] = useState(false);
+  const [fokus, setFokus] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const absicht = useCallback((drauf: boolean) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setMaus(drauf), drauf ? 110 : 260);
+  }, []);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  // Ohne feinen Zeiger (Tablet quer) gibt es kein Hover — die Leiste bliebe
+  // für immer zu. Dort steht sie deshalb offen, wie vor dem 30.09.
+  const [hatMaus, setHatMaus] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const pruefen = () => setHatMaus(mq.matches);
+    pruefen();
+    mq.addEventListener("change", pruefen);
+    return () => mq.removeEventListener("change", pruefen);
+  }, []);
+
+  // ANHEFTEN (Leon 30.09.): Angeheftet steht die Leiste offen IM FLUSS, die
+  // Seiten rücken zur Seite. Gemerkt im Browser — wer sie mag, heftet sie
+  // einmal an und hat sie überall so. Die Hülle wird erst nach dem Laden
+  // des Profils gezeigt (AppShell), der Server rendert sie nie: Den
+  // gespeicherten Wert gleich beim ersten Rendern zu lesen, erzeugt deshalb
+  // keinen Hydrations-Unterschied, und die Leiste springt nicht nach.
+  const [angeheftet, setAngeheftet] = useState(() => {
+    try {
+      return window.localStorage.getItem(ANGEHEFTET_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const anheften = useCallback(() => {
+    setAngeheftet((v) => {
+      try {
+        window.localStorage.setItem(ANGEHEFTET_KEY, v ? "0" : "1");
+      } catch {
+        // Ohne Speicher gilt es eben nur bis zum Neuladen.
+      }
+      return !v;
+    });
+  }, []);
+
+  const sbZustand =
+    !hatMaus || angeheftet ? "fest" : maus || fokus || panel ? "offen" : "zu";
+
   return (
     <>
       {/* Der Grund liegt HINTER allem und füllt das ganze Fenster (Leon
@@ -69,36 +128,65 @@ export default function StaffShell({ children }: { children: React.ReactNode }) 
           `.shell-ambient`. */}
       <div aria-hidden className="shell-ambient" />
 
-      <div className="relative z-10 flex flex-1">
+      <div className="staff-huelle relative z-10 flex flex-1" data-sb={sbZustand}>
       {/* Desktop: freistehende Sidebar (Leon 01.09.) — Rundung an allen Ecken,
           Abstand zum Bildschirmrand, eigener Scroller. FEST bleibt sie
           trotzdem: `sticky` mit demselben Abstand oben, den sie ringsum hat,
           und eine Höhe von genau einem Bildschirm minus der beiden Abstände.
           Vorher stieß sie stumpf an Rand und Kopf, und in der Ecke dazwischen
-          entstand ein toter Winkel ohne Radius. */}
-      <aside
-        // `t-glass` bringt Milchglas, Rahmen und Schatten aus dem Token-System
-        // mit (Leon 01.09.: „etwas durchsichtiger"). Radius und Lage werden
-        // überschrieben.
-        //
-        // SIE STEHT FREI, MIT ABSTAND RINGSUM (Leon 01.09.). Ein Zwischenstand
-        // hatte sie bündig an den Bildschirmrand gesetzt — das war falsch: Der
-        // Abstand ist es, der sie zu einem eigenen Element macht, und deshalb
-        // sind auch alle vier Ecken gerundet.
-        className="t-glass hidden shrink-0 self-start lg:block"
+          entstand ein toter Winkel ohne Radius.
+
+          SEIT 30.09. KLAPPT SIE EIN (Leon): Im Fluss steht nur dieser
+          Platzhalter in der Breite der Symbolspalte, die Leiste selbst liegt
+          absolut darin und wächst beim Überfahren ÜBER den Inhalt. Regeln
+          und Maße in globals.css unter `.staff-huelle`. */}
+      <div
+        className="sb-platz hidden shrink-0 self-start lg:block"
         style={{
           position: "sticky",
           top: "var(--shell-gap)",
-          width: "var(--sb-w)",
+          zIndex: 40,
+          width: "var(--sb-platz)",
           height: "calc(100vh - var(--shell-gap) * 2)",
           margin: "var(--shell-gap) 0 var(--shell-gap) var(--shell-gap)",
-          borderRadius: "var(--r-shell)",
-          // Ohne das ragten die Zeilen-Hover-Flächen über die runden Ecken.
-          overflow: "hidden",
         }}
       >
-        <StaffSidebar />
-      </aside>
+        <aside
+          ref={leisteRef}
+          // `t-glass` bringt Milchglas, Rahmen und Schatten aus dem
+          // Token-System mit (Leon 01.09.: „etwas durchsichtiger"). Radius
+          // und Lage werden überschrieben, die Breite kommt aus `.sb-leiste`.
+          className="sb-leiste t-glass"
+          aria-label="Menü"
+          onMouseEnter={() => absicht(true)}
+          onMouseLeave={() => absicht(false)}
+          onFocus={(e) => {
+            // NUR die Tastatur klappt über den Fokus auf. Ein Mausklick
+            // setzt den Fokus ebenfalls in die Leiste — hielte der sie
+            // offen, bliebe sie nach jedem Klick stehen, bis man woanders
+            // hinklickt.
+            if ((e.target as HTMLElement).matches(":focus-visible")) setFokus(true);
+          }}
+          onBlur={(e) => {
+            if (!leisteRef.current?.contains(e.relatedTarget as Node | null)) setFokus(false);
+          }}
+          style={{
+            position: "absolute",
+            inset: "0 auto 0 0",
+            borderRadius: "var(--r-shell)",
+            // Ohne das ragten die Zeilen-Hover-Flächen über die runden Ecken
+            // — und eingeklappt die ausgeblendeten Beschriftungen.
+            overflow: "hidden",
+          }}
+        >
+          <StaffSidebar
+            onPanel={setPanel}
+            angeheftet={angeheftet}
+            // Ohne Maus steht sie ohnehin offen — dort gäbe es nichts zu heften.
+            onAnheften={hatMaus ? anheften : undefined}
+          />
+        </aside>
+      </div>
 
       {/* Inhalt: `min-w-0`, sonst sprengt ein breites Kind (Tabelle, langes
           Wort) die Flex-Spalte statt zu schrumpfen. Der Kopf steht IN dieser
