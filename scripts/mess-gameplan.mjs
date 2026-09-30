@@ -349,7 +349,14 @@ async function anmelden(page, email) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL(/\/(dashboard|trainer|kampfprofil)/, { timeout: 30000 });
+  try {
+    await page.waitForURL(/\/(dashboard|trainer|kampfprofil)/, { timeout: 30000 });
+  } catch (err) {
+    // Was die Login-Seite im Fehlerfall zeigt — sonst sagt der Timeout nichts.
+    const text = await page.locator("body").innerText().catch(() => "");
+    console.log(`  Login ${email} hängt auf ${page.url()}: „${text.replace(/\s+/g, " ").slice(0, 300)}“`);
+    throw err;
+  }
   await page.waitForTimeout(1500);
 }
 
