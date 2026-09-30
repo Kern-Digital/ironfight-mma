@@ -4,8 +4,17 @@
  * Mitgliederbereich (Multi-Gym Phase 2, Konzept §4) — die Liste aller
  * Menschen im Gym mit den beiden Rechte-Häkchen.
  *
- * Aufbau im Token-Look nach app/verwaltung/einladungen/page.tsx:
- * Ambient-Kopf, `.t-card`-Zeilen, BTN_FONT, META_BASE/META_SIZE.
+ * Aufbau im Token-Look: Ambient-Kopf, `.t-card`-Zeilen im Raster der
+ * Athletenliste, Kennzahlen und Einladen-Symbol rechts neben der Überschrift.
+ *
+ * EINLADUNGEN WOHNEN HIER (Leon 30.09.2026: „die menüleiste einladungen kann
+ * auch weg … das ist ja jetzt unter mitglieder"). Über der Liste stehen die
+ * OFFENEN Einladungen — kopieren direkt an der Zeile, Notiz und Zurückziehen
+ * im Detail-Sheet. Aufgebrauchte, abgelaufene und zurückgezogene fehlen: Wer
+ * hier schaut, will wissen, welche Links gerade jemanden hereinlassen. Die
+ * alte Seite /verwaltung/einladungen leitet hierher um (next.config.mjs).
+ * Lesen wie gehabt nur die Verwaltung (Regel `gyms/{gymId}/invites`),
+ * geschrieben wird ausschließlich über /api/invites.
  *
  * RECHTE: Sichtbar nur für die Verwaltung. Ein Trainer ohne Verwaltungsrecht
  * kommt hier gar nicht an — die Middleware schickt ihn auf /dashboard
@@ -18,13 +27,24 @@
  */
 
 import GooeySearch from "@/components/ui/GooeySearch";
+import InviteCreateSheet from "@/components/InviteCreateSheet";
+import InviteDetailSheet from "@/components/InviteDetailSheet";
 import MemberRoleSheet from "@/components/MemberRoleSheet";
 import { SeitenZurueck } from "@/components/shell/KopfNavigation";
 import Icon from "@/components/ui/Icon";
-import { StaggerList } from "@/components/motion";
+import Select from "@/components/ui/Select";
+import { CountingNumber, FlowItem, StaggerFlow } from "@/components/motion";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth, useRights } from "@/lib/auth-context";
+import { copyText } from "@/lib/clipboard";
 import { resolveGymId } from "@/lib/gym";
+import {
+  formatInviteCode,
+  inviteJoinUrl,
+  inviteStatus,
+  listGymInvites,
+  type GymInvite,
+} from "@/lib/invites";
 import {
   MEMBER_GROUP_LABEL,
   memberGroupOf,
@@ -33,28 +53,47 @@ import {
   membershipShort,
   memberSince,
 } from "@/lib/members";
-import { rightsLabel } from "@/lib/roles";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-const BTN_FONT: React.CSSProperties = {
-  font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-};
-
-const META_BASE: React.CSSProperties = {
-  fontFamily: "var(--font-archivo), system-ui, sans-serif",
-  fontWeight: 600,
-  lineHeight: 1.3,
-  letterSpacing: "var(--ls-label)",
-  textTransform: "uppercase",
-};
-const META_SIZE = "text-[10px] sm:text-[13px]";
+import Profilbild from "@/components/ui/Profilbild";
 
 type MemberGroup = ReturnType<typeof memberGroupOf>;
 
 const GROUP_ORDER: MemberGroup[] = ["verwaltung", "trainer", "athlet"];
+
+/**
+ * Wie die Liste geordnet ist (Leon 29.09.2026, Stufe 1). „Aufgabe" statt
+ * „Rolle": Verwaltung und Trainer sind im Gym Aufgaben, kein Rang. Es ist
+ * der Standard und die alte Gruppierung.
+ *
+ * Alle vier kommen aus dem users-Dokument, das die Liste ohnehin lädt —
+ * keine einzige zusätzliche Abfrage. Sortieren nach Kampfstil und Rang
+ * (Stufe 2) wartet auf ein Graduierungs-Datenmodell; siehe Roadmap.
+ */
+type Sortierung = "aufgabe" | "neu" | "alt" | "name";
+
+const SORTIERUNGEN: { value: Sortierung; label: string }[] = [
+  { value: "aufgabe", label: "Nach Aufgabe" },
+  { value: "neu", label: "Neueste zuerst" },
+  { value: "alt", label: "Älteste zuerst" },
+  { value: "name", label: "Name A–Z" },
+];
+
+function nachName(a: StudentEntry, b: StudentEntry): number {
+  return memberName(a).localeCompare(memberName(b), "de", {
+    sensitivity: "base",
+  });
+}
+
+/** Beitritt als Zahl; ohne bekanntes Datum ans Ende, egal in welche Richtung. */
+function beitritt(m: StudentEntry): number | null {
+  return memberSince(m)?.getTime() ?? null;
+}
+
+/** „Leon Reichle" → „LR" — dieselbe Kachel wie in der Athletenliste. */
+function initialsOf(entry: StudentEntry): string {
+  const parts = memberName(entry).trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export default function TrainerMembersPage() {
   const { user, profile, profileLoading } = useAuth();
@@ -66,7 +105,76 @@ export default function TrainerMembersPage() {
   const [members, setMembers] = useState<StudentEntry[] | null>(null);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
+  const [sortierung, setSortierung] = useState<Sortierung>("aufgabe");
   const [detail, setDetail] = useState<StudentEntry | null>(null);
+  // Einladen direkt von hier (Leon 29.09.2026): Wer auf die Liste seiner
+  // Leute schaut, will als Nächstes oft jemanden dazuholen.
+  const [inviting, setInviting] = useState(false);
+  const [invites, setInvites] = useState<GymInvite[] | null>(null);
+  const [invitesError, setInvitesError] = useState(false);
+  const [inviteDetail, setInviteDetail] = useState<GymInvite | null>(null);
+  // Code, dessen Link gerade kopiert wurde (Symbol wechselt kurz auf „check")
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState(false);
+
+  const loadInvites = useCallback(() => {
+    if (!user || profileLoading || !isVerwaltung) return;
+    listGymInvites(gymId)
+      .then((list) => {
+        setInvites(list);
+        setInvitesError(false);
+      })
+      .catch(() => {
+        setInvites([]);
+        setInvitesError(true);
+      });
+  }, [user, profileLoading, isVerwaltung, gymId]);
+
+  useEffect(() => {
+    loadInvites();
+  }, [loadInvites]);
+
+  // Nur, was gerade jemanden hereinlässt; die Liste kommt schon neueste
+  // zuerst (listGymInvites).
+  const offeneEinladungen = useMemo(() => {
+    const jetzt = new Date();
+    return (invites ?? []).filter((i) => inviteStatus(i, jetzt) === "open");
+  }, [invites]);
+
+  // Die Verwaltungs-Übersicht verlinkt auf #einladungen. Der Abschnitt
+  // entsteht erst mit den Daten — der Browser findet den Anker beim Laden
+  // also noch nicht; deshalb einmal nachspringen, sobald er da ist.
+  const hatOffene = offeneEinladungen.length > 0;
+  useEffect(() => {
+    if (!hatOffene || window.location.hash !== "#einladungen") return;
+    document
+      .getElementById("einladungen")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [hatOffene]);
+
+  // „Einladen" auf der Verwaltungs-Übersicht kommt mit ?einladen=1 und
+  // öffnet das Sheet gleich. Gelesen aus `window` statt `useSearchParams`:
+  // Das verlangte eine Suspense-Grenze um die ganze Seite. Danach verschwindet
+  // der Parameter wieder, sonst öffnete ein Neuladen das Sheet erneut.
+  useEffect(() => {
+    if (!isVerwaltung) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("einladen") !== "1") return;
+    setInviting(true);
+    url.searchParams.delete("einladen");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [isVerwaltung]);
+
+  async function handleCopy(invite: GymInvite) {
+    const ok = await copyText(inviteJoinUrl(invite.code));
+    setCopyError(!ok);
+    if (!ok) return;
+    setCopiedCode(invite.code);
+    window.setTimeout(
+      () => setCopiedCode((c) => (c === invite.code ? null : c)),
+      2000,
+    );
+  }
 
   const load = useCallback(() => {
     if (!user || profileLoading || !isVerwaltung) return;
@@ -116,10 +224,47 @@ export default function TrainerMembersPage() {
     return { total: all.length, trainer, verwaltung };
   }, [members]);
 
-  const visibleCount = useMemo(
-    () => GROUP_ORDER.reduce((n, k) => n + groups[k].length, 0),
-    [groups],
-  );
+  // Die Liste als Abschnitte: „Nach Aufgabe" hat je Gruppe einen mit
+  // Überschrift, die anderen Ordnungen sind EIN Abschnitt ohne (`key: null`).
+  // Jeder Abschnitt läuft in senkrechten Spalten (siehe SpaltenListe).
+  const abschnitte = useMemo((): {
+    key: MemberGroup | null;
+    members: StudentEntry[];
+  }[] => {
+    if (sortierung === "aufgabe") {
+      return GROUP_ORDER.filter((key) => groups[key].length > 0).map((key) => ({
+        key,
+        members: groups[key],
+      }));
+    }
+    const liste = GROUP_ORDER.flatMap((k) => groups[k]);
+    if (sortierung === "name") {
+      liste.sort(nachName);
+    } else {
+      const richtung = sortierung === "neu" ? -1 : 1;
+      liste.sort((a, b) => {
+        const ta = beitritt(a);
+        const tb = beitritt(b);
+        if (ta === null || tb === null) {
+          if (ta === tb) return nachName(a, b);
+          return ta === null ? 1 : -1;
+        }
+        return ta === tb ? nachName(a, b) : (ta - tb) * richtung;
+      });
+    }
+    return liste.length > 0 ? [{ key: null, members: liste }] : [];
+  }, [groups, sortierung]);
+
+  // Spaltenzahl aus der Breite der Inhaltsspalte (Leon 30.09.2026: „mehrere
+  // vertikale Spalten, so dass der Platz in der Breite besser genutzt wird").
+  const [rahmenEl, setRahmenEl] = useState<HTMLDivElement | null>(null);
+  const spalten = useSpaltenzahl(rahmenEl);
+
+  const stats = [
+    { label: counts.total === 1 ? "Mitglied" : "Mitglieder", value: counts.total },
+    { label: "Trainer", value: counts.trainer },
+    { label: "Verwaltung", value: counts.verwaltung },
+  ];
 
   return (
     <main
@@ -140,37 +285,68 @@ export default function TrainerMembersPage() {
         >
           <div data-ambient style={{ background: "var(--ambient)" }} />
         </div>
-        <div className="relative mx-auto flex w-full max-w-2xl items-start gap-3 px-4 pb-5 pt-4 lg:max-w-5xl lg:px-6 lg:pb-7 lg:pt-6">
-          <div className="flex flex-1 flex-col gap-1">
-            {/* Zurück in die VERWALTUNG, nicht in den Trainerbereich: Diese
-                Seite gehört dem Gym, und wer nur Verwaltungsrechte hat, kommt
-                auf /trainer gar nicht hinein. Ab `lg` steht der Weg im Kopf
-                der Hülle (Leon: „Zurück-Knöpfe nach oben").
-                KEINE SPRUNGMARKEN auf die drei Gruppen (Leon 19.09.2026,
-                nachdem er sie gesehen hat: „Gruppen weglassen"): Die erste
-                Gruppe heißt „Verwaltung" wie der Weg zurück — das Wort stand
-                zweimal nebeneinander im Kopf. Wer jemanden sucht, nimmt
-                ohnehin die Suche. */}
-            <SeitenZurueck href="/verwaltung" label="Verwaltung" />
-            <h1
-              style={{
-                font: "var(--type-display)",
-                letterSpacing: "var(--ls-display)",
-                textTransform: "uppercase",
-              }}
-            >
-              Mitglieder
-            </h1>
-            <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-              Hier steht dein ganzes Gym. Jeder ist zuerst Athlet — mit den
-              beiden Häkchen machst du daraus einen Trainer, jemanden aus der
-              Verwaltung oder beides.
+        <div className="mitglieder-rahmen relative mx-auto flex w-full max-w-2xl flex-col gap-2 px-4 pb-6 pt-4 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6">
+          {/* Zurück in die VERWALTUNG, nicht in den Trainerbereich: Diese
+              Seite gehört dem Gym, und wer nur Verwaltungsrechte hat, kommt
+              auf /trainer gar nicht hinein. Ab `lg` steht der Weg im Kopf
+              der Hülle (Leon: „Zurück-Knöpfe nach oben").
+              KEINE SPRUNGMARKEN auf die drei Gruppen (Leon 19.09.2026,
+              nachdem er sie gesehen hat: „Gruppen weglassen"): Die erste
+              Gruppe heißt „Verwaltung" wie der Weg zurück — das Wort stand
+              zweimal nebeneinander im Kopf. Wer jemanden sucht, nimmt
+              ohnehin die Suche. */}
+          <SeitenZurueck href="/verwaltung" label="Verwaltung" />
+          {/* Überschrift links, das Einladen-Symbol rechts auf ihrer Höhe,
+              darunter die Kennzahlen (Leon 29.09.2026). Die Zahlen zählen das
+              ganze Gym, auch während einer Suche — sie beschreiben das Gym,
+              nicht den Treffer. Auf dem Handy steht das Symbol neben der
+              Überschrift und die Zahlen bekommen eine eigene Zeile — alle
+              drei nebeneinander passten nicht auf 390 px. */}
+          <div className="mitglieder-kopf">
+            <h1 className="mitglieder-titel">Mitglieder</h1>
+            <p className="mitglieder-intro">
+              Dein ganzes Gym auf einen Blick. Tipp einen Namen an und vergib
+              Trainer- oder Verwaltungsrechte.
             </p>
+            {isVerwaltung && (
+              <>
+                <dl className="mitglieder-zahlen">
+                  {stats.map((s) => (
+                    <div key={s.label}>
+                      <dt>{s.label}</dt>
+                      <dd>
+                        <CountingNumber target={s.value} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {/* Nach dem Erstellen zeigt das Sheet den Code sofort zum
+                    Teilen; die neue Einladung steht danach unter „Offene
+                    Einladungen". */}
+                <button
+                  type="button"
+                  onClick={() => setInviting(true)}
+                  aria-label="Einladung erstellen"
+                  title="Einladung erstellen"
+                  className="mitglieder-einladen"
+                >
+                  {/* Beim Hovern gleitet das Wort links aus dem Symbol,
+                      ein Glanz huscht durch (Leon 29.09.). Nur Zierde: Der
+                      Name steht im aria-label, auf Touch bleibt das Symbol. */}
+                  <span aria-hidden className="mitglieder-einladen__wort">
+                    Hinzufügen
+                  </span>
+                  <Icon name="einladen" size={48} strokeWidth={1.6} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-4 lg:max-w-5xl lg:px-6 lg:pt-5">
+      <div className="mitglieder-rahmen mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-2 lg:max-w-5xl lg:px-6">
+        {/* Misst die Breite der Inhaltsspalte für die Spaltenzahl. */}
+        <div ref={setRahmenEl} aria-hidden className="h-0 w-full" />
         {!isVerwaltung ? (
           <p
             className="py-8 text-center"
@@ -188,54 +364,90 @@ export default function TrainerMembersPage() {
               </p>
             )}
 
-            {/* Suche steht oben und immer — auch bei zwölf Mitgliedern ist
-                sie schneller als das Auge. Sie durchsucht ausschließlich die
-                bereits geladene Liste des EIGENEN Gyms (siehe memberMatches);
-                fremde Gyms sind für die Abfrage wie für die Firestore-Regeln
-                gar nicht erst erreichbar. */}
-            {members !== null && members.length > 0 && (
-              <GooeySearch
-                value={search}
-                onChange={setSearch}
-                placeholder="Mitglied suchen…"
-              />
+            {invitesError && (
+              <p style={{ font: "var(--type-sub)", color: "var(--negative)" }}>
+                Die Einladungen konnten nicht geladen werden.
+              </p>
             )}
 
+            {/* Offene Einladungen — nur, wenn es welche gibt. Ohne offene
+                bleibt der Knopf oben der Weg; ein leerer Abschnitt stünde
+                nur zwischen Kopf und Liste. */}
+            {hatOffene && (
+              <section
+                id="einladungen"
+                aria-labelledby="einladungen-titel"
+                className="flex scroll-mt-24 flex-col gap-3"
+              >
+                <div className="flex items-baseline gap-2.5">
+                  <h2 id="einladungen-titel" className="t-rubrik">
+                    Offene Einladungen
+                  </h2>
+                  <span
+                    style={{ font: "var(--type-rubrik)", color: "var(--text-3)" }}
+                  >
+                    {offeneEinladungen.length}
+                  </span>
+                </div>
+                {copyError && (
+                  <p style={{ font: "var(--type-sub)", color: "var(--negative)" }}>
+                    Kopieren hat nicht geklappt. Öffne die Einladung und
+                    übernimm den Link von Hand.
+                  </p>
+                )}
+                <SpaltenListe spalten={spalten} anzahl={offeneEinladungen.length}>
+                  {(zeilen) =>
+                    offeneEinladungen.map((invite, i) => (
+                      <FlowItem key={invite.code} index={i} className="mitglied-item min-w-0">
+                        <EinladungZeile
+                          invite={invite}
+                          erste={i % zeilen === 0}
+                          copied={copiedCode === invite.code}
+                          onOpen={() => setInviteDetail(invite)}
+                          onCopy={() => void handleCopy(invite)}
+                        />
+                      </FlowItem>
+                    ))
+                  }
+                </SpaltenListe>
+              </section>
+            )}
+
+            {/* Die Suche durchsucht ausschließlich die bereits geladene Liste
+                des EIGENEN Gyms (siehe memberMatches); fremde Gyms sind für
+                die Abfrage wie für die Firestore-Regeln gar nicht erst
+                erreichbar. */}
             {members !== null && members.length > 0 && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span
-                  className={META_SIZE}
-                  style={{ ...META_BASE, color: "var(--text-2)" }}
-                >
-                  {counts.total} {counts.total === 1 ? "Mitglied" : "Mitglieder"}{" "}
-                  · {counts.trainer} Trainer · {counts.verwaltung} Verwaltung
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <GooeySearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Name oder E-Mail…"
+                  breiteAuf={280}
+                />
+                {/* Sortieren rechts, damit die Suche beim Aufklappen nach
+                    rechts wachsen kann, ohne das Feld zu verschieben. */}
+                <div className="w-[200px] shrink-0">
+                  <Select
+                    value={sortierung}
+                    options={SORTIERUNGEN}
+                    onChange={(v) => setSortierung(v as Sortierung)}
+                    ariaLabel="Sortieren"
+                  />
+                </div>
               </div>
             )}
 
             {/* Liste erst mit Ladeergebnis (kein Leer-Blitz) */}
             {members === null ? null : members.length === 0 && !error ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  Außer dir ist noch niemand da. Hol dein erstes Mitglied
-                  dazu — mit einer Einladung dauert das eine Minute.
-                </p>
-                <Link data-press
-                  href="/verwaltung/einladungen"
-                  className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-5"
-                  style={{
-                    ...BTN_FONT,
-                    background: "var(--accent)",
-                    color: "var(--on-accent)",
-                    boxShadow: "var(--accent-glow)",
-                    textDecoration: "none",
-                  }}
-                >
-                  <Icon name="plus" size={13} strokeWidth={2.4} />
-                  Einladung erstellen
-                </Link>
-              </div>
-            ) : visibleCount === 0 ? (
+              <p
+                className="py-8 text-center"
+                style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
+              >
+                Außer dir ist noch niemand da. Hol dein erstes Mitglied dazu —
+                mit einer Einladung dauert das eine Minute.
+              </p>
+            ) : abschnitte.length === 0 ? (
               <p
                 className="py-8 text-center"
                 style={{ font: "var(--type-sub)", color: "var(--text-3)" }}
@@ -243,78 +455,36 @@ export default function TrainerMembersPage() {
                 Zu „{search}“ passt niemand.
               </p>
             ) : (
-              <div className="flex flex-col gap-6">
-                {GROUP_ORDER.map((key) => {
-                  const list = groups[key];
-                  if (list.length === 0) return null;
-                  return (
-                    <StaggerList
-                      as="section"
-                      key={key}
-                      className="flex flex-col gap-3"
-                    >
-                      <span className="t-label">
-                        {MEMBER_GROUP_LABEL[key]} · {list.length}
-                      </span>
-                      {list.map((member) => {
-                        const rights = member.rights;
-                        const isSelf = member.uid === user?.uid;
-                        return (
-                          <button
-                            key={member.uid}
-                            type="button"
-                            onClick={() => setDetail(member)}
-                            className="t-card t-interactive flex w-full items-center gap-4 p-4 text-left sm:p-5"
-                          >
-                            <div className="flex min-w-0 flex-1 flex-col gap-1">
-                              <span className="flex flex-wrap items-baseline gap-x-2">
-                                <span
-                                  className="truncate"
-                                  style={{
-                                    font: "var(--type-body-strong)",
-                                    color: "var(--text-body)",
-                                  }}
-                                >
-                                  {memberName(member)}
-                                </span>
-                                {isSelf && (
-                                  <span
-                                    style={{
-                                      ...META_BASE,
-                                      fontSize: "10px",
-                                      color: "var(--accent-text)",
-                                    }}
-                                  >
-                                    Du
-                                  </span>
-                                )}
-                              </span>
-                              <span
-                                className={`${META_SIZE} truncate`}
-                                style={{ ...META_BASE, color: "var(--text-2)" }}
-                              >
-                                {rightsLabel(rights)} ·{" "}
-                                {membershipShort(memberSince(member))}
-                                {member.email ? ` · ${member.email}` : ""}
-                              </span>
-                            </div>
-                            <span
-                              aria-hidden
-                              className="shrink-0"
-                              style={{ color: "var(--text-3)" }}
-                            >
-                              <Icon
-                                name="arrow-right"
-                                size={18}
-                                strokeWidth={2}
-                              />
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </StaggerList>
-                  );
-                })}
+              <div className="flex flex-col gap-8">
+                {abschnitte.map((ab) => (
+                  <section key={ab.key ?? "alle"} className="flex flex-col gap-2">
+                    {ab.key && (
+                      <div className="flex items-baseline gap-2.5">
+                        <h2 className="t-rubrik">{MEMBER_GROUP_LABEL[ab.key]}</h2>
+                        <span
+                          style={{ font: "var(--type-rubrik)", color: "var(--text-3)" }}
+                        >
+                          {ab.members.length}
+                        </span>
+                      </div>
+                    )}
+                    <SpaltenListe spalten={spalten} anzahl={ab.members.length}>
+                      {(zeilen) =>
+                        ab.members.map((member, i) => (
+                          <FlowItem key={member.uid} index={i} className="mitglied-item min-w-0">
+                            <MitgliedZeile
+                              member={member}
+                              group={ab.key}
+                              erste={i % zeilen === 0}
+                              isSelf={member.uid === user?.uid}
+                              onOpen={() => setDetail(member)}
+                            />
+                          </FlowItem>
+                        ))
+                      }
+                    </SpaltenListe>
+                  </section>
+                ))}
               </div>
             )}
           </>
@@ -329,6 +499,256 @@ export default function TrainerMembersPage() {
         onChanged={load}
         onClose={() => setDetail(null)}
       />
+
+      {/* Eine neue Einladung ändert die Mitgliederliste nicht — dazu kommt
+          jemand erst, wenn er den Code einlöst. Neu gelesen werden deshalb
+          nur die Einladungen. */}
+      <InviteCreateSheet
+        open={inviting}
+        canInviteTrainer={isVerwaltung}
+        onCreated={loadInvites}
+        onClose={() => setInviting(false)}
+      />
+
+      {/* Notiz ändern, Link kopieren, zurückziehen. Eine zurückgezogene
+          Einladung fällt nach dem Neulesen aus dem Abschnitt. */}
+      <InviteDetailSheet
+        invite={inviteDetail}
+        onChanged={loadInvites}
+        onClose={() => setInviteDetail(null)}
+      />
     </main>
+  );
+}
+
+/** Mindestbreite einer Spalte und Abstand zwischen zwei Spalten (px). */
+const SPALTE_MIN = 290;
+const SPALTE_ABSTAND = 40;
+const SPALTEN_MAX = 3;
+
+/**
+ * Wie viele Spalten in die Breite passen: eine auf dem Handy, zwei am
+ * Laptop mit Seitenleiste, drei am Schreibtisch. Gemessen per
+ * ResizeObserver am Element, nicht am Fenster — die Seitenleiste nimmt je
+ * nach Gerät unterschiedlich viel weg.
+ */
+function useSpaltenzahl(el: HTMLElement | null): number {
+  const [n, setN] = useState(1);
+  useEffect(() => {
+    if (!el) return;
+    const ro = new ResizeObserver(([eintrag]) => {
+      const breite = eintrag.contentRect.width;
+      setN(
+        Math.max(
+          1,
+          Math.min(
+            SPALTEN_MAX,
+            Math.floor((breite + SPALTE_ABSTAND) / (SPALTE_MIN + SPALTE_ABSTAND)),
+          ),
+        ),
+      );
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return n;
+}
+
+/**
+ * Eine Liste in SENKRECHTEN Spalten: erst die erste Spalte von oben nach
+ * unten, dann die nächste — alphabetisch liest man so weiter wie in einem
+ * Verzeichnis, nicht im Zickzack. Ein Raster mit `grid-auto-flow: column`
+ * und fester Zeilenzahl statt CSS-Spalten: So bleiben die Zeilen auf einer
+ * Höhe, und StaggerFlow kann gehende Einträge weiter vermessen.
+ * `children` bekommt die Zeilenzahl, damit jede Zeile weiß, ob sie oben in
+ * ihrer Spalte steht (dort keine Linie).
+ */
+function SpaltenListe({
+  spalten,
+  anzahl,
+  children,
+}: {
+  spalten: number;
+  anzahl: number;
+  children: (zeilen: number) => React.ReactNode;
+}) {
+  // Jeder Abschnitt nimmt DIESELBE Spaltenzahl, auch mit zwei Einträgen:
+  // So stehen die Spalten über alle Gruppen hinweg bündig untereinander.
+  const n = Math.max(1, spalten);
+  const zeilen = Math.max(1, Math.ceil(anzahl / n));
+  return (
+    <StaggerFlow
+      className="mitglieder-liste"
+      style={{
+        gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${zeilen}, auto)`,
+        columnGap: SPALTE_ABSTAND,
+      }}
+    >
+      {children(zeilen)}
+    </StaggerFlow>
+  );
+}
+
+const BIS_FMT = new Intl.DateTimeFormat("de-DE", {
+  day: "numeric",
+  month: "long",
+});
+
+/**
+ * Eine offene Einladung — gebaut wie die Mitglieder-Zeile, damit beide
+ * Listen gleich lesen. Oben der Code mit dem Kopieren-Symbol direkt daneben,
+ * darunter Notiz, Plätze und Ablauf.
+ *
+ * Zwei Wege in einer Zeile: Das Klickziel liegt als unsichtbares Geschwister
+ * über der ganzen Zeile und öffnet das Detail-Sheet, das Symbol am Code
+ * kopiert den Link — der Alltagsgriff. Ein Knopf IM Knopf wäre ungültiges
+ * HTML.
+ */
+function EinladungZeile({
+  invite,
+  erste,
+  copied,
+  onOpen,
+  onCopy,
+}: {
+  invite: GymInvite;
+  /** Erste Zeile der Liste — ohne Linie darüber. */
+  erste: boolean;
+  copied: boolean;
+  onOpen: () => void;
+  onCopy: () => void;
+}) {
+  const code = formatInviteCode(invite.code);
+  const note = invite.note.trim();
+  const plaetze =
+    invite.maxUses === 1
+      ? "Für eine Person"
+      : `${invite.usedCount} von ${invite.maxUses} eingelöst`;
+  const bis = invite.expiresAt ? `bis ${BIS_FMT.format(invite.expiresAt)}` : null;
+  return (
+    <div className="mitglied-zeile" data-erste={erste || undefined}>
+      <button
+        type="button"
+        onClick={onOpen}
+        data-press="surface"
+        className="mitglied-zeile__ziel"
+        aria-label={`Einladung ${note || code} öffnen`}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none relative flex h-10 w-10 shrink-0 items-center justify-center"
+        style={{ color: "var(--accent-text)" }}
+      >
+        <Icon name="einladen" size={26} strokeWidth={1.7} />
+      </span>
+      <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-1">
+          <span
+            className="truncate font-mono"
+            style={{
+              fontWeight: 700,
+              letterSpacing: "var(--ls-label)",
+              color: "var(--text-body)",
+            }}
+          >
+            {code}
+          </span>
+          {/* Kopieren DIREKT am Code (Leon 30.09.: „zu weit weg von der
+              Nummer"). Steht über dem Klickziel der Zeile und behält seine
+              eigenen Ereignisse; die Hülle ist durchlässig, der Knopf nicht. */}
+          <button
+            type="button"
+            onClick={onCopy}
+            aria-label={copied ? "Link kopiert" : `Link zu ${code} kopieren`}
+            title={copied ? "Kopiert" : "Link kopieren"}
+            className="t-interactive pointer-events-auto relative -my-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-field"
+            style={{ color: "var(--accent-text)" }}
+          >
+            <Icon name={copied ? "check" : "copy"} size={18} strokeWidth={2} />
+          </button>
+          {invite.role === "trainer" && (
+            <span className="mitglied-marke">Trainer</span>
+          )}
+        </span>
+        <span className="mitglied-zeile__unter truncate">
+          {note ? `${note} · ` : ""}
+          {plaetze}
+          {bis ? ` · ${bis}` : ""}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Eine Zeile der Liste — Profilbild, Name, eine ruhige Unterzeile.
+ *
+ * OHNE RAHMEN (Leon 30.09.2026: „mir alles zu viel mit einzelnen Rahmen …
+ * organisch, übersichtlich, intuitiv lesbar"): Die Zeilen stehen als EINE
+ * Liste untereinander, getrennt nur von einer Haarlinie, die beim Profilbild
+ * beginnt. Unter dem Zeiger hebt sich die Zeile als weiche Fläche ab. Die
+ * Spalten laufen senkrecht (SpaltenListe): Man liest von oben nach unten,
+ * nicht im Zickzack.
+ *
+ * Unter dem Namen steht, wie lange jemand dabei ist, und die E-Mail (in
+ * normaler Schreibung — Namensgleiche wie die zwei „Theo Zimmer" sind nur an
+ * ihr zu unterscheiden). Seit den Spalten (30.09.) ohne eigene Datumsspalte
+ * und ohne Pfeil: In einer 300-px-Spalte kostete beides die E-Mail. Ein Recht steht nur dann am Namen, wenn es
+ * ÜBER die Gruppe hinausgeht: der Cheftrainer in „Verwaltung" trägt
+ * „Trainer".
+ */
+function MitgliedZeile({
+  member,
+  group,
+  erste,
+  isSelf,
+  onOpen,
+}: {
+  member: StudentEntry;
+  /** `null` = durchgehende Liste ohne Gruppen-Überschrift. */
+  group: MemberGroup | null;
+  /** Erste Zeile unter einer Überschrift — ohne Linie darüber. */
+  erste: boolean;
+  isSelf: boolean;
+  onOpen: () => void;
+}) {
+  // Mit Überschrift sagt die Gruppe schon, was jemand macht — dann steht nur
+  // ein Recht DARÜBER HINAUS am Namen. Ohne Überschrift stehen beide Rechte.
+  const zeigeVerwaltung = group === null && member.rights.verwaltung;
+  const zeigeTrainer =
+    member.rights.trainer && (group === null || group === "verwaltung");
+  const seit = membershipShort(memberSince(member));
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      data-press="surface"
+      data-erste={erste || undefined}
+      className="mitglied-zeile"
+    >
+      <Profilbild avatar={member.avatar} kuerzel={initialsOf(member)} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span
+            className="truncate"
+            style={{ font: "var(--type-body-strong)", color: "var(--text-body)" }}
+          >
+            {memberName(member)}
+          </span>
+          {isSelf && (
+            <span className="mitglied-marke mitglied-marke--du">Du</span>
+          )}
+          {zeigeVerwaltung && (
+            <span className="mitglied-marke">Verwaltung</span>
+          )}
+          {zeigeTrainer && <span className="mitglied-marke">Trainer</span>}
+        </span>
+        <span className="mitglied-zeile__unter truncate">
+          {seit}
+          {member.email ? ` · ${member.email}` : ""}
+        </span>
+      </span>
+    </button>
   );
 }

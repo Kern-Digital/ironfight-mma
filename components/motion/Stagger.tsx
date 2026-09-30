@@ -1,7 +1,7 @@
 "use client";
 
 import { Children, forwardRef, isValidElement } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { HTMLMotionProps } from "framer-motion";
 import { BLUR_IN, STAGGER_STEP, springGentle } from "@/lib/motion";
@@ -108,7 +108,16 @@ export function StaggerFlow({
   ...rest
 }: { children: ReactNode } & HTMLMotionProps<"div">) {
   const { reduced } = useMotionCapability();
-  if (reduced) return <div className={className}>{children}</div>;
+  // Ohne Bewegung ein schlichtes div — aber MIT `style`: Die Mitgliederliste
+  // setzt ihre Spalten als Inline-Raster (30.09.2026), ohne Stil stünde sie
+  // bei reduzierter Bewegung einspaltig. Nur einfache Werte werden gereicht;
+  // Motion-Werte gibt es bei diesem Aufrufer nicht.
+  if (reduced)
+    return (
+      <div className={className} style={rest.style as CSSProperties}>
+        {children}
+      </div>
+    );
 
   return (
     <motion.div className={className} layout {...rest}>

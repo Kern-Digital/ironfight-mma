@@ -14,7 +14,7 @@
  * ist, wessen Rechte sich geändert haben, wer das Gym verlassen hat. Die
  * Einladungs-Buchhaltung (erstellt, zurückgezogen, Notiz geändert) stand hier
  * bis zum 01.09. unter „Alle Vorgänge" — sie ist aber kein Ereignis, sondern
- * der Zustand einer Einladung, und den zeigt /verwaltung/einladungen an jeder
+ * der Zustand einer Einladung, und den zeigt die Mitglieder-Seite (Offene Einladungen) an jeder
  * Zeile. Nebenbei führte diese Ansicht die Codes im Klartext mit.
  *
  * RECHTE: nur die Verwaltung. Die Middleware gated die Route

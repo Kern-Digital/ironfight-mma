@@ -136,11 +136,6 @@ const verwaltungNavChildren: NavChild[] = [
     section: "Verwaltung",
   },
   {
-    href: "/verwaltung/einladungen",
-    label: "Einladungen",
-    activePattern: /^\/verwaltung\/einladungen/,
-  },
-  {
     href: "/verwaltung/neuigkeiten",
     label: "Neuigkeiten",
     activePattern: /^\/verwaltung\/neuigkeiten/,

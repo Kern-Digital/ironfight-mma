@@ -322,7 +322,7 @@ function InviteCreateInhalt({
                 />
                 <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
                   Die Notiz hilft dir, den Code später wiederzuerkennen — sie
-                  steht nur in deiner Übersicht, nie im Link.
+                  ist nur für dich und die Verwaltung deines Gyms sichtbar.
                 </p>
               </div>
             </div>

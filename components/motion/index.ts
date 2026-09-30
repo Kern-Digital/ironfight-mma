@@ -22,6 +22,7 @@ export {
 export { Collapse, Pop, MorphSwap } from "./Morph";
 export { Reveal } from "./Reveal";
 export { RollZahl } from "./RollZahl";
+export { CountingNumber } from "./CountingNumber";
 export { WortReveal } from "./WortReveal";
 export { SheetShell, useLetzterWert } from "./SheetShell";
 export { GooAuswahl } from "./GooAuswahl";

@@ -175,12 +175,9 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
           icon: "users",
           isActive: under("/verwaltung/mitglieder"),
         },
-        {
-          href: "/verwaltung/einladungen",
-          label: "Einladungen",
-          icon: "plus",
-          isActive: under("/verwaltung/einladungen"),
-        },
+        // KEIN Punkt „Einladungen" mehr (Leon 30.09.2026): Die offenen
+        // Einladungen stehen auf der Mitglieder-Seite, erstellt wird dort
+        // oben rechts. /verwaltung/einladungen leitet dorthin um.
         {
           href: "/verwaltung/neuigkeiten",
           label: "Neuigkeiten",

@@ -38,10 +38,19 @@ const nextConfig = {
         destination: "/verwaltung/mitglieder/:pfad*",
         permanent: true,
       },
+      // Die Einladungen wohnen seit dem 30.09.2026 auf der Mitglieder-Seite
+      // (Leon: „das ist ja jetzt unter mitglieder"). Beide alten Adressen
+      // führen dorthin. NICHT `permanent`: Browser merken sich eine 308 für
+      // immer, und die Adresse könnte eines Tages wieder etwas tragen.
       {
         source: "/trainer/einladungen/:pfad*",
-        destination: "/verwaltung/einladungen/:pfad*",
-        permanent: true,
+        destination: "/verwaltung/mitglieder",
+        permanent: false,
+      },
+      {
+        source: "/verwaltung/einladungen/:pfad*",
+        destination: "/verwaltung/mitglieder",
+        permanent: false,
       },
       {
         source: "/trainer/neuigkeiten/:pfad*",

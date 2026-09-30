@@ -387,6 +387,11 @@
      Überschriften über Feldern waren zu klein) — app-weit am Token, nie in
      der Komponente. */
   --type-label: 600 14px/1.2 var(--font-body);         /* +ls .08em, caps */
+  /* Abschnitts-Überschrift über einer Liste („VERWALTUNG", „TRAINER",
+     „ATHLETEN"). Eine Stufe über dem Feld-Label (Leon 29.09.: „größer"),
+     aber unter --type-h2. Eigenes Token, weil `.t-label` zugleich die
+     Formularfelder beschriftet — die sollen nicht mitwachsen. */
+  --type-rubrik: 700 18px/1.2 var(--font-body);        /* +ls .06em, caps */
   /* Kopfzeile von Sheets/Overlays — eine Stufe ÜBER dem Feld-Label, damit
      „Neue Einladung" als Titel liest und nicht als weiteres Feld. */
   --type-sheet-title: 700 19px/1.2 var(--font-body);   /* +ls .08em, caps */
@@ -2296,6 +2301,12 @@ header:has([data-app-suche="kopf"] [data-open]) .kopf-neben {
   .t-label {
     font: var(--type-label);
     letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--text-label);
+  }
+  .t-rubrik {
+    font: var(--type-rubrik);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-label);
   }
@@ -4688,3 +4699,136 @@ a[data-press]:active:not([data-motion]):not([data-press="surface"]):not([data-pr
   .kal-nav, .kal-zelle { transition: none; }
 }
 
+/* ─── Mitglieder-Seite: Kennzahlen + Marken (29.09.2026) ─────────────────
+   Die drei Zahlen stehen rechts unter dem Einladen-Symbol (Leon, nach der
+   Vorlage „counting-number"). Archivo 600, 32 px — Leon 29.09.: 800/44 px
+   war „zu fett und zu groß"; die Zahl soll lesen, nicht mit der Überschrift
+   konkurrieren. Haarlinien trennen die drei statt Kästen. */
+/* Umgeschaltet wird nach der Breite des INHALTS (Container-Query am
+   Seitenrahmen), nicht des Bildschirms: Am 1024er-Laptop nimmt die
+   Seitenleiste 330 px weg, der Inhalt ist dann so schmal wie ein Tablet.
+   Unter 760 px passten Überschrift und drei Zahlen nicht nebeneinander
+   („MITGLIED-ER" brach um), und zwei Spalten schnitten die Namen ab. */
+.mitglieder-rahmen { container-type: inline-size; }
+
+.mitglieder-zahlen { grid-area: zahlen; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.mitglieder-zahlen > div { display: flex; flex-direction: column-reverse; gap: 6px; min-width: 0; padding: 0 14px; border-left: 1px solid var(--line); }
+.mitglieder-zahlen > div:first-child { padding-left: 0; border-left: 0; }
+.mitglieder-zahlen > div:last-child { padding-right: 0; }
+.mitglieder-zahlen dt { font: var(--type-meta); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mitglieder-zahlen dd { margin: 0; font: 600 26px/1 var(--font-body); letter-spacing: -0.01em; color: var(--text-1); }
+
+/* Kopf: auf schmaler Fläche Symbol neben der Überschrift, Zahlen in eigener
+   Zeile; auf breiter Fläche das Symbol auf Höhe der Überschrift, die
+   Zahlen rechtsbündig darunter (Leon 29.09., erst umgekehrt, dann getauscht). */
+.mitglieder-kopf { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "titel knopf" "intro intro" "zahlen zahlen"; align-items: center; gap: 12px 16px; }
+.mitglieder-kopf .mitglieder-zahlen { margin-top: 12px; }
+.mitglieder-titel { grid-area: titel; font: 800 clamp(30px, 8.6vw, 48px)/1 var(--font-body); letter-spacing: var(--ls-display); text-transform: uppercase; }
+.mitglieder-intro { grid-area: intro; max-width: 46ch; font: 400 17px/1.5 var(--font-body); color: var(--text-2); }
+@media (min-width: 640px) { .mitglieder-intro { font-size: 19px; } }
+
+/* „Einladung erstellen" als großes Symbol OHNE Rahmen (Leon 29.09.: „ohne
+   Rahmen"), in der Akzentschrift. Der Name steht als aria-label am Knopf; das Symbol trägt die Bedeutung, Hover nie. */
+.mitglieder-einladen { --icon-zusatz: var(--text-1); grid-area: knopf; justify-self: end; display: grid; place-items: center; width: 56px; height: 56px; margin-right: -8px; border-radius: var(--r-md); color: var(--accent-text); transition: color var(--dur-med) var(--ease-out); }
+
+/* Hover: „Hinzufügen" gleitet links aus dem Symbol heraus, das Plus dreht
+   eine Viertelrunde, die hintere Person hebt sich — und kurz danach huscht
+   ein weißer schräger Glanz durch die Buchstaben (Leon 29.09.: „katching").
+   Das Wort liegt ABSOLUT links vom Knopf: Es verschiebt nichts, weder die
+   Zahlen noch die Überschrift. Der Glanz ist ein Verlauf, der per
+   background-clip nur IN den Buchstaben sichtbar ist — so trägt er im hellen
+   wie im dunklen Design. Nur mit echter Maus (MOTION-BRIEF Regel 2). */
+.mitglieder-einladen { position: relative; }
+/* Bewusst OHNE .t-interactive: dessen Hover-Fläche war genau der Rahmen,
+   den Leon nicht wollte. Auch KEIN Fokusring: Nach dem Schließen des
+   Einladungs-Sheets springt der Fokus auf diesen Knopf zurück, der Browser
+   wertet das als Tastatur-Fokus und zeichnete den Ring — wieder ein Rahmen
+   (Leon 29.09.: „nicht wieder in einem Rahmen"). Sichtbar bleibt der Fokus
+   trotzdem: Das Wort erscheint und das Symbol bewegt sich wie beim Hovern. */
+.mitglieder-einladen:focus-visible { outline: none; }
+.mitglieder-einladen:focus-visible svg { transform: translateX(-2px); }
+.mitglieder-einladen:focus-visible .icon-zusatz { transform: rotate(90deg) scale(1.15); }
+.mitglieder-einladen:focus-visible .icon-hinten { transform: translateY(-1.5px); }
+.mitglieder-einladen svg { overflow: visible; transition: transform 420ms cubic-bezier(0.33, 1, 0.68, 1); }
+.mitglieder-einladen .icon-zusatz,
+.mitglieder-einladen .icon-hinten { transform-box: fill-box; transform-origin: center; transition: transform 520ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.mitglieder-einladen__wort {
+  position: absolute; right: calc(100% + 2px); top: 50%;
+  pointer-events: none; white-space: nowrap;
+  font: 700 15px/1 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase;
+  color: transparent;
+  background: linear-gradient(115deg, var(--accent-text) 0 40%, #fff 46% 54%, var(--accent-text) 60% 100%);
+  background-size: 300% 100%; background-position: 100% 0;
+  -webkit-background-clip: text; background-clip: text;
+  opacity: 0; transform: translate(14px, -50%);
+  clip-path: inset(-4px 0 -4px 100%);
+  transition: opacity 260ms ease-out, transform 460ms cubic-bezier(0.33, 1, 0.68, 1), clip-path 460ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+@keyframes mitglieder-glanz { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (hover: hover) {
+  .mitglieder-einladen:hover svg { transform: translateX(-2px); }
+  .mitglieder-einladen:hover .icon-zusatz { transform: rotate(90deg) scale(1.15); }
+  .mitglieder-einladen:hover .icon-hinten { transform: translateY(-1.5px); }
+  .mitglieder-einladen:hover .mitglieder-einladen__wort {
+    opacity: 1; transform: translate(0, -50%); clip-path: inset(-4px 0 -4px 0);
+    animation: mitglieder-glanz 750ms cubic-bezier(0.45, 0, 0.25, 1) 280ms both;
+  }
+}
+.mitglieder-einladen:focus-visible .mitglieder-einladen__wort { opacity: 1; transform: translate(0, -50%); clip-path: inset(-4px 0 -4px 0); }
+@media (prefers-reduced-motion: reduce) {
+  .mitglieder-einladen svg, .mitglieder-einladen .icon-zusatz, .mitglieder-einladen .icon-hinten, .mitglieder-einladen__wort { transition: none; }
+  .mitglieder-einladen:hover .mitglieder-einladen__wort { animation: none; }
+}
+
+/* Mitgliederliste OHNE RAHMEN (Leon 30.09.2026: „alles zu viel mit einzelnen
+   Rahmen … organisch, übersichtlich, intuitiv lesbar"). Senkrechte Spalten
+   (Spaltenzahl und Zeilen setzt SpaltenListe inline), die Zeilen trennt nur
+   eine Haarlinie, die beim Profilbild beginnt — so bleibt
+   die Bildspalte links ruhig, und das Auge läuft an den Namen herunter.
+   Unter dem Zeiger wird die Zeile zur weichen Fläche; die Linien darüber und
+   darunter treten dann zurück, sonst schnitten sie durch die Rundung. Die
+   Zeile ragt links und rechts 12 px über die Spalte hinaus, damit Bild und
+   Name bündig mit den Überschriften stehen und die Fläche trotzdem Luft hat. */
+.mitglieder-liste { display: grid; grid-auto-flow: column; align-items: start; }
+.mitglied-zeile {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  width: calc(100% + 24px); margin-inline: -12px; padding: 12px;
+  border-radius: var(--r-md); text-align: left; color: inherit;
+  transition: background-color 180ms ease-out;
+}
+.mitglied-zeile::before {
+  content: ""; position: absolute; top: 0; left: 66px; right: 12px; height: 1px;
+  background: var(--line); transition: opacity 180ms ease-out; pointer-events: none;
+}
+.mitglied-zeile[data-erste]::before { display: none; }
+.mitglied-zeile:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mitglied-zeile__unter { font: 400 13px/1.35 var(--font-body); color: var(--text-3); }
+/* Einladung: das Klickziel liegt als Geschwister über der ganzen Zeile. */
+.mitglied-zeile__ziel { position: absolute; inset: 0; border-radius: inherit; }
+.mitglied-zeile__ziel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) {
+  button.mitglied-zeile:hover,
+  .mitglied-zeile:has(> .mitglied-zeile__ziel:hover) { background: color-mix(in oklab, var(--text-1) 5%, transparent); }
+  .mitglied-zeile:hover::before,
+  .mitglied-item:hover + .mitglied-item .mitglied-zeile::before { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mitglied-zeile, .mitglied-zeile::before { transition: none; }
+}
+
+@container (min-width: 760px) {
+  .mitglieder-kopf { grid-template-areas: "titel knopf" "intro zahlen"; align-items: start; gap: 14px 40px; }
+  .mitglieder-kopf .mitglieder-zahlen { margin-top: 4px; }
+  .mitglieder-titel { font-size: 60px; }
+  .mitglieder-zahlen { display: flex; justify-content: flex-end; }
+  .mitglieder-zahlen > div { align-items: flex-end; padding: 0 24px; text-align: right; }
+  .mitglieder-zahlen dd { font-size: 32px; }
+  .mitglieder-einladen { width: 64px; height: 64px; margin-top: -10px; }
+}
+
+/* Kleine Marke am Namen: „Du" in der Akzentfarbe, ein Recht über die Gruppe
+   hinaus („Trainer" in der Verwaltung) neutral. Farbe trägt nie allein — das
+   Wort steht immer da. Seit 30.09. ohne Pille: nur das Wort, klein und in
+   Versalien — die Kapsel war einer der vielen kleinen Rahmen. */
+.mitglied-marke { flex-shrink: 0; font: 600 10px/1.3 var(--font-body); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-3); }
+.mitglied-marke--du { color: var(--accent-text); }

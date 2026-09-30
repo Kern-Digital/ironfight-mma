@@ -430,7 +430,7 @@ export default function VerwaltungDashboardPage() {
               </div>
             ) : openInvites.count > 0 ? (
               <Link data-press="surface"
-                href="/verwaltung/einladungen"
+                href="/verwaltung/mitglieder#einladungen"
                 className="t-glass t-interactive flex flex-col gap-2.5 p-4"
                 style={{
                   borderRadius: "var(--r-xl)",
@@ -496,7 +496,7 @@ export default function VerwaltungDashboardPage() {
                   in dein Gym — die Rolle legst du dabei schon fest.
                 </span>
                 <Link data-press
-                  href="/verwaltung/einladungen"
+                  href="/verwaltung/mitglieder?einladen=1"
                   className="t-interactive inline-flex min-h-hit items-center gap-2 rounded-field px-4"
                   style={{
                     ...BTN_FONT,
@@ -630,7 +630,7 @@ export default function VerwaltungDashboardPage() {
               label="Freie Plätze"
               value={openInvites === null ? null : openInvites.seats}
               sub="über offene Einladungen"
-              href="/verwaltung/einladungen"
+              href="/verwaltung/mitglieder#einladungen"
             />
           </div>
 
