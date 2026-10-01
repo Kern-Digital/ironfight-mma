@@ -565,6 +565,7 @@
 | Animation | Framer Motion | 12.x |
 | State | Zustand (installiert) | 5.x |
 | Payments | Stripe (installiert, noch nicht gebaut) | — |
+| Karte | MapLibre GL + OpenFreeMap (kein Schlüssel) | **5.24.0 fest** — 6.x braucht einen eigenen Worker-Pfad |
 | React | React | **18** (nicht 19!) |
 
 ## Architektur & Patterns (wichtig)
@@ -922,12 +923,78 @@ Verwaltung es freischaltet, Schalter standardmäßig AN, greift erst mit
 eingetragener Adresse (Datenschutz: Eintragen im klar als öffentlich
 beschrifteten Bereich; Satz für AGB/Datenschutzerklärung nötig). Etappen:
 1 ohne Gym = ohne Gym-Inhalte (ERLEDIGT) · 2 Kontakt & Standort in der
-Verwaltung (Adresse, Telefon, E-Mail, Website, Pin auf der Karte, Schalter) ·
+Verwaltung (Adresse, Telefon, E-Mail, Website, Pin auf der Karte, Schalter;
+ERLEDIGT 01.10., Abschnitt „GYM-SUCHE — ETAPPE 2") ·
 3 /gym-finden mit Liste + Karte (MapLibre + OpenFreeMap, kein Schlüssel),
 PLZ/Ort über eingebaute PLZ-Tabelle (keine externe Anfrage),
 Standort-Freigabe nur im Browser, Radius · 4 Anfrage „Probetraining
 vereinbaren" (gyms/{gymId}/anfragen, eine offene je Konto und Gym,
 Löschfrist, Verwaltung sieht Zahl auf der Mitglieder-Seite; kein Mailweg).
+
+### GYM-SUCHE — ETAPPE 2: KONTAKT & STANDORT (01.10.2026)
+**Was die Verwaltung einträgt:** `/verwaltung/kontakt` (Menüpunkt „Kontakt &
+Standort", Icon `standort`): Straße, PLZ, Ort, Telefon, E-Mail, Website, Pin
+auf der Karte, Schalter „In der Gym-Suche zeigen". Oben steht als Erstes
+„Öffentlich. Diese Angaben stehen öffentlich in der Gym-Suche." — das ist die
+Datenschutz-Bedingung für den Schalter, der standardmäßig AN steht (Leon
+30.09.): Wer einträgt, weiß vorher, wer es sieht. Der Satz darf nicht
+verschwinden.
+
+**Daten:** Feld `kontakt` im Gym-Dokument (`lib/gym-kontakt.ts`, Client UND
+Server): `strasse, plz, ort, telefon, email, website, lat, lng, inSuche` plus
+das vom SERVER gerechnete `sichtbar`. `inSucheSichtbar()` ist die EINE Stelle
+für „steht dieses Gym in der Suche?": Schalter an UND Straße + PLZ + Ort UND
+Pin. Ein Gym, das nie etwas einträgt, steht nicht drin. Fehlt `inSuche`, gilt
+AN. Stillgelegte Gyms bleiben drin (Stilllegen trifft nur DeepFight).
+
+**Zwei Routen, die Regeln bleiben zu** (`gyms/{gymId}` lesen nur Mitglieder —
+im selben Dokument stehen Abo, Stripe-Kunde und Branding):
+- `POST /api/gym/kontakt` — schreibt. `verwaltungDesGyms` (401 / 403 für
+  Athlet, Trainer ohne Verwaltung, Konto ohne Gym). Gym nur aus dem Claim, ein
+  `gymId` im Body wird nicht gelesen. `pruefeKontakt`: jedes Feld darf leer
+  sein, ein gefülltes muss stimmen (PLZ 4–5 Ziffern, Website nur http(s) und
+  bekommt `https://`, E-Mail klein, Pin beide Zahlen oder keine) → 400 mit
+  `feld`. Schreibt mit `update` (ersetzt `kontakt` ganz, legt kein Gym an),
+  dazu `kontaktGeaendertAm/Von`. Keine Stufe, keine Stilllegungs-Sperre.
+- `POST /api/gyms/suche` — gibt heraus. Jedes angemeldete Konto (401 ohne
+  Token), keine Eingabe, `no-store`. Abfrage `kontakt.sichtbar == true`,
+  danach noch einmal `inSucheSichtbar` (ein von Hand gesetztes `sichtbar`
+  zählt nicht). Je Gym GENAU zehn Schlüssel: `id, name, strasse, plz, ort,
+  telefon, email, website, lat, lng`. Wer hier ein Feld ergänzt, ergänzt es in
+  `SuchGym` und in der Messzeile „genau zehn Schlüssel".
+
+**PLZ-Tabelle** (`public/daten/plz-de.json`, 8.172 PLZ + 13.211 Orte, ~820 KB,
+gepackt ~300 KB): gebaut von `scripts/plz-tabelle-bauen.mjs <DE.txt>` aus dem
+GeoNames-Abzug (download.geonames.org/export/zip/DE.zip, CC BY 4.0 — die
+Quelle MUSS auf /gym-finden stehen, Text in `PLZ_QUELLE_TEXT`). Zeilen ohne
+Genauigkeit (letzte Spalte leer) sind Großkunden-PLZ („10875 Daimler …") und
+fliegen raus. `lib/plz.ts`: `ladePlzTabelle()` (einmal je Tab, eigene
+Adresse), `ortZurPlz`, `sucheOrte` (Ziffern = PLZ-Anfang, Buchstaben = Ort;
+zwei Schlüssel je Ort, damit „Muenchen" München findet, aber „Neunkirchen"
+nicht Neuenkirchen), `entfernungKm`. Nur Deutschland; ein Gym mit
+vierstelliger PLZ (AT/CH) setzt den Pin von Hand.
+
+**Karte** (`components/karte/`): `karte-basis.ts` (MapLibre lädt erst mit
+der Karte, Stil `positron` hell / `dark` dunkel von tiles.openfreemap.org,
+deutsche Beschriftung der Knöpfe, `pinElement`), `karte.css` (bewusst NICHT
+in globals.css), `PinKarte.tsx` (ziehen oder tippen meldet `onPin`; eine von
+außen gesetzte Stelle löst einen Flug aus, die eigene Meldung nicht).
+- **Falle:** MapLibre setzt am Behälter selbst `position: relative`. Ein
+  Behälter mit `absolute inset-0` hat danach Höhe 0 — die Karte ist da, aber
+  unsichtbar. Der Behälter trägt `h-full w-full` in einem Kasten mit Höhe.
+- **Falle:** maplibre-gl 6.x liefert den Worker als eigene Datei
+  (`import.meta.url`), die der Bundler von Next 14 nicht findet → 5.24.0 fest.
+- **Falle (Playwright):** WebGL braucht
+  `--enable-unsafe-swiftshader --use-gl=swiftshader`; auf die Karte klickt man
+  mit `locator.click({ position })`, nicht mit `page.mouse`.
+- **Fremde Adresse:** Der Browser lädt Kacheln von OpenFreeMap (IP-Adresse
+  geht dorthin). Suche und Standort gehen NICHT dorthin. Gehört in die
+  Datenschutzerklärung — zusammen mit dem Satz zu den öffentlichen
+  Gym-Kontaktdaten (beides offen, Leon).
+
+**Messung:** `scripts/mess-gym-kontakt.mjs` (zwei Prüf-Gyms, fünf Konten,
+Gym B mit Abo-Feld und Logo als Köder; räumt alles weg). 47/47 hell und dunkel
+am 01.10.2026, `NUR_API=1` 31/31. Bilder in `../abnahme-gym-suche/`.
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
@@ -1925,6 +1992,9 @@ alle `hover:`-Klassen ab — nicht wieder entfernen.
 ```
 gyms/{gymId}                      — Gym-Stammdaten (Multi-Gym; Mitglieder lesen ihr
                                     eigenes Gym, Schreiben nur Admin/serverseitig)
+                                    Feld `kontakt` = Kontakt & Standort für die
+                                    Gym-Suche (nur /api/gym/kontakt schreibt, an
+                                    Fremde gibt NUR /api/gyms/suche heraus)
 gyms/{gymId}/invites/{code}       — Einladungen (Code = Dokument-ID; write:false,
                                     nur /api/invites; Lesen nur die Verwaltung)
 gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UND Quelle

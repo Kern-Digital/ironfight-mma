@@ -72,7 +72,14 @@ export type IconName =
   | "settings"
   | "hash"
   // Anheften der Sidebar (30.09.2026)
-  | "pin";
+  | "pin"
+  // Gym-Suche (01.10.2026): Ort auf der Karte, Telefon, Brief, Weltkugel,
+  // Fadenkreuz für „Meinen Standort nutzen"
+  | "standort"
+  | "telefon"
+  | "brief"
+  | "welt"
+  | "ortung";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Boxhandschuh
@@ -428,6 +435,39 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12 17v5" />
       <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
+  // Kartennadel — Standort des Gyms
+  standort: (
+    <>
+      <path d="M12 21.5s7-6.4 7-12a7 7 0 1 0-14 0c0 5.6 7 12 7 12Z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </>
+  ),
+  // Hörer
+  telefon: (
+    <path d="M5.5 3.5h3l1.5 4-2 1.5a12 12 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16 16 0 0 1 3.5 5.7a2 2 0 0 1 2-2.2Z" />
+  ),
+  // Briefumschlag
+  brief: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+      <path d="m4 7.5 8 6 8-6" />
+    </>
+  ),
+  // Weltkugel — Website
+  welt: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5s1.3-6.2 3.8-8.5Z" />
+    </>
+  ),
+  // Fadenkreuz — eigener Standort
+  ortung: (
+    <>
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
     </>
   ),
   "panel-left": (

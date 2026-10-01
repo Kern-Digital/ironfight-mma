@@ -194,6 +194,15 @@ export function shellNavGroups(rights: RoleSet): ShellNavGroup[] {
           icon: "spark",
           isActive: under("/verwaltung/branding"),
         },
+        // KONTAKT & STANDORT — Adresse, Telefon, E-Mail, Website und der Pin
+        // auf der Karte (Etappe 2 der Gym-Suche, 01.10.2026). Was hier steht,
+        // sehen Athleten ohne Gym auf /gym-finden.
+        {
+          href: "/verwaltung/kontakt",
+          label: "Kontakt & Standort",
+          icon: "standort",
+          isActive: under("/verwaltung/kontakt"),
+        },
         // WOCHENPLAN — die Woche des GYMS (Leon 27.09.2026: „in der
         // verwaltungsebene soll der Kursplan wochenplan heißen und wenn ich
         // darauf gehe dann soll ich kurse hinzufügen können, bearbeiten").
