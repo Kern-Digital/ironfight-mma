@@ -900,9 +900,9 @@ Wochenplan (gemessen 200), seit dem Deploy 403.
   Trainer deines Gyms" (Status `ohne-gym` aus der Trainer-Auswahl).
 - Die Dashboard-Karte „Du gehörst gerade zu keinem Gym" ist weg — die Seite
   wird ohne Gym gar nicht mehr erreicht.
-- `/gym-finden` ist in Etappe 1 ein GRUNDGERÜST (Kopf, Einladungscode, Gym
-  anmelden) und steht in `ATHLETE_SHELL_ROUTES`. Die Liste aller Tidal-Gyms
-  mit PLZ/Ort-Suche, Standort-Freigabe, Radius und Karte ist Etappe 3.
+- `/gym-finden` steht in `ATHLETE_SHELL_ROUTES`. In Etappe 1 war es ein
+  Grundgerüst (Kopf, Einladungscode, Gym anmelden); seit Etappe 3 trägt es
+  Liste und Karte (Abschnitt „GYM-SUCHE — ETAPPE 3").
 - Alte Workouts und der Verlauf bleiben gespeichert und erscheinen nach einem
   Beitritt wieder (Leons Vorgabe geht vor dem früheren Text „Deine Workouts …
   bleiben dir erhalten").
@@ -927,7 +927,8 @@ Verwaltung (Adresse, Telefon, E-Mail, Website, Pin auf der Karte, Schalter;
 ERLEDIGT 01.10., Abschnitt „GYM-SUCHE — ETAPPE 2") ·
 3 /gym-finden mit Liste + Karte (MapLibre + OpenFreeMap, kein Schlüssel),
 PLZ/Ort über eingebaute PLZ-Tabelle (keine externe Anfrage),
-Standort-Freigabe nur im Browser, Radius · 4 Anfrage „Probetraining
+Standort-Freigabe nur im Browser, Radius (ERLEDIGT 01.10., Abschnitt
+„GYM-SUCHE — ETAPPE 3") · 4 Anfrage „Probetraining
 vereinbaren" (gyms/{gymId}/anfragen, eine offene je Konto und Gym,
 Löschfrist, Verwaltung sieht Zahl auf der Mitglieder-Seite; kein Mailweg).
 
@@ -995,6 +996,53 @@ außen gesetzte Stelle löst einen Flug aus, die eigene Meldung nicht).
 **Messung:** `scripts/mess-gym-kontakt.mjs` (zwei Prüf-Gyms, fünf Konten,
 Gym B mit Abo-Feld und Logo als Köder; räumt alles weg). 47/47 hell und dunkel
 am 01.10.2026, `NUR_API=1` 31/31. Bilder in `../abnahme-gym-suche/`.
+
+### GYM-SUCHE — ETAPPE 3: /gym-finden MIT LISTE UND KARTE (01.10.2026)
+**Die Seite** (`app/gym-finden/page.tsx`): öffnet mit ALLEN Gyms der Suche,
+nach Namen sortiert („frei anzeigen lassen"). Eine MITTE bringt Umkreis und
+Entfernung: PLZ oder Ort (GooeySearch + Vorschlagsliste aus `sucheOrte`,
+Enter nimmt den ersten Vorschlag) oder „Meinen Standort nutzen". Mit Mitte:
+Umkreis-Regler (`UMKREIS_STUFEN` 5–300 km, Start 25), Liste nach Entfernung,
+„Alle anzeigen" nimmt die Mitte wieder weg. Leerer Umkreis und unbekannter
+Ort haben eigene Sätze. Je Gym: Name, Adresse, Entfernung, Telefon / E-Mail /
+Website als Links (`tel:`, `mailto:`, Website `_blank` + `noopener
+noreferrer nofollow`), am eigenen Gym die Marke „Dein Gym". Unten bleiben
+Einladungscode und „Gym anmelden"; darunter die Quelle der PLZ-Daten (Pflicht,
+CC BY).
+
+**Was im Gerät bleibt — per Messung bewiesen:** Die Liste ist für alle
+dieselbe (`ladeSuchGyms`, lib/gym-suche.ts → `POST /api/gyms/suche` OHNE
+Body). PLZ/Ort löst die Tabelle im Browser auf, der Standort kommt einmal auf
+Knopf aus `navigator.geolocation` und wird weder gespeichert noch gesendet,
+Umkreis und Entfernung rechnet `entfernungKm` (Luftlinie). Fremde Adressen:
+nur Firebase und `tiles.openfreemap.org`; PLZ, Ort und Koordinaten stehen in
+KEINER Anfrage (die Messung liest jede Anfrage der Seite mit).
+
+**Die Karte** (`components/karte/GymKarte.tsx`): je Gym ein Pin als Knopf
+(`aria-label` = Gym-Name, Enter/Leertaste), Punkt für die Mitte, Umkreis als
+GeoJSON-Ebene. Liste und Karte wählen in beide Richtungen (`gewaehlt`). Blick:
+mit Mitte auf den Umkreis, ohne auf alle Gyms, ohne Gyms auf Deutschland.
+- **Falle:** MapLibre versteht kein `oklch`. `akzentRgb()` rechnet
+  `--accent` über eine 1-Pixel-Zeichenfläche in rgb um.
+- **Falle:** `setStyle` (Themenwechsel) wirft eigene Ebenen weg. Der Umkreis
+  hängt sich bei jedem `style.load` neu ein (`zeichneUmkreis`).
+- **Falle:** Die Stile von OpenFreeMap beschriften mit `name_en` („Munich").
+  `deutscheNamen()` (karte-basis.ts) stellt bei jedem `style.load` auf
+  `name:de` um — für beide Karten.
+- **Falle:** `--type-h1` gibt es nicht (das Grundgerüst aus Etappe 1 nutzte
+  es und fiel auf die Fließschrift zurück). Große Zeile = `--type-display`
+  in Versalien → Prüfsätze mit `/…/i`.
+- Höhe am Desktop: Athleten `clamp(20rem, 100vh − 26rem, 38rem)` (die
+  schwebende Leiste verdeckt sonst den Kartenfuß mit der Quellenzeile), Stab
+  `min(40rem, 100vh − 8rem)`.
+
+**Messung:** `scripts/mess-gym-finden.mjs` (braucht
+`--import ./scripts/lib/ts-loader-register.mjs`; vier Prüf-Gyms Stuttgart /
+Esslingen / München / ausgeschaltet, zwei Konten; räumt alles weg). 46/46 hell
+und dunkel am 01.10.2026; `NUR_LOGIK=1` prüft nur lib/plz.ts gegen die echte
+Tabelle (11 Zeilen, ohne Server). Bilder in `../abnahme-gym-suche/`. Die
+Zahlen der Seite werden gegen die Antwort der Route gerechnet — stehen echte
+Gyms in der Suche, zählt die Messung sie mit.
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:

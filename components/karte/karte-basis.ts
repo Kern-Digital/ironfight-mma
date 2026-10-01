@@ -51,6 +51,23 @@ export function ladeMapLibre(): Promise<MapLibre> {
   return geladen;
 }
 
+/**
+ * Ortsnamen auf Deutsch. Die Stile von OpenFreeMap nehmen `name_en`
+ * („Munich", „Cologne"); die Kacheln tragen aber auch `name:de`. Jede
+ * Beschriftung, die `name_en` liest, bekommt den deutschen Namen, sonst den
+ * örtlichen. Straßenschilder (`ref`) bleiben, wie sie sind.
+ *
+ * Läuft bei JEDEM `style.load` — ein Themenwechsel lädt den Stil neu.
+ */
+export function deutscheNamen(karte: import("maplibre-gl").Map): void {
+  for (const ebene of karte.getStyle().layers ?? []) {
+    if (ebene.type !== "symbol") continue;
+    const feld = ebene.layout?.["text-field"];
+    if (!feld || !JSON.stringify(feld).includes("name_en")) continue;
+    karte.setLayoutProperty(ebene.id, "text-field", ["coalesce", ["get", "name:de"], ["get", "name"]]);
+  }
+}
+
 /** Das Pin-Element: ein Tropfen in der Akzentfarbe, Spitze unten. */
 export function pinElement(opts: { ziehbar?: boolean; label?: string } = {}): HTMLDivElement {
   const el = document.createElement("div");

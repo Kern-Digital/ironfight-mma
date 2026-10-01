@@ -20,6 +20,7 @@ import {
   DEUTSCHLAND,
   KARTEN_SPRACHE,
   KARTEN_STIL,
+  deutscheNamen,
   ladeMapLibre,
   pinElement,
   type MapLibre,
@@ -73,6 +74,7 @@ export default function PinKarte({ lat, lng, onPin, className = "h-72" }: Props)
           gemeldet.current = `${e.lngLat.lat},${e.lngLat.lng}`;
           onPinRef.current(e.lngLat.lat, e.lngLat.lng);
         });
+        m.on("style.load", () => deutscheNamen(m));
         m.on("error", () => {
           /* einzelne Kachel fehlt — die Karte bleibt benutzbar */
         });

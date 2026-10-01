@@ -213,7 +213,7 @@ try {
       await page.goto(`${BASE}/gym-finden`, { waitUntil: "domcontentloaded" });
       await geladen(page);
       const tg = await text(page);
-      pruefe("/gym-finden erreichbar", tg.includes("Dein Gym auf Tidal Athletics") && /code eingeben/i.test(tg));
+      pruefe("/gym-finden erreichbar", /Dein Gym auf Tidal Athletics/i.test(tg) && /code eingeben/i.test(tg));
       await page.screenshot({ path: `${OUT}/gym-finden-${THEME}.png` });
       pruefe("Konsole ohne Fehler (ohne Gym)", konsole.filter((k) => !/403|permission/i.test(k)).length === 0, konsole.slice(0, 3).join(" | "));
       await ctx.close();
