@@ -45,7 +45,7 @@ import {
   userGymId,
   verifyUser,
 } from "@/lib/server/verify-user";
-import { DEFAULT_GYM_ID } from "@/lib/gym";
+import { KEIN_GYM } from "@/lib/gym";
 import {
   claimsWithRights,
   readRoleSet,
@@ -178,9 +178,12 @@ export async function POST(req: Request) {
     // entscheidet, was GESCHRIEBEN wird — sie braucht die tatsaechlich
     // gesetzten Haekchen, nicht die abgeleiteten.
     const targetRights = readRoleSet(targetClaims);
+    // Ziel ohne Claim gehoert zu KEINEM Gym (30.09.2026, kein Rueckfall mehr):
+    // Die Verwaltung des Default-Gyms konnte sonst an Konten, die nie
+    // beigetreten waren.
     const targetGymId =
       (typeof targetClaims.gymId === "string" && targetClaims.gymId.trim()) ||
-      DEFAULT_GYM_ID;
+      KEIN_GYM;
 
     // Fremdes Gym: Die Verwaltung entscheidet über IHR Gym. Der
     // Plattform-Admin darf gym-übergreifend handeln (Konzept §1); er wirkt

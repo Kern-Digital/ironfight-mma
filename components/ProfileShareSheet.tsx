@@ -285,6 +285,9 @@ function ShareSheetInhalt({
                 anklickt, meint auch den Trainer, der nächsten Monat anfängt.
                 Deshalb ist es ein eigener Eintrag über den Personen und keine
                 Momentaufnahme der heutigen Liste. */}
+            {/* Ohne Gym gibt es keine „alle Trainer" — die Karte bleibt weg
+                (Leon 30.09.2026), der Satz unten sagt den Weg ins Gym. */}
+            {status !== "ohne-gym" && (
             <div className="t-card flex flex-col gap-3 p-3.5">
               <div className="flex items-center gap-3">
                 <span
@@ -329,6 +332,7 @@ function ShareSheetInhalt({
                 ))}
               </div>
             </div>
+            )}
 
             {kollegen.length === 0 ? (
               <p

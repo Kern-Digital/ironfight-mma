@@ -8,6 +8,7 @@ import { SheetShell } from "@/components/motion";
 import AppSuche from "@/components/shell/AppSuche";
 import XKnopf from "@/components/ui/XKnopf";
 import { useTheme } from "@/lib/theme-context";
+import { useOhneGym } from "@/lib/auth-context";
 
 /** Beschriftung eines Platzes — dieselbe für Links und Knöpfe der Leiste. */
 const TAB_LABEL: React.CSSProperties = {
@@ -24,9 +25,22 @@ const TAB_LABEL: React.CSSProperties = {
  * jede umgebaute Seite sie selbst.
  */
 
-const TABS: { href: string; icon: IconName; label: string; activePrefix?: string }[] = [
+type Tab = { href: string; icon: IconName; label: string; activePrefix?: string };
+
+const TABS: Tab[] = [
   { href: "/dashboard", icon: "dumbbell", label: "Training" },
   { href: "/schedule", icon: "calendar", label: "Kursplan" },
+  { href: "/kampfprofil", icon: "trophy", label: "Kampfprofil" },
+  { href: "/profile", icon: "user", label: "Profil" },
+];
+
+/**
+ * OHNE GYM (Leon 30.09.2026): Training und Kursplan gibt es nicht — an ihre
+ * Stelle tritt der Weg ins Gym. Dieselben drei Ziele, die `OhneGymGate`
+ * durchlässt; alles andere zeigte ohnehin nur den Hinweis.
+ */
+const TABS_OHNE_GYM: Tab[] = [
+  { href: "/gym-finden", icon: "search", label: "Gym finden" },
   { href: "/kampfprofil", icon: "trophy", label: "Kampfprofil" },
   { href: "/profile", icon: "user", label: "Profil" },
 ];
@@ -52,6 +66,9 @@ export default function AthleteTabBar({
   // steht der Platz nur ohne `onOpenMenu`.
   const [sucheOffen, setSucheOffen] = useState(false);
   useEffect(() => setSucheOffen(false), [pathname]);
+  // Ohne Gym: andere Plätze, keine App-Suche (sie durchsucht Gym-Inhalte).
+  const ohneGym = useOhneGym();
+  const tabs = ohneGym ? TABS_OHNE_GYM : TABS;
 
   return (
     <nav
@@ -60,7 +77,7 @@ export default function AthleteTabBar({
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
     >
       <div className="t-glass mx-auto flex w-full max-w-2xl">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           // „Training" deckt Dashboard, alle Workout-Routen, den Timer und
           // die Technikbibliothek (/techniques + /library, Einstieg über den
           // Dashboard-Schnell-Start) ab — so bleibt die Orientierung auch
@@ -101,7 +118,7 @@ export default function AthleteTabBar({
             </Link>
           );
         })}
-        {!onOpenMenu && (
+        {!onOpenMenu && !ohneGym && (
           <button
             type="button"
             onClick={() => setSucheOffen(true)}

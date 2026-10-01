@@ -23,7 +23,7 @@
  */
 
 import type { Firestore } from "firebase-admin/firestore";
-import { DEFAULT_GYM_ID } from "@/lib/gym";
+import { KEIN_GYM } from "@/lib/gym";
 import { darfSehen, readShares, type ProfileShares, type ShareArea } from "@/lib/profile-sharing";
 import { isAdmin, isTrainerOrAdmin, userGymId, type VerifiedUser } from "./verify-user";
 
@@ -44,7 +44,10 @@ export async function readMember(
   const d = snap.data() ?? {};
   const shares = readShares(d as Record<string, unknown>);
   return {
-    gymId: typeof d.gymId === "string" && d.gymId.trim() ? d.gymId : DEFAULT_GYM_ID,
+    // Ohne gymId gehoert das Ziel zu KEINEM Gym (30.09.2026) — vorher fiel es
+    // aufs Default-Gym, und dessen Trainer kamen an ein Konto, das nie
+    // beigetreten war.
+    gymId: typeof d.gymId === "string" && d.gymId.trim() ? d.gymId : KEIN_GYM,
     displayName:
       typeof d.displayName === "string" && d.displayName.trim()
         ? d.displayName

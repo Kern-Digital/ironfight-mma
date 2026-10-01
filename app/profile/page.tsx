@@ -16,7 +16,7 @@ import AthleteTabBar from "@/components/AthleteTabBar";
 import AchievementsPanel from "@/components/AchievementsPanel";
 import Icon from "@/components/ui/Icon";
 import Skeleton from "@/components/ui/Skeleton";
-import { useAuth, useFighterName, useHasStaffShell } from "@/lib/auth-context";
+import { useAuth, useFighterName, useHasStaffShell, useOhneGym } from "@/lib/auth-context";
 import { PROFILBILDER, profilbildSrc, type ProfilbildId } from "@/lib/profilbilder";
 import { useTheme } from "@/lib/theme-context";
 import { useTimerSettings } from "@/lib/use-timer-settings";
@@ -515,6 +515,7 @@ function ProfileContent() {
   // Menü und Bottom-Bar selbst mit, der Hell/Dunkel-Umschalter sitzt in ihrer
   // Fußgruppe. Diese Seite lässt ihre eigenen Entsprechungen dann weg.
   const hasStaffShell = useHasStaffShell();
+  const ohneGym = useOhneGym();
 
   const greeting = greetingFor(profile?.displayName);
 
@@ -644,8 +645,8 @@ function ProfileContent() {
               </div>
             </section>
 
-            {/* Kurs-Abos */}
-            {user && (
+            {/* Kurs-Abos — ohne Gym gibt es keine Kurse (Leon 30.09.2026) */}
+            {user && !ohneGym && (
               <section className="flex flex-col gap-3">
                 <SectionHeader
                   title="Meine Kurse"

@@ -178,7 +178,7 @@ function upcomingBlocks(kurse: TrainingBlock[], count: number): { block: Trainin
 // ─── Schüler-Dashboard — Referenzseite des Redesigns (DESIGN-BRIEF §4.2) ─────
 
 function DashboardContent() {
-  const { user, profile, profileLoading } = useAuth();
+  const { user, profile } = useAuth();
   // Verwaltungsrecht OHNE Trainer-Haekchen: Diese Seite ist fuer sie der
   // einzige Einstieg, denn die Top-Navigation ist hier ausgeblendet
   // (AthleteChromeGate). Trainer/Admin landen gar nicht in diesem Dashboard.
@@ -189,11 +189,10 @@ function DashboardContent() {
   // sonst stehen zwei Leisten übereinander. Für den Trainer stellt sich die
   // Frage nicht: der landet in TrainerDashboardContent.
   const hasStaffShell = useHasStaffShell();
-  // Kein Gym: entweder von der Verwaltung entfernt (/api/members/remove setzt
-  // den gymId-Claim auf null) oder ohne Einladung registriert (die Regeln
-  // verbieten dem Client, sich selbst ein Gym zu setzen). Beides sah bisher
-  // aus wie „drin, aber nichts los" — dabei fehlt schlicht die Zugehörigkeit.
-  const hasNoGym = !profile?.gymId && !profileLoading;
+  // Kein Gym: Seit dem 30.09.2026 kommt so ein Konto gar nicht bis hierher —
+  // OhneGymGate (components/shell) zeigt statt jeder Gym-Seite den Hinweis
+  // mit dem Weg in ein Gym. Die frühere Karte „Du gehörst gerade zu keinem
+  // Gym" auf dieser Seite ist damit weg.
   const { theme, toggleTheme } = useTheme();
   // Seed einmal pro Seitenaufruf würfeln — der Spruch bleibt bei Re-Renders
   // stabil, wechselt aber von Besuch zu Besuch.
@@ -422,55 +421,6 @@ function DashboardContent() {
       </section>
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pt-1 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-6 lg:px-6">
-        {hasNoGym && (
-          <section className="flex flex-col gap-2 lg:col-span-2">
-            <span className="t-label">Dein Gym</span>
-            <div className="t-card flex items-start gap-3.5 p-4">
-              <span
-                aria-hidden
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                style={{
-                  background: "var(--accent-subtle)",
-                  color: "var(--accent-text)",
-                }}
-              >
-                <Icon name="users" size={18} strokeWidth={2} />
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <span
-                  style={{
-                    font: "var(--type-body-strong)",
-                    color: "var(--text-body)",
-                  }}
-                >
-                  Du gehörst gerade zu keinem Gym
-                </span>
-                <span style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>
-                  Deine Workouts, dein Verlauf und dein Kampfprofil bleiben dir
-                  erhalten — Kursplan und Trainer-Inhalte kommen erst wieder
-                  dazu, wenn du einem Gym beitrittst. Dafür brauchst du einen
-                  Einladungscode.
-                </span>
-                <Link data-press
-                  href="/beitreten"
-                  className="t-interactive inline-flex min-h-hit items-center gap-2 self-start rounded-field px-4"
-                  style={{
-                    font: "600 13px/1 var(--font-archivo), system-ui, sans-serif",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    background: "var(--accent)",
-                    color: "var(--on-accent)",
-                    boxShadow: "var(--accent-glow)",
-                    textDecoration: "none",
-                  }}
-                >
-                  Code eingeben
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* Einstieg in die Gym-Verwaltung — nur fuer eine REINE Verwaltung
             (Verwaltungsrecht ohne Trainer-Haekchen). Trainer und Admins
             erreichen den Bereich ueber die Top-Navigation; sie sehen dieses

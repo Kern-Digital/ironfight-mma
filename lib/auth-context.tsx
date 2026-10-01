@@ -33,6 +33,7 @@ import {
   markTrainerOnboarded as markProfileTrainerOnboarded,
 } from "./user-profile";
 import { hasAnyRight, NO_RIGHTS, rightsFromClaims, type RoleSet } from "./roles";
+import { KEIN_GYM, resolveGymId } from "./gym";
 import type { ProfilbildId } from "./profilbilder";
 import type { UserProfile } from "./types";
 
@@ -366,4 +367,25 @@ export function useRights(): RoleSet {
  */
 export function useHasStaffShell(): boolean {
   return hasAnyRight(useRights());
+}
+
+/**
+ * Gehört dieses Konto zu KEINEM Gym (Leon 30.09.2026)?
+ *
+ * Wahr für die Selbstanmeldung ohne Einladung und für ein entferntes
+ * Mitglied — nie für Stab-Konten (ein Admin ist ein Ghost-Konto mit eigener
+ * Hülle, Trainer und Verwaltung tragen immer ein Gym). Solange das Profil
+ * lädt, ist die Antwort FALSCH: Die Sperre darf nicht kurz aufblitzen,
+ * während der Claim noch gelesen wird — dieselbe Richtung wie bei den
+ * Rechten, nur umgekehrt: Der Inhalt bleibt, bis die Antwort feststeht.
+ *
+ * Was ein Konto ohne Gym sieht, entscheidet `OhneGymGate`
+ * (components/shell/OhneGymGate.tsx): nur Profil, Kampfprofil und die
+ * Gym-Suche.
+ */
+export function useOhneGym(): boolean {
+  const { user, profile, profileLoading } = useAuth();
+  if (!user || profileLoading || !profile) return false;
+  if (hasAnyRight(profile.rights)) return false;
+  return resolveGymId(profile) === KEIN_GYM;
 }

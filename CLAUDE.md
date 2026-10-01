@@ -857,12 +857,77 @@ Kollegenliste der Trainer filtert über den Spiegel am Dokument
 nachhinkendem Spiegel oder ein gesperrtes Konto steht dort. Ohne Namen zeigt
 sie die E-Mail (`memberName`); Trainer dürfen die E-Mail ohnehin lesen.
 
-**Offen (bewusst nicht in diesem Schritt):** Der Default-Gym-Rückfall in
-`userGymId()` (Server wie Regeln) lässt ein Konto OHNE gymId-Claim lesen, was
-Mitglieder von Tidal Athletics lesen (z. B. den aktiven Wochenplan). Umgekehrt
-sehen die Trainer es nicht: `sameGym(d)` vergleicht `d.gymId`, und das fehlt
-an seinem Dokument. Bestandsverhalten, eine eigene Entscheidung (Leon
-vorlegen) — diese Route folgt dem Rückfall ausdrücklich NICHT.
+~~**Offen:** Der Default-Gym-Rückfall …~~ **ERLEDIGT 30.09.2026 abends**: Der
+Rückfall ist überall weg, siehe „KONTEN OHNE GYM" direkt unten.
+
+### KONTEN OHNE GYM (30.09.2026, Etappe 1 der Gym-Suche; Leon: „konten ohne gym [sehen] nur ihr profil + ihr bis dato gemachtes kampfprofil. kursplan etc. sehen sie nicht")
+**Der Rückfall aufs Default-Gym ist WEG** — an allen drei Stellen, die
+Zugehörigkeit entscheiden, und sie müssen gleich bleiben:
+- `firestore.rules` `userGymId()`: Claim nur, wenn `gymId` ein nicht-leerer
+  String ist, sonst `"__kein-gym__"`. Fängt auch den `gymId: null`-Claim aus
+  `/api/members/remove` (vorher: `"gymId" in token` war mit null wahr, Server
+  und Client sahen aber „kein Claim" → Default-Gym; die drei Stellen liefen
+  auseinander). **Deployt 30.09.2026 abends** (Leon: „ja deploy").
+- `lib/server/verify-user.ts` `userGymId()`: ohne Claim `KEIN_GYM`.
+- `lib/gym.ts` `resolveGymId()`: ohne Claim `KEIN_GYM` (vorher nur für Admins).
+- Dazu die Ziel-Seite: `lib/server/member-access.ts` `readMember` und
+  `/api/members/{role,remove}` schieben ein Ziel ohne gymId nicht mehr ins
+  Default-Gym (`KEIN_GYM`) — die Verwaltung von Tidal Athletics konnte sonst
+  die Rechte eines Kontos ändern, das nie beigetreten war (gemessen: jetzt 403).
+- `belongsToGym()` (Datensätze ohne gymId = Default-Gym) bleibt: Das ist ein
+  Rückfall für ALTE DATENSÄTZE, keine Mitgliedschaft.
+
+**Wen es trifft:** Selbstanmeldung ohne Einladung (kein Claim), entferntes
+Mitglied (Claim null). Produktion 30.09.: genau ein solches Konto; alle
+echten Mitglieder tragen ihr Gym im Claim. Ein Admin war schon vorher
+`KEIN_GYM`. Vor dem Deploy las so ein Konto Leons Gym-Dokument und den aktiven
+Wochenplan (gemessen 200), seit dem Deploy 403.
+
+**Was ein Konto ohne Gym sieht — die Oberfläche:**
+- `useOhneGym()` (lib/auth-context.tsx): angemeldet, Profil geladen, KEIN
+  Recht, `resolveGymId === KEIN_GYM`. Während des Ladens FALSCH (die Sperre
+  darf nicht aufblitzen).
+- `components/shell/OhneGymGate.tsx`: sitzt in der Athleten-Hülle
+  (`AppShell`), nicht in den Seiten — keine Seite kann die Sperre vergessen.
+  Erlaubt: `/profile`, `/kampfprofil`, `/gym-finden`. Alles andere zeigt
+  `OhneGymHinweis` („Du gehörst gerade keinem Gym an." · „Gym finden" →
+  /gym-finden · „Einladungscode eingeben" → /beitreten · „Gym anmelden").
+  Ohne Gym gibt es keine Navbar, keinen Footer, keinen Gesperrt-Streifen.
+- `AthleteTabBar`: ohne Gym die Plätze Gym finden / Kampfprofil / Profil,
+  keine App-Suche (sie durchsucht Gym-Inhalte).
+- `/profile` ohne „Meine Kurse"; `ProfileShareSheet` ohne die Karte „Alle
+  Trainer deines Gyms" (Status `ohne-gym` aus der Trainer-Auswahl).
+- Die Dashboard-Karte „Du gehörst gerade zu keinem Gym" ist weg — die Seite
+  wird ohne Gym gar nicht mehr erreicht.
+- `/gym-finden` ist in Etappe 1 ein GRUNDGERÜST (Kopf, Einladungscode, Gym
+  anmelden) und steht in `ATHLETE_SHELL_ROUTES`. Die Liste aller Tidal-Gyms
+  mit PLZ/Ort-Suche, Standort-Freigabe, Radius und Karte ist Etappe 3.
+- Alte Workouts und der Verlauf bleiben gespeichert und erscheinen nach einem
+  Beitritt wieder (Leons Vorgabe geht vor dem früheren Text „Deine Workouts …
+  bleiben dir erhalten").
+
+**Messung:** `scripts/mess-ohne-gym.mjs` (Prüf-Gym mit aktivem Wochenplan,
+Konten fremd/entfernt/Mitglied/Verwaltung; liest Leons Gym nur als Beweis;
+räumt alles weg). Vor dem Rules-Deploy 28/30 (die zwei Regel-Zeilen zeigten
+das Loch), nach dem Deploy 17/17 im API-Teil (`NUR_API=1`); der Browser-Teil
+war vor dem Deploy grün (hell + dunkel). Fallen: Knöpfe und Leiste stehen in
+VERSALIEN (CSS) — Prüfsätze mit `/…/i`; der Hinweis nennt selbst das Wort
+„Kursplan".
+
+**Der Plan dahinter (Leon 30.09., Antworten auf drei Fragen):** Gym-Suche nur
+mit Tidal-Gyms (Google Places irgendwann → Roadmap) · Beitritt NICHT direkt:
+Kontaktdaten des Gyms (eigener Bereich in der Verwaltung) + Knopf
+„Probetraining vereinbaren / Anfrage stellen" · Gym erscheint, wenn die
+Verwaltung es freischaltet, Schalter standardmäßig AN, greift erst mit
+eingetragener Adresse (Datenschutz: Eintragen im klar als öffentlich
+beschrifteten Bereich; Satz für AGB/Datenschutzerklärung nötig). Etappen:
+1 ohne Gym = ohne Gym-Inhalte (ERLEDIGT) · 2 Kontakt & Standort in der
+Verwaltung (Adresse, Telefon, E-Mail, Website, Pin auf der Karte, Schalter) ·
+3 /gym-finden mit Liste + Karte (MapLibre + OpenFreeMap, kein Schlüssel),
+PLZ/Ort über eingebaute PLZ-Tabelle (keine externe Anfrage),
+Standort-Freigabe nur im Browser, Radius · 4 Anfrage „Probetraining
+vereinbaren" (gyms/{gymId}/anfragen, eine offene je Konto und Gym,
+Löschfrist, Verwaltung sieht Zahl auf der Mitglieder-Seite; kein Mailweg).
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
@@ -949,6 +1014,8 @@ Stilllegen (20.09.) „lesen ja ändern nein".
   Konto anlegt, landet in Leons Gym. `/api/gyms/anmelden` nimmt genau diese
   Konten und zieht sie in ihr eigenes Gym. **„Kein Claim“ ist NICHT „kein
   Gym“**; wer Guthaben oder Rechnungen je Gym rechnet, muss das wissen.
+  **AUFGEHOBEN 30.09.2026:** Seit „KONTEN OHNE GYM" ist kein Claim = KEIN Gym,
+  an allen drei Stellen; `/api/gyms/anmelden` prüft weiter nur den rohen Claim.
 - **Falle 43:** `VerifiedUser.stored` IST schon ein `RoleSet` —
   `readRoleSet(user.stored)` scheitert am Typ (`ClaimLike` verlangt eine
   Index-Signatur). Einfach spreaden.

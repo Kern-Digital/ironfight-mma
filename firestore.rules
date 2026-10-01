@@ -39,10 +39,19 @@ service cloud.firestore {
     // haengt seither allein an isAdmin() — dem Betreiber-Zugriff, der in die
     // Datenschutzhinweise gehoert, nicht an einer Gym-Mitgliedschaft.
     // Dieselbe Zeichenkette steht als KEIN_GYM in lib/gym.ts.
+    // KEIN RUECKFALL MEHR (Leon 30.09.2026: „konten ohne gym [sehen] nur ihr
+    // profil + ihr bis dato gemachtes kampfprofil. kursplan etc. sehen sie
+    // nicht"): Wer keinen gymId-Claim traegt — Selbstanmeldung ohne
+    // Einladung, entferntes Mitglied (Claim null) — gehoert zu KEINEM Gym.
+    // Bis dahin galt so ein Konto stillschweigend als Mitglied von
+    // tidal-athletics und las dessen Kursplan (Falle 44). `is string` faengt
+    // den null-Claim aus /api/members/remove mit ab. Dieselbe Regel steht in
+    // lib/server/verify-user.ts (userGymId) und lib/gym.ts (resolveGymId).
     function userGymId() {
-      return ("gymId" in request.auth.token)
+      return ("gymId" in request.auth.token && request.auth.token.gymId is string
+              && request.auth.token.gymId != "")
              ? request.auth.token.gymId
-             : (isAdmin() ? "__kein-gym__" : "tidal-athletics");
+             : "__kein-gym__";
     }
     // Gym-Verwaltungsrecht — gesetzt ausschliesslich von /api/members/role.
     // BEWUSST kein Wert von `role` (und heute eines von drei Haekchen):

@@ -31,8 +31,9 @@ import AthleteChromeGate from "@/components/AthleteChromeGate";
 import GymGesperrtStreifen from "@/components/shell/GymGesperrtStreifen";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import OhneGymGate from "@/components/shell/OhneGymGate";
 import StaffShell from "@/components/shell/StaffShell";
-import { useAuth, useHasStaffShell } from "@/lib/auth-context";
+import { useAuth, useHasStaffShell, useOhneGym } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
 
 /**
@@ -57,6 +58,7 @@ const OHNE_HUELLE = ["/login", "/register", "/beitreten", "/forgot-password", "/
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, profileLoading } = useAuth();
   const staffShell = useHasStaffShell();
+  const ohneGym = useOhneGym();
   const pathname = usePathname();
 
   const nackt = OHNE_HUELLE.some(
@@ -68,6 +70,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (undecided) return <main className="flex-1">{children}</main>;
 
   if (staffShell) return <StaffShell>{children}</StaffShell>;
+
+  // OHNE GYM (Leon 30.09.2026): keine Navbar, kein Footer, kein Streifen —
+  // nur der Inhalt hinter der Sperre. Die erlaubten Seiten bringen ihre
+  // Leiste selbst mit, der Hinweis ebenso.
+  if (ohneGym) {
+    return (
+      <main className="flex-1">
+        <OhneGymGate>{children}</OhneGymGate>
+      </main>
+    );
+  }
 
   return (
     <>

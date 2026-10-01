@@ -13,7 +13,7 @@
  * KI-Routen aufrufen.
  */
 
-import { DEFAULT_GYM_ID, KEIN_GYM } from "@/lib/gym";
+import { KEIN_GYM } from "@/lib/gym";
 import { readRoleSet, effectiveRights, type RoleSet } from "@/lib/roles";
 
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -107,7 +107,11 @@ export function isAdmin(user: VerifiedUser | null): boolean {
 export function userGymId(user: VerifiedUser): string {
   const claim = user.gymId?.trim();
   if (claim) return claim;
-  return user.rights.admin ? KEIN_GYM : DEFAULT_GYM_ID;
+  // KEIN RUECKFALL MEHR (Leon 30.09.2026): Ohne Claim gehoert das Konto zu
+  // keinem Gym — Selbstanmeldung ohne Einladung, entferntes Mitglied. Bis
+  // dahin fiel es aufs Default-Gym und las dessen Kursplan. Identisch zu
+  // userGymId() in firestore.rules und resolveGymId in lib/gym.ts.
+  return KEIN_GYM;
 }
 
 /**

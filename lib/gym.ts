@@ -100,7 +100,11 @@ export function slugifyGym(name: string): string {
 export function resolveGymId(profile: UserProfile | null | undefined): string {
   const claim = profile?.gymId?.trim();
   if (claim) return claim;
-  return profile?.rights?.admin ? KEIN_GYM : DEFAULT_GYM_ID;
+  // KEIN RUECKFALL MEHR (Leon 30.09.2026): Ohne gymId gehört das Konto zu
+  // keinem Gym — nicht nur der Admin. Identisch zu userGymId() in
+  // firestore.rules und lib/server/verify-user.ts. Was ein Konto ohne Gym
+  // sieht, entscheidet OhneGymGate (components/shell/OhneGymGate.tsx).
+  return KEIN_GYM;
 }
 
 /**
