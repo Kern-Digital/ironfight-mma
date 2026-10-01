@@ -26,10 +26,15 @@
  * Erst eine Mitte (PLZ, Ort, Standort) bringt den Umkreis-Regler und sortiert
  * nach Entfernung. „Alle anzeigen" nimmt die Mitte wieder weg.
  *
+ * ETAPPE 4: Je Gym der Knopf „Probetraining vereinbaren" (AnfrageSheet,
+ * lib/gym-anfrage.ts). Wer schon angefragt hat, sieht statt des Knopfs das
+ * Datum — die Route gibt die EIGENEN offenen Anfragen mit.
+ *
  * Die Seite gehört zu den drei Seiten, die ein Konto ohne Gym sehen darf
  * (OhneGymGate); Mitglieder dürfen sie ebenfalls öffnen.
  */
 
+import AnfrageSheet, { type AnfrageZiel } from "@/components/AnfrageSheet";
 import AthleteTabBar from "@/components/AthleteTabBar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import GymKarte from "@/components/karte/GymKarte";
@@ -37,6 +42,7 @@ import GooeySearch from "@/components/ui/GooeySearch";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { useAuth, useHasStaffShell } from "@/lib/auth-context";
 import { resolveGymId } from "@/lib/gym";
+import { anfrageTag } from "@/lib/gym-anfrage";
 import { adressZeile, websiteKurz, type SuchGym } from "@/lib/gym-kontakt";
 import { UMKREIS_START, UMKREIS_STUFEN, kmText, ladeSuchGyms } from "@/lib/gym-suche";
 import {
@@ -94,6 +100,9 @@ function GymFindenContent() {
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [ortet, setOrtet] = useState(false);
   const [ortHinweis, setOrtHinweis] = useState<string | null>(null);
+  // Etappe 4: bei welchen Gyms dieses Konto schon angefragt hat (Gym → Datum).
+  const [angefragt, setAngefragt] = useState<Record<string, string | null>>({});
+  const [anfrageZiel, setAnfrageZiel] = useState<AnfrageZiel | null>(null);
   const liste = useRef<HTMLUListElement>(null);
   const radiusKm = UMKREIS_STUFEN[stufe];
 
@@ -101,8 +110,9 @@ function GymFindenContent() {
     if (!user) return;
     setStand("laedt");
     ladeSuchGyms(user)
-      .then((l) => {
-        setGyms(l);
+      .then((e) => {
+        setGyms(e.gyms);
+        setAngefragt(Object.fromEntries(e.angefragt.map((a) => [a.gymId, a.am])));
         setStand("ok");
       })
       .catch(() => setStand("fehler"));
@@ -456,6 +466,39 @@ function GymFindenContent() {
                           )}
                         </div>
                       )}
+
+                      {/* Probetraining: der Weg ins Gym ohne Einladung (Leon
+                          30.09.). Am eigenen Gym gibt es nichts anzufragen. */}
+                      {gym.id !== eigenesGym &&
+                        (gym.id in angefragt ? (
+                          <p
+                            data-gym-angefragt
+                            className="mt-2 flex items-start gap-2"
+                            style={{ font: "var(--type-sub)", color: "var(--text-2)" }}
+                          >
+                            <Icon name="check" size={16} strokeWidth={2.2} className="mt-0.5 shrink-0" />
+                            <span>
+                              Angefragt{angefragt[gym.id] ? ` am ${anfrageTag(angefragt[gym.id])}` : ""}. Das Gym
+                              meldet sich per E-Mail bei dir.
+                            </span>
+                          </p>
+                        ) : (
+                          <button
+                            type="button"
+                            data-press
+                            data-gym-anfragen
+                            onClick={() => setAnfrageZiel({ gymId: gym.id, gymName: gym.name })}
+                            className="t-interactive mt-2 inline-flex min-h-hit items-center gap-2 self-start rounded-field px-4"
+                            style={{
+                              ...BTN_FONT,
+                              background: "var(--accent)",
+                              color: "var(--on-accent)",
+                              boxShadow: "var(--accent-glow)",
+                            }}
+                          >
+                            Probetraining vereinbaren
+                          </button>
+                        ))}
                     </article>
                   </li>
                 );
@@ -524,6 +567,12 @@ function GymFindenContent() {
         <p style={{ font: "var(--type-sub)", color: "var(--text-3)" }}>{PLZ_QUELLE_TEXT}</p>
       </div>
       {!hasStaffShell && <AthleteTabBar />}
+
+      <AnfrageSheet
+        ziel={anfrageZiel}
+        onGesendet={(a) => setAngefragt((alt) => ({ ...alt, [a.gymId]: a.am }))}
+        onClose={() => setAnfrageZiel(null)}
+      />
     </div>
   );
 }

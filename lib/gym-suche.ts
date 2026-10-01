@@ -8,15 +8,25 @@
 
 import type { User } from "firebase/auth";
 import type { SuchGym } from "./gym-kontakt";
+import type { MeineAnfrage } from "./gym-anfrage";
 
-export async function ladeSuchGyms(user: User): Promise<SuchGym[]> {
+export interface SuchErgebnis {
+  gyms: SuchGym[];
+  /** Bei welchen Gyms das eigene Konto eine offene Anfrage hat. */
+  angefragt: MeineAnfrage[];
+}
+
+export async function ladeSuchGyms(user: User): Promise<SuchErgebnis> {
   const res = await fetch("/api/gyms/suche", {
     method: "POST",
     headers: { authorization: `Bearer ${await user.getIdToken()}` },
   });
   if (!res.ok) throw new Error(`Gym-Suche: ${res.status}`);
-  const daten = (await res.json()) as { gyms?: SuchGym[] };
-  return Array.isArray(daten.gyms) ? daten.gyms : [];
+  const daten = (await res.json()) as Partial<SuchErgebnis>;
+  return {
+    gyms: Array.isArray(daten.gyms) ? daten.gyms : [],
+    angefragt: Array.isArray(daten.angefragt) ? daten.angefragt : [],
+  };
 }
 
 /** Die Stufen des Umkreis-Reglers in Kilometern. */

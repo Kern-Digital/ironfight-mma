@@ -1,7 +1,10 @@
 /**
  * POST /api/gyms/suche — die Gyms, die in der Gym-Suche stehen.
- * Antwort: { gyms: SuchGym[] } — je Gym genau
+ * Antwort: { gyms: SuchGym[], angefragt: MeineAnfrage[] } — je Gym genau
  * id, name, strasse, plz, ort, telefon, email, website, lat, lng.
+ * `angefragt` (seit Etappe 4): bei welchen dieser Gyms der AUFRUFER eine
+ * offene Anfrage „Probetraining vereinbaren" hat — nur seine eigenen, nur
+ * Gym und Datum. Die Gym-Liste selbst bleibt für alle dieselbe.
  *
  * WARUM ES DIESE ROUTE GIBT (Leon 30.09.2026): Ein Konto ohne Gym soll alle
  * Gyms sehen, die Tidal Athletics nutzen. Die Regeln lassen ein Gym-Dokument
@@ -28,6 +31,7 @@ import { NextResponse } from "next/server";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { bearerToken, verifyUser } from "@/lib/server/verify-user";
 import { decodeKontakt, inSucheSichtbar, type SuchGym } from "@/lib/gym-kontakt";
+import { meineAnfragen } from "@/lib/server/anfragen";
 
 export const runtime = "nodejs";
 
@@ -44,7 +48,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const snap = await adminDb()
+    const db = adminDb();
+    const snap = await db
       .collection("gyms")
       .where("kontakt.sichtbar", "==", true)
       .select("name", "kontakt")
@@ -70,7 +75,9 @@ export async function POST(req: Request) {
       });
     }
     gyms.sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" }));
-    return NextResponse.json({ gyms }, { headers: KEIN_CACHE });
+    // Scheitert der Blick auf die eigenen Anfragen, steht die Liste trotzdem.
+    const angefragt = await meineAnfragen(db, user.uid, gyms.map((g) => g.id)).catch(() => []);
+    return NextResponse.json({ gyms, angefragt }, { headers: KEIN_CACHE });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {
       return NextResponse.json(

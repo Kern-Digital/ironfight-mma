@@ -23,6 +23,7 @@
 import { NextResponse } from "next/server";
 import { AdminUnavailableError, adminDb } from "@/lib/server/firebase-admin";
 import { standAbgleichen } from "@/lib/server/wochenplan";
+import { abgelaufeneAnfragenLoeschen } from "@/lib/server/anfragen";
 import { tagSchluessel } from "@/lib/guthaben";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
     const gyms = await db.collection("gyms").listDocuments();
     const gewechselt: { gymId: string; planId: string }[] = [];
     const fehler: string[] = [];
+    let anfragenGeloescht = 0;
     for (const gym of gyms) {
       try {
         const { neuAktiv } = await standAbgleichen(db, gym.id, heute, "automatik");
@@ -52,8 +54,17 @@ export async function GET(req: Request) {
         console.error("[cron/wochenplan]", gym.id, err);
         fehler.push(gym.id);
       }
+      // ZWEITE AUFGABE DESSELBEN JOBS (01.10.2026): Anfragen „Probetraining
+      // vereinbaren", deren 90 Tage um sind, löschen (lib/gym-anfrage.ts).
+      // Eigener try: Ein Fehler hier darf den Planwechsel nicht als
+      // gescheitert melden. Abgelaufene zählen ohnehin schon nirgends mehr.
+      try {
+        anfragenGeloescht += await abgelaufeneAnfragenLoeschen(db, gym.id);
+      } catch (err) {
+        console.error("[cron/anfragen]", gym.id, err);
+      }
     }
-    return NextResponse.json({ ok: fehler.length === 0, heute, gyms: gyms.length, gewechselt, fehler });
+    return NextResponse.json({ ok: fehler.length === 0, heute, gyms: gyms.length, gewechselt, fehler, anfragenGeloescht });
   } catch (err) {
     if (err instanceof AdminUnavailableError) {
       return NextResponse.json({ error: "Server gerade nicht erreichbar." }, { status: 503 });

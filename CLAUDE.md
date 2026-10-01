@@ -930,7 +930,8 @@ PLZ/Ort über eingebaute PLZ-Tabelle (keine externe Anfrage),
 Standort-Freigabe nur im Browser, Radius (ERLEDIGT 01.10., Abschnitt
 „GYM-SUCHE — ETAPPE 3") · 4 Anfrage „Probetraining
 vereinbaren" (gyms/{gymId}/anfragen, eine offene je Konto und Gym,
-Löschfrist, Verwaltung sieht Zahl auf der Mitglieder-Seite; kein Mailweg).
+Löschfrist, Verwaltung sieht Zahl auf der Mitglieder-Seite; kein Mailweg;
+ERLEDIGT 01.10., Abschnitt „GYM-SUCHE — ETAPPE 4").
 
 ### GYM-SUCHE — ETAPPE 2: KONTAKT & STANDORT (01.10.2026)
 **Was die Verwaltung einträgt:** `/verwaltung/kontakt` (Menüpunkt „Kontakt &
@@ -1043,6 +1044,71 @@ und dunkel am 01.10.2026; `NUR_LOGIK=1` prüft nur lib/plz.ts gegen die echte
 Tabelle (11 Zeilen, ohne Server). Bilder in `../abnahme-gym-suche/`. Die
 Zahlen der Seite werden gegen die Antwort der Route gerechnet — stehen echte
 Gyms in der Suche, zählt die Messung sie mit.
+
+### GYM-SUCHE — ETAPPE 4: „PROBETRAINING VEREINBAREN" (01.10.2026)
+**Leons Vorgabe (30.09.):** KEIN Direktbeitritt. Kontaktdaten des Gyms plus
+Knopf „Probetraining vereinbaren / Anfrage stellen". Mitglied wird man weiter
+über die Einladung, die das Gym danach schickt.
+
+**Daten** (`lib/gym-anfrage.ts`, Server `lib/server/anfragen.ts`):
+`gyms/{gymId}/anfragen/{uid}` mit genau sechs Feldern — `uid, name, email,
+nachricht, erstelltAm, loeschenAm`. DIE DOKUMENT-ID IST DAS KONTO: höchstens
+eine offene Anfrage je Konto und Gym, ohne Abfrage und ohne Wettlauf. Für die
+Sammlung steht in den Regeln NICHTS — im Browser liest und schreibt niemand
+(gemessen: Absender und Verwaltung bekommen per REST 403). Kein Regel-Deploy.
+
+**Routen:**
+- `POST /api/gyms/anfrage` `{ gymId, name, nachricht? }` — jedes angemeldete
+  Konto. Die E-MAIL KOMMT AUS DEM KONTO (Firebase Auth), nie aus dem Body.
+  401 ohne Token · 400 Name unter 2/über 60, Nachricht über 600 · 404 Gym
+  steht nicht in der Suche (`inSucheSichtbar`) · 409 eigenes Gym oder schon
+  angefragt · 429 ab `ANFRAGE_MAX_OFFEN` (5) offenen Anfragen. Anlegen in
+  einer Transaktion; eine abgelaufene Anfrage wird überschrieben.
+- `POST /api/gyms/suche` gibt seither zusätzlich `angefragt: [{ gymId, am }]`
+  mit — nur die EIGENEN offenen Anfragen des Aufrufers (`meineAnfragen`: ein
+  Sammelabruf über die Gyms der Suche, ein Lesevorgang je Gym; ab ~200 Gyms
+  auf eine collectionGroup-Abfrage umstellen, die braucht einen Index).
+- `POST /api/gym/anfragen` — die Verwaltung liest die Anfragen ihres Gyms
+  (Trainer ohne Verwaltung, Athleten, Konten ohne Gym: 403).
+- `POST /api/gym/anfragen/erledigt` `{ uid }` — LÖSCHT die Anfrage. Der Pfad
+  hängt am eigenen Gym; die uid einer Anfrage an ein anderes Gym trifft
+  nichts (404). Danach kann dieselbe Person wieder anfragen.
+
+**Löschfrist 90 Tage** (`ANFRAGE_TAGE`, meine Festlegung — Leon hat nur
+„Löschfrist" bestätigt): `loeschenAm` = Eingang + 90 Tage. Abgelaufenes zählt
+sofort nirgends mehr (`istOffen`), der Abruf der Verwaltung löscht es
+nebenbei, und der Nacht-Job `/api/cron/wochenplan` ruft je Gym
+`abgelaufeneAnfragenLoeschen` (eigener try, Antwortfeld `anfragenGeloescht`).
+KEIN zweiter Cron-Eintrag in vercel.json.
+
+**Oberfläche:**
+- Athlet, `/gym-finden`: je Gym-Karte der Knopf „Probetraining vereinbaren"
+  → `components/AnfrageSheet.tsx` (Name vorbelegt, E-Mail des Kontos nur
+  gezeigt, Nachricht mit Zähler). Unter dem Formular steht VOR dem Senden:
+  „Das Gym sieht deinen Namen, deine E-Mail-Adresse und deine Nachricht. Es
+  meldet sich per E-Mail bei dir. Nach 90 Tagen löschen wir die Anfrage."
+  Danach statt des Knopfs „Angefragt am … Das Gym meldet sich per E-Mail bei
+  dir." Am eigenen Gym kein Knopf.
+- Verwaltung, `/verwaltung/mitglieder`: Abschnitt „Anfragen" (`#anfragen`)
+  GANZ OBEN mit der Zahl an der Überschrift — dasselbe Muster wie „Offene
+  Einladungen", dieselbe Zeile (`mitglied-zeile`). Nur, wenn es Anfragen
+  gibt. `components/AnfrageDetailSheet.tsx`: „E-Mail schreiben" ist ein
+  `mailto:` ins eigene Postfach (die App verschickt KEINE Mail), „Erledigt"
+  → „Ja, löschen".
+
+**Messung:** `scripts/mess-gym-anfrage.mjs` (mit
+`--import ./scripts/lib/ts-loader-register.mjs`; sieben Prüf-Gyms, fünf
+Konten; räumt alles weg). 59/59 hell und dunkel am 01.10.2026, `NUR_API=1`
+39/39. Bilder in `../abnahme-gym-suche/`.
+**Messfalle:** Die drei Gym-Suche-Messungen (kontakt, finden, anfrage) NIE
+gleichzeitig laufen lassen. Alle legen Prüf-Gyms an, die in derselben Suche
+stehen — `mess-gym-finden` zählt dann fremde Prüf-Gyms mit und fällt mit
+42/46 durch (so geschehen am 01.10., allein wieder 46/46).
+
+**Offen (Leon):** Satz in AGB/Datenschutzerklärung zu (1) öffentlichen
+Gym-Kontaktdaten, (2) Kacheln von OpenFreeMap, (3) Anfragen (Name, E-Mail,
+Nachricht gehen ans Gym, 90 Tage). · Andere Gyms über Google Places — steht
+in der Roadmap, nicht gebaut.
 
 ### Konto vs. Mitgliedschaft (Entscheidung 2026-09-01)
 Zwei verschiedene Verhältnisse, die nie vermischt werden dürfen:
@@ -2043,6 +2109,10 @@ gyms/{gymId}                      — Gym-Stammdaten (Multi-Gym; Mitglieder lese
                                     Feld `kontakt` = Kontakt & Standort für die
                                     Gym-Suche (nur /api/gym/kontakt schreibt, an
                                     Fremde gibt NUR /api/gyms/suche heraus)
+gyms/{gymId}/anfragen/{uid}       — „Probetraining vereinbaren" aus der Gym-Suche
+                                    (Dokument-ID = Konto; KEINE Regel = im Browser
+                                    zu; nur /api/gyms/anfrage und /api/gym/anfragen;
+                                    90 Tage, dann löscht der Nacht-Job)
 gyms/{gymId}/invites/{code}       — Einladungen (Code = Dokument-ID; write:false,
                                     nur /api/invites; Lesen nur die Verwaltung)
 gyms/{gymId}/auditLog/{id}        — Protokoll rechteverändernder Vorgänge UND Quelle

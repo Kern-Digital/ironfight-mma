@@ -7,6 +7,10 @@
  * Aufbau im Token-Look: Ambient-Kopf, `.t-card`-Zeilen im Raster der
  * Athletenliste, Kennzahlen und Einladen-Symbol rechts neben der Überschrift.
  *
+ * ANFRAGEN WOHNEN AUCH HIER (01.10.2026, Etappe 4 der Gym-Suche): Wer auf
+ * /gym-finden „Probetraining vereinbaren" schickt, steht oben im Abschnitt
+ * „Anfragen" mit der Zahl an der Überschrift (lib/gym-anfrage.ts).
+ *
  * EINLADUNGEN WOHNEN HIER (Leon 30.09.2026: „die menüleiste einladungen kann
  * auch weg … das ist ja jetzt unter mitglieder"). Über der Liste stehen die
  * OFFENEN Einladungen — kopieren direkt an der Zeile, Notiz und Zurückziehen
@@ -26,6 +30,7 @@
  * wer das Gym führt und wer Kurse gibt. Innerhalb der Gruppen alphabetisch.
  */
 
+import AnfrageDetailSheet from "@/components/AnfrageDetailSheet";
 import GooeySearch from "@/components/ui/GooeySearch";
 import InviteCreateSheet from "@/components/InviteCreateSheet";
 import InviteDetailSheet from "@/components/InviteDetailSheet";
@@ -37,7 +42,8 @@ import { CountingNumber, FlowItem, StaggerFlow } from "@/components/motion";
 import { listAllMembers, type StudentEntry } from "@/lib/admin";
 import { useAuth, useRights } from "@/lib/auth-context";
 import { copyText } from "@/lib/clipboard";
-import { resolveGymId } from "@/lib/gym";
+import { getGymName, resolveGymId } from "@/lib/gym";
+import { anfrageTag, ladeAnfragen, type GymAnfrage } from "@/lib/gym-anfrage";
 import {
   formatInviteCode,
   inviteJoinUrl,
@@ -116,6 +122,48 @@ export default function TrainerMembersPage() {
   // Code, dessen Link gerade kopiert wurde (Symbol wechselt kurz auf „check")
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copyError, setCopyError] = useState(false);
+
+  // Anfragen „Probetraining vereinbaren" aus der Gym-Suche (Etappe 4,
+  // 01.10.2026). Sie kommen über eine Route — die Sammlung ist im Browser zu.
+  const [anfragen, setAnfragen] = useState<GymAnfrage[]>([]);
+  const [anfragenError, setAnfragenError] = useState(false);
+  const [anfrageDetail, setAnfrageDetail] = useState<GymAnfrage | null>(null);
+  const [gymName, setGymName] = useState("");
+
+  const loadAnfragen = useCallback(() => {
+    if (!user || profileLoading || !isVerwaltung) return;
+    ladeAnfragen(user)
+      .then((list) => {
+        setAnfragen(list);
+        setAnfragenError(false);
+      })
+      .catch(() => {
+        setAnfragen([]);
+        setAnfragenError(true);
+      });
+  }, [user, profileLoading, isVerwaltung]);
+
+  useEffect(() => {
+    loadAnfragen();
+  }, [loadAnfragen]);
+
+  useEffect(() => {
+    if (!isVerwaltung) return;
+    let lebt = true;
+    getGymName(gymId)
+      .then((n) => lebt && setGymName(n))
+      .catch(() => {});
+    return () => {
+      lebt = false;
+    };
+  }, [isVerwaltung, gymId]);
+
+  // /verwaltung/mitglieder#anfragen: nachspringen, sobald der Abschnitt da ist.
+  const hatAnfragen = anfragen.length > 0;
+  useEffect(() => {
+    if (!hatAnfragen || window.location.hash !== "#anfragen") return;
+    document.getElementById("anfragen")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [hatAnfragen]);
 
   const loadInvites = useCallback(() => {
     if (!user || profileLoading || !isVerwaltung) return;
@@ -370,6 +418,48 @@ export default function TrainerMembersPage() {
               </p>
             )}
 
+            {anfragenError && (
+              <p style={{ font: "var(--type-sub)", color: "var(--negative)" }}>
+                Die Anfragen konnten nicht geladen werden.
+              </p>
+            )}
+
+            {/* Anfragen aus der Gym-Suche — ganz oben, weil dort jemand auf
+                Antwort wartet. Nur, wenn es welche gibt; die Zahl steht an
+                der Überschrift wie bei den Einladungen. */}
+            {hatAnfragen && (
+              <section
+                id="anfragen"
+                aria-labelledby="anfragen-titel"
+                className="flex scroll-mt-24 flex-col gap-3"
+              >
+                <div className="flex items-baseline gap-2.5">
+                  <h2 id="anfragen-titel" className="t-rubrik">
+                    Anfragen
+                  </h2>
+                  <span
+                    data-anfragen-zahl
+                    style={{ font: "var(--type-rubrik)", color: "var(--text-3)" }}
+                  >
+                    {anfragen.length}
+                  </span>
+                </div>
+                <SpaltenListe spalten={spalten} anzahl={anfragen.length}>
+                  {(zeilen) =>
+                    anfragen.map((a, i) => (
+                      <FlowItem key={a.uid} index={i} className="mitglied-item min-w-0">
+                        <AnfrageZeile
+                          anfrage={a}
+                          erste={i % zeilen === 0}
+                          onOpen={() => setAnfrageDetail(a)}
+                        />
+                      </FlowItem>
+                    ))
+                  }
+                </SpaltenListe>
+              </section>
+            )}
+
             {/* Offene Einladungen — nur, wenn es welche gibt. Ohne offene
                 bleibt der Knopf oben der Weg; ein leerer Abschnitt stünde
                 nur zwischen Kopf und Liste. */}
@@ -517,6 +607,15 @@ export default function TrainerMembersPage() {
         onChanged={loadInvites}
         onClose={() => setInviteDetail(null)}
       />
+
+      {/* E-Mail schreiben oder erledigen. „Erledigt" löscht die Anfrage —
+          danach fällt sie aus dem Abschnitt. */}
+      <AnfrageDetailSheet
+        anfrage={anfrageDetail}
+        gymName={gymName}
+        onChanged={loadAnfragen}
+        onClose={() => setAnfrageDetail(null)}
+      />
     </main>
   );
 }
@@ -594,6 +693,56 @@ const BIS_FMT = new Intl.DateTimeFormat("de-DE", {
   day: "numeric",
   month: "long",
 });
+
+/**
+ * Eine Anfrage „Probetraining vereinbaren" — dieselbe Zeile wie Mitglied und
+ * Einladung. Name oben, darunter Eingang und der Anfang der Nachricht.
+ */
+function AnfrageZeile({
+  anfrage,
+  erste,
+  onOpen,
+}: {
+  anfrage: GymAnfrage;
+  /** Erste Zeile der Liste — ohne Linie darüber. */
+  erste: boolean;
+  onOpen: () => void;
+}) {
+  const tag = anfrageTag(anfrage.erstelltAm);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      data-press="surface"
+      data-erste={erste || undefined}
+      data-anfrage={anfrage.uid}
+      className="mitglied-zeile"
+    >
+      <span
+        aria-hidden
+        className="flex h-10 w-10 shrink-0 items-center justify-center"
+        style={{ color: "var(--accent-text)" }}
+      >
+        <Icon name="brief" size={24} strokeWidth={1.7} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span
+            className="truncate"
+            style={{ font: "var(--type-body-strong)", color: "var(--text-body)" }}
+          >
+            {anfrage.name}
+          </span>
+          <span className="mitglied-marke">Probetraining</span>
+        </span>
+        <span className="mitglied-zeile__unter truncate">
+          {tag}
+          {anfrage.nachricht ? ` · ${anfrage.nachricht.replace(/\s+/g, " ")}` : ""}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 /**
  * Eine offene Einladung — gebaut wie die Mitglieder-Zeile, damit beide
